@@ -94,32 +94,32 @@ module.exports = {
         {
             resolve: 'gatsby-plugin-page-creator',
             options: {
-                path: `${__dirname}/src/pages`,
+                path: `${__dirname}/src/page`,
             },
         },
         {
             resolve: 'gatsby-source-filesystem',
             options: {
                 name: 'pages',
-                path: `${__dirname}/src/pages/`,
+                path: `${__dirname}/src/page/`,
             },
             __key: 'pages',
         },
         {
             resolve: 'gatsby-source-filesystem',
             options: {
-                name: 'asciidocs',
-                path: `${__dirname}/src/asciidocs/`,
+                name: 'pages',
+                path: `${__dirname}/modules/ROOT/pages`,
             },
-            __key: 'asciidocs',
+            __key: 'pages',
         },
         {
             resolve: 'gatsby-source-filesystem',
             options: {
                 name: 'common',
-                path: `${__dirname}/src/asciidocs/common/`,
+                path: `${__dirname}/modules/ROOT/pages/common/`,
             },
-            __key: 'asciidocs_common',
+            __key: 'pages_common',
         },
         {
             resolve: 'gatsby-plugin-intl',
@@ -141,7 +141,7 @@ module.exports = {
                 attributes: {
                     showtitle: true,
                     imagesdir: '/doc-images',
-                    path: `${__dirname}/src/asciidocs/partials`,
+                    path: `${__dirname}/modules/ROOT/pages/partials`,
                 },
                 fileExtensions: ['ad', 'adoc'],
                 converterFactory: CustomDocConverter,
@@ -186,7 +186,7 @@ module.exports = {
             resolve: 'gatsby-plugin-sitemap',
             options: {
                 query: `
-                {   
+                {
                     allAsciidoc {
                         edges {
                             node {
