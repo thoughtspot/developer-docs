@@ -87,7 +87,10 @@ console.log(getPath(config.DOC_REPO_NAME));
 module.exports = {
     pathPrefix: getPath(config.DOC_REPO_NAME),
     siteMetadata: {
-        title: 'tseverywhere-docs',
+        title: 'default title',
+        description: 'default description',
+        image: 'favicon.png',
+        url: 'developers.thoughtspot.com',
     },
     plugins: [
         'gatsby-plugin-sass',
@@ -235,5 +238,6 @@ module.exports = {
                 debug: false,
             },
         },
+        'gatsby-plugin-react-helmet',
     ],
 };

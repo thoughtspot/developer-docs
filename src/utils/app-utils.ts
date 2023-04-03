@@ -49,7 +49,7 @@ export const queryStringParser = (queryParamStr: string) => {
 
     // prepare and set 'Main Navigation' links URL prefix
     navPrefix += TS_PAGE_ID_PARAM;
-    queryParamObj[NAV_PREFIX] = navPrefix;
+    queryParamObj[NAV_PREFIX] = '';
 
     // prepare and set 'Preview in Playground' button URL prefix
     queryParamObj[

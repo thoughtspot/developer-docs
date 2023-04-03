@@ -3,6 +3,7 @@ import { useStaticQuery, graphql, navigate } from 'gatsby';
 import { useResizeDetector } from 'react-resize-detector';
 import { useFlexSearch } from 'react-use-flexsearch';
 import algoliasearch from 'algoliasearch';
+import { Seo } from '../components/Seo';
 import { queryStringParser, isPublicSite } from '../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../utils/doc-utils';
 import Header from '../components/Header';
@@ -51,6 +52,7 @@ const IndexPage = ({ location }) => {
     const [docContent, setDocContent] = useState('');
     const [navTitle, setNavTitle] = useState('');
     const [navContent, setNavContent] = useState('');
+    const [docDescription, setDocDescription] = useState('');
     const [breadcrumsData, setBreadcrumsData] = useState([]);
     const [backLink, setBackLink] = useState('');
     const [allPageIds, setAllPageIds] = useState([]);
@@ -109,6 +111,11 @@ const IndexPage = ({ location }) => {
                         edges[edgeIndex].node.pageAttributes.title,
                 );
 
+                // set description
+                setDocDescription(
+                    edges[edgeIndex].node.document.description ||
+                        edges[edgeIndex].node.pageAttributes.description,
+                );
                 // get and set doc page content with dynamic data replaced
                 setDocContent(
                     passThroughHandler(edges[edgeIndex].node.html, params),
@@ -276,75 +283,82 @@ const IndexPage = ({ location }) => {
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
 
     return (
-        <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
-            {isPublicSiteOpen && <Header location={location} />}
-            <main
-                ref={ref as React.RefObject<HTMLDivElement>}
-                className={`dark ${isPublicSiteOpen ? 'withHeaderFooter' : ''}`}
-                style={{
-                    height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
-                }}
-            >
-                <LeftSidebar
-                    navTitle={navTitle}
-                    navContent={navContent}
-                    backLink={backLink}
-                    docWidth={width}
-                    handleLeftNavChange={setLeftNavWidth}
-                    location={location}
-                    setLeftNavOpen={setLeftNavOpen}
-                    leftNavOpen={leftNavOpen}
-                    isPublicSiteOpen={isPublicSiteOpen}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={setDarkMode}
-                    isDarkMode={isDarkMode}
-                />
-                <div
-                    className="documentBody"
+        <>
+            <Seo title={docTitle} description={docDescription} />
+            <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
+                {isPublicSiteOpen && <Header location={location} />}
+                <main
+                    ref={ref as React.RefObject<HTMLDivElement>}
+                    className={`dark ${
+                        isPublicSiteOpen ? 'withHeaderFooter' : ''
+                    }`}
                     style={{
-                        width: calculateDocumentBodyWidth(),
-                        marginLeft: isMaxMobileResolution
-                            ? `${leftNavWidth}px`
-                            : '0px',
+                        height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                     }}
                 >
-                    <Search
-                        keyword={keyword}
-                        onChange={(e: React.FormEvent<HTMLInputElement>) =>
-                            updateKeyword((e.target as HTMLInputElement).value)
-                        }
-                        options={results}
-                        optionSelected={optionSelected}
+                    <LeftSidebar
+                        navTitle={navTitle}
+                        navContent={navContent}
+                        backLink={backLink}
+                        docWidth={width}
+                        handleLeftNavChange={setLeftNavWidth}
+                        location={location}
+                        setLeftNavOpen={setLeftNavOpen}
                         leftNavOpen={leftNavOpen}
-                        updateKeyword={updateKeyword}
+                        isPublicSiteOpen={isPublicSiteOpen}
                         isMaxMobileResolution={isMaxMobileResolution}
                         setDarkMode={setDarkMode}
                         isDarkMode={isDarkMode}
-                        isPublicSiteOpen={isPublicSiteOpen}
                     />
-
-                    <div className="introWrapper">
-                        <Document
-                            shouldShowRightNav={shouldShowRightNav}
-                            pageid={params[TS_PAGE_ID_PARAM]}
-                            docTitle={docTitle}
-                            docContent={docContent}
-                            breadcrumsData={breadcrumsData}
+                    <div
+                        className="documentBody"
+                        style={{
+                            width: calculateDocumentBodyWidth(),
+                            marginLeft: isMaxMobileResolution
+                                ? `${leftNavWidth}px`
+                                : '0px',
+                        }}
+                    >
+                        <Search
+                            keyword={keyword}
+                            onChange={(e: React.FormEvent<HTMLInputElement>) =>
+                                updateKeyword(
+                                    (e.target as HTMLInputElement).value,
+                                )
+                            }
+                            options={results}
+                            optionSelected={optionSelected}
+                            leftNavOpen={leftNavOpen}
+                            updateKeyword={updateKeyword}
+                            isMaxMobileResolution={isMaxMobileResolution}
+                            setDarkMode={setDarkMode}
+                            isDarkMode={isDarkMode}
                             isPublicSiteOpen={isPublicSiteOpen}
                         />
-                        {shouldShowRightNav && (
-                            <div>
-                                <Docmap
-                                    docContent={docContent}
-                                    location={location}
-                                    options={results}
-                                />
-                            </div>
-                        )}
+
+                        <div className="introWrapper">
+                            <Document
+                                shouldShowRightNav={shouldShowRightNav}
+                                pageid={params[TS_PAGE_ID_PARAM]}
+                                docTitle={docTitle}
+                                docContent={docContent}
+                                breadcrumsData={breadcrumsData}
+                                isPublicSiteOpen={isPublicSiteOpen}
+                            />
+                            {shouldShowRightNav && (
+                                <div>
+                                    <Docmap
+                                        docContent={docContent}
+                                        location={location}
+                                        options={results}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </main>
-        </div>
+                </main>
+            </div>
+        </>
     );
 };
 
