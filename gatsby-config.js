@@ -63,7 +63,7 @@ class CustomDocConverter {
                         target.lastIndexOf('.html'),
                     );
 
-                    anchorMarkup = `{{${config.NAV_PREFIX}}}={{${target}}}`;
+                    anchorMarkup = `{{${config.NAV_PREFIX}}}/{{${target}}}`;
                 }
 
                 // attribute handling - DO NOT CHANGE ORDER OF IFs
@@ -74,7 +74,6 @@ class CustomDocConverter {
                 if (attributes.window) {
                     anchorMarkup += ` target="${attributes.window}"`;
                 }
-
                 return `<a ${anchorMarkup}>${node.getText()}</a>`;
             }
         }
