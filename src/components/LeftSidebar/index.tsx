@@ -49,7 +49,7 @@ const LeftSideBar = (props: {
         const divElement = document.createElement('div');
         divElement.innerHTML = props.navContent;
         const tag = divElement.querySelector(
-            `a[href='${params[NAV_PREFIX]}=${params[TS_PAGE_ID_PARAM]}']`,
+            `a[href='${props.location.pathname}']`,
         );
         if (tag) {
             tag.classList.add('active');
