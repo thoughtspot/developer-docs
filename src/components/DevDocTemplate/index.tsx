@@ -2,6 +2,7 @@ import React, { useState, useEffect, FC } from 'react';
 import { graphql, navigate } from 'gatsby';
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
+import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
 import Header from '../Header';
@@ -37,9 +38,14 @@ import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
 
 // markup
-const DevDocTemplate: FC<DevDocTemplateProps> = ({ data }) => {
-    const location = window.location;
-
+const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
+    const { data, location } = props;
+    // console.log('awd', props);
+    const {
+        curPageNode,
+        navNode,
+        allAsciidoc: { edges },
+    } = data;
     const { width, ref } = useResizeDetector();
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
@@ -51,6 +57,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = ({ data }) => {
     const [docTitle, setDocTitle] = useState('');
     const [docContent, setDocContent] = useState('');
     const [navTitle, setNavTitle] = useState('');
+    const [docDescription, setDocDescription] = useState('');
     const [navContent, setNavContent] = useState('');
     const [breadcrumsData, setBreadcrumsData] = useState([]);
     const [backLink, setBackLink] = useState('');
@@ -120,47 +127,22 @@ const DevDocTemplate: FC<DevDocTemplateProps> = ({ data }) => {
             }
         }
     };
+    const setPageContentFromSingleNode = (node: AsciiDocNode) => {
+        setDocTitle(node.document.title || node.pageAttributes.title);
 
-    useEffect(() => {
-        async function fetchData() {
-            const navIndex = edges.findIndex(
-                (i) =>
-                    i.node.pageAttributes[TS_PAGE_ID_PARAM] === DOC_NAV_PAGE_ID,
-            );
-
-            // get & set left navigation title
-            setNavTitle(edges[navIndex].node.pageAttributes.title);
-
-            // get & set left navigation area content with dynamic link creation
-            const navContentData = passThroughHandler(
-                edges[navIndex].node.html,
-                params,
-            );
-            setNavContent(navContentData);
-
-            // set breadcrums data
-            setBreadcrumsData(fetchChild(navContentData));
-
-            // get & set left navigation 'SpotDev Home' button url
-            setBackLink(params[TS_ORIGIN_PARAM]);
-
-            // set page title and content based on pageid
-            await setPageContent(params[TS_PAGE_ID_PARAM]);
-        }
-
-        // fetch navigation page index
-        const navIndex = edges.findIndex(
-            (i) => i.node.pageAttributes[TS_PAGE_ID_PARAM] === DOC_NAV_PAGE_ID,
+        // set description
+        setDocDescription(
+            node.document.description || node.pageAttributes.description,
         );
-
+        // get and set doc page content with dynamic data replaced
+        setDocContent(passThroughHandler(node.html, params));
+    };
+    useEffect(() => {
         // get & set left navigation title
-        setNavTitle(edges[navIndex].node.pageAttributes.title);
+        setNavTitle(navNode.pageAttributes.title);
 
         // get & set left navigation area content with dynamic link creation
-        const navContentData = passThroughHandler(
-            edges[navIndex].node.html,
-            params,
-        );
+        const navContentData = passThroughHandler(navNode.html, params);
         setNavContent(navContentData);
 
         // set breadcrums data
@@ -169,14 +151,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = ({ data }) => {
         // get & set left navigation 'Back' button url
         setBackLink(params[TS_ORIGIN_PARAM]);
 
-        // set page title and content based on pageid
-        setPageContent(params[TS_PAGE_ID_PARAM]);
+        // set page title , description and content based on the page node
+        setPageContentFromSingleNode(curPageNode);
     }, [params]);
 
     // fetch adoc translated doc edges using graphql
-    const {
-        allAsciidoc: { edges },
-    } = data;
 
     useEffect(() => {
         setAllPageIds(getAllPageIds(navContent));
@@ -252,85 +231,89 @@ const DevDocTemplate: FC<DevDocTemplateProps> = ({ data }) => {
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
 
     return (
-        <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
-            {isPublicSiteOpen && <Header location={location} />}
-            <main
-                ref={ref as React.RefObject<HTMLDivElement>}
-                className={`dark ${isPublicSiteOpen ? 'withHeaderFooter' : ''}`}
-                style={{
-                    height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
-                }}
-            >
-                <LeftSidebar
-                    navTitle={navTitle}
-                    navContent={navContent}
-                    backLink={backLink}
-                    docWidth={width}
-                    handleLeftNavChange={setLeftNavWidth}
-                    location={location}
-                    setLeftNavOpen={setLeftNavOpen}
-                    leftNavOpen={leftNavOpen}
-                    isPublicSiteOpen={isPublicSiteOpen}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={setDarkMode}
-                    isDarkMode={isDarkMode}
-                />
-                <div
-                    className="documentBody"
+        <>
+            <Seo title={docTitle} description={docDescription} />
+            <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
+                {isPublicSiteOpen && <Header location={location} />}
+                <main
+                    ref={ref as React.RefObject<HTMLDivElement>}
+                    className={`dark ${
+                        isPublicSiteOpen ? 'withHeaderFooter' : ''
+                    }`}
                     style={{
-                        width: calculateDocumentBodyWidth(),
-                        marginLeft: isMaxMobileResolution
-                            ? `${leftNavWidth}px`
-                            : '0px',
+                        height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                     }}
                 >
-                    <Search
-                        keyword={keyword}
-                        onChange={(e: React.FormEvent<HTMLInputElement>) =>
-                            updateKeyword((e.target as HTMLInputElement).value)
-                        }
-                        options={results}
-                        optionSelected={optionSelected}
+                    <LeftSidebar
+                        navTitle={navTitle}
+                        navContent={navContent}
+                        backLink={backLink}
+                        docWidth={width}
+                        handleLeftNavChange={setLeftNavWidth}
+                        location={location}
+                        setLeftNavOpen={setLeftNavOpen}
                         leftNavOpen={leftNavOpen}
-                        updateKeyword={updateKeyword}
+                        isPublicSiteOpen={isPublicSiteOpen}
                         isMaxMobileResolution={isMaxMobileResolution}
                         setDarkMode={setDarkMode}
                         isDarkMode={isDarkMode}
-                        isPublicSiteOpen={isPublicSiteOpen}
                     />
-
-                    <div className="introWrapper">
-                        <Document
-                            shouldShowRightNav={shouldShowRightNav}
-                            pageid={params[TS_PAGE_ID_PARAM]}
-                            docTitle={docTitle}
-                            docContent={docContent}
-                            breadcrumsData={breadcrumsData}
+                    <div
+                        className="documentBody"
+                        style={{
+                            width: calculateDocumentBodyWidth(),
+                            marginLeft: isMaxMobileResolution
+                                ? `${leftNavWidth}px`
+                                : '0px',
+                        }}
+                    >
+                        <Search
+                            keyword={keyword}
+                            onChange={(e: React.FormEvent<HTMLInputElement>) =>
+                                updateKeyword(
+                                    (e.target as HTMLInputElement).value,
+                                )
+                            }
+                            options={results}
+                            optionSelected={optionSelected}
+                            leftNavOpen={leftNavOpen}
+                            updateKeyword={updateKeyword}
+                            isMaxMobileResolution={isMaxMobileResolution}
+                            setDarkMode={setDarkMode}
+                            isDarkMode={isDarkMode}
                             isPublicSiteOpen={isPublicSiteOpen}
                         />
-                        {shouldShowRightNav && (
-                            <div>
-                                <Docmap
-                                    docContent={docContent}
-                                    location={location}
-                                    options={results}
-                                />
-                            </div>
-                        )}
+
+                        <div className="introWrapper">
+                            <Document
+                                shouldShowRightNav={shouldShowRightNav}
+                                pageid={params[TS_PAGE_ID_PARAM]}
+                                docTitle={docTitle}
+                                docContent={docContent}
+                                breadcrumsData={breadcrumsData}
+                                isPublicSiteOpen={isPublicSiteOpen}
+                            />
+                            {shouldShowRightNav && (
+                                <div>
+                                    <Docmap
+                                        docContent={docContent}
+                                        location={location}
+                                        options={results}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </main>
-        </div>
+                </main>
+            </div>
+        </>
     );
 };
 
 export default DevDocTemplate;
 
 export const query = graphql`
-    query TemplateQuery(
-        $pageId: String = "introduction"
-        $navId: String = "nav"
-    ) {
+    query TemplateQuery($pageId: String = "introduction", $navId: String) {
         curPageNode: asciidoc(pageAttributes: { pageid: { eq: $pageId } }) {
             document {
                 title
@@ -382,6 +365,7 @@ type DevDocTemplateProps = {
         navNode: AsciiDocNode;
         allAsciidoc: any;
     };
+    location: Location;
 };
 
 type AsciiDocNode = {

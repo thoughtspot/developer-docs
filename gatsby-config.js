@@ -88,6 +88,8 @@ module.exports = {
     pathPrefix: getPath(config.DOC_REPO_NAME),
     siteMetadata: {
         title: 'tseverywhere-docs',
+        url: 'https://developers.thoughtspot.com/docs',
+        image: './images/favicon.svg',
     },
     plugins: [
         'gatsby-plugin-sass',
