@@ -28,7 +28,8 @@ export const Seo: FC<SeoProps> = ({
         image: `${siteUrl}${image}`,
         url: `${siteUrl}${pathname || ''}`,
     };
-
+    
+    // Uses helmet to put tags in header
     return (
         <Helmet>
             <title>{seo.title}</title>
