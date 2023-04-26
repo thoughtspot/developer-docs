@@ -173,16 +173,16 @@ module.exports = {
                 icon: `${__dirname}/src/assets/icons/favicon.png`,
             },
         },
-        'gatsby-plugin-output',
-        {
-            resolve: 'gatsby-plugin-algolia',
-            options: {
-                appId: process.env.GATSBY_ALGOLIA_APP_ID,
-                apiKey: process.env.ALGOLIA_ADMIN_KEY,
-                queries: require(`${__dirname}/src/utils/algolia-queries`)
-                    .queries,
-            },
-        },
+        // 'gatsby-plugin-output',
+        // {
+        //     resolve: 'gatsby-plugin-algolia',
+        //     options: {
+        //         appId: process.env.GATSBY_ALGOLIA_APP_ID,
+        //         apiKey: process.env.ALGOLIA_ADMIN_KEY,
+        //         queries: require(`${__dirname}/src/utils/algolia-queries`)
+        //             .queries,
+        //     },
+        // },
         {
             resolve: 'gatsby-plugin-sitemap',
             options: {
