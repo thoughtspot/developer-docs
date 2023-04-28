@@ -185,10 +185,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             acc.push(cur);
                         } else if (cur.pageid) {
                             if (
-                                !acc.some(
-                                    (data) => data.pageid === cur.pageid,
-                                ) &&
-                                allPageIds.includes(cur.pageid)
+                                !acc.some((data) => data.pageid === cur.pageid)
                             ) {
                                 acc.push(cur);
                             }
@@ -205,7 +202,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
-        navigate(`${params[NAV_PREFIX]}=${pageid}#${sectionId}`);
+        navigate(`/${pageid}#${sectionId}`);
     };
 
     const isMaxMobileResolution = !(width < MAX_MOBILE_RESOLUTION);
