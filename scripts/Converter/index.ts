@@ -179,7 +179,7 @@ class TypeDocParser {
         return sources
             .map(
                 (source) =>
-                    `Defined in : link:${GITHUB_LINK}/${source.fileName}#L${source.line}[${source.fileName}, window=_blank]`,
+                    `Defined in : link:${GITHUB_LINK}-${source.fileName}#L${source.line}[${source.fileName}, window=_blank]`,
             )
             .join('\n');
     };
@@ -559,7 +559,7 @@ class TypeDocParser {
             description: node?.comment?.shortText,
         });
 
-        let sideNavContent = `* link:{{navprefix}}/${encodePageId(
+        let sideNavContent = `* link:{{navprefix}}=${encodePageId(
             indexPageId,
         )}[Visual Embed SDK]\n`;
 
@@ -574,21 +574,21 @@ class TypeDocParser {
                 description: group.title,
             });
 
-            sideNavContent += `** link:{{navprefix}}/${encodePageId(
+            sideNavContent += `** link:{{navprefix}}=${encodePageId(
                 groupPageId,
             )}[${groupPageId}]\n`;
 
             group.children.forEach((id) => {
                 const child = this.childrenIdMap[id];
                 groupContent += `| ${this.convertNameToLink(child.name)}\n`;
-                const pageId = `${child.kindString}/${child.name}`;
+                const pageId = `${child.kindString}-${child.name}`;
                 const heading = this.getHeadingString({
                     title: child.name,
                     pageId,
                     description: child?.comment?.shortText,
                 });
 
-                sideNavContent += `*** link:{{navprefix}}/${encodePageId(
+                sideNavContent += `*** link:{{navprefix}}=${encodePageId(
                     pageId,
                 )}[${child.name}]\n`;
 

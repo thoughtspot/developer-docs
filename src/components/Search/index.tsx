@@ -11,6 +11,7 @@ import {
 import t from '../../utils/lang-utils';
 import SearchResult from './SearchResult';
 import ToggleButton from '../ToggleButton';
+import BackButton from '../BackButton';
 
 type SearchProps = {
     options: SearchQueryResult[];
@@ -18,11 +19,12 @@ type SearchProps = {
     keyword: string;
     isMaxMobileResolution: boolean;
     isDarkMode: boolean;
-    optionSelected: (pageid: string, sectionId:string) => void;
+    optionSelected: (pageid: string, sectionId: string) => void;
     onChange: (e: React.FormEvent<HTMLInputElement>) => void;
     updateKeyword: Function;
     setDarkMode: Function;
     isPublicSiteOpen: boolean;
+    backLink: string;
 };
 
 const Search: React.FC<SearchProps> = (props) => {
@@ -36,7 +38,7 @@ const Search: React.FC<SearchProps> = (props) => {
         if (props.options.length > 0 && props.keyword) {
             updateShowSearchResult(true);
         } else {
-            updateShowSearchResult(false); 
+            updateShowSearchResult(false);
         }
     }, [props.keyword, props.options]);
 
@@ -49,11 +51,11 @@ const Search: React.FC<SearchProps> = (props) => {
     };
     const onSearchOptionSelected = () => {
         props.updateKeyword('');
-        if(searchInput.current) {
+        if (searchInput.current) {
             searchInput.current.blur();
         }
-        updateShowSearchResult(false);  
-    }
+        updateShowSearchResult(false);
+    };
     useEffect(() => {
         document.addEventListener('mousedown', handleClick);
         return () => {
@@ -118,7 +120,10 @@ const Search: React.FC<SearchProps> = (props) => {
                             highlightedIndex={highlightedIndex}
                             index={index}
                             keyword={option.title}
-                            title={option._snippetResult && option._snippetResult.body.value}
+                            title={
+                                option._snippetResult &&
+                                option._snippetResult.body.value
+                            }
                         />
                     </a>
                 );
@@ -135,7 +140,10 @@ const Search: React.FC<SearchProps> = (props) => {
                             highlightedIndex={highlightedIndex}
                             index={index}
                             keyword={props.keyword}
-                            title={option._snippetResult && option._snippetResult.body.value}
+                            title={
+                                option._snippetResult &&
+                                option._snippetResult.body.value
+                            }
                             isKeywordNotFound={true}
                         />
                     </div>
@@ -146,7 +154,10 @@ const Search: React.FC<SearchProps> = (props) => {
                         key={option.pageid}
                         className="result"
                         onClick={() => {
-                            props.optionSelected(option.pageid,option.sectionId);
+                            props.optionSelected(
+                                option.pageid,
+                                option.sectionId,
+                            );
                             onSearchOptionSelected();
                         }}
                         ref={(el: HTMLDivElement) => {
@@ -157,7 +168,10 @@ const Search: React.FC<SearchProps> = (props) => {
                             highlightedIndex={highlightedIndex}
                             index={index}
                             keyword={`${option.title} | ${option.sectionTitle}`}
-                            title={option._snippetResult && option._snippetResult.body.value}
+                            title={
+                                option._snippetResult &&
+                                option._snippetResult.body.value
+                            }
                         />
                     </div>
                 );
@@ -170,10 +184,21 @@ const Search: React.FC<SearchProps> = (props) => {
 
     return (
         <div
-            className={`searchWrapper ${props.leftNavOpen ? 'visHidden' : ''} ${!props.isPublicSiteOpen ? 'inClusterSite' : ''
-                }`}
+            className={`searchWrapper ${props.leftNavOpen ? 'visHidden' : ''} ${
+                !props.isPublicSiteOpen ? 'inClusterSite' : ''
+            }`}
         >
-            <div className="searchInputWrapper">
+            <div
+                className="searchInputWrapper"
+                style={props?.backLink ? { display: 'flex' } : {}}
+            >
+                {props.backLink ? (
+                    <BackButton
+                        title={t('NAV_BACK_BTN_TEXT')}
+                        backLink={props.backLink}
+                        customStyles={{ padding: 0 }}
+                    />
+                ) : null}
                 <div className="searchInputContainer">
                     <IconContext.Provider
                         value={{
@@ -194,7 +219,11 @@ const Search: React.FC<SearchProps> = (props) => {
                     />
                 </div>
                 {showSearchResult && props.options?.length ? (
-                    <div ref={node} className="resultContainer" data-testid="resultContainer">
+                    <div
+                        ref={node}
+                        className="resultContainer"
+                        data-testid="resultContainer"
+                    >
                         {props.options.map(
                             (option: SearchQueryResult, index: number) => {
                                 return renderOption(option, index);
@@ -202,8 +231,8 @@ const Search: React.FC<SearchProps> = (props) => {
                         )}
                     </div>
                 ) : (
-                        ''
-                    )}
+                    ''
+                )}
             </div>
             {props.isMaxMobileResolution && (
                 <div className="ml-4">

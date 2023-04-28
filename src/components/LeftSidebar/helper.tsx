@@ -62,7 +62,7 @@ export const addExpandCollapseImages = (
                     }
                 }
 
-                //Adding arrow icon to the p tags
+                // Adding arrow icon to the p tags
                 spanElementParent.appendChild(spanElementChild);
                 paragraphElement.appendChild(spanElementParent);
             }
@@ -71,6 +71,54 @@ export const addExpandCollapseImages = (
 
     nav.innerHTML = addExternalLinkIcon(nav.innerHTML);
     return nav.innerHTML;
+};
+
+export const trimTrailingSlash = (str: string) => str.replace(/\/*$/, '');
+
+export const getPageIdFromUrl = (href: string) => {
+    const pageidMatches = href.match(/pageid=([A-z-0-9]*)/);
+    const pageid =
+        pageidMatches && pageidMatches.length > 1 && pageidMatches[1];
+
+    return pageid;
+};
+
+const isLinkMatching = (href: string, curLocation: Location) => {
+    if (href === trimTrailingSlash(curLocation.href)) return true;
+
+    const hostUrlMatches = window.location.href.match(/(.*)\/\?/);
+    const hostUrl =
+        hostUrlMatches && hostUrlMatches.length > 1 && hostUrlMatches[1];
+
+    const pageid = getPageIdFromUrl(curLocation.href);
+
+    const newUrl = `${hostUrl}/${pageid}`;
+
+    return href === newUrl;
+};
+
+const isCurrentNavOpen = (liEle: HTMLLIElement) => {
+    const paraEle = liEle.children[0] as HTMLParagraphElement;
+    const divEle = liEle.children[1] as HTMLDivElement;
+
+    const isLinkParentOpen =
+        paraEle &&
+        isLinkMatching(
+            (paraEle.children[0] as HTMLAnchorElement).href,
+            window.location,
+        );
+
+    const isChildOpen: boolean =
+        divEle &&
+        Array.from(divEle.children[0].children)
+            .map((childLiEle): boolean => {
+                return isCurrentNavOpen(childLiEle as HTMLLIElement);
+            })
+            .reduce((prev, cur) => {
+                return prev || cur;
+            }, false);
+
+    return isLinkParentOpen || isChildOpen;
 };
 
 export const collapseAndExpandLeftNav = (
@@ -91,20 +139,32 @@ export const collapseAndExpandLeftNav = (
                 el.children[0].children.length === 2
                     ? el.children[0].children[1]
                     : el.children[0].children[0];
+
+            const isOpen = isCurrentNavOpen(el);
+            const divElement = el.children[1];
+            if (!isOpen) {
+                divElement.classList.toggle('displayNone');
+            }
+
             if (spanElement) {
+                (spanElement
+                    .children[0] as HTMLImageElement).innerHTML = divElement.classList.contains(
+                    'displayNone',
+                )
+                    ? ArrowForwardHTML
+                    : ArrowDownHTML;
                 // Adding click listener to the headings
                 spanElement.addEventListener('click', () => {
-                    const divElement = el.children[1];
                     toggleExpandOnTab(
                         (el.children[0] as HTMLParagraphElement).innerText,
                     );
                     divElement.classList.toggle('displayNone');
                     (spanElement
                         .children[0] as HTMLImageElement).innerHTML = divElement.classList.contains(
-                            'displayNone',
-                        )
-                            ? ArrowForwardHTML
-                            : ArrowDownHTML;
+                        'displayNone',
+                    )
+                        ? ArrowForwardHTML
+                        : ArrowDownHTML;
                 });
             }
         }
