@@ -84,11 +84,10 @@ export const getPageIdFromUrl = (href: string) => {
 };
 
 const isLinkMatching = (href: string, curLocation: Location) => {
-    if (href === trimTrailingSlash(curLocation.href)) return true;
+    const hostUrl = `${window.location.protocol}//${window.location.host}`;
 
-    const hostUrlMatches = window.location.href.match(/(.*)\/\?/);
-    const hostUrl =
-        hostUrlMatches && hostUrlMatches.length > 1 && hostUrlMatches[1];
+    if (href === trimTrailingSlash(hostUrl + window.location.pathname))
+        return true;
 
     const pageid = getPageIdFromUrl(curLocation.href);
 
