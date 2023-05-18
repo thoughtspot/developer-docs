@@ -50,7 +50,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
         [TS_ORIGIN_PARAM]: '',
-        [TS_PAGE_ID_PARAM]: 'introduction',
+        [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
         [NAV_PREFIX]: '',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
