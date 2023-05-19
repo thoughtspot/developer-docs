@@ -254,10 +254,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
 
     const isExternal = () =>
-        !document?.URL?.includes('developers.thoughtspot.com/docs');
+        !location?.href?.includes('developers.thoughtspot.com/docs');
 
     const baseUrl = isExternal()
-        ? window?.location?.origin
+        ? location?.origin
         : 'https://try-everywhere.thoughtspot.cloud';
 
     useEffect(() => {
@@ -302,7 +302,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
                     const data = await response.json();
                     const token = data?.data?.restapiV2__getSessionToken?.token;
-                    console.log(token);
                     setToken(token);
                 } catch (e) {
                     console.log(e);
