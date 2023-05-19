@@ -252,12 +252,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return '100%';
     };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
-
     const isExternal = () =>
-        window?.location?.href?.includes('developers.thoughtspot.com/docs');
+        location?.href?.includes('developers.thoughtspot.com/docs');
 
     const baseUrl = isExternal()
-        ? window?.location?.origin
+        ? location?.origin
         : 'https://try-everywhere.thoughtspot.cloud';
 
     useEffect(() => {
