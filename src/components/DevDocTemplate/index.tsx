@@ -254,7 +254,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
 
     const isExternal = () =>
-        !document?.URL?.includes('developers.thoughtspot.com/docs');
+        window?.location?.href?.includes('developers.thoughtspot.com/docs');
 
     const baseUrl = isExternal()
         ? window?.location?.origin
