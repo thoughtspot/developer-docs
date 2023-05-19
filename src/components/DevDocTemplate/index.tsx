@@ -252,36 +252,64 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return '100%';
     };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
+
     const isExternal = () =>
-        location?.href?.includes('developers.thoughtspot.com/docs');
+        !document?.URL?.includes('developers.thoughtspot.com/docs');
 
     const baseUrl = isExternal()
-        ? location?.origin
+        ? window?.location?.origin
         : 'https://try-everywhere.thoughtspot.cloud';
 
     useEffect(() => {
         if (isAPIPlayGround) {
             setLeftNavWidth(ZERO_MARGIN);
-            async function fetchData(url: string) {
+            async function fetchData() {
                 const endPoint = '/api/rest/2.0/auth/session/token';
 
-                const fetchList = await fetch(url + endPoint, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        Accept: 'application/json',
-                    },
-                    credentials: 'include',
-                })
-                    .then((res: any) => {
-                        console.log(res);
-                        // setToken(res?.token);
-                    })
-                    .catch((e) => console.log(e));
+                try {
+                    if (!isExternal()) {
+                        await fetch(
+                            baseUrl + '/callosum/v1/session/demo/login',
+                            {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type':
+                                        'application/x-www-form-urlencoded',
+                                    Accept: 'application/json',
+                                },
+                                // credentials: 'include',
+                            },
+                        );
+                    }
+
+                    const response = await fetch(
+                        baseUrl + '/prism/?op=GetSessionToken',
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Accept: 'application/json',
+                            },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                operationName: 'GetSessionToken',
+                                variables: {},
+                                query:
+                                    'query GetSessionToken {\n  restapiV2__getSessionToken {\n    token\n    __typename\n  }\n}\n',
+                            }),
+                        },
+                    );
+
+                    const data = await response.json();
+                    const token = data?.data?.restapiV2__getSessionToken?.token;
+                    console.log(token);
+                    setToken(token);
+                } catch (e) {
+                    console.log(e);
+                }
             }
-            // if (isExternal())
-            fetchData('https://try-everywhere.thoughtspot.cloud');
-            fetchData(location?.origin);
+
+            fetchData();
         }
     }, [curPageNode?.pageAttributes?.pageid]);
 
