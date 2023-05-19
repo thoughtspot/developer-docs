@@ -42,4 +42,8 @@ module.exports = {
             link: '/visual-embed-sdk/7.1/en',
         },
     ],
+    CUSTOM_PAGE_ID: {
+        API_PLAYGROUND: 'restV2-playground',
+        VISUAL_EMBED_SDK: 'js-reference',
+    },
 };
