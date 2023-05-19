@@ -262,10 +262,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     useEffect(() => {
         if (isAPIPlayGround) {
             setLeftNavWidth(ZERO_MARGIN);
-            async function fetchData() {
+            async function fetchData(url: string) {
                 const endPoint = '/api/rest/2.0/auth/session/token';
 
-                const fetchList = await fetch(baseUrl + endPoint, {
+                const fetchList = await fetch(url + endPoint, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -280,7 +280,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     .catch((e) => console.log(e));
             }
             // if (isExternal())
-            fetchData();
+            fetchData('https://try-everywhere.thoughtspot.cloud');
+            fetchData(location?.origin);
         }
     }, [curPageNode?.pageAttributes?.pageid]);
 
