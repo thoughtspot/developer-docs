@@ -27,6 +27,8 @@ import {
     DEFAULT_APP_ROOT,
     HOME_PAGE_ID,
     CUSTOM_PAGE_ID,
+    TS_DEMO_LOGIN,
+    TS_SESSION_TOKEN,
 } from '../../configs/doc-configs';
 
 import {
@@ -256,49 +258,39 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const isExternal = () =>
         !location?.href?.includes('developers.thoughtspot.com/docs');
 
-    const baseUrl = isExternal()
-        ? location?.origin
-        : 'https://try-everywhere.thoughtspot.cloud';
+    const baseUrl = isExternal() ? location?.origin : DEFAULT_HOST;
 
     useEffect(() => {
         if (isAPIPlayGround) {
             setLeftNavWidth(ZERO_MARGIN);
             async function fetchData() {
-                const endPoint = '/api/rest/2.0/auth/session/token';
-
                 try {
                     if (!isExternal()) {
-                        await fetch(
-                            baseUrl + '/callosum/v1/session/demo/login',
-                            {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type':
-                                        'application/x-www-form-urlencoded',
-                                    Accept: 'application/json',
-                                },
-                                // credentials: 'include',
-                            },
-                        );
-                    }
-
-                    const response = await fetch(
-                        baseUrl + '/prism/?op=GetSessionToken',
-                        {
+                        await fetch(baseUrl + TS_DEMO_LOGIN, {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
+                                'Content-Type':
+                                    'application/x-www-form-urlencoded',
                                 Accept: 'application/json',
                             },
                             credentials: 'include',
-                            body: JSON.stringify({
-                                operationName: 'GetSessionToken',
-                                variables: {},
-                                query:
-                                    'query GetSessionToken {\n  restapiV2__getSessionToken {\n    token\n    __typename\n  }\n}\n',
-                            }),
+                        });
+                    }
+
+                    const response = await fetch(baseUrl + TS_SESSION_TOKEN, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json',
                         },
-                    );
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            operationName: 'GetSessionToken',
+                            variables: {},
+                            query:
+                                'query GetSessionToken {\n  restapiV2__getSessionToken {\n    token\n    __typename\n  }\n}\n',
+                        }),
+                    });
 
                     const data = await response.json();
                     const token = data?.data?.restapiV2__getSessionToken?.token;

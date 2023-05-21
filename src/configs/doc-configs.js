@@ -17,6 +17,8 @@ module.exports = {
     DEFAULT_PREVIEW_HOST: 'https://try-everywhere.thoughtspot.cloud/v2',
     DEFAULT_APP_ROOT: '/everywhere',
     IS_PUBLIC_SITE_OPEN: 'isPublicSiteOpen',
+    TS_DEMO_LOGIN: '/callosum/v1/session/demo/login',
+    TS_SESSION_TOKEN: '/prism/?op=GetSessionToken',
     BUILD_ENVS: {
         PROD: 'PROD',
         DEV: 'DEV',
