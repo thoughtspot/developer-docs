@@ -287,7 +287,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     const { clusterType = 'DEV' } = info?.configInfo;
 
                     const playgroundUrl =
-                        clusterType !== CLUSTER_TYPES.PROD
+                        clusterType === CLUSTER_TYPES.PROD
                             ? playgroundUrlTemplate({
                                   version: DOC_VERSION_PROD,
                               })
