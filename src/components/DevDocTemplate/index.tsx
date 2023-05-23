@@ -29,6 +29,8 @@ import {
     CUSTOM_PAGE_ID,
     TS_DEMO_LOGIN,
     TS_SESSION_TOKEN,
+    TS_INFO,
+    CLUSTER_TYPES,
 } from '../../configs/doc-configs';
 
 import {
@@ -86,6 +88,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [isDarkMode, setDarkMode] = useState(checkout);
     const [token, setToken] = useState('=');
     const [isPlaygroundReady, setIsPlaygroundReady] = React.useState(false);
+    const [playgroundUrl, setPlayGroundUrl] = React.useState('');
 
     const isAPIPlayGround =
         CUSTOM_PAGE_ID.API_PLAYGROUND ===
@@ -98,11 +101,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         // eslint-disable-next-line no-template-curly-in-string
         'https://rest-api-sdk-v2-0${version}.vercel.app',
     );
-    const playgroundUrl =
-        // sessionService.getClusterType() === CLUSTER_TYPES.PROD // TODO
-        // ? playgroundUrlTemplate({ version: DOC_VERSION_PROD }):
-        playgroundUrlTemplate({ version: DOC_VERSION_PROD });
-    // playgroundUrlTemplate({ version: DOC_VERSION_DEV });
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -256,7 +254,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
 
     const isExternal = () =>
-        !location?.href?.includes('developers.thoughtspot.com/docs');
+        location?.href?.includes('developers.thoughtspot.com/docs');
 
     const baseUrl = isExternal() ? location?.origin : DEFAULT_HOST;
 
@@ -276,6 +274,27 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             credentials: 'include',
                         });
                     }
+                    const infoReq = await fetch(baseUrl + TS_INFO, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json',
+                        },
+                        credentials: 'include',
+                    });
+
+                    const info = await infoReq?.json();
+                    const { clusterType = 'DEV' } = info?.configInfo;
+
+                    const playgroundUrl =
+                        clusterType !== CLUSTER_TYPES.PROD
+                            ? playgroundUrlTemplate({
+                                  version: DOC_VERSION_PROD,
+                              })
+                            : playgroundUrlTemplate({
+                                  version: DOC_VERSION_DEV,
+                              });
+                    setPlayGroundUrl(playgroundUrl);
 
                     const response = await fetch(baseUrl + TS_SESSION_TOKEN, {
                         method: 'POST',

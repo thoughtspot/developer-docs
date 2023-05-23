@@ -19,6 +19,7 @@ module.exports = {
     IS_PUBLIC_SITE_OPEN: 'isPublicSiteOpen',
     TS_DEMO_LOGIN: '/callosum/v1/session/demo/login',
     TS_SESSION_TOKEN: '/prism/?op=GetSessionToken',
+    TS_INFO: '/callosum/v1/session/info',
     BUILD_ENVS: {
         PROD: 'PROD',
         DEV: 'DEV',
@@ -47,5 +48,8 @@ module.exports = {
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
         VISUAL_EMBED_SDK: 'js-reference',
+    },
+    CLUSTER_TYPES: {
+        PROD: 'PROD',
     },
 };
