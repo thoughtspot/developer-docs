@@ -2,6 +2,7 @@ import React, { useState, useEffect, FC } from 'react';
 import { graphql, navigate } from 'gatsby';
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
+
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
@@ -12,6 +13,7 @@ import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
+import _ from 'lodash';
 import {
     DOC_NAV_PAGE_ID,
     TS_HOST_PARAM,
@@ -24,7 +26,13 @@ import {
     DEFAULT_PREVIEW_HOST,
     DEFAULT_APP_ROOT,
     HOME_PAGE_ID,
+    CUSTOM_PAGE_ID,
+    TS_DEMO_LOGIN,
+    TS_SESSION_TOKEN,
+    TS_INFO,
+    CLUSTER_TYPES,
 } from '../../configs/doc-configs';
+
 import {
     LEFT_NAV_WIDTH_DESKTOP,
     MAX_TABLET_RESOLUTION,
@@ -32,15 +40,18 @@ import {
     MAX_MOBILE_RESOLUTION,
     MAX_CONTENT_WIDTH_DESKTOP,
     MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
+    ZERO_MARGIN,
+    DOC_VERSION_DEV,
+    DOC_VERSION_PROD,
 } from '../../constants/uiConstants';
 import { SearchQueryResult } from '../../interfaces';
 import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
+import { MIN_LEFT_NAV_WIDTH_DESKTOP } from '../../constants/uiConstants';
 
 // markup
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const { data, location } = props;
-    // console.log('awd', props);
     const {
         curPageNode,
         navNode,
@@ -75,6 +86,21 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             ? localStorage.getItem('theme') === 'dark'
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
+    const [token, setToken] = useState('=');
+    const [isPlaygroundReady, setIsPlaygroundReady] = React.useState(false);
+    const [clusterType, setClusterType] = React.useState('');
+
+    const isAPIPlayGround =
+        CUSTOM_PAGE_ID.API_PLAYGROUND ===
+        data?.curPageNode?.pageAttributes?.pageid;
+
+    const playgroundRef = React.useRef<HTMLIFrameElement>(null);
+    const apiResourceConfig = React.useRef<string>(null);
+
+    const playgroundUrlTemplate = _.template(
+        // eslint-disable-next-line no-template-curly-in-string
+        'https://rest-api-sdk-v2-0${version}.vercel.app',
+    );
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -217,7 +243,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }
 
     const calculateDocumentBodyWidth = () => {
-        if (isMaxMobileResolution) {
+        if (isMaxMobileResolution && !isAPIPlayGround) {
             if (width > MAX_CONTENT_WIDTH_DESKTOP) {
                 return `${MAX_CONTENT_WIDTH_DESKTOP - 300}px`;
             }
@@ -226,6 +252,112 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return '100%';
     };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
+
+    const isExternal = () =>
+        !location?.href?.includes('developers.thoughtspot.com/docs');
+
+    const baseUrl = isExternal() ? location?.origin : DEFAULT_HOST;
+    const playgroundUrl =
+        clusterType === CLUSTER_TYPES.PROD
+            ? playgroundUrlTemplate({
+                  version: DOC_VERSION_PROD,
+              })
+            : playgroundUrlTemplate({
+                  version: DOC_VERSION_DEV,
+              });
+
+    useEffect(() => {
+        if (isAPIPlayGround) {
+            setLeftNavWidth(ZERO_MARGIN);
+            async function fetchData() {
+                try {
+                    if (!isExternal()) {
+                        await fetch(baseUrl + TS_DEMO_LOGIN, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type':
+                                    'application/x-www-form-urlencoded',
+                                Accept: 'application/json',
+                            },
+                            credentials: 'include',
+                        });
+                    }
+                    const info = await fetch(baseUrl + TS_INFO, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json',
+                        },
+                        credentials: 'include',
+                    })
+                        .then((res) => res.json())
+                        .catch((e) => console.log(e));
+
+                    const cType = info?.configInfo?.clusterType || 'DEV';
+
+                    setClusterType(cType);
+
+                    const response = await fetch(baseUrl + TS_SESSION_TOKEN, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json',
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            operationName: 'GetSessionToken',
+                            variables: {},
+                            query:
+                                'query GetSessionToken {\n  restapiV2__getSessionToken {\n    token\n    __typename\n  }\n}\n',
+                        }),
+                    });
+
+                    const data = await response.json();
+                    const token = data?.data?.restapiV2__getSessionToken?.token;
+                    setToken(token);
+                } catch (e) {
+                    console.log(e);
+                }
+            }
+
+            fetchData();
+        }
+    }, [curPageNode?.pageAttributes?.pageid]);
+
+    React.useEffect(() => {
+        if (isPlaygroundReady) {
+            const config = {
+                baseUrl,
+                accessToken: token,
+                apiResourceId: apiResourceConfig?.current,
+            };
+            const playgroundOrigin = new URL(playgroundUrl)?.origin || '*';
+            playgroundRef?.current?.contentWindow?.postMessage(
+                {
+                    type: 'api-playground-config', //EXTERNAL_PLAYGROUND_EVENTS.CONFIG,
+                    ...config,
+                },
+                playgroundOrigin,
+            );
+        }
+    }, [token, isPlaygroundReady]);
+
+    const renderPlayGround = () => (
+        <div
+            className="restApiWrapper"
+            style={{
+                marginTop: isMaxMobileResolution ? '84px' : '72px',
+            }}
+        >
+            <iframe
+                ref={playgroundRef}
+                src={playgroundUrl}
+                height="100%"
+                width="100%"
+                onLoad={() => setIsPlaygroundReady(true)}
+            />
+        </div>
+    );
 
     return (
         <>
@@ -241,20 +373,22 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                     }}
                 >
-                    <LeftSidebar
-                        navTitle={navTitle}
-                        navContent={navContent}
-                        backLink={backLink}
-                        docWidth={width}
-                        handleLeftNavChange={setLeftNavWidth}
-                        location={location}
-                        setLeftNavOpen={setLeftNavOpen}
-                        leftNavOpen={leftNavOpen}
-                        isPublicSiteOpen={isPublicSiteOpen}
-                        isMaxMobileResolution={isMaxMobileResolution}
-                        setDarkMode={setDarkMode}
-                        isDarkMode={isDarkMode}
-                    />
+                    {!isAPIPlayGround && (
+                        <LeftSidebar
+                            navTitle={navTitle}
+                            navContent={navContent}
+                            backLink={backLink}
+                            docWidth={width}
+                            handleLeftNavChange={setLeftNavWidth}
+                            location={location}
+                            setLeftNavOpen={setLeftNavOpen}
+                            leftNavOpen={leftNavOpen}
+                            isPublicSiteOpen={isPublicSiteOpen}
+                            isMaxMobileResolution={isMaxMobileResolution}
+                            setDarkMode={setDarkMode}
+                            isDarkMode={isDarkMode}
+                        />
+                    )}
                     <div
                         className="documentBody"
                         style={{
@@ -279,27 +413,31 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             setDarkMode={setDarkMode}
                             isDarkMode={isDarkMode}
                             isPublicSiteOpen={isPublicSiteOpen}
+                            backLink={isAPIPlayGround ? 'rest-api-v2' : ''} //
                         />
-
-                        <div className="introWrapper">
-                            <Document
-                                shouldShowRightNav={shouldShowRightNav}
-                                pageid={params[TS_PAGE_ID_PARAM]}
-                                docTitle={docTitle}
-                                docContent={docContent}
-                                breadcrumsData={breadcrumsData}
-                                isPublicSiteOpen={isPublicSiteOpen}
-                            />
-                            {shouldShowRightNav && (
-                                <div>
-                                    <Docmap
-                                        docContent={docContent}
-                                        location={location}
-                                        options={results}
-                                    />
-                                </div>
-                            )}
-                        </div>
+                        {isAPIPlayGround ? (
+                            renderPlayGround()
+                        ) : (
+                            <div className="introWrapper">
+                                <Document
+                                    shouldShowRightNav={shouldShowRightNav}
+                                    pageid={params[TS_PAGE_ID_PARAM]}
+                                    docTitle={docTitle}
+                                    docContent={docContent}
+                                    breadcrumsData={breadcrumsData}
+                                    isPublicSiteOpen={isPublicSiteOpen}
+                                />
+                                {shouldShowRightNav && (
+                                    <div>
+                                        <Docmap
+                                            docContent={docContent}
+                                            location={location}
+                                            options={results}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </main>
             </div>
