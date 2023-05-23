@@ -88,7 +88,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [isDarkMode, setDarkMode] = useState(checkout);
     const [token, setToken] = useState('=');
     const [isPlaygroundReady, setIsPlaygroundReady] = React.useState(false);
-    const [playgroundUrl, setPlayGroundUrl] = React.useState('');
+    const [clusterType, setClusterType] = React.useState('');
 
     const isAPIPlayGround =
         CUSTOM_PAGE_ID.API_PLAYGROUND ===
@@ -254,9 +254,17 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
 
     const isExternal = () =>
-        location?.href?.includes('developers.thoughtspot.com/docs');
+        !location?.href?.includes('developers.thoughtspot.com/docs');
 
     const baseUrl = isExternal() ? location?.origin : DEFAULT_HOST;
+    const playgroundUrl =
+        clusterType === CLUSTER_TYPES.PROD
+            ? playgroundUrlTemplate({
+                  version: DOC_VERSION_PROD,
+              })
+            : playgroundUrlTemplate({
+                  version: DOC_VERSION_DEV,
+              });
 
     useEffect(() => {
         if (isAPIPlayGround) {
@@ -274,27 +282,20 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             credentials: 'include',
                         });
                     }
-                    const infoReq = await fetch(baseUrl + TS_INFO, {
+                    const info = await fetch(baseUrl + TS_INFO, {
                         method: 'GET',
                         headers: {
                             'Content-Type': 'application/json',
                             Accept: 'application/json',
                         },
                         credentials: 'include',
-                    });
+                    })
+                        .then((res) => res.json())
+                        .catch((e) => console.log(e));
 
-                    const info = await infoReq?.json();
-                    const { clusterType = 'DEV' } = info?.configInfo;
+                    const cType = info?.configInfo?.clusterType || 'DEV';
 
-                    const playgroundUrl =
-                        clusterType === CLUSTER_TYPES.PROD
-                            ? playgroundUrlTemplate({
-                                  version: DOC_VERSION_PROD,
-                              })
-                            : playgroundUrlTemplate({
-                                  version: DOC_VERSION_DEV,
-                              });
-                    setPlayGroundUrl(playgroundUrl);
+                    setClusterType(cType);
 
                     const response = await fetch(baseUrl + TS_SESSION_TOKEN, {
                         method: 'POST',
