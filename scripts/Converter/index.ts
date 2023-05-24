@@ -179,7 +179,7 @@ class TypeDocParser {
         return sources
             .map(
                 (source) =>
-                    `Defined in : link:${GITHUB_LINK}-${source.fileName}#L${source.line}[${source.fileName}, window=_blank]`,
+                    `Defined in : link:${GITHUB_LINK}/${source.fileName}#L${source.line}[${source.fileName}, window=_blank]`,
             )
             .join('\n');
     };
