@@ -581,7 +581,7 @@ class TypeDocParser {
             group.children.forEach((id) => {
                 const child = this.childrenIdMap[id];
                 groupContent += `| ${this.convertNameToLink(child.name)}\n`;
-                const pageId = `${child.kindString}-${child.name}`;
+                const pageId = `${child.kindString}/${child.name}`;
                 const heading = this.getHeadingString({
                     title: child.name,
                     pageId,

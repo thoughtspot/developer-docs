@@ -76,7 +76,8 @@ export const addExpandCollapseImages = (
 export const trimTrailingSlash = (str: string) => str.replace(/\/*$/, '');
 
 export const getPageIdFromUrl = (href: string) => {
-    const pageidMatches = href.match(/pageid=([A-z-0-9\/\%-]*)/);
+    const pageidMatches = href.match(/pageid=([A-z-0-9\/\%]*)/);
+
     const pageid =
         pageidMatches && pageidMatches.length > 1 && pageidMatches[1];
 
