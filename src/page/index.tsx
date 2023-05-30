@@ -272,7 +272,15 @@ const IndexPage = ({ location }) => {
     const isExternal = () =>
         !location?.href?.includes('developers.thoughtspot.com/docs');
 
-    const baseUrl = isExternal() ? location?.origin : DEFAULT_HOST;
+    const { ancestorOrigins } = window?.location;
+
+    const parentUrl =
+        ancestorOrigins?.length > 0
+            ? ancestorOrigins[ancestorOrigins?.length - 1]
+            : document.referrer || window?.origin;
+
+    const baseUrl = isExternal() ? parentUrl : DEFAULT_HOST;
+
     const playgroundUrl =
         clusterType === CLUSTER_TYPES.PROD
             ? playgroundUrlTemplate({ version: DOC_VERSION_PROD })
@@ -367,6 +375,7 @@ const IndexPage = ({ location }) => {
                 height="100%"
                 width="100%"
                 onLoad={() => setIsPlaygroundReady(true)}
+                id="iframe"
             />
         </div>
     );
