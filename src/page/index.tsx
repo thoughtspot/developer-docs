@@ -272,13 +272,16 @@ const IndexPage = ({ location }) => {
     const isExternal = () =>
         !location?.href?.includes('developers.thoughtspot.com/docs');
 
-    const { ancestorOrigins } = window?.location;
+    let parentUrl = location?.origin;
 
-    const parentUrl =
-        ancestorOrigins?.length > 0
-            ? ancestorOrigins[ancestorOrigins?.length - 1]
-            : document.referrer || window?.origin;
+    if (typeof window !== 'undefined') {
+        const { ancestorOrigins } = window?.location;
 
+        parentUrl =
+            ancestorOrigins?.length > 0
+                ? ancestorOrigins[ancestorOrigins?.length - 1]
+                : document.referrer || window?.origin;
+    }
     const baseUrl = isExternal() ? parentUrl : DEFAULT_HOST;
 
     const playgroundUrl =
