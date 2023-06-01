@@ -272,17 +272,22 @@ const IndexPage = ({ location }) => {
     const isExternal = () =>
         !location?.href?.includes('developers.thoughtspot.com/docs');
 
-    let parentUrl = location?.origin;
+    const isBrowser = () => typeof window !== 'undefined';
 
-    if (typeof window !== 'undefined') {
-        const { ancestorOrigins } = window?.location;
+    const getParentURL = () => {
+        let parentUrl = location?.origin;
+        if (isBrowser()) {
+            const { ancestorOrigins } = window?.location;
 
-        parentUrl =
-            ancestorOrigins?.length > 0
-                ? ancestorOrigins[ancestorOrigins?.length - 1]
-                : document.referrer || window?.origin;
-    }
-    const baseUrl = isExternal() ? parentUrl : DEFAULT_HOST;
+            parentUrl =
+                ancestorOrigins?.length > 0
+                    ? ancestorOrigins[ancestorOrigins?.length - 1]
+                    : document.referrer || window?.origin;
+        }
+        return parentUrl;
+    };
+
+    const baseUrl = isExternal() ? getParentURL() : DEFAULT_HOST;
 
     const playgroundUrl =
         clusterType === CLUSTER_TYPES.PROD
@@ -410,6 +415,14 @@ const IndexPage = ({ location }) => {
     };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
 
+    const getBackButtonLink = () => {
+        const defaultPath = '?pageid=rest-api-v2';
+        if (isBrowser() && window?.self !== window?.top) {
+            return `${getParentURL()}/#/develop/documentation/en/${defaultPath}`;
+        }
+        return defaultPath;
+    };
+
     return (
         <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
             {isPublicSiteOpen && <Header location={location} />}
@@ -458,7 +471,7 @@ const IndexPage = ({ location }) => {
                         setDarkMode={setDarkMode}
                         isDarkMode={isDarkMode}
                         isPublicSiteOpen={isPublicSiteOpen}
-                        backLink={isAPIPlayGround ? '?pageid=rest-api-v2' : ''} //
+                        backLink={isAPIPlayGround ? getBackButtonLink() : ''} //
                     />
 
                     {isAPIPlayGround ? (
