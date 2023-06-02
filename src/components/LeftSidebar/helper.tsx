@@ -76,8 +76,12 @@ export const addExpandCollapseImages = (
 export const trimTrailingSlash = (str: string) => str.replace(/\/*$/, '');
 
 export const getPageIdFromUrl = (href: string) => {
+<<<<<<< HEAD
     const pageidMatches = href.match(/pageid=([A-z-0-9\/\%]*)/);
 
+=======
+    const pageidMatches = href.match(/pageid=([A-z-0-9]*)/);
+>>>>>>> 9-3-refresh
     const pageid =
         pageidMatches && pageidMatches.length > 1 && pageidMatches[1];
 
@@ -85,11 +89,18 @@ export const getPageIdFromUrl = (href: string) => {
 };
 
 const isLinkMatching = (href: string, curLocation: Location) => {
+<<<<<<< HEAD
     if (href === trimTrailingSlash(curLocation.href)) return true;
 
     const hostUrlMatches = window.location.href.match(/(.*)\/\?/);
     const hostUrl =
         hostUrlMatches && hostUrlMatches.length > 1 && hostUrlMatches[1];
+=======
+    const hostUrl = `${window.location.protocol}//${window.location.host}`;
+
+    if (href === trimTrailingSlash(hostUrl + window.location.pathname))
+        return true;
+>>>>>>> 9-3-refresh
 
     const pageid = getPageIdFromUrl(curLocation.href);
 

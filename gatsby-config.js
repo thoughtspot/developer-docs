@@ -63,7 +63,7 @@ class CustomDocConverter {
                         target.lastIndexOf('.html'),
                     );
 
-                    anchorMarkup = `{{${config.NAV_PREFIX}}}={{${target}}}`;
+                    anchorMarkup = `{{${config.NAV_PREFIX}}}/{{${target}}}`;
                 }
 
                 // attribute handling - DO NOT CHANGE ORDER OF IFs
@@ -74,7 +74,6 @@ class CustomDocConverter {
                 if (attributes.window) {
                     anchorMarkup += ` target="${attributes.window}"`;
                 }
-
                 return `<a ${anchorMarkup}>${node.getText()}</a>`;
             }
         }
@@ -88,6 +87,8 @@ module.exports = {
     pathPrefix: getPath(config.DOC_REPO_NAME),
     siteMetadata: {
         title: 'tseverywhere-docs',
+        url: 'https://developers.thoughtspot.com/docs',
+        image: './images/favicon.svg',
     },
     plugins: [
         'gatsby-plugin-sass',

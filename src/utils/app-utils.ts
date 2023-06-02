@@ -20,7 +20,7 @@ export const queryStringParser = (queryParamStr: string) => {
     const queryParamObj: { [key: string]: string } = {};
 
     const entries = new URLSearchParams(queryParamStr).entries();
-    let navPrefix = '?';
+    let navPrefix = '';
     let tsHostUrl = DEFAULT_PREVIEW_HOST;
 
     for (const [key, value] of entries) {
@@ -48,7 +48,8 @@ export const queryStringParser = (queryParamStr: string) => {
     );
 
     // prepare and set 'Main Navigation' links URL prefix
-    navPrefix += TS_PAGE_ID_PARAM;
+    // navPrefix += TS_PAGE_ID_PARAM;
+    // when using the / based system we dont need to prefix with pageid
     queryParamObj[NAV_PREFIX] = navPrefix;
 
     // prepare and set 'Preview in Playground' button URL prefix

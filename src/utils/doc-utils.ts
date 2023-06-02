@@ -28,7 +28,7 @@ export const fetchChild = (html: string) => {
     return data;
 };
 
-//Not being used anywhere
+// Not being used anywhere
 const getParentHref = (current) => {
     if (current.href) {
         return current.href;
@@ -45,7 +45,10 @@ export const getBreadcrumsPath = (data: any, pageid?: string) => {
     }
 
     return data.reduce((previous, current) => {
-        if (current.href === `?pageid=${pageid}`) {
+        if (
+            current.href === `?pageid=${pageid}` ||
+            current.href === `/${pageid}`
+        ) {
             // To avoid having link for the same page we are setting href to null
             return [{ name: current.name, href: null }];
         }

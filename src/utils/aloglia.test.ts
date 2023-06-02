@@ -70,6 +70,7 @@ const asciiAlgoliaObj = {
     sectionTitle: 'Resource endpoints',
     title: 'About REST APIs',
     type: 'ASCII',
+    link: '/rest-apis',
 };
 
 const asciiPremableAlgoliaObj = {
@@ -80,6 +81,7 @@ const asciiPremableAlgoliaObj = {
     sectionTitle: 'About REST APIs',
     title: 'About REST APIs',
     type: 'ASCII',
+    link: '/rest-apis',
 };
 
 const algoliaTransformerData:any = {
@@ -120,11 +122,11 @@ describe('test cases from algolia search', () => {
     });
 
     it('verify Algolia transformer data', () => {
+        // TODO : sending only asciiodc nodes skipping typedoc
         expect(algoliaSearch.queries[0].transformer({data: algoliaTransformerData}))
         .toStrictEqual([
             asciiAlgoliaObj,
-            asciiPremableAlgoliaObj,
-            typedocAlgoliaObj
+            asciiPremableAlgoliaObj
         ]);
     });
 });

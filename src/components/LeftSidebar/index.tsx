@@ -55,10 +55,14 @@ const LeftSideBar = (props: {
         const pageid =
             removeTrailingSlash(props.location.pathname).replace(/^\/*/, '') ||
             getPageIdFromUrl(props.location.href);
+<<<<<<< HEAD
         const tag = divElement.querySelector(
             `a[href='${params[NAV_PREFIX]}=${pageid}']`,
         );
 
+=======
+        const tag = divElement.querySelector(`a[href='/${pageid}']`);
+>>>>>>> 9-3-refresh
         if (tag) {
             tag.classList.add('active');
         }
