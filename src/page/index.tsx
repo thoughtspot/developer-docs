@@ -412,7 +412,7 @@ const IndexPage = ({ location }) => {
                         window.parent.postMessage(
                             {
                                 type: 'url-change',
-                                data: searchParams.toString(),
+                                data: event.data.data,
                             },
                             '*',
                         );
