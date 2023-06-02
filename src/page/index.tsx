@@ -406,9 +406,17 @@ const IndexPage = ({ location }) => {
                     const currentUrl = window.location.search;
                     var searchParams = new URLSearchParams(currentUrl);
                     searchParams.set('apiResourceId', event.data.data);
-                    const newUrl =
-                        getParentURL() + '?' + searchParams?.toString();
-                    window.history.replaceState(null, '', newUrl);
+                    const newUrl = `${getParentURL()}?${searchParams?.toString()}`;
+                    if (window.self !== window.top) {
+                        const queryParams = window.location.href.split('#/')[1];
+                        window.parent.postMessage(
+                            {
+                                type: 'url-change',
+                                data: searchParams.toString(),
+                            },
+                            '*',
+                        );
+                    } else window.history.replaceState(null, '', newUrl);
                 }
             }
         };
