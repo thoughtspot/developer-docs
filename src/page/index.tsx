@@ -46,6 +46,12 @@ import { SearchQueryResult } from '../interfaces';
 import { getAllPageIds } from '../components/LeftSidebar/helper';
 import t from '../utils/lang-utils';
 
+const EXTERNAL_PLAYGROUND_EVENTS = {
+    READY: 'api-playground-ready',
+    URL_CHANGE: 'url-change',
+    CONFIG: 'api-playground-config',
+};
+
 // markup
 const IndexPage = ({ location }) => {
     const { width, ref } = useResizeDetector();
@@ -83,7 +89,14 @@ const IndexPage = ({ location }) => {
         CUSTOM_PAGE_ID.API_PLAYGROUND === params[TS_PAGE_ID_PARAM];
 
     const playgroundRef = React.useRef<HTMLIFrameElement>(null);
-    const apiResourceConfig = React.useRef<string>(null);
+
+    const isBrowser = () => typeof window !== 'undefined';
+
+    const getApiResourceId = () => {
+        if (!isBrowser()) return '';
+        const params = new URLSearchParams(window?.location?.search);
+        return params.get('apiResourceId') ?? '';
+    };
 
     const playgroundUrlTemplate = _.template(
         // eslint-disable-next-line no-template-curly-in-string
@@ -272,8 +285,6 @@ const IndexPage = ({ location }) => {
     const isExternal = () =>
         !location?.href?.includes('developers.thoughtspot.com/docs');
 
-    const isBrowser = () => typeof window !== 'undefined';
-
     const getParentURL = () => {
         let parentUrl = location?.origin;
         if (isBrowser()) {
@@ -357,12 +368,12 @@ const IndexPage = ({ location }) => {
             const config = {
                 baseUrl,
                 accessToken: token,
-                apiResourceId: apiResourceConfig?.current,
+                apiResourceId: getApiResourceId(),
             };
             const playgroundOrigin = new URL(playgroundUrl)?.origin || '*';
             playgroundRef?.current?.contentWindow?.postMessage(
                 {
-                    type: 'api-playground-config', //EXTERNAL_PLAYGROUND_EVENTS.CONFIG,
+                    type: EXTERNAL_PLAYGROUND_EVENTS.CONFIG,
                     ...config,
                 },
                 playgroundOrigin,
@@ -387,6 +398,23 @@ const IndexPage = ({ location }) => {
             />
         </div>
     );
+
+    React.useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            if (event.data?.type === EXTERNAL_PLAYGROUND_EVENTS.URL_CHANGE) {
+                if (event.data?.data && event.data.data !== 'http') {
+                    const currentUrl = window.location.search;
+                    var searchParams = new URLSearchParams(currentUrl);
+                    searchParams.set('apiResourceId', event.data.data);
+                    const newUrl =
+                        getParentURL() + '?' + searchParams?.toString();
+                    window.history.replaceState(null, '', newUrl);
+                }
+            }
+        };
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, []);
 
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
