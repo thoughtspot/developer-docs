@@ -400,12 +400,10 @@ const IndexPage = ({ location }) => {
         const handler = (event: MessageEvent) => {
             if (event.data?.type === EXTERNAL_PLAYGROUND_EVENTS.URL_CHANGE) {
                 if (event.data?.data && event.data.data !== 'http') {
-                    const currentUrl = window.location.search;
-                    var searchParams = new URLSearchParams(currentUrl);
+                    const queryParams = window.location.search;
+                    var searchParams = new URLSearchParams(queryParams);
                     searchParams.set('apiResourceId', event.data.data);
-                    const newUrl = `${getParentURL()}?${searchParams?.toString()}`;
                     if (window.self !== window.top) {
-                        const queryParams = window.location.href.split('#/')[1];
                         window.parent.postMessage(
                             {
                                 type: 'url-change',
@@ -413,7 +411,10 @@ const IndexPage = ({ location }) => {
                             },
                             '*',
                         );
-                    } else window.history.replaceState(null, '', newUrl);
+                    } else {
+                        const newUrl = `${getParentURL()}?${searchParams?.toString()}`;
+                        window.history.replaceState(null, '', newUrl);
+                    }
                 }
             }
         };
