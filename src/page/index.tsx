@@ -30,6 +30,7 @@ import {
     TS_SESSION_TOKEN,
     TS_INFO,
     CLUSTER_TYPES,
+    TS_REST_API_PLAYGROUND,
 } from '../configs/doc-configs';
 import {
     LEFT_NAV_WIDTH_DESKTOP,
@@ -50,6 +51,7 @@ const EXTERNAL_PLAYGROUND_EVENTS = {
     READY: 'api-playground-ready',
     URL_CHANGE: 'url-change',
     CONFIG: 'api-playground-config',
+    RENDER_PLAY_GROUND: 'render-play-ground',
 };
 
 // markup
@@ -201,7 +203,10 @@ const IndexPage = ({ location }) => {
         setBreadcrumsData(fetchChild(navContentData));
 
         // get & set left navigation 'Back' button url
-        setBackLink(params[TS_ORIGIN_PARAM]);
+        let backLinkPath = params[TS_ORIGIN_PARAM];
+        if (params[TS_ORIGIN_PARAM]?.includes(TS_REST_API_PLAYGROUND))
+            backLinkPath = params[PREVIEW_PREFIX];
+        setBackLink(backLinkPath);
 
         // set page title and content based on pageid
         setPageContent(params[TS_PAGE_ID_PARAM]);
@@ -364,6 +369,20 @@ const IndexPage = ({ location }) => {
     }, [params[TS_PAGE_ID_PARAM]]);
 
     React.useEffect(() => {
+        if (isAPIPlayGround && isAppEmbedded) {
+            setTimeout(() => {
+                window.parent.postMessage(
+                    {
+                        type: EXTERNAL_PLAYGROUND_EVENTS.RENDER_PLAY_GROUND,
+                        data: null,
+                    },
+                    '*',
+                );
+            }, 300);
+        }
+    }, [isAPIPlayGround]);
+
+    React.useEffect(() => {
         if (isPlaygroundReady) {
             const config = {
                 baseUrl,
@@ -399,16 +418,17 @@ const IndexPage = ({ location }) => {
         </div>
     );
 
+    const isAppEmbedded = isBrowser() && window.self !== window.top;
+
     React.useEffect(() => {
         const handler = (event: MessageEvent) => {
             if (event.data?.type === EXTERNAL_PLAYGROUND_EVENTS.URL_CHANGE) {
                 if (event.data?.data && event.data.data !== 'http') {
-                    const currentUrl = window.location.search;
-                    var searchParams = new URLSearchParams(currentUrl);
+                    const queryParams = window.location.search;
+                    var searchParams = new URLSearchParams(queryParams);
                     searchParams.set('apiResourceId', event.data.data);
                     const newUrl = `${getParentURL()}?${searchParams?.toString()}`;
-                    if (window.self !== window.top) {
-                        const queryParams = window.location.href.split('#/')[1];
+                    if (isAppEmbedded) {
                         window.parent.postMessage(
                             {
                                 type: 'url-change',
@@ -416,7 +436,10 @@ const IndexPage = ({ location }) => {
                             },
                             '*',
                         );
-                    } else window.history.replaceState(null, '', newUrl);
+                    } else {
+                        const newUrl = `${getParentURL()}?${searchParams?.toString()}`;
+                        window.history.replaceState(null, '', newUrl);
+                    }
                 }
             }
         };
@@ -454,7 +477,7 @@ const IndexPage = ({ location }) => {
     const getBackButtonLink = () => {
         const defaultPath = '?pageid=rest-api-v2';
         if (isBrowser() && window?.self !== window?.top) {
-            return `${getParentURL()}/#/develop/documentation/en/${defaultPath}`;
+            return params[TS_ORIGIN_PARAM];
         }
         return defaultPath;
     };
