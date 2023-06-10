@@ -41,11 +41,7 @@ import t from '../../utils/lang-utils';
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const { data, location } = props;
     // console.log('awd', props);
-    const {
-        curPageNode,
-        navNode,
-        allAsciidoc: { edges },
-    } = data;
+    const { curPageNode, navNode } = data;
     const { width, ref } = useResizeDetector();
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
@@ -81,10 +77,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         setIsPublicSiteOpen(isPublicSite(location.search));
 
         const paramObj = queryStringParser(location.search);
-        edges.map((e) => {
-            paramObj[e.node.parent.name] =
-                e.node.pageAttributes.pageid || NOT_FOUND_PAGE_ID;
-        });
+        // edges.map((e) => {
+        //     paramObj[e.node.parent.name] =
+        //         e.node.pageAttributes.pageid || NOT_FOUND_PAGE_ID;
+        // });
 
         setParams({ ...params, ...paramObj });
     }, [location.search]);
@@ -101,32 +97,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         );
     }, [location.search, location.hash]);
 
-    const setPageContent = (pageid: string = NOT_FOUND_PAGE_ID) => {
-        // check if url query param is having pageid or not
-        if (pageid) {
-            // fetch edge id for specified pageid in the url
-            const edgeIndex = edges.findIndex(
-                (i) => i.node.pageAttributes[TS_PAGE_ID_PARAM] === pageid,
-            );
-
-            // check if we have corresponding document to serve if not redirect to 404
-            if (edgeIndex > -1) {
-                // get and set page title
-                setDocTitle(
-                    edges[edgeIndex].node.document.title ||
-                        edges[edgeIndex].node.pageAttributes.title,
-                );
-
-                // get and set doc page content with dynamic data replaced
-                setDocContent(
-                    passThroughHandler(edges[edgeIndex].node.html, params),
-                );
-            } else {
-                // pageid not found redirect
-                setPageContent(NOT_FOUND_PAGE_ID);
-            }
-        }
-    };
     const setPageContentFromSingleNode = (node: AsciiDocNode) => {
         setDocTitle(node.document.title || node.pageAttributes.title);
 
@@ -254,6 +224,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         isMaxMobileResolution={isMaxMobileResolution}
                         setDarkMode={setDarkMode}
                         isDarkMode={isDarkMode}
+                        pageId={params[TS_PAGE_ID_PARAM]}
                     />
                     <div
                         className="documentBody"
@@ -332,26 +303,6 @@ export const query = graphql`
                 description
             }
             html
-        }
-        allAsciidoc(sort: { fields: [document___title], order: ASC }) {
-            edges {
-                node {
-                    document {
-                        title
-                    }
-                    pageAttributes {
-                        pageid
-                        title
-                        description
-                    }
-                    parent {
-                        ... on File {
-                            name
-                        }
-                    }
-                    html
-                }
-            }
         }
     }
 `;
