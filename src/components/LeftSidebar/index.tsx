@@ -39,6 +39,7 @@ const LeftSideBar = (props: {
     setLeftNavOpen: Function;
     isPublicSiteOpen: boolean;
     setDarkMode: Function;
+    pageId?: string;
 }) => {
     const params = queryStringParser(props.location.search);
     const [navContent, setNavContent] = useState('');

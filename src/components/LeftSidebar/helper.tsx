@@ -173,7 +173,7 @@ export const collapseAndExpandLeftNav = (
 export const getAllPageIds = (navContent: string): string[] => {
     const divElement = document.createElement('div');
     divElement.innerHTML = navContent;
-    const allPageIds = [];
+    const allPageIds: string[] = [];
     divElement.querySelectorAll('a').forEach((link: HTMLAnchorElement) => {
         const splitArr = link.href.split('?');
         if (splitArr.length > 1) {
