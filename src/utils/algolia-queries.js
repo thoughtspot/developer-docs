@@ -115,7 +115,7 @@ const queries = [
     {
         query: pageQuery,
         transformer: ({ data }) => {
-            return [
+            const data1 = [
                 ...data.allAsciidoc.edges
                     .filter(
                         (edge) =>
@@ -147,10 +147,16 @@ const queries = [
                         }
                         return [
                             ...acc,
-                            ...sections.reduce((accR, e) => [...accR, ...e]),
+                            ...sections.reduce(
+                                (accR, e) => [...accR, ...e],
+                                [],
+                            ),
                         ];
                     }, []),
             ];
+
+            console.log('hihii', data1.length);
+            return data1;
         },
         indexName: getAlgoliaIndex(),
         settings: {

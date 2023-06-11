@@ -82,8 +82,6 @@ export const passThroughHandler = (html: string, params: object) => {
     const customPassThroughStart = '{{';
     const customPassThroughEnd = '}}';
 
-    console.log(JSON.stringify(params));
-
     paramKeys.map((key) => {
         parsedHtml = parsedHtml.replace(
             new RegExp(

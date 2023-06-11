@@ -223,6 +223,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         isMaxMobileResolution={isMaxMobileResolution}
                         setDarkMode={setDarkMode}
                         isDarkMode={isDarkMode}
+                        curPageid={curPageNode.pageAttributes.pageid}
                     />
                     <div
                         className="documentBody"

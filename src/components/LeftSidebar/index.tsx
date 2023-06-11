@@ -39,6 +39,7 @@ const LeftSideBar = (props: {
     setLeftNavOpen: Function;
     isPublicSiteOpen: boolean;
     setDarkMode: Function;
+    curPageid: string;
 }) => {
     const params = queryStringParser(props.location.search);
     const [navContent, setNavContent] = useState('');
@@ -85,9 +86,9 @@ const LeftSideBar = (props: {
             ref.current as HTMLDivElement,
             props.setLeftNavOpen,
             toggleExpandOnTab,
-            params[TS_PAGE_ID_PARAM],
+            props.curPageid,
         );
-    }, [params[TS_PAGE_ID_PARAM], isMaxMobileResolution, navContent]);
+    }, [props.curPageid, isMaxMobileResolution, navContent]);
 
     const onMenuClick = () => {
         props.setLeftNavOpen(!props.leftNavOpen);

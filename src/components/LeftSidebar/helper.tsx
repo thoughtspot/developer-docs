@@ -91,10 +91,15 @@ const isLinkMatching = (
     pageid: string,
 ) => {
     if (!href || !curLocation) return false;
-    return href.includes(`pageid=${pageid}`) || href.includes(`/${pageid}`);
+
+    return (
+        href.includes(`pageid=${pageid}`) ||
+        href.includes(`/${pageid}#`) ||
+        href.endsWith(`/${pageid}`)
+    );
 };
 
-const isCurrentNavOpen = (liEle: HTMLLIElement, pageid: string) => {
+const isCurrentNavOpen = (liEle: HTMLLIElement, activePageid: string) => {
     const paraEle = liEle.children[0] as HTMLParagraphElement;
     const divEle = liEle.children[1] as HTMLDivElement;
     const isLinkParentOpen =
@@ -102,14 +107,17 @@ const isCurrentNavOpen = (liEle: HTMLLIElement, pageid: string) => {
         isLinkMatching(
             (paraEle.children[0] as HTMLAnchorElement).href,
             window.location,
-            pageid,
+            activePageid,
         );
 
     const isChildOpen: boolean =
         divEle &&
         Array.from(divEle.children[0].children)
             .map((childLiEle): boolean => {
-                return isCurrentNavOpen(childLiEle as HTMLLIElement, pageid);
+                return isCurrentNavOpen(
+                    childLiEle as HTMLLIElement,
+                    activePageid,
+                );
             })
             .reduce((prev, cur) => {
                 return prev || cur;
@@ -122,7 +130,7 @@ export const collapseAndExpandLeftNav = (
     doc: HTMLDivElement,
     setLeftNavOpen: Function,
     toggleExpandOnTab: Function,
-    pageid: string,
+    activePageid: string,
 ) => {
     // Adding click listener to close left nav when in mobile resolution
     doc.querySelectorAll(selectors.links).forEach((link) => {
@@ -138,7 +146,7 @@ export const collapseAndExpandLeftNav = (
                     ? el.children[0].children[1]
                     : el.children[0].children[0];
 
-            const isOpen = isCurrentNavOpen(el, pageid);
+            const isOpen = isCurrentNavOpen(el, activePageid);
             const divElement = el.children[1];
             if (!isOpen) {
                 divElement.classList.toggle('displayNone');
@@ -172,7 +180,7 @@ export const collapseAndExpandLeftNav = (
 export const getAllPageIds = (navContent: string): string[] => {
     const divElement = document.createElement('div');
     divElement.innerHTML = navContent;
-    const allPageIds = [];
+    const allPageIds: string[] = [];
     divElement.querySelectorAll('a').forEach((link: HTMLAnchorElement) => {
         const splitArr = link.href.split('?');
         if (splitArr.length > 1) {
