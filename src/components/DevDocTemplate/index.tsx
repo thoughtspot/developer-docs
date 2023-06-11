@@ -33,19 +33,18 @@ import {
     MAX_CONTENT_WIDTH_DESKTOP,
     MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
 } from '../../constants/uiConstants';
-import { SearchQueryResult } from '../../interfaces';
 import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
 
 // markup
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
-    const { data, location } = props;
-    // console.log('awd', props);
     const {
-        curPageNode,
-        navNode,
-        allAsciidoc: { edges },
-    } = data;
+        data,
+        location,
+        pageContext: { namePageIdMap },
+    } = props;
+
+    const { curPageNode, navNode } = data;
     const { width, ref } = useResizeDetector();
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
@@ -61,7 +60,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [navContent, setNavContent] = useState('');
     const [breadcrumsData, setBreadcrumsData] = useState([]);
     const [backLink, setBackLink] = useState('');
-    const [allPageIds, setAllPageIds] = useState([]);
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
             ? LEFT_NAV_WIDTH_DESKTOP
@@ -81,12 +79,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         setIsPublicSiteOpen(isPublicSite(location.search));
 
         const paramObj = queryStringParser(location.search);
-        edges.map((e) => {
-            paramObj[e.node.parent.name] =
-                e.node.pageAttributes.pageid || NOT_FOUND_PAGE_ID;
-        });
 
-        setParams({ ...params, ...paramObj });
+        setParams({ ...paramObj, ...params });
     }, [location.search]);
 
     useEffect(() => {
@@ -101,32 +95,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         );
     }, [location.search, location.hash]);
 
-    const setPageContent = (pageid: string = NOT_FOUND_PAGE_ID) => {
-        // check if url query param is having pageid or not
-        if (pageid) {
-            // fetch edge id for specified pageid in the url
-            const edgeIndex = edges.findIndex(
-                (i) => i.node.pageAttributes[TS_PAGE_ID_PARAM] === pageid,
-            );
-
-            // check if we have corresponding document to serve if not redirect to 404
-            if (edgeIndex > -1) {
-                // get and set page title
-                setDocTitle(
-                    edges[edgeIndex].node.document.title ||
-                        edges[edgeIndex].node.pageAttributes.title,
-                );
-
-                // get and set doc page content with dynamic data replaced
-                setDocContent(
-                    passThroughHandler(edges[edgeIndex].node.html, params),
-                );
-            } else {
-                // pageid not found redirect
-                setPageContent(NOT_FOUND_PAGE_ID);
-            }
-        }
-    };
     const setPageContentFromSingleNode = (node: AsciiDocNode) => {
         setDocTitle(node.document.title || node.pageAttributes.title);
 
@@ -135,8 +103,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             node.document.description || node.pageAttributes.description,
         );
         // get and set doc page content with dynamic data replaced
-        setDocContent(passThroughHandler(node.html, params));
+        setDocContent(
+            passThroughHandler(node.html, { ...params, ...namePageIdMap }),
+        );
     };
+
     useEffect(() => {
         // get & set left navigation title
         setNavTitle(navNode.pageAttributes.title);
@@ -157,11 +128,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     // fetch adoc translated doc edges using graphql
 
-    useEffect(() => {
-        setAllPageIds(getAllPageIds(navContent));
-    }, [navContent]);
     const [results, setResults] = useState([]);
-
     const searchClient = React.useMemo(
         () =>
             algoliasearch(
@@ -333,26 +300,6 @@ export const query = graphql`
             }
             html
         }
-        allAsciidoc(sort: { fields: [document___title], order: ASC }) {
-            edges {
-                node {
-                    document {
-                        title
-                    }
-                    pageAttributes {
-                        pageid
-                        title
-                        description
-                    }
-                    parent {
-                        ... on File {
-                            name
-                        }
-                    }
-                    html
-                }
-            }
-        }
     }
 `;
 
@@ -361,6 +308,11 @@ type DevDocTemplateProps = {
         curPageNode: AsciiDocNode;
         navNode: AsciiDocNode;
         allAsciidoc: any;
+    };
+    pageContext: {
+        namePageIdMap: {
+            [key: string]: string;
+        };
     };
     location: Location;
 };

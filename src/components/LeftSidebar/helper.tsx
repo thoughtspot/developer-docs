@@ -80,38 +80,36 @@ export const getPageIdFromUrl = (href: string) => {
     const pageid =
         pageidMatches && pageidMatches.length > 1 && pageidMatches[1];
 
+    // console.log(pageid);
+
     return pageid;
 };
 
-const isLinkMatching = (href: string, curLocation: Location) => {
-    const hostUrl = `${window.location.protocol}//${window.location.host}`;
-
-    if (href === trimTrailingSlash(hostUrl + window.location.pathname))
-        return true;
-
-    const pageid = getPageIdFromUrl(curLocation.href);
-
-    const newUrl = `${hostUrl}/${pageid}`;
-
-    return href === newUrl;
+const isLinkMatching = (
+    href: string | null,
+    curLocation: Location | null,
+    pageid: string,
+) => {
+    if (!href || !curLocation) return false;
+    return href.includes(`pageid=${pageid}`) || href.includes(`/${pageid}`);
 };
 
-const isCurrentNavOpen = (liEle: HTMLLIElement) => {
+const isCurrentNavOpen = (liEle: HTMLLIElement, pageid: string) => {
     const paraEle = liEle.children[0] as HTMLParagraphElement;
     const divEle = liEle.children[1] as HTMLDivElement;
-
     const isLinkParentOpen =
         paraEle &&
         isLinkMatching(
             (paraEle.children[0] as HTMLAnchorElement).href,
             window.location,
+            pageid,
         );
 
     const isChildOpen: boolean =
         divEle &&
         Array.from(divEle.children[0].children)
             .map((childLiEle): boolean => {
-                return isCurrentNavOpen(childLiEle as HTMLLIElement);
+                return isCurrentNavOpen(childLiEle as HTMLLIElement, pageid);
             })
             .reduce((prev, cur) => {
                 return prev || cur;
@@ -124,6 +122,7 @@ export const collapseAndExpandLeftNav = (
     doc: HTMLDivElement,
     setLeftNavOpen: Function,
     toggleExpandOnTab: Function,
+    pageid: string,
 ) => {
     // Adding click listener to close left nav when in mobile resolution
     doc.querySelectorAll(selectors.links).forEach((link) => {
@@ -139,7 +138,7 @@ export const collapseAndExpandLeftNav = (
                     ? el.children[0].children[1]
                     : el.children[0].children[0];
 
-            const isOpen = isCurrentNavOpen(el);
+            const isOpen = isCurrentNavOpen(el, pageid);
             const divElement = el.children[1];
             if (!isOpen) {
                 divElement.classList.toggle('displayNone');

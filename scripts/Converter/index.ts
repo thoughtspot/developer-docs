@@ -126,6 +126,7 @@ interface TypeAliasNode extends TypeDocNode {
 
 interface TypeDocLinkingNode extends TypeDocNode {
     parentId?: number;
+    signatures?: SignatureNode[];
 }
 
 const encodePageId = (pageId: string) => {
@@ -137,7 +138,7 @@ const encodePageId = (pageId: string) => {
 // To get the main content use the handleNode function
 class TypeDocParser {
     private covertTypeDocText = (text: string) => {
-        // convert all {@link Name#hash}
+        // convert all {@link Name.hash}
         // to xref:Name.adoc#hash[Name]
         const matches = text.match(/{@link [^{]+}/g);
         if (!matches) return text;
@@ -153,6 +154,14 @@ class TypeDocParser {
         return updatedText;
     };
 
+    // function to parse a tag
+    private parseTag(tag: TypeDocCommentTag): string {
+        if (tag.tag === 'group') return '';
+        if (tag.tag === 'version')
+            return `[version]#${tag.text.replace(/\n/g, '')}#\n`;
+        return `\n\`${tag.tag}\` : ${tag.text}\n\n\n`;
+    }
+
     private parseComment(comment: TypeDocComment | undefined): string {
         if (!comment) return '';
 
@@ -165,8 +174,7 @@ class TypeDocParser {
         const tags = comment?.tags;
         if (tags) {
             tags.forEach((tag) => {
-                if (tag.tag && tag.text)
-                    content += `\n\`${tag.tag}\` : ${tag.text}\n\n\n`;
+                content += this.parseTag(tag);
             });
         }
         return content;
@@ -211,7 +219,19 @@ class TypeDocParser {
 
     private childrenNameMap: Record<string, TypeDocLinkingNode> = {};
 
+    private groupMap: Record<string, TypeDocLinkingNode[]> = {};
+
     private generateMap = (node: TypeDocLinkingNode) => {
+        const groupTag =
+            node.comment?.tags?.filter((e) => e.tag === 'group')[0] ||
+            node?.signatures?.[0].comment?.tags?.filter(
+                (e) => e.tag === 'group',
+            )[0];
+        if (groupTag) {
+            if (!this.groupMap[groupTag.text])
+                this.groupMap[groupTag.text] = [];
+            this.groupMap[groupTag.text].push(node);
+        }
         if (!this.childrenIdMap[node.id]) this.childrenIdMap[node.id] = node;
         if (!this.childrenNameMap[node.name])
             this.childrenNameMap[node.name] = node;
@@ -228,6 +248,17 @@ class TypeDocParser {
     public handleMainNode = (node: TypeDocNode) => {
         const pageTitle = `= ${node.name}`;
 
+        let mainPageContent = '';
+
+        if (node.kindString === 'Enumeration') {
+            mainPageContent += '[cols="1,1,1,1,1"]\n|===\n';
+            node.children?.forEach((e) => {
+                mainPageContent += `| ${this.convertNodeToLink(e)}\n`;
+            });
+            mainPageContent += '| \n| \n| \n| \n';
+            mainPageContent += '|===\n';
+        }
+
         const groupContent = node.groups
             ?.map((group) => {
                 const groupHeading = `== ${group.title}`;
@@ -240,9 +271,12 @@ class TypeDocParser {
             })
             .join('\n\n');
 
-        return [pageTitle, this.parseComment(node.comment), groupContent].join(
-            '\n\n',
-        );
+        return [
+            pageTitle,
+            mainPageContent,
+            this.parseComment(node.comment),
+            groupContent,
+        ].join('\n\n');
     };
 
     public handleEnumMember = (enumMember: EnumerationMemberNode) => {
@@ -256,45 +290,44 @@ class TypeDocParser {
         ].join('\n');
     };
 
+    private convertNodeToLink = (node: TypeDocNode) => {
+        const parent = this.childrenIdMap[node.id]?.parentId;
+        if (parent === undefined) return node.name;
+
+        if (
+            this.childrenIdMap[parent]?.kindString ===
+            TypeDocReflectionKind.Project
+        ) {
+            return `xref:${node.name}.adoc[${node.name}]`;
+        }
+
+        const grandParent = this.childrenIdMap[parent]?.parentId;
+        if (grandParent === undefined) return node.name;
+
+        if (
+            this.childrenIdMap[grandParent]?.kindString ===
+            TypeDocReflectionKind.Project
+        ) {
+            let newLinkText = `xref:${this.childrenIdMap[parent].name}.adoc`;
+            newLinkText += `#_${node.name.toLowerCase()}`;
+            newLinkText += `[${node.name}]`;
+            return newLinkText;
+        }
+
+        return '';
+    };
+
     private convertNameToLink = (linkTo: string | undefined) => {
         if (!linkTo) return '';
 
         const [name, hash] = linkTo.split('.');
         if (!name) return '';
 
-        const parent = this.childrenNameMap[name]?.parentId;
-        if (parent === undefined) return name;
-
-        if (
-            this.childrenIdMap[parent]?.kindString ===
-            TypeDocReflectionKind.Project
-        ) {
-            let newLinkText = `xref:${name}.adoc`;
-            if (hash) {
-                newLinkText += `#${hash}`;
-            }
-            newLinkText += `[${name}]`;
-
-            return newLinkText;
+        if (hash) {
+            return `xref:${name}.adoc#_${hash.toLocaleLowerCase()}[${hash}]`;
         }
 
-        const grandParent = this.childrenIdMap[parent]?.parentId;
-
-        if (grandParent === undefined) return name;
-
-        if (
-            this.childrenIdMap[grandParent]?.kindString ===
-                TypeDocReflectionKind.Project &&
-            !hash
-        ) {
-            let newLinkText = `xref:${this.childrenIdMap[parent].name}.adoc`;
-            newLinkText += `#${name}`;
-            newLinkText += `[${name}]`;
-
-            return newLinkText;
-        }
-
-        return name;
+        return `xref:${name}.adoc[${name}]`;
     };
 
     // TODO : better handling for typeArg
@@ -580,8 +613,8 @@ class TypeDocParser {
 
             group.children.forEach((id) => {
                 const child = this.childrenIdMap[id];
-                groupContent += `| ${this.convertNameToLink(child.name)}\n`;
-                const pageId = `${child.kindString}/${child.name}`;
+                groupContent += `| ${this.convertNodeToLink(child)}\n`;
+                const pageId = `${child.kindString}_${child.name}`;
                 const heading = this.getHeadingString({
                     title: child.name,
                     pageId,
@@ -596,7 +629,7 @@ class TypeDocParser {
                 callBack(pageId, `${heading}\n\n${content}`);
             });
 
-            groupContent += '|===\n--\n\n';
+            groupContent += '| \n| \n|===\n--\n\n';
 
             callBack(groupPageId, `${groupHeading}\n\n${groupContent}`);
 
@@ -633,10 +666,11 @@ class TypedocConverter {
             typedocNode,
             indexPageId,
             (pageId, content) => {
+                const updatedPageId = pageId.replace('_', '/');
                 const filePath =
                     pageId === 'VisualEmbedSdkNavLinks'
-                        ? `modules/ROOT/pages/common/generated/typedoc/${pageId}.adoc`
-                        : `modules/ROOT/pages/generated/typedoc/${pageId}.adoc`;
+                        ? `modules/ROOT/pages/common/generated/typedoc/${updatedPageId}.adoc`
+                        : `modules/ROOT/pages/generated/typedoc/${updatedPageId}.adoc`;
                 this.writeFile(filePath, content);
             },
         );
@@ -644,6 +678,7 @@ class TypedocConverter {
 }
 
 const fileLink =
+    process.argv[2] ||
     'https://raw.githubusercontent.com/thoughtspot/visual-embed-sdk/main/static/typedoc/typedoc.json';
 
 const getFileFromUrl = async (url: string) => {

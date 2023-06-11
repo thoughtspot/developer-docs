@@ -77,7 +77,7 @@ class CustomDocConverter {
                 return `<a ${anchorMarkup}>${node.getText()}</a>`;
             }
         }
-
+        // console.log(node);
         return this.baseConverter.convert(node, transform);
     }
 }

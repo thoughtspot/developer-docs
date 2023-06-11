@@ -1,5 +1,8 @@
 const fsExtra = require('fs-extra');
-const { DOC_NAV_PAGE_ID } = require('./src/configs/doc-configs');
+const {
+    DOC_NAV_PAGE_ID,
+    NOT_FOUND_PAGE_ID,
+} = require('./src/configs/doc-configs');
 
 exports.onPostBuild = () => {
     fsExtra.copyFileSync(
@@ -20,19 +23,33 @@ exports.createPages = async function ({ actions, graphql }) {
                         pageAttributes {
                             pageid
                         }
+                        parent {
+                            ... on File {
+                                name
+                            }
+                        }
                     }
                 }
             }
         }
     `);
+
+    const namePageIdMap = {};
+    data.allAsciidoc.edges.forEach((e) => {
+        namePageIdMap[e.node.parent.name] =
+            e.node.pageAttributes.pageid || NOT_FOUND_PAGE_ID;
+    });
+
+    console.log(namePageIdMap);
     data.allAsciidoc.edges.forEach((edge) => {
         const { pageid: pageId } = edge.node.pageAttributes;
+
         actions.createPage({
             path: `/${pageId}`,
             component: require.resolve(
                 './src/components/DevDocTemplate/index.tsx',
             ),
-            context: { pageId, navId: DOC_NAV_PAGE_ID },
+            context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
         });
     });
 };
