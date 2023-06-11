@@ -69,6 +69,18 @@ query {
 }
 `;
 
+function splitStringIntoChunks(input, n) {
+    const chunkSize = Math.ceil(input.length / n);
+    const result = [];
+
+    for (let i = 0; i < input.length; i += chunkSize) {
+        const chunk = input.slice(i, i + chunkSize);
+        result.push(chunk);
+    }
+
+    return result;
+}
+
 const pageToAlgoliaRecordForASCII = (ele, type, node) => {
     const pageid = node.pageAttributes.pageid;
     let sectionId;
@@ -81,50 +93,22 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
         sectionTitle = node.document.title;
     }
 
-    let body = ele && getTextFromHtml(ele.innerHTML);
+    const body = ele && getTextFromHtml(ele.innerHTML);
     const len = new TextEncoder().encode(body).length;
 
-    if (len > 8000) {
-        body = '';
-    }
+    const numberOfChunks = len / 8000 + 1;
+    const chunks = splitStringIntoChunks(body, numberOfChunks);
 
-    return {
-        objectID: node.id + sectionId,
+    return chunks.map((chunk, i) => ({
+        objectID: `${node.id + sectionId}chunk_${i}`,
         sectionId,
         sectionTitle,
-        body,
+        body: chunk,
         pageid,
         type: 'ASCII',
         title: node.document.title,
         link: `/${pageid}`,
-    };
-};
-
-const pageToAlgoliaRecordForTypedoc = (node) => {
-    const pageid = node.name;
-    let body =
-        node && node.childHtmlRehype
-            ? getTextFromHtml(node.childHtmlRehype.html)
-            : '';
-
-    const len = new TextEncoder().encode(body).length;
-    // ignoring big objects for now
-    if (len > 8000) {
-        body = '';
-    }
-    return {
-        objectID: node.id,
-        body,
-        pageid,
-        typedoc: true,
-        type: node.extension,
-        title: node.childHtmlRehype.htmlAst.children.find(
-            (children) => children.tagName === 'title',
-        ).children[0].value,
-        link: `${getPath(config.DOC_REPO_NAME)}/${config.TYPE_DOC_PREFIX}/${
-            node.relativePath
-        }`,
-    };
+    }));
 };
 
 const queries = [
@@ -159,15 +143,13 @@ const queries = [
                                 ),
                         );
                         if (preamble) {
-                            acc = [...acc, preamble];
+                            acc = [...acc, ...preamble];
                         }
-                        return [...acc, ...sections];
+                        return [
+                            ...acc,
+                            ...sections.reduce((accR, e) => [...accR, ...e]),
+                        ];
                     }, []),
-                // ...data.allFile.edges
-                //     .filter((edge) => edge.node.extension === 'html')
-                //     .map((edge) => {
-                //         return edge && pageToAlgoliaRecordForTypedoc(edge.node);
-                //     }),
             ];
         },
         indexName: getAlgoliaIndex(),
@@ -179,6 +161,5 @@ const queries = [
 
 module.exports = {
     queries,
-    pageToAlgoliaRecordForTypedoc,
     pageToAlgoliaRecordForASCII,
 };

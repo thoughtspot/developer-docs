@@ -1,5 +1,5 @@
+import { JSDOM } from 'jsdom';
 import * as algoliaSearch from './algolia-queries';
-import {JSDOM} from 'jsdom';
 
 const typedocNode = {
     name: 'typeDoc Page',
@@ -7,15 +7,16 @@ const typedocNode = {
     childHtmlRehype: {
         html: '<div>typedoc HTML</div>',
         htmlAst: {
-            children: [ {
+            children: [
+                {
                     tagName: 'title',
                     children: [
                         {
                             value: '@thoughtspot/visual-embed-sdk',
-                        }
-                    ]
-                },  
-            ]
+                        },
+                    ],
+                },
+            ],
         },
     },
     extension: 'html',
@@ -63,7 +64,8 @@ const asciiNode = {
 };
 
 const asciiAlgoliaObj = {
-    body: 'ThoughtSpot API components or resources are represented by the URI endpoints.',
+    body:
+        'ThoughtSpot API components or resources are represented by the URI endpoints.',
     objectID: 'fa556896-4e38-5e7a-ab35-a45ee93d58ee_resource_endpoints',
     pageid: 'rest-apis',
     sectionId: '_resource_endpoints',
@@ -74,7 +76,8 @@ const asciiAlgoliaObj = {
 };
 
 const asciiPremableAlgoliaObj = {
-    body: 'ThoughtSpot REST APIs let you programmatically create ThoughtSpot objects.',
+    body:
+        'ThoughtSpot REST APIs let you programmatically create ThoughtSpot objects.',
     objectID: 'fa556896-4e38-5e7a-ab35-a45ee93d58eepreamble',
     pageid: 'rest-apis',
     sectionId: 'preamble',
@@ -84,49 +87,54 @@ const asciiPremableAlgoliaObj = {
     link: '/rest-apis',
 };
 
-const algoliaTransformerData:any = {
+const algoliaTransformerData: any = {
     allAsciidoc: {
         edges: [
             {
-                node:   {
+                node: {
                     ...asciiNode,
                     html: htmlForSectionEle,
                 },
             },
             {
-                node:   {
+                node: {
                     ...asciiNode,
                     html: htmlForPreambleEle,
-                }
-            }
-        ]
+                },
+            },
+        ],
     },
     allFile: {
-        edges: [{node:typedocNode}],
-    }
+        edges: [{ node: typedocNode }],
+    },
 };
 describe('test cases from algolia search', () => {
-
-    it('verify JSON object for typedoc', () => {
-        expect(algoliaSearch.pageToAlgoliaRecordForTypedoc(typedocNode)).toStrictEqual(typedocAlgoliaObj);
-    });
-
     it('verify section JSON object for ascii docs', () => {
-        expect(algoliaSearch.pageToAlgoliaRecordForASCII(dummySectionEle,'section',asciiNode))
-        .toStrictEqual(asciiAlgoliaObj);
+        expect(
+            algoliaSearch.pageToAlgoliaRecordForASCII(
+                dummySectionEle,
+                'section',
+                asciiNode,
+            ),
+        ).toStrictEqual(asciiAlgoliaObj);
     });
 
     it('verify preable JSON object for ascii docs', () => {
-        expect(algoliaSearch.pageToAlgoliaRecordForASCII(dummyPreambleEle,'preamble',asciiNode))
-        .toStrictEqual(asciiPremableAlgoliaObj);
+        expect(
+            algoliaSearch.pageToAlgoliaRecordForASCII(
+                dummyPreambleEle,
+                'preamble',
+                asciiNode,
+            ),
+        ).toStrictEqual(asciiPremableAlgoliaObj);
     });
 
     it('verify Algolia transformer data', () => {
         // TODO : sending only asciiodc nodes skipping typedoc
-        expect(algoliaSearch.queries[0].transformer({data: algoliaTransformerData}))
-        .toStrictEqual([
-            asciiAlgoliaObj,
-            asciiPremableAlgoliaObj
-        ]);
+        expect(
+            algoliaSearch.queries[0].transformer({
+                data: algoliaTransformerData,
+            }),
+        ).toStrictEqual([asciiAlgoliaObj, asciiPremableAlgoliaObj]);
     });
 });

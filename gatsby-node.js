@@ -40,7 +40,6 @@ exports.createPages = async function ({ actions, graphql }) {
             e.node.pageAttributes.pageid || NOT_FOUND_PAGE_ID;
     });
 
-    console.log(namePageIdMap);
     data.allAsciidoc.edges.forEach((edge) => {
         const { pageid: pageId } = edge.node.pageAttributes;
 

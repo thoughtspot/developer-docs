@@ -1,5 +1,7 @@
 import React, { useState, useEffect, FC } from 'react';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { graphql, navigate } from 'gatsby';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
 import { Seo } from '../Seo';

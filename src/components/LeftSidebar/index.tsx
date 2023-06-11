@@ -71,6 +71,15 @@ const LeftSideBar = (props: {
         props.handleLeftNavChange(ref.current.offsetWidth);
     }, [width]);
 
+    const toggleExpandOnTab = (text: string) => {
+        const allTabsRef = { ...expandedTabsRef.current };
+        if (allTabsRef[text] !== undefined) {
+            allTabsRef[text] = !allTabsRef[text];
+        } else {
+            allTabsRef[text] = true;
+        }
+        expandedTabsRef.current = { ...allTabsRef };
+    };
     useEffect(() => {
         collapseAndExpandLeftNav(
             ref.current as HTMLDivElement,
@@ -83,16 +92,6 @@ const LeftSideBar = (props: {
     const onMenuClick = () => {
         props.setLeftNavOpen(!props.leftNavOpen);
         document.documentElement.scrollTop = 0;
-    };
-
-    const toggleExpandOnTab = (text: string) => {
-        const allTabsRef = { ...expandedTabsRef.current };
-        if (allTabsRef[text] !== undefined) {
-            allTabsRef[text] = !allTabsRef[text];
-        } else {
-            allTabsRef[text] = true;
-        }
-        expandedTabsRef.current = { ...allTabsRef };
     };
 
     const renderLeftNav = () => {
