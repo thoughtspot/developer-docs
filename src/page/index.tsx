@@ -295,6 +295,7 @@ const IndexPage = ({ location }) => {
                     isMaxMobileResolution={isMaxMobileResolution}
                     setDarkMode={setDarkMode}
                     isDarkMode={isDarkMode}
+                    curPageid={params[TS_PAGE_ID_PARAM]}
                 />
                 <div
                     className="documentBody"
