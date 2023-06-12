@@ -5,22 +5,23 @@ import './index.scss';
 
 const Dropdown = (props: { location: Location }) => {
     const { location } = props;
-    const [currentVersion, setCurrentVersion] = useState({});
     const options = VERSION_DROPDOWN;
+    const [currentVersion, setCurrentVersion] = useState({});
     useEffect(() => {
-        const pathname = location.pathname;
-        const selectedOption = options.find(({ link }) => {
-            return pathname.includes(link);
-        });
-        setCurrentVersion(selectedOption);
+        const params = new URLSearchParams(location.search);
+        const version = params.get('version');
+        const selectedOption =
+            options.find(({ link }) => {
+                return link.includes(version);
+            }) || options[0];
+        if (selectedOption) setCurrentVersion(selectedOption);
     }, []);
 
-    const handelClick = (link) => {
-        if (currentVersion?.link) {
-            const previousLink = currentVersion.link;
-            const url = location.href.replace(previousLink, link);
-            window.open(url, '_self');
-        }
+    const handelClick = (link: string) => {
+        const params = new URLSearchParams(location.search);
+        params.set('version', link);
+        const url = location.origin + '?' + params.toString();
+        window.open(url, '_self');
     };
 
     if (!currentVersion?.link) {
@@ -37,7 +38,11 @@ const Dropdown = (props: { location: Location }) => {
                 <div className="dropdownContent">
                     {options.map(({ label, link }) => {
                         return (
-                            <div data-testid={`option-${label}`} key={link} onClick={() => handelClick(link)}>
+                            <div
+                                data-testid={`option-${label}`}
+                                key={link}
+                                onClick={() => handelClick(link)}
+                            >
                                 {label}
                             </div>
                         );
