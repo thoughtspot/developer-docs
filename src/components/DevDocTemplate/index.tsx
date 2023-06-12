@@ -365,7 +365,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         const defaultPath = 'rest-api-v2';
         if (isBrowser() && window?.self !== window?.top) {
             return `${getParentURL()}/#/develop/documentation/en/?pageid=rest-api-v2`;
-            // return params[TS_ORIGIN_PARAM];
         }
         return defaultPath;
     };
