@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown';
-import { VERSION_DROPDOWN } from '../../configs/doc-configs';
+import { VERSION_DROPDOWN, TS_Version } from '../../configs/doc-configs';
 import './index.scss';
 
 const Dropdown = (props: { location: Location }) => {
@@ -9,7 +9,8 @@ const Dropdown = (props: { location: Location }) => {
     const [currentVersion, setCurrentVersion] = useState({});
     useEffect(() => {
         const params = new URLSearchParams(location.search);
-        const version = params.get('version');
+        const version =
+            params.get('version') || localStorage.getItem('version');
         const selectedOption =
             options.find(({ link }) => {
                 return link.includes(version);
@@ -22,6 +23,7 @@ const Dropdown = (props: { location: Location }) => {
         params.set('version', link);
         const url = location.origin + '?' + params.toString();
         window.open(url, '_self');
+        localStorage.setItem('version', link);
     };
 
     if (!currentVersion?.link) {
@@ -32,11 +34,12 @@ const Dropdown = (props: { location: Location }) => {
         <div className="dropdownWrapper">
             <div className="dropdown">
                 <button className="dropbtn">
-                    {currentVersion?.label}
+                    {`${TS_Version} ${currentVersion?.label}`}
+
                     <AiOutlineCaretDown className="arrowDown" />
                 </button>
                 <div className="dropdownContent">
-                    {options.map(({ label, link }) => {
+                    {options.map(({ label, link, subLabel }) => {
                         return (
                             <div
                                 data-testid={`option-${label}`}
@@ -44,6 +47,9 @@ const Dropdown = (props: { location: Location }) => {
                                 onClick={() => handelClick(link)}
                             >
                                 {label}
+                                <div className="subLabel">
+                                    <span>{subLabel}</span>
+                                </div>
                             </div>
                         );
                     })}
