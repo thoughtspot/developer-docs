@@ -21,6 +21,7 @@ module.exports = {
     TS_SESSION_TOKEN: '/prism/?op=GetSessionToken',
     TS_INFO: '/callosum/v1/session/info',
     TS_REST_API_PLAYGROUND: 'api/rest/playgroundV2_0',
+    TS_Version: 'Version',
     BUILD_ENVS: {
         PROD: 'PROD',
         DEV: 'DEV',
@@ -34,16 +35,19 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '9.5.0',
+            label: 'Cloud',
             link: '9.5.0',
+            subLabel: 'latest',
         },
         {
-            label: '9.4.0',
+            label: '8.5.0 sw',
             link: '9.4.0',
+            subLabel: 'Previous',
         },
         {
-            label: '9.3.0',
+            label: '9.3.0 sw',
             link: '9.3.0',
+            subLabel: 'Legacy',
         },
     ],
     CUSTOM_PAGE_ID: {
