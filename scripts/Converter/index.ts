@@ -85,7 +85,7 @@ interface TypeDocType {
     id?: number;
     name?: string;
     types?: TypeDocType[];
-    declaration?: TypeDocNode;
+    declaration?: TypeLiteralNode;
     typeArguments?: TypeDocType[];
     elementType?: TypeDocType;
     value?: string;
@@ -135,9 +135,24 @@ const encodePageId = (pageId: string) => {
 };
 
 // All the parse functions are to be used internally (its used to get sub content)
-// To get the main content use the handleNode function
-class TypeDocParser {
-    private covertTypeDocText = (text: string) => {
+class TypeDocInternalParser {
+    static convertNameToLink = (linkTo: string | undefined) => {
+        if (!linkTo) return '';
+
+        const [name, hash] = linkTo.split('.');
+        if (!name) return '';
+
+        if (hash) {
+            return `xref:${name}.adoc#_${hash.toLocaleLowerCase()}[${hash}]`;
+        }
+
+        return `xref:${name}.adoc[${name}]`;
+    };
+
+    static convertToItalic = (name: string | undefined) =>
+        name ? `_${name}_` : '';
+
+    static covertTypeDocText = (text: string) => {
         // convert all {@link Name.hash}
         // to xref:Name.adoc#hash[Name]
         const matches = text.match(/{@link [^{]+}/g);
@@ -155,14 +170,14 @@ class TypeDocParser {
     };
 
     // function to parse a tag
-    private parseTag(tag: TypeDocCommentTag): string {
+    static parseTag(tag: TypeDocCommentTag): string {
         if (tag.tag === 'group') return '';
         if (tag.tag === 'version')
             return `[version]#${tag.text.replace(/\n/g, '')}#\n`;
         return `\n\`${tag.tag}\` : ${tag.text}\n\n\n`;
     }
 
-    private parseComment(comment: TypeDocComment | undefined): string {
+    static parseComment(comment: TypeDocComment | undefined): string {
         if (!comment) return '';
 
         let content = '';
@@ -180,7 +195,7 @@ class TypeDocParser {
         return content;
     }
 
-    private parseSources = (sources: TypeDocSource[] | undefined) => {
+    static parseSources = (sources: TypeDocSource[] | undefined) => {
         if (!sources) return '';
         const GITHUB_LINK =
             'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
@@ -191,6 +206,132 @@ class TypeDocParser {
             )
             .join('\n');
     };
+
+    // TODO : better handling for typeArg
+    static parseTypeDocType = (
+        node: TypeDocType | undefined,
+        link = false,
+    ): string => {
+        let typeArg = '';
+        if (!node) return '';
+
+        if (node.typeArguments && node.typeArguments.length) {
+            typeArg = `< ${node.typeArguments
+                ?.map((type) => this.parseTypeDocType(type, link))
+                .join(', ')} >`;
+        }
+
+        switch (node.type) {
+            case 'literal':
+                if (link) return this.convertToItalic(node.name);
+                return `"${node.value}"`;
+            case 'intrinsic':
+                if (link)
+                    return this.convertToItalic(node.name) + typeArg || '';
+                return node.name + typeArg || '';
+            case 'reference': {
+                // since code block doesn't support links
+                if (link) return this.convertNameToLink(node.name) + typeArg;
+                return node.name + typeArg || '';
+            }
+            case 'union': {
+                return (
+                    node.types
+                        ?.map((type) => this.parseTypeDocType(type, link))
+                        .join(' | ') + typeArg || ''
+                );
+            }
+            case 'reflection': {
+                return (
+                    this.parseTypeLiteralNode(node.declaration, link) + typeArg
+                );
+            }
+            case 'array': {
+                return `${
+                    this.parseTypeDocType(node.elementType, link) + typeArg
+                }[]`;
+            }
+            default: {
+                console.error(`${node.type} not handled`);
+                return node.name || '';
+            }
+        }
+    };
+
+    // handles both call and constructor signature
+    static parseCallSignature = (node: SignatureNode, link?: boolean) => {
+        return `(${this.parseParameters(
+            node.parameters,
+            link,
+        )}) : ${this.parseTypeDocType(node.type, link)}`;
+    };
+
+    static parseIndexSignatures = (node: SignatureNode, link?: boolean) => {
+        return `{[${this.parseParameters(
+            node.parameters,
+            link,
+        )}] : ${this.parseTypeDocType(node.type, link)}}`;
+    };
+
+    static parseTypeLiteralNode = (
+        node: TypeLiteralNode | undefined,
+        link?: boolean,
+    ) => {
+        // 3 types
+        if (!node) return '';
+
+        if (node.indexSignature) {
+            return this.parseIndexSignatures(node.indexSignature, link);
+        }
+        if (node.signatures) {
+            return node.signatures
+                .map((sig) => this.parseCallSignature(sig, link))
+                .join('\n\n');
+        }
+        if (node.children) {
+            return `{${this.parseParameters(
+                node.children as ParameterNode[],
+                link,
+            )}}`;
+        }
+        console.error(
+            `No handler defined for : ${node.kindString}, Name : ${node.name}`,
+        );
+        return '';
+    };
+
+    static parseParameters = (
+        parameters: ParameterNode[] | undefined,
+        link?: boolean,
+    ) => {
+        if (!parameters) return '';
+        return parameters
+            .map((param) => {
+                const isOptional =
+                    param.defaultValue !== undefined || param.flags?.isOptional
+                        ? '?'
+                        : '';
+
+                const defaultValue =
+                    param.defaultValue !== undefined
+                        ? `= ${param.defaultValue}`
+                        : '';
+                return `${param.name}${isOptional}: ${this.parseTypeDocType(
+                    param.type,
+                    link,
+                )} ${defaultValue}`;
+            })
+            .join(', ');
+    };
+}
+
+// To get the main content use the handleNode function
+class TypeDocParser {
+    private childrenIdMap: Record<number, TypeDocLinkingNode> = {};
+
+    private childrenNameMap: Record<string, TypeDocLinkingNode> = {};
+
+    private groupMap: Record<string, TypeDocLinkingNode[]> = {};
 
     private getHeadingString = (options: {
         toc?: boolean;
@@ -215,11 +356,21 @@ class TypeDocParser {
         ].join('\n');
     };
 
-    private childrenIdMap: Record<number, TypeDocLinkingNode> = {};
+    private createTypeDocTable = (
+        data: string[],
+        noOfColumns: number,
+    ): string => {
+        let content = `[cols="${'1,'.repeat(noOfColumns - 1)}1"]\n|===\n`;
+        data.forEach((str) => {
+            content += `| ${str}\n`;
+        });
 
-    private childrenNameMap: Record<string, TypeDocLinkingNode> = {};
-
-    private groupMap: Record<string, TypeDocLinkingNode[]> = {};
+        for (let i = 0; i < noOfColumns - 1; i++) {
+            content += '| \n';
+        }
+        content += '|===\n';
+        return content;
+    };
 
     private generateMap = (node: TypeDocLinkingNode) => {
         const groupTag =
@@ -242,52 +393,6 @@ class TypeDocParser {
             this.childrenNameMap[child.name] = child;
             this.generateMap(child);
         });
-    };
-
-    // handles the Main page nodes (Enum, Class, Interface, Type Alias)
-    public handleMainNode = (node: TypeDocNode) => {
-        const pageTitle = `= ${node.name}`;
-
-        let mainPageContent = '';
-
-        if (node.kindString === 'Enumeration') {
-            mainPageContent += '[cols="1,1,1,1,1"]\n|===\n';
-            node.children?.forEach((e) => {
-                mainPageContent += `| ${this.convertNodeToLink(e)}\n`;
-            });
-            mainPageContent += '| \n| \n| \n| \n';
-            mainPageContent += '|===\n';
-        }
-
-        const groupContent = node.groups
-            ?.map((group) => {
-                const groupHeading = `== ${group.title}`;
-                return [
-                    groupHeading,
-                    ...group.children.map((id) => {
-                        return this.convertTypeDocNode(this.childrenIdMap[id]);
-                    }),
-                ].join('\n\n');
-            })
-            .join('\n\n');
-
-        return [
-            pageTitle,
-            mainPageContent,
-            this.parseComment(node.comment),
-            groupContent,
-        ].join('\n\n');
-    };
-
-    public handleEnumMember = (enumMember: EnumerationMemberNode) => {
-        // debugger;
-        const sourceContent = this.parseSources(enumMember.sources);
-        return [
-            `=== ${enumMember.name}`,
-            `\`${enumMember.name}:= ${enumMember.defaultValue}\`\n`,
-            this.parseComment(enumMember.comment),
-            sourceContent,
-        ].join('\n');
     };
 
     private convertNodeToLink = (node: TypeDocNode) => {
@@ -317,115 +422,77 @@ class TypeDocParser {
         return '';
     };
 
-    private convertNameToLink = (linkTo: string | undefined) => {
-        if (!linkTo) return '';
+    // handles the Main page nodes (Enum, Class, Interface, Type Alias)
+    private handleMainNode = (node: TypeDocNode) => {
+        const pageTitle = `= ${node.name}`;
 
-        const [name, hash] = linkTo.split('.');
-        if (!name) return '';
+        let mainPageContent = '';
 
-        if (hash) {
-            return `xref:${name}.adoc#_${hash.toLocaleLowerCase()}[${hash}]`;
+        // Special handling
+        if (node.kindString === 'Enumeration') {
+            mainPageContent += this.createTypeDocTable(
+                node.children?.map(this.convertNodeToLink) || [],
+                5,
+            );
         }
 
-        return `xref:${name}.adoc[${name}]`;
-    };
-
-    // TODO : better handling for typeArg
-    private parseTypeDocType = (
-        node: TypeDocType | undefined,
-        link = false,
-    ): string => {
-        let typeArg = '';
-        if (!node) return '';
-
-        if (node.typeArguments && node.typeArguments.length) {
-            typeArg = `<${node.typeArguments
-                ?.map((type) => this.parseTypeDocType(type, link))
-                .join(', ')}>`;
-        }
-
-        switch (node.type) {
-            case 'literal':
-                return `"${node.value}"`;
-            case 'intrinsic':
-                return node.name + typeArg || '';
-            case 'reference': {
-                // since code block doesn't support links
-                if (link) return this.convertNameToLink(node.name) + typeArg;
-                return node.name + typeArg || '';
-            }
-            case 'union': {
-                return (
-                    node.types
-                        ?.map((type) => this.parseTypeDocType(type))
-                        .join(' | ') + typeArg || ''
-                );
-            }
-            case 'reflection': {
-                return this.convertTypeDocNode(node.declaration) + typeArg;
-            }
-            case 'array': {
-                return `${this.parseTypeDocType(node.elementType) + typeArg}[]`;
-            }
-            default: {
-                console.error(`${node.type} not handled`);
-                return node.name || '';
-            }
-        }
-    };
-
-    // handles both call and constructor signature
-    private parseCallSignature = (node: SignatureNode, link?: boolean) => {
-        return `(${this.parseParameters(
-            node.parameters,
-        )}) : ${this.parseTypeDocType(node.type, link)}`;
-    };
-
-    private parseIndexSignatures = (node: SignatureNode, link?: boolean) => {
-        return `[${this.parseParameters(
-            node.parameters,
-        )}] : ${this.parseTypeDocType(node.type, link)}`;
-    };
-
-    private parseParameters = (parameters: ParameterNode[] | undefined) => {
-        if (!parameters) return '';
-        return parameters
-            .map((param) => {
-                const isOptional =
-                    param.defaultValue !== undefined || param.flags?.isOptional
-                        ? '?'
-                        : '';
-
-                const defaultValue =
-                    param.defaultValue !== undefined
-                        ? `= ${param.defaultValue}`
-                        : '';
-                return `${param.name}${isOptional}: ${this.parseTypeDocType(
-                    param.type,
-                )} ${defaultValue}`;
+        // Crate content for children ( Enum members , Parameters, Properties, etc..)
+        const groupContent = node.groups
+            ?.map((group) => {
+                const groupHeading = `== ${group.title}`;
+                return [
+                    groupHeading,
+                    ...group.children.map((id) => {
+                        return this.convertTypeDocNode(this.childrenIdMap[id]);
+                    }),
+                ].join('\n\n');
             })
-            .join(', ');
+            .join('\n\n');
+
+        return [
+            pageTitle,
+            mainPageContent,
+            TypeDocInternalParser.parseComment(node.comment),
+            groupContent,
+        ].join('\n\n');
     };
 
-    public handleFunctionNode = (node: FunctionNode) => {
+    private handleEnumMember = (enumMember: EnumerationMemberNode) => {
+        // debugger;
+        const sourceContent = TypeDocInternalParser.parseSources(
+            enumMember.sources,
+        );
+        return [
+            `=== ${enumMember.name}`,
+            '[div typeDocBlock boxFullWidth]\n--',
+            `\`${enumMember.name}:= ${enumMember.defaultValue}\`\n`,
+            TypeDocInternalParser.parseComment(enumMember.comment),
+            sourceContent,
+            '--',
+        ].join('\n');
+    };
+
+    private handleFunctionNode = (node: FunctionNode) => {
         const name = `=== ${node.name}`;
 
         let overwrites = '';
         if (node.overwrites) {
-            overwrites = `\`Overrides ${this.parseTypeDocType(
+            overwrites = `\`Overrides ${TypeDocInternalParser.parseTypeDocType(
                 node.overwrites,
             )}\``;
         }
 
         let inheritedFrom = '';
         if (node.inheritedFrom) {
-            inheritedFrom = `\`Inherited from  ${this.parseTypeDocType(
+            inheritedFrom = `\`Inherited from  ${TypeDocInternalParser.parseTypeDocType(
                 node.inheritedFrom,
             )}\``;
         }
 
         const signatureContent = node.signatures.map((signature) => {
-            const sigText = signature.name + this.parseCallSignature(signature);
+            const sigText =
+                signature.name +
+                TypeDocInternalParser.parseCallSignature(signature);
 
             const detailedParamContent = signature.parameters
                 ?.map(this.convertTypeDocNode)
@@ -436,36 +503,116 @@ class TypeDocParser {
                 '[source, js]\n----',
                 sigText,
                 '----',
-                this.parseComment(signature.comment),
-                detailedParamContent && '==== Parameters',
+                TypeDocInternalParser.parseComment(signature.comment),
+                detailedParamContent && '`Parameters`',
                 detailedParamContent,
-                '==== Returns',
-                this.parseTypeDocType(signature.type, true),
+                '`Returns`',
+                TypeDocInternalParser.parseTypeDocType(signature.type, true),
+                TypeDocInternalParser.covertTypeDocText(
+                    signature.comment?.returns || '',
+                ),
             ].join('\n\n');
         });
 
-        const sources = this.parseSources(node.sources);
+        const sources = TypeDocInternalParser.parseSources(node.sources);
 
         return [
             name,
-            this.parseComment(node.comment),
+            TypeDocInternalParser.parseComment(node.comment),
+            sources,
+            '[div typeDocBlock boxFullWidth]\n--',
             overwrites,
             inheritedFrom,
             sources,
             signatureContent,
+            '--',
         ].join('\n\n');
     };
 
-    public handleParameterNode = (node: ParameterNode) => {
+    private handleParameterNode = (node: ParameterNode) => {
         return [
-            `* ${node.name}: ${this.parseTypeDocType(node.type, true)}${
-                node?.defaultValue ? ` = ${node.defaultValue}` : ''
-            }`,
-            this.parseComment(node.comment),
+            `=== ${node.name}`,
+            node.flags.isOptional ? '`optional`' : '',
+            `* ${node.name}: ${TypeDocInternalParser.parseTypeDocType(
+                node.type,
+                true,
+            )}${node?.defaultValue ? ` = ${node.defaultValue}` : ''}`,
+            TypeDocInternalParser.parseComment(node.comment),
+            this.handleTypeNode(node.type),
         ].join('\n\n');
     };
 
-    public convertTypeDocNode = (rootNode: TypeDocNode | undefined): string => {
+    private handlePropertyNode = (node: ParameterNode) => {
+        return [
+            `=== ${node.name}`,
+            '[div typeDocBlock boxFullWidth]\n--',
+            node.flags.isOptional ? '`optional`' : '',
+            `* ${node.name}: ${TypeDocInternalParser.parseTypeDocType(
+                node.type,
+                true,
+            )}${node?.defaultValue ? ` = ${node.defaultValue}` : ''}`,
+            TypeDocInternalParser.parseComment(node.comment),
+            this.handleTypeNode(node.type),
+            '--\n',
+        ].join('\n\n');
+    };
+
+    private handleTypeLiteralNode = (
+        node: TypeLiteralNode | undefined,
+        link?: boolean,
+    ) => {
+        if (!node) return '';
+
+        let content = '';
+        if (node.indexSignature?.parameters) {
+            content += 'Index Signature Parameters\n\n';
+            node.indexSignature.parameters
+                .map(this.convertTypeDocNode)
+                .join('\n\n');
+        } else if (node.signatures) {
+            content += 'Parameters\n\n';
+            content += node.signatures
+                .map(
+                    (sig) =>
+                        `${TypeDocInternalParser.parseCallSignature(
+                            sig,
+                            link,
+                        )}\n\n${sig.parameters
+                            ?.map(this.convertTypeDocNode)
+                            .join('\n\n')}`,
+                )
+                .join('\n\n');
+        } else if (node.children) {
+            content += 'Parameters\n\n';
+            content += node.children.map(this.convertTypeDocNode).join('\n\n');
+        }
+
+        return content;
+    };
+
+    private handleTypeNode = (node: TypeDocType | undefined) => {
+        const content = [
+            TypeDocInternalParser.parseComment(node?.declaration?.comment),
+        ].join('\n\n');
+
+        return content;
+    };
+
+    private handleTypeAliasNode = (node: TypeAliasNode) => {
+        return [
+            `= ${node.name}`,
+            `[source, js]\n----\n${
+                node.name
+            } : ${TypeDocInternalParser.parseTypeDocType(node.type)}\n----`,
+            TypeDocInternalParser.parseSources(node.sources),
+            TypeDocInternalParser.parseComment(node.comment),
+            `${this.handleTypeNode(node.type)}`,
+        ].join('\n\n');
+    };
+
+    private convertTypeDocNode = (
+        rootNode: TypeDocNode | undefined,
+    ): string => {
         if (!rootNode) return '';
         switch (rootNode.kindString) {
             case TypeDocReflectionKind.Enumeration: {
@@ -493,13 +640,13 @@ class TypeDocParser {
                 return this.handleParameterNode(rootNode as ParameterNode);
             }
             case TypeDocReflectionKind.Property: {
-                return this.handleParameterNode(rootNode as ParameterNode);
+                return this.handlePropertyNode(rootNode as ParameterNode);
             }
             case TypeDocReflectionKind.TypeAlias: {
                 return this.handleTypeAliasNode(rootNode as TypeAliasNode);
             }
             case TypeDocReflectionKind.TypeLiteral: {
-                return this.parseTypeLiteralNode(rootNode as TypeLiteralNode);
+                return this.handleTypeLiteralNode(rootNode as TypeLiteralNode);
             }
             default: {
                 console.error(
@@ -510,80 +657,13 @@ class TypeDocParser {
         }
     };
 
-    private parseTypeLiteralNode = (node: TypeLiteralNode) => {
-        // 3 types
-
-        if (node.indexSignature) {
-            return this.parseIndexSignatures(node.indexSignature);
-        }
-        if (node.signatures) {
-            return node.signatures
-                .map((sig) => this.parseCallSignature(sig))
-                .join('\n\n');
-        }
-        if (node.children) {
-            return `{${this.parseParameters(
-                node.children as ParameterNode[],
-            )}}`;
-        }
-        console.error(
-            `No handler defined for : ${node.kindString}, Name : ${node.name}`,
-        );
-        return '';
-    };
-
-    private handleTypeLiteralNode = (node: TypeLiteralNode | undefined) => {
-        if (!node) return '';
-
-        let content = '';
-        if (node.indexSignature?.parameters) {
-            content += '== Parameters\n\n';
-            node.indexSignature.parameters
-                .map(this.convertTypeDocNode)
-                .join('\n\n');
-        }
-        if (node.signatures) {
-            content += '== Index Signature Parameters\n\n';
-            content += node.signatures
-                .map(
-                    (sig) =>
-                        `${this.parseCallSignature(
-                            sig,
-                        )}\n\n${sig.parameters
-                            ?.map(this.convertTypeDocNode)
-                            .join('\n\n')}`,
-                )
-                .join('\n\n');
-        }
-        if (node.children) {
-            content += '== Parameters\n\n';
-            content += node.children.map(this.convertTypeDocNode).join('\n\n');
-        }
-
-        return content;
-    };
-
-    public handleTypeAliasNode = (node: TypeAliasNode) => {
-        return [
-            `= ${node.name}`,
-            `[source, js]\n----\n${node.name} : ${this.parseTypeDocType(
-                node.type,
-            )}\n----`,
-            this.parseSources(node.sources),
-            this.parseComment(node.comment),
-            `${this.convertTypeDocNode(node.type.declaration)}`,
-        ].join('\n\n');
-    };
-
     public handleProjectNode = (
         node: TypeDocNode,
         indexPageId = 'VisualEmbedSdk',
         callBack: (pageId: string, content: string) => void,
     ) => {
         const projectNode = node;
-
         this.generateMap(projectNode);
-
         // creating an index page
         let indexPageContent = '= Visual Embed SDK\n\n';
         const indexPageHeading = this.getHeadingString({
@@ -597,7 +677,15 @@ class TypeDocParser {
         )}[Visual Embed SDK]\n`;
 
         projectNode?.groups?.forEach((group) => {
-            let groupContent = `== ${group.title}\n\n[div boxDiv boxFullWidth]\n--\n[cols="1,1,1"]\n|===\n`;
+            // create table group content
+            let groupContent = `== ${group.title}\n\n[div boxDiv boxFullWidth]\n--\n`;
+            groupContent += this.createTypeDocTable(
+                group.children.map((id) =>
+                    this.convertNodeToLink(this.childrenIdMap[id]),
+                ),
+                3,
+            );
+            groupContent += '--\n\n';
 
             const groupPageId = this.childrenIdMap[group.children[0]]
                 .kindString;
@@ -613,7 +701,6 @@ class TypeDocParser {
 
             group.children.forEach((id) => {
                 const child = this.childrenIdMap[id];
-                groupContent += `| ${this.convertNodeToLink(child)}\n`;
                 const pageId = `${child.kindString}_${child.name}`;
                 const heading = this.getHeadingString({
                     title: child.name,
@@ -628,8 +715,6 @@ class TypeDocParser {
                 const content = this.convertTypeDocNode(child);
                 callBack(pageId, `${heading}\n\n${content}`);
             });
-
-            groupContent += '| \n| \n|===\n--\n\n';
 
             callBack(groupPageId, `${groupHeading}\n\n${groupContent}`);
 
@@ -687,6 +772,7 @@ const getFileFromUrl = async (url: string) => {
 };
 
 const main = async () => {
+    debugger;
     console.info(`Reading file from : ${fileLink}`);
     const typeDocJson = await getFileFromUrl(fileLink);
     const typedoc = JSON.parse(typeDocJson);
