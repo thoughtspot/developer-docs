@@ -190,13 +190,17 @@ class TypeDocInternalParser {
 
     // function to parse a tag
     static parseTag(tag: TypeDocCommentTag): string {
+        if (!tag.tag.trim() || !tag.text.trim()) {
+            console.log('\t', 'Tag skipped ', JSON.stringify(tag));
+            return '';
+        }
         if (tag.tag === 'group') return '';
         if (tag.tag === 'version')
             return `[version]#Version : ${tag.text.replace(/\n/g, '')}#\n`;
         if (tag.tag === 'example') return `${tag.text}\n`;
 
-        if (!tag.tag.trim() || !tag.text) {
-            console.log('\t', 'Tag skipped ', JSON.stringify(tag));
+        if (tag.tag === 'param') {
+            return `Param:: ${tag.text.replace(/\n/g, '')}\n`;
         }
 
         return `\n\`${tag.tag}\` : ${this.covertTypeDocText(tag.text)} \n`;
@@ -597,7 +601,7 @@ class TypeDocParser {
     };
 
     private handleFunctionNode = (node: FunctionNode) => {
-        const name = `=== ${node.name}`;
+        const name = node.name !== 'constructor' ? `=== ${node.name}` : '';
 
         let overwrites = '';
         if (node.overwrites) {
@@ -620,11 +624,11 @@ class TypeDocParser {
         return [
             name,
             TypeDocInternalParser.parseComment(node.comment),
+            '[div typeDocBlock boxFullWidth]\n--',
+            signatureContent,
             sources,
             overwrites,
             inheritedFrom,
-            '[div typeDocBlock boxFullWidth]\n--',
-            signatureContent,
             TypeDocInternalParser.parseTags(node.comment?.tags),
             '--',
         ].join('\n\n');
