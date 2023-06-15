@@ -57,7 +57,7 @@ module.exports = {
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
-        VISUAL_EMBED_SDK: 'js-reference',
+        ASK_DOCS: 'ask-docs',
     },
     CLUSTER_TYPES: {
         PROD: 'PROD',
