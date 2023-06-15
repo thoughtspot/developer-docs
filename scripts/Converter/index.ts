@@ -134,6 +134,25 @@ const encodePageId = (pageId: string) => {
     return pageId.replace(/ /g, '%20');
 };
 
+// eslint-disable-next-line no-underscore-dangle
+const _indent = (
+    content: string,
+    indentDelim: string,
+    level: number,
+): string => {
+    if (!content || !indentDelim || !level) return content;
+
+    const lines = content.split('\n');
+
+    const indentChar = indentDelim.repeat(level);
+    const updateLines = lines.map((line) => {
+        if (line) return `${indentChar}\n${line}`;
+        return line;
+    });
+
+    return updateLines.join('\n');
+};
+
 // All the parse functions are to be used internally (its used to get sub content)
 class TypeDocInternalParser {
     static convertNameToLink = (linkTo: string | undefined) => {
@@ -173,8 +192,14 @@ class TypeDocInternalParser {
     static parseTag(tag: TypeDocCommentTag): string {
         if (tag.tag === 'group') return '';
         if (tag.tag === 'version')
-            return `[version]#${tag.text.replace(/\n/g, '')}#\n`;
-        return `\n\`${tag.tag}\` : ${tag.text}\n\n\n`;
+            return `[version]#Version : ${tag.text.replace(/\n/g, '')}#\n`;
+        if (tag.tag === 'example') return `${tag.text}\n`;
+
+        if (!tag.tag.trim() || !tag.text) {
+            console.log('\t', 'Tag skipped ', JSON.stringify(tag));
+        }
+
+        return `\n\`${tag.tag}\` : ${this.covertTypeDocText(tag.text)} \n`;
     }
 
     static parseComment(comment: TypeDocComment | undefined): string {
@@ -182,16 +207,24 @@ class TypeDocInternalParser {
 
         let content = '';
         content += this.covertTypeDocText(
-            `${comment?.shortText || ''}\n${comment?.text || ''}\n\n`,
+            `${comment?.shortText?.trim() || ''}\n${
+                comment?.text?.trim() || ''
+            }\n\n`,
         );
 
+        return content;
+    }
+
+    static parseTags(tags: TypeDocCommentTag[] | undefined) {
         // process tags
-        const tags = comment?.tags;
+        let content = '';
+
         if (tags) {
             tags.forEach((tag) => {
                 content += this.parseTag(tag);
             });
         }
+
         return content;
     }
 
@@ -202,7 +235,7 @@ class TypeDocInternalParser {
         return sources
             .map(
                 (source) =>
-                    `Defined in : link:${GITHUB_LINK}/${source.fileName}#L${source.line}[${source.fileName}, window=_blank]`,
+                    `[definedInTag]#Defined in : link:${GITHUB_LINK}/${source.fileName}#L${source.line}[${source.fileName}, window=_blank]#`,
             )
             .join('\n');
     };
@@ -231,7 +264,9 @@ class TypeDocInternalParser {
                 return node.name + typeArg || '';
             case 'reference': {
                 // since code block doesn't support links
-                if (link) return this.convertNameToLink(node.name) + typeArg;
+                if (link) {
+                    return this.convertNameToLink(node.name) + typeArg;
+                }
                 return node.name + typeArg || '';
             }
             case 'union': {
@@ -333,6 +368,87 @@ class TypeDocParser {
 
     private groupMap: Record<string, TypeDocLinkingNode[]> = {};
 
+    private convertNameToLink = (linkTo: string | undefined) => {
+        if (!linkTo) return '';
+
+        const [name, hash] = linkTo.split('.');
+
+        if (!name) return this.convertNodeToLink(this.childrenNameMap[name]);
+
+        if (hash) {
+            return `xref:${name}.adoc#_${hash.toLocaleLowerCase()}[${hash}]`;
+        }
+
+        return `xref:${name}.adoc[${name}]`;
+    };
+
+    private parseTypeDocType = (
+        node: TypeDocType | undefined,
+        link = false,
+    ): string => {
+        let typeArg = '';
+        if (!node) return '';
+
+        if (node.typeArguments && node.typeArguments.length) {
+            typeArg = `< ${node.typeArguments
+                ?.map((type) => this.parseTypeDocType(type, link))
+                .join(', ')} >`;
+        }
+
+        switch (node.type) {
+            case 'literal':
+                if (link)
+                    return TypeDocInternalParser.convertToItalic(node.name);
+                return `"${node.value}"`;
+            case 'intrinsic':
+                if (link)
+                    return (
+                        TypeDocInternalParser.convertToItalic(node.name) +
+                            typeArg || ''
+                    );
+                return node.name + typeArg || '';
+            case 'reference': {
+                // since code block doesn't support links
+                if (link) {
+                    const nodeToLink = this.childrenNameMap[node.name || ''];
+                    if (nodeToLink) {
+                        return this.convertNodeToLink(nodeToLink);
+                    }
+                    // console.log('\t', node.name, 'not found in map');
+                    // return (
+                    //     TypeDocInternalParser.convertNameToLink(node.name) +
+                    //     typeArg
+                    // );
+                }
+                return node.name + typeArg || '';
+            }
+            case 'union': {
+                return (
+                    node.types
+                        ?.map((type) => this.parseTypeDocType(type, link))
+                        .join(' | ') + typeArg || ''
+                );
+            }
+            case 'reflection': {
+                return (
+                    TypeDocInternalParser.parseTypeLiteralNode(
+                        node.declaration,
+                        link,
+                    ) + typeArg
+                );
+            }
+            case 'array': {
+                return `${
+                    this.parseTypeDocType(node.elementType, link) + typeArg
+                }[]`;
+            }
+            default: {
+                console.error(`${node.type} not handled`);
+                return node.name || '';
+            }
+        }
+    };
+
     private getHeadingString = (options: {
         toc?: boolean;
         tocLevel?: number;
@@ -403,7 +519,9 @@ class TypeDocParser {
             this.childrenIdMap[parent]?.kindString ===
             TypeDocReflectionKind.Project
         ) {
-            return `xref:${node.name}.adoc[${node.name}]`;
+            return `[.${node.kindString.replace(/ /g, '_')}]#xref:${
+                node.name
+            }.adoc[${node.name}]#`;
         }
 
         const grandParent = this.childrenIdMap[parent]?.parentId;
@@ -413,9 +531,11 @@ class TypeDocParser {
             this.childrenIdMap[grandParent]?.kindString ===
             TypeDocReflectionKind.Project
         ) {
-            let newLinkText = `xref:${this.childrenIdMap[parent].name}.adoc`;
+            let newLinkText = `[.${node.kindString.replace(/ /g, '_')}]#xref:${
+                this.childrenIdMap[parent].name
+            }.adoc`;
             newLinkText += `#_${node.name.toLowerCase()}`;
-            newLinkText += `[${node.name}]`;
+            newLinkText += `[${node.name}]#`;
             return newLinkText;
         }
 
@@ -426,14 +546,15 @@ class TypeDocParser {
     private handleMainNode = (node: TypeDocNode) => {
         const pageTitle = `= ${node.name}`;
 
-        let mainPageContent = '';
+        const mainPageContent = '';
 
+        let enumIndexContent = '';
         // Special handling
         if (node.kindString === 'Enumeration') {
-            mainPageContent += this.createTypeDocTable(
+            enumIndexContent += `${this.createTypeDocTable(
                 node.children?.map(this.convertNodeToLink) || [],
                 5,
-            );
+            )}`;
         }
 
         // Crate content for children ( Enum members , Parameters, Properties, etc..)
@@ -451,9 +572,11 @@ class TypeDocParser {
 
         return [
             pageTitle,
-            mainPageContent,
+            enumIndexContent,
             TypeDocInternalParser.parseComment(node.comment),
+            mainPageContent,
             groupContent,
+            TypeDocInternalParser.parseTags(node.comment?.tags),
         ].join('\n\n');
     };
 
@@ -468,6 +591,7 @@ class TypeDocParser {
             `\`${enumMember.name}:= ${enumMember.defaultValue}\`\n`,
             TypeDocInternalParser.parseComment(enumMember.comment),
             sourceContent,
+            TypeDocInternalParser.parseTags(enumMember.comment?.tags),
             '--',
         ].join('\n');
     };
@@ -477,42 +601,19 @@ class TypeDocParser {
 
         let overwrites = '';
         if (node.overwrites) {
-            overwrites = `\`Overrides ${TypeDocInternalParser.parseTypeDocType(
+            overwrites = `[definedInTag]#Overrides ${this.parseTypeDocType(
                 node.overwrites,
-            )}\``;
+            )}#`;
         }
 
         let inheritedFrom = '';
         if (node.inheritedFrom) {
-            inheritedFrom = `\`Inherited from  ${TypeDocInternalParser.parseTypeDocType(
+            inheritedFrom = `[definedInTag]#Inherited from  ${this.parseTypeDocType(
                 node.inheritedFrom,
-            )}\``;
+            )}#`;
         }
 
-        const signatureContent = node.signatures.map((signature) => {
-            const sigText =
-                signature.name +
-                TypeDocInternalParser.parseCallSignature(signature);
-
-            const detailedParamContent = signature.parameters
-                ?.map(this.convertTypeDocNode)
-                .filter((text) => text)
-                .join('\n\n');
-
-            return [
-                '[source, js]\n----',
-                sigText,
-                '----',
-                TypeDocInternalParser.parseComment(signature.comment),
-                detailedParamContent && '`Parameters`',
-                detailedParamContent,
-                '`Returns`',
-                TypeDocInternalParser.parseTypeDocType(signature.type, true),
-                TypeDocInternalParser.covertTypeDocText(
-                    signature.comment?.returns || '',
-                ),
-            ].join('\n\n');
-        });
+        const signatureContent = this.handleCallSignatureNodes(node.signatures);
 
         const sources = TypeDocInternalParser.parseSources(node.sources);
 
@@ -520,47 +621,79 @@ class TypeDocParser {
             name,
             TypeDocInternalParser.parseComment(node.comment),
             sources,
-            '[div typeDocBlock boxFullWidth]\n--',
             overwrites,
             inheritedFrom,
-            sources,
+            '[div typeDocBlock boxFullWidth]\n--',
             signatureContent,
+            TypeDocInternalParser.parseTags(node.comment?.tags),
             '--',
         ].join('\n\n');
     };
 
     private handleParameterNode = (node: ParameterNode) => {
         return [
-            `=== ${node.name}`,
-            node.flags.isOptional ? '`optional`' : '',
-            `* ${node.name}: ${TypeDocInternalParser.parseTypeDocType(
-                node.type,
-                true,
-            )}${node?.defaultValue ? ` = ${node.defaultValue}` : ''}`,
+            `${node.name}::: ${node.flags.isOptional ? '_Optional_\n' : ''}`,
+            `* ${node.name}: ${this.parseTypeDocType(node.type, true)}${
+                node?.defaultValue ? ` = ${node.defaultValue}` : ''
+            }`,
             TypeDocInternalParser.parseComment(node.comment),
             this.handleTypeNode(node.type),
+            TypeDocInternalParser.parseTags(node.comment?.tags),
         ].join('\n\n');
     };
 
     private handlePropertyNode = (node: ParameterNode) => {
+        const sig = `\`${node.name}: ${this.parseTypeDocType(node.type, true)}${
+            node?.defaultValue ? ` = ${node.defaultValue}` : ''
+        }\``;
+
         return [
             `=== ${node.name}`,
             '[div typeDocBlock boxFullWidth]\n--',
-            node.flags.isOptional ? '`optional`' : '',
-            `* ${node.name}: ${TypeDocInternalParser.parseTypeDocType(
-                node.type,
-                true,
-            )}${node?.defaultValue ? ` = ${node.defaultValue}` : ''}`,
+            sig,
+            // TODO : move this iwth aobve line
+            node.flags.isOptional ? '_Optional_' : '',
             TypeDocInternalParser.parseComment(node.comment),
             this.handleTypeNode(node.type),
+            TypeDocInternalParser.parseTags(node.comment?.tags),
             '--\n',
         ].join('\n\n');
     };
 
-    private handleTypeLiteralNode = (
-        node: TypeLiteralNode | undefined,
-        link?: boolean,
-    ) => {
+    private handleCallSignatureNode = (node: SignatureNode) => {
+        const parmContent = node.parameters
+            ?.map(this.convertTypeDocNode)
+            .join('\n\n');
+
+        return [
+            TypeDocInternalParser.parseComment(node.comment),
+            node.parameters?.length ? '**Function Parameters**' : '',
+            parmContent,
+            '**Returns**',
+            TypeDocInternalParser.parseTypeDocType(node.type, true),
+            this.handleTypeNode(node.type),
+            TypeDocInternalParser.parseTags(node.comment?.tags),
+        ].join('\n\n');
+    };
+
+    private handleCallSignatureNodes = (nodes: SignatureNode[]) => {
+        let content = '';
+        content += nodes
+            .map((node) => {
+                return [
+                    `\`${node.name}${TypeDocInternalParser.parseCallSignature(
+                        node,
+                        true,
+                    )}\``,
+                    this.handleCallSignatureNode(node),
+                ].join('\n\n');
+            })
+            .join('\n\n');
+
+        return content;
+    };
+
+    private handleTypeLiteralNode = (node: TypeLiteralNode | undefined) => {
         if (!node) return '';
 
         let content = '';
@@ -570,18 +703,13 @@ class TypeDocParser {
                 .map(this.convertTypeDocNode)
                 .join('\n\n');
         } else if (node.signatures) {
-            content += 'Parameters\n\n';
-            content += node.signatures
-                .map(
-                    (sig) =>
-                        `${TypeDocInternalParser.parseCallSignature(
-                            sig,
-                            link,
-                        )}\n\n${sig.parameters
-                            ?.map(this.convertTypeDocNode)
-                            .join('\n\n')}`,
-                )
-                .join('\n\n');
+            node.signatures.forEach((sigNode) => {
+                content += `\`${TypeDocInternalParser.parseCallSignature(
+                    sigNode,
+                    true,
+                )}\`\n\n`;
+                content += `${this.handleCallSignatureNode(sigNode)}\n\n`;
+            });
         } else if (node.children) {
             content += 'Parameters\n\n';
             content += node.children.map(this.convertTypeDocNode).join('\n\n');
@@ -593,6 +721,8 @@ class TypeDocParser {
     private handleTypeNode = (node: TypeDocType | undefined) => {
         const content = [
             TypeDocInternalParser.parseComment(node?.declaration?.comment),
+            TypeDocInternalParser.parseTags(node?.declaration?.comment?.tags),
+            this.handleTypeLiteralNode(node?.declaration),
         ].join('\n\n');
 
         return content;
@@ -601,11 +731,9 @@ class TypeDocParser {
     private handleTypeAliasNode = (node: TypeAliasNode) => {
         return [
             `= ${node.name}`,
-            `[source, js]\n----\n${
-                node.name
-            } : ${TypeDocInternalParser.parseTypeDocType(node.type)}\n----`,
-            TypeDocInternalParser.parseSources(node.sources),
+            `\`${node.name} : ${this.parseTypeDocType(node.type, true)}\``,
             TypeDocInternalParser.parseComment(node.comment),
+            TypeDocInternalParser.parseSources(node.sources),
             `${this.handleTypeNode(node.type)}`,
         ].join('\n\n');
     };
@@ -647,6 +775,9 @@ class TypeDocParser {
             }
             case TypeDocReflectionKind.TypeLiteral: {
                 return this.handleTypeLiteralNode(rootNode as TypeLiteralNode);
+            }
+            case TypeDocReflectionKind.CallSignature: {
+                return this.handleCallSignatureNode(rootNode as SignatureNode);
             }
             default: {
                 console.error(
@@ -772,7 +903,6 @@ const getFileFromUrl = async (url: string) => {
 };
 
 const main = async () => {
-    debugger;
     console.info(`Reading file from : ${fileLink}`);
     const typeDocJson = await getFileFromUrl(fileLink);
     const typedoc = JSON.parse(typeDocJson);
@@ -783,3 +913,10 @@ const main = async () => {
 };
 
 main();
+
+/**
+ * Title (main heading) =
+ * funtions sig should be on top and in ``
+ *
+ * comment.tag should be redenred at the end
+ */
