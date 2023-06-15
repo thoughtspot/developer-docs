@@ -160,6 +160,9 @@ class TypeDocInternalParser {
 
     static convertNameToLink: (node: string | undefined) => string;
 
+    static GITHUB_LINK =
+        'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
+
     static covertTypeDocText = (text: string) => {
         // convert all {@link Name.hash}
         // to xref:Name.adoc#hash[Name]
@@ -223,12 +226,11 @@ class TypeDocInternalParser {
 
     static parseSources = (sources: TypeDocSource[] | undefined) => {
         if (!sources) return '';
-        const GITHUB_LINK =
-            'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
+
         return sources
             .map(
                 (source) =>
-                    `[definedInTag]#Defined in : link:${GITHUB_LINK}/${source.fileName}#L${source.line}[${source.fileName}, window=_blank]#`,
+                    `[definedInTag]#Defined in : link:${this.GITHUB_LINK}/${source.fileName}#L${source.line}[${source.fileName}, window=_blank]#`,
             )
             .join('\n');
     };
@@ -514,7 +516,7 @@ class TypeDocParser {
             this.childrenIdMap[parent]?.kindString ===
             TypeDocReflectionKind.Project
         ) {
-            return `[.${node.kindString.replace(/ /g, '_')}]#xref:${
+            return `[.typedoc-${node.kindString.replace(/ /g, '_')}]#xref:${
                 node.name
             }.adoc[${node.name}]#`;
         }
@@ -526,9 +528,10 @@ class TypeDocParser {
             this.childrenIdMap[grandParent]?.kindString ===
             TypeDocReflectionKind.Project
         ) {
-            let newLinkText = `[.${node.kindString.replace(/ /g, '_')}]#xref:${
-                this.childrenIdMap[parent].name
-            }.adoc`;
+            let newLinkText = `[.typeodc-${node.kindString.replace(
+                / /g,
+                '_',
+            )}]#xref:${this.childrenIdMap[parent].name}.adoc`;
             newLinkText += `#_${node.name.toLowerCase()}`;
             newLinkText += `[${node.name}]#`;
             return newLinkText;
@@ -857,8 +860,11 @@ class TypeDocParser {
 class TypedocConverter {
     private typedDocParser = new TypeDocParser();
 
-    constructor() {
+    constructor(branch: string) {
         TypeDocInternalParser.convertNameToLink = this.typedDocParser.convertNameToLink;
+        TypeDocInternalParser.GITHUB_LINK = `https://github.com/thoughtspot/visual-embed-sdk/blob/${branch}/src`;
+
+        console.info('Source link : ', TypeDocInternalParser.GITHUB_LINK);
     }
 
     private writeFile(filePath: string, content: string): void {
@@ -893,31 +899,30 @@ class TypedocConverter {
     };
 }
 
-const fileLink =
-    process.argv[2] ||
-    'https://raw.githubusercontent.com/thoughtspot/visual-embed-sdk/main/static/typedoc/typedoc.json';
-
 const getFileFromUrl = async (url: string) => {
     const data = await nodeFetch(url);
     return data.text();
 };
 
 const main = async () => {
+    const branchFromCli = process.argv.filter((arg) =>
+        arg.startsWith('--branch='),
+    )[0];
+    const branchFromCliValue = branchFromCli?.split('=')[1];
+    const branch = branchFromCliValue || 'main';
+
+    console.info(`Using branch: ${branch}`);
+
+    const fileLink = `https://raw.githubusercontent.com/thoughtspot/visual-embed-sdk/${branch}/static/typedoc/typedoc.json`;
+
     console.info(`Reading file from : ${fileLink}`);
     const typeDocJson = await getFileFromUrl(fileLink);
     const typedoc = JSON.parse(typeDocJson);
 
     console.info(`Parse success : ${fileLink}`);
-    const converter = new TypedocConverter();
+    const converter = new TypedocConverter(branch);
 
     converter.generateFiles(typedoc);
 };
 
 main();
-
-/**
- * Title (main heading) =
- * funtions sig should be on top and in ``
- *
- * comment.tag should be redenred at the end
- */
