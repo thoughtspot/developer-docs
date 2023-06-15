@@ -17,6 +17,11 @@ module.exports = {
     DEFAULT_PREVIEW_HOST: 'https://try-everywhere.thoughtspot.cloud/v2',
     DEFAULT_APP_ROOT: '/everywhere',
     IS_PUBLIC_SITE_OPEN: 'isPublicSiteOpen',
+    TS_DEMO_LOGIN: '/callosum/v1/session/demo/login',
+    TS_SESSION_TOKEN: '/prism/?op=GetSessionToken',
+    TS_INFO: '/callosum/v1/session/info',
+    TS_REST_API_PLAYGROUND: 'api/rest/playgroundV2_0',
+    TS_Version: 'Version',
     BUILD_ENVS: {
         PROD: 'PROD',
         DEV: 'DEV',
@@ -31,15 +36,25 @@ module.exports = {
     VERSION_DROPDOWN: [
         {
             label: 'Cloud',
-            link: '/visual-embed-sdk/release/en',
+            link: '9.5.0',
+            subLabel: 'latest',
         },
         {
-            label: 'Dev',
-            link: '/visual-embed-sdk/dev/en',
+            label: '8.5.0 sw',
+            link: '9.4.0',
+            subLabel: 'Previous',
         },
         {
-            label: '7.1',
-            link: '/visual-embed-sdk/7.1/en',
+            label: '9.3.0 sw',
+            link: '9.3.0',
+            subLabel: 'Legacy',
         },
     ],
+    CUSTOM_PAGE_ID: {
+        API_PLAYGROUND: 'restV2-playground',
+        VISUAL_EMBED_SDK: 'js-reference',
+    },
+    CLUSTER_TYPES: {
+        PROD: 'PROD',
+    },
 };

@@ -94,8 +94,8 @@ const isLinkMatching = (
 
     return (
         href.includes(`pageid=${pageid}`) ||
-        href.includes(`/${pageid}#`) ||
-        href.endsWith(`/${pageid}`)
+        href.includes(`/${encodeURI(pageid)}#`) ||
+        href.endsWith(`/${encodeURI(pageid)}`)
     );
 };
 
