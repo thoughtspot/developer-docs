@@ -796,6 +796,8 @@ class TypeDocParser {
         this.generateMap(projectNode);
         // creating an index page
         let indexPageContent = '= Visual Embed SDK\n\n';
+        /* const indexPageHeading = '';
+        */
         const indexPageHeading = this.getHeadingString({
             title: indexPageId,
             pageId: indexPageId,
@@ -804,7 +806,7 @@ class TypeDocParser {
 
         let sideNavContent = `* link:{{navprefix}}/${encodePageId(
             indexPageId,
-        )}[Visual Embed SDK]\n`;
+        )}[Visual Embed SDK Reference]\n`;
 
         projectNode?.groups?.forEach((group) => {
             // create table group content
