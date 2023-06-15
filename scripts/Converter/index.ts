@@ -155,21 +155,10 @@ const _indent = (
 
 // All the parse functions are to be used internally (its used to get sub content)
 class TypeDocInternalParser {
-    static convertNameToLink = (linkTo: string | undefined) => {
-        if (!linkTo) return '';
-
-        const [name, hash] = linkTo.split('.');
-        if (!name) return '';
-
-        if (hash) {
-            return `xref:${name}.adoc#_${hash.toLocaleLowerCase()}[${hash}]`;
-        }
-
-        return `xref:${name}.adoc[${name}]`;
-    };
-
     static convertToItalic = (name: string | undefined) =>
         name ? `_${name}_` : '';
+
+    static convertNameToLink: (node: string | undefined) => string;
 
     static covertTypeDocText = (text: string) => {
         // convert all {@link Name.hash}
@@ -372,18 +361,20 @@ class TypeDocParser {
 
     private groupMap: Record<string, TypeDocLinkingNode[]> = {};
 
-    private convertNameToLink = (linkTo: string | undefined) => {
+    public convertNameToLink = (linkTo: string | undefined) => {
         if (!linkTo) return '';
 
         const [name, hash] = linkTo.split('.');
 
-        if (!name) return this.convertNodeToLink(this.childrenNameMap[name]);
+        const hashNode = this.childrenNameMap[hash || ''];
 
-        if (hash) {
-            return `xref:${name}.adoc#_${hash.toLocaleLowerCase()}[${hash}]`;
-        }
+        if (hashNode) return this.convertNodeToLink(hashNode);
 
-        return `xref:${name}.adoc[${name}]`;
+        const nameNode = this.childrenNameMap[name || ''];
+
+        if (nameNode) return this.convertNodeToLink(nameNode);
+
+        return hash || name;
     };
 
     private parseTypeDocType = (
@@ -578,9 +569,10 @@ class TypeDocParser {
             pageTitle,
             enumIndexContent,
             TypeDocInternalParser.parseComment(node.comment),
+            TypeDocInternalParser.parseTags(node.comment?.tags),
+
             mainPageContent,
             groupContent,
-            TypeDocInternalParser.parseTags(node.comment?.tags),
         ].join('\n\n');
     };
 
@@ -865,6 +857,10 @@ class TypeDocParser {
 class TypedocConverter {
     private typedDocParser = new TypeDocParser();
 
+    constructor() {
+        TypeDocInternalParser.convertNameToLink = this.typedDocParser.convertNameToLink;
+    }
+
     private writeFile(filePath: string, content: string): void {
         const folderPath = path.dirname(filePath);
         if (!fs.existsSync(folderPath)) {
@@ -913,6 +909,7 @@ const main = async () => {
 
     console.info(`Parse success : ${fileLink}`);
     const converter = new TypedocConverter();
+
     converter.generateFiles(typedoc);
 };
 
