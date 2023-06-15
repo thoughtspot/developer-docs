@@ -221,7 +221,7 @@ class TypeDocInternalParser {
 
         if (tags) {
             tags.forEach((tag) => {
-                content += this.parseTag(tag);
+                content += `\n${this.parseTag(tag)}\n\n`;
             });
         }
 
