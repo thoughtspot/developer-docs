@@ -11,7 +11,6 @@ import {
 import t from '../../utils/lang-utils';
 import SearchResult from './SearchResult';
 import ToggleButton from '../ToggleButton';
-import BackButton from '../BackButton';
 
 type SearchProps = {
     options: SearchQueryResult[];
@@ -24,7 +23,6 @@ type SearchProps = {
     updateKeyword: Function;
     setDarkMode: Function;
     isPublicSiteOpen: boolean;
-    backLink: string;
 };
 
 const Search: React.FC<SearchProps> = (props) => {
@@ -188,17 +186,7 @@ const Search: React.FC<SearchProps> = (props) => {
                 !props.isPublicSiteOpen ? 'inClusterSite' : ''
             }`}
         >
-            <div
-                className="searchInputWrapper"
-                style={props?.backLink ? { display: 'flex' } : {}}
-            >
-                {props.backLink ? (
-                    <BackButton
-                        title={t('NAV_BACK_BTN_TEXT')}
-                        backLink={props.backLink}
-                        customStyles={{ padding: 0 }}
-                    />
-                ) : null}
+            <div className="searchInputWrapper">
                 <div className="searchInputContainer">
                     <IconContext.Provider
                         value={{
