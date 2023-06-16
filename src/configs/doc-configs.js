@@ -20,7 +20,6 @@ module.exports = {
     TS_DEMO_LOGIN: '/callosum/v1/session/demo/login',
     TS_SESSION_TOKEN: '/prism/?op=GetSessionToken',
     TS_INFO: '/callosum/v1/session/info',
-    TS_REST_API_PLAYGROUND: 'api/rest/playgroundV2_0',
     TS_Version: 'Version',
     BUILD_ENVS: {
         PROD: 'PROD',

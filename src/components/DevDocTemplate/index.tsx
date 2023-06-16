@@ -15,6 +15,7 @@ import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
+import RenderPlayGround from './renderPlayGround';
 import {
     DOC_NAV_PAGE_ID,
     TS_HOST_PARAM,
@@ -28,11 +29,6 @@ import {
     DEFAULT_APP_ROOT,
     HOME_PAGE_ID,
     CUSTOM_PAGE_ID,
-    TS_DEMO_LOGIN,
-    TS_SESSION_TOKEN,
-    TS_INFO,
-    CLUSTER_TYPES,
-    TS_REST_API_PLAYGROUND,
 } from '../../configs/doc-configs';
 import {
     LEFT_NAV_WIDTH_DESKTOP,
@@ -41,19 +37,9 @@ import {
     MAX_MOBILE_RESOLUTION,
     MAX_CONTENT_WIDTH_DESKTOP,
     MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
-    ZERO_MARGIN,
-    DOC_VERSION_DEV,
-    DOC_VERSION_PROD,
 } from '../../constants/uiConstants';
 import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
-
-const EXTERNAL_PLAYGROUND_EVENTS = {
-    READY: 'api-playground-ready',
-    URL_CHANGE: 'url-change',
-    CONFIG: 'api-playground-config',
-    RENDER_PLAY_GROUND: 'render-play-ground',
-};
 
 // markup
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
@@ -93,23 +79,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             ? localStorage.getItem('theme') === 'dark'
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
-    const [token, setToken] = useState('=');
-    const [isPlaygroundReady, setIsPlaygroundReady] = React.useState(false);
-    const [clusterType, setClusterType] = React.useState('');
+
     const isAPIPlayGround =
         CUSTOM_PAGE_ID.API_PLAYGROUND === params[TS_PAGE_ID_PARAM];
-    const playgroundRef = React.useRef<HTMLIFrameElement>(null);
-    const isBrowser = () => typeof window !== 'undefined';
 
-    const getApiResourceId = () => {
-        if (!isBrowser()) return '';
-        const ulrParams = new URLSearchParams(window?.location?.search);
-        return ulrParams.get('apiResourceId') ?? '';
-    };
-    const playgroundUrlTemplate = _.template(
-        // eslint-disable-next-line no-template-curly-in-string
-        'https://rest-api-sdk-v2-0${version}.vercel.app',
-    );
     useEffect(() => {
         // based on query params set if public site is open or not
         setIsPublicSiteOpen(isPublicSite(location.search));
@@ -178,24 +151,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [],
     );
     const searchIndex = searchClient.initIndex(getAlgoliaIndex());
-    const isExternal = () =>
-        !location?.href?.includes('developers.thoughtspot.com/docs');
-    const getParentURL = () => {
-        let parentUrl = location?.origin;
-        if (isBrowser()) {
-            const { ancestorOrigins } = window?.location;
-            parentUrl =
-                ancestorOrigins?.length > 0
-                    ? ancestorOrigins[ancestorOrigins?.length - 1]
-                    : document.referrer || window?.origin;
-        }
-        return parentUrl;
-    };
-    const baseUrl = isExternal() ? getParentURL() : DEFAULT_HOST;
-    const playgroundUrl =
-        clusterType === CLUSTER_TYPES.PROD
-            ? playgroundUrlTemplate({ version: DOC_VERSION_PROD })
-            : playgroundUrlTemplate({ version: DOC_VERSION_DEV });
 
     useEffect(() => {
         if (keyword) {
@@ -224,170 +179,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 });
         }
     }, [keyword]);
-    React.useEffect(() => {
-        if (isPlaygroundReady) {
-            const config = {
-                baseUrl,
-                accessToken: token,
-                apiResourceId: getApiResourceId(),
-            };
-            const playgroundOrigin = new URL(playgroundUrl)?.origin || '*';
-            playgroundRef?.current?.contentWindow?.postMessage(
-                {
-                    type: EXTERNAL_PLAYGROUND_EVENTS.CONFIG,
-                    ...config,
-                },
-                playgroundOrigin,
-            );
-        }
-    }, [token, isPlaygroundReady]);
-    useEffect(() => {
-        if (isAPIPlayGround) {
-            setLeftNavWidth(ZERO_MARGIN);
-            async function fetchData() {
-                try {
-                    if (!isExternal()) {
-                        await fetch(baseUrl + TS_DEMO_LOGIN, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type':
-                                    'application/x-www-form-urlencoded',
-                                Accept: 'application/json',
-                            },
-                            credentials: 'include',
-                        });
-                    }
-                    const info = await fetch(baseUrl + TS_INFO, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Accept: 'application/json',
-                        },
-                        credentials: 'include',
-                    })
-                        .then((res) => res.json())
-                        .catch((e) => console.log(e));
-                    const cType = info?.configInfo?.clusterType || 'DEV';
-                    setClusterType(cType);
-                    const response = await fetch(baseUrl + TS_SESSION_TOKEN, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Accept: 'application/json',
-                        },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            operationName: 'GetSessionToken',
-                            variables: {},
-                            query:
-                                'query GetSessionToken {\n  restapiV2__getSessionToken {\n    token\n    __typename\n  }\n}\n',
-                        }),
-                    });
-                    const data = await response.json();
-                    const token = data?.data?.restapiV2__getSessionToken?.token;
-                    setToken(token);
-                } catch (e) {
-                    console.log(e);
-                }
-            }
-            fetchData();
-        }
-    }, [params[TS_PAGE_ID_PARAM]]);
 
     React.useEffect(() => {
         setPrevPageId(location?.pathname.split('/')[1] || 'introduction');
     }, [location]);
-
-    React.useEffect(() => {
-        if (isAPIPlayGround && isAppEmbedded) {
-            setTimeout(() => {
-                window.parent.postMessage(
-                    {
-                        type: EXTERNAL_PLAYGROUND_EVENTS.RENDER_PLAY_GROUND,
-                        data: { pageid: prevPageId },
-                    },
-                    '*',
-                );
-            }, 300);
-        }
-    }, [isAPIPlayGround]);
-
-    React.useEffect(() => {
-        if (isPlaygroundReady) {
-            const config = {
-                baseUrl,
-                accessToken: token,
-                apiResourceId: getApiResourceId(),
-            };
-            const playgroundOrigin = new URL(playgroundUrl)?.origin || '*';
-            playgroundRef?.current?.contentWindow?.postMessage(
-                {
-                    type: EXTERNAL_PLAYGROUND_EVENTS.CONFIG,
-                    ...config,
-                },
-                playgroundOrigin,
-            );
-        }
-    }, [token, isPlaygroundReady]);
-
-    React.useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            if (event.data?.type === EXTERNAL_PLAYGROUND_EVENTS.URL_CHANGE) {
-                if (event.data?.data && event.data.data !== 'http') {
-                    const path = window?.location?.pathname;
-                    const currentUrl = window.location.search;
-                    var searchParams = new URLSearchParams(currentUrl);
-                    const queryParams = window.location.search;
-                    var searchParams = new URLSearchParams(queryParams);
-                    searchParams.set('apiResourceId', event.data.data);
-                    const newUrl = `${getParentURL()}${path}?${searchParams?.toString()}`;
-                    if (window.self !== window.top) {
-                        const queryParams = window.location.href.split('#/')[1];
-                        if (isAppEmbedded) {
-                            window.parent.postMessage(
-                                {
-                                    type: 'url-change',
-                                    data: event.data.data,
-                                },
-                                '*',
-                            );
-                        } else window.history.replaceState(null, '', newUrl);
-                    } else {
-                        window.history.replaceState(null, '', newUrl);
-                    }
-                }
-            }
-        };
-        window.addEventListener('message', handler);
-        return () => window.removeEventListener('message', handler);
-    }, []);
-    const getBackButtonLink = () => {
-        const defaultPath = 'rest-api-v2';
-        if (isBrowser() && window?.self !== window?.top) {
-            return `${getParentURL()}/#/develop/documentation/en/?pageid=rest-api-v2`;
-        }
-        return defaultPath;
-    };
-
-    const renderPlayGround = () => (
-        <div
-            className="restApiWrapper"
-            style={{
-                marginTop: isMaxMobileResolution ? '84px' : '72px',
-            }}
-        >
-            <iframe
-                ref={playgroundRef}
-                src={playgroundUrl}
-                height="100%"
-                width="100%"
-                onLoad={() => setIsPlaygroundReady(true)}
-                id="iframe"
-            />
-        </div>
-    );
-
-    const isAppEmbedded = isBrowser() && window.self !== window.top;
 
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
@@ -416,6 +211,78 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
 
+    const renderDocTemplate = () => (
+        <>
+            <LeftSidebar
+                navTitle={navTitle}
+                navContent={navContent}
+                backLink={backLink}
+                docWidth={width}
+                handleLeftNavChange={setLeftNavWidth}
+                location={location}
+                setLeftNavOpen={setLeftNavOpen}
+                leftNavOpen={leftNavOpen}
+                isPublicSiteOpen={isPublicSiteOpen}
+                isMaxMobileResolution={isMaxMobileResolution}
+                setDarkMode={setDarkMode}
+                isDarkMode={isDarkMode}
+                curPageid={curPageNode.pageAttributes.pageid}
+            />
+            <div
+                className="documentBody"
+                style={{
+                    width: calculateDocumentBodyWidth(),
+                    marginLeft: isMaxMobileResolution
+                        ? `${leftNavWidth}px`
+                        : '0px',
+                }}
+            >
+                <Search
+                    keyword={keyword}
+                    onChange={(e: React.FormEvent<HTMLInputElement>) =>
+                        updateKeyword((e.target as HTMLInputElement).value)
+                    }
+                    options={results}
+                    optionSelected={optionSelected}
+                    leftNavOpen={leftNavOpen}
+                    updateKeyword={updateKeyword}
+                    isMaxMobileResolution={isMaxMobileResolution}
+                    setDarkMode={setDarkMode}
+                    isDarkMode={isDarkMode}
+                    isPublicSiteOpen={isPublicSiteOpen}
+                />
+
+                <div className="introWrapper">
+                    <Document
+                        shouldShowRightNav={shouldShowRightNav}
+                        pageid={params[TS_PAGE_ID_PARAM]}
+                        docTitle={docTitle}
+                        docContent={docContent}
+                        breadcrumsData={breadcrumsData}
+                        isPublicSiteOpen={isPublicSiteOpen}
+                    />
+                    {shouldShowRightNav && (
+                        <div>
+                            <Docmap
+                                docContent={docContent}
+                                location={location}
+                                options={results}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+        </>
+    );
+    const renderPlayGround = () => <RenderPlayGround location={location} />;
+
+    const getClassName = () => {
+        let cName = isDarkMode ? 'dark ' : '';
+        if (isPublicSiteOpen) cName += 'withHeaderFooter';
+        if (isAPIPlayGround) cName += ' pgHeader';
+        return cName;
+    };
+
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
@@ -423,82 +290,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 {isPublicSiteOpen && <Header location={location} />}
                 <main
                     ref={ref as React.RefObject<HTMLDivElement>}
-                    className={`dark ${
-                        isPublicSiteOpen ? 'withHeaderFooter' : ''
-                    }`}
+                    className={getClassName()}
                     style={{
                         height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                     }}
                 >
-                    {!isAPIPlayGround && (
-                        <LeftSidebar
-                            navTitle={navTitle}
-                            navContent={navContent}
-                            backLink={backLink}
-                            docWidth={width}
-                            handleLeftNavChange={setLeftNavWidth}
-                            location={location}
-                            setLeftNavOpen={setLeftNavOpen}
-                            leftNavOpen={leftNavOpen}
-                            isPublicSiteOpen={isPublicSiteOpen}
-                            isMaxMobileResolution={isMaxMobileResolution}
-                            setDarkMode={setDarkMode}
-                            isDarkMode={isDarkMode}
-                            curPageid={curPageNode.pageAttributes.pageid}
-                        />
-                    )}
-                    <div
-                        className="documentBody"
-                        style={{
-                            width: calculateDocumentBodyWidth(),
-                            marginLeft: isMaxMobileResolution
-                                ? `${leftNavWidth}px`
-                                : '0px',
-                        }}
-                    >
-                        <Search
-                            keyword={keyword}
-                            onChange={(e: React.FormEvent<HTMLInputElement>) =>
-                                updateKeyword(
-                                    (e.target as HTMLInputElement).value,
-                                )
-                            }
-                            options={results}
-                            optionSelected={optionSelected}
-                            leftNavOpen={leftNavOpen}
-                            updateKeyword={updateKeyword}
-                            isMaxMobileResolution={isMaxMobileResolution}
-                            setDarkMode={setDarkMode}
-                            isDarkMode={isDarkMode}
-                            isPublicSiteOpen={isPublicSiteOpen}
-                            backLink={
-                                isAPIPlayGround ? getBackButtonLink() : ''
-                            } //
-                        />
-                        {isAPIPlayGround ? (
-                            renderPlayGround()
-                        ) : (
-                            <div className="introWrapper">
-                                <Document
-                                    shouldShowRightNav={shouldShowRightNav}
-                                    pageid={params[TS_PAGE_ID_PARAM]}
-                                    docTitle={docTitle}
-                                    docContent={docContent}
-                                    breadcrumsData={breadcrumsData}
-                                    isPublicSiteOpen={isPublicSiteOpen}
-                                />
-                                {shouldShowRightNav && (
-                                    <div>
-                                        <Docmap
-                                            docContent={docContent}
-                                            location={location}
-                                            options={results}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                    {isAPIPlayGround ? renderPlayGround() : renderDocTemplate()}
                 </main>
             </div>
         </>
