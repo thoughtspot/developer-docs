@@ -24,6 +24,7 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
     const isBrowser = () => typeof window !== 'undefined';
 
     const isAppEmbedded = isBrowser() && window.self !== window.top;
+    const [isPlaygroundReady, setIsPlaygroundReady] = React.useState(false);
 
     const [prevPageId, setPrevPageId] = useState('introduction');
 
@@ -164,7 +165,7 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
     /**
      * @description: Setting apiresource id in url params
      */
-    const sendURLParamsToplayGround = () => {
+    const sendURLParamsToPlayGround = () => {
         const config = {
             baseUrl,
             accessToken: token,
@@ -196,12 +197,11 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
     };
 
     React.useEffect(() => {
-        console.log(172);
-        if (token) {
-            sendURLParamsToplayGround();
+        if (isPlaygroundReady) {
+            sendURLParamsToPlayGround();
             if (isAppEmbedded) updateParentTORenderPlayGround();
         }
-    }, [token]);
+    }, [token, isPlaygroundReady]);
 
     return (
         <div className="restApiWrapper">
@@ -212,6 +212,7 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
                 height="100%"
                 width="100%"
                 id="restAPIPlayGround"
+                onLoad={() => setIsPlaygroundReady(true)}
             />
         </div>
     );
