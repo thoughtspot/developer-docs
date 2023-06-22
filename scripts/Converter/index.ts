@@ -797,7 +797,7 @@ class TypeDocParser {
         // creating an index page
         let indexPageContent = '= Visual Embed SDK\n\n';
         /* const indexPageHeading = '';
-        */
+         */
         const indexPageHeading = this.getHeadingString({
             title: indexPageId,
             pageId: indexPageId,
@@ -902,27 +902,56 @@ class TypedocConverter {
 }
 
 const getFileFromUrl = async (url: string) => {
+    console.log('Reading from remote');
     const data = await nodeFetch(url);
     return data.text();
 };
 
+const getFileFromLocal = async (filePath: string) => {
+    console.log('Reading from local');
+    const fileContent = await fs.promises.readFile(filePath, 'utf8');
+    return fileContent;
+};
+
+const getFile = async (filePath: string) => {
+    console.info(`Reading file from : ${filePath}`);
+    if (filePath.startsWith('http://') || filePath.startsWith('https://'))
+        return getFileFromUrl(filePath);
+    return getFileFromLocal(filePath);
+};
+
 const main = async () => {
-    const branchFromCli = process.argv.filter((arg) =>
-        arg.startsWith('--branch='),
-    )[0];
-    const branchFromCliValue = branchFromCli?.split('=')[1];
-    const branch = branchFromCliValue || 'main';
+    const defaultCliOptions = {
+        branch: 'main',
+        typeDocFilePath:
+            'https://raw.githubusercontent.com/thoughtspot/visual-embed-sdk/{branch}/static/typedoc/typedoc.json',
+    };
 
-    console.info(`Using branch: ${branch}`);
+    const cliKeys = Object.keys(defaultCliOptions).map((key) => ({
+        cliPrefix: `--${key}=`,
+        optionKey: key,
+    }));
+    const cliOptions = process.argv.reduce((acc, arg) => {
+        const newAcc = acc;
+        cliKeys.forEach((cliKey) => {
+            if (arg.startsWith(cliKey.cliPrefix))
+                newAcc[cliKey.optionKey] = arg.replace(cliKey.cliPrefix, '');
+        });
+        return newAcc;
+    }, defaultCliOptions);
 
-    const fileLink = `https://raw.githubusercontent.com/thoughtspot/visual-embed-sdk/${branch}/static/typedoc/typedoc.json`;
+    cliOptions.typeDocFilePath = cliOptions.typeDocFilePath.replace(
+        '{branch}',
+        cliOptions.branch,
+    );
 
-    console.info(`Reading file from : ${fileLink}`);
-    const typeDocJson = await getFileFromUrl(fileLink);
+    console.log('Script options : ', cliOptions);
+
+    const typeDocJson = await getFile(cliOptions.typeDocFilePath);
     const typedoc = JSON.parse(typeDocJson);
+    console.info(`Parse success : ${cliOptions.typeDocFilePath}`);
 
-    console.info(`Parse success : ${fileLink}`);
-    const converter = new TypedocConverter(branch);
+    const converter = new TypedocConverter(cliOptions.branch);
 
     converter.generateFiles(typedoc);
 };
