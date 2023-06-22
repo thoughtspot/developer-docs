@@ -66,7 +66,7 @@ const asciiNode = {
 const asciiAlgoliaObj = {
     body:
         'ThoughtSpot API components or resources are represented by the URI endpoints.',
-    objectID: 'fa556896-4e38-5e7a-ab35-a45ee93d58ee_resource_endpoints',
+    objectID: 'fa556896-4e38-5e7a-ab35-a45ee93d58ee_resource_endpoints_chunk_0',
     pageid: 'rest-apis',
     sectionId: '_resource_endpoints',
     sectionTitle: 'Resource endpoints',
@@ -78,7 +78,7 @@ const asciiAlgoliaObj = {
 const asciiPremableAlgoliaObj = {
     body:
         'ThoughtSpot REST APIs let you programmatically create ThoughtSpot objects.',
-    objectID: 'fa556896-4e38-5e7a-ab35-a45ee93d58eepreamble',
+    objectID: 'fa556896-4e38-5e7a-ab35-a45ee93d58eepreamble_chunk_0',
     pageid: 'rest-apis',
     sectionId: 'preamble',
     sectionTitle: 'About REST APIs',
@@ -116,7 +116,7 @@ describe('test cases from algolia search', () => {
                 'section',
                 asciiNode,
             ),
-        ).toStrictEqual(asciiAlgoliaObj);
+        ).toStrictEqual([asciiAlgoliaObj]);
     });
 
     it('verify preable JSON object for ascii docs', () => {
@@ -126,7 +126,7 @@ describe('test cases from algolia search', () => {
                 'preamble',
                 asciiNode,
             ),
-        ).toStrictEqual(asciiPremableAlgoliaObj);
+        ).toStrictEqual([asciiPremableAlgoliaObj]);
     });
 
     it('verify Algolia transformer data', () => {

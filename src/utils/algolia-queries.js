@@ -100,7 +100,7 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
     const chunks = splitStringIntoChunks(body, numberOfChunks);
 
     return chunks.map((chunk, i) => ({
-        objectID: `${node.id + sectionId}chunk_${i}`,
+        objectID: `${node.id + sectionId}_chunk_${i}`,
         sectionId,
         sectionTitle,
         body: chunk,
