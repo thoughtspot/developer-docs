@@ -192,7 +192,11 @@ class TypeDocInternalParser {
         if (tag.tag === 'example') return `${tag.text}\n`;
 
         if (tag.tag === 'param') {
-            return `Param:: ${tag.text.replace(/\n/g, '')}\n`;
+            return `\nParameter::\n${tag.text}\n`;
+        }
+
+        if (tag.tag === 'tryItOut') {
+            return `++++\n<a href="{{previewPrefix}}${tag.text}" id="preview-in-playground" target="_blank">Try it out</a>\n++++\n`;
         }
 
         return `\n\`${tag.tag}\` : ${this.covertTypeDocText(tag.text)} \n`;
