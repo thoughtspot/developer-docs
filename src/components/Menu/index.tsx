@@ -3,7 +3,7 @@ import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown
 import './index.scss';
 
 const Menu = (props: { config: {} }) => {
-    const { config } = props;
+    const { config = [] } = props;
     const handelClick = (menu: { link: string; external: boolean }) => {
         const { external = false, link } = menu;
         let url = location.origin + '/' + link;
@@ -17,14 +17,14 @@ const Menu = (props: { config: {} }) => {
 
     return (
         <div className="d-inline-block headerLink menuWrapper">
-            {config.map(({ name, child }) => (
+            {config?.map(({ name, child }) => (
                 <div className="menu">
                     <button className="menubtn">{name}</button>
                     <div className="menuContent">
                         {child?.map((d: { label: string; link: string }) => {
                             return (
                                 <div
-                                    data-testid={`option-${d?.label}`}
+                                    data-testid={`menu-${d?.label}`}
                                     onClick={() => handelClick(d)}
                                 >
                                     {d?.label}
