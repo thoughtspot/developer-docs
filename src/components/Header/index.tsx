@@ -2,33 +2,41 @@ import React from 'react';
 import TSLogo from '../../assets/svg/ts-logo-white-developer.svg';
 import t from '../../utils/lang-utils';
 import Dropdown from '../Dropdown';
+import Menu from '../Menu';
 import './index.scss';
 
 const Header = (props: { location: Location }) => {
     const headerLinks = [
         {
+            name: 'APIs and SDK',
+            href: '?pageid=apis-sdk',
+            child: [
+                { label: 'Embed Analytics', link: 'embed-analytics' },
+                { label: 'Rest Apis', link: 'rest-apis' },
+                { label: 'Customize Links', link: 'customize-links' },
+            ],
+        },
+        {
             name: 'CodeSpot',
-            href: 'https://developers.thoughtspot.com/codespot/',
+            child: [
+                {
+                    label: 'CodeSpot',
+                    link: 'https://developers.thoughtspot.com/codespot/',
+                    external: true,
+                },
+                { label: 'VisualEmbedSdk', link: 'VisualEmbedSdk' },
+            ],
         },
         {
             name: 'Playground',
-            href: 'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere',
+
+            child: [{ label: 'Play Ground 2.0', link: 'restV2-playground' }],
         },
         {
             name: 'Product Guides',
-            href: 'https://docs.thoughtspot.com/',
         },
         {
             name: 'Community',
-            href:
-                'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers',
-        },
-    ];
-
-    const headerLinkSelf = [
-        {
-            name: 'APIs and SDK',
-            href: '?pageid=apis-sdk',
         },
     ];
 
@@ -49,20 +57,21 @@ const Header = (props: { location: Location }) => {
                                 />
                             </a>
                         </h2>
+                    </div>
+                    <Menu config={headerLinks} />
 
-                        <div className="d-inline-block headerLink">
+                    {/* <div className="d-inline-block headerLink">
                             {headerLinkSelf.map(({ name, href }) => (
                                 <a href={href}>{name}</a>
                             ))}
-                        </div>
-                        <div className="d-inline-block headerLink">
+                        </div> */}
+                    {/* <div className="d-inline-block headerLink">
                             {headerLinks.map(({ name, href }) => (
                                 <a href={href} target="_blank">
                                     {name}
                                 </a>
                             ))}
-                        </div>
-                    </div>
+                        </div> */}
                     <Dropdown location={props.location} />
                 </div>
             </section>
