@@ -22,8 +22,8 @@ const Dropdown = (props: { location: Location }) => {
         const params = new URLSearchParams(location.search);
         params.set('version', link);
         const url = location.origin + '?' + params.toString();
-        window.open(url, '_self');
         localStorage.setItem('version', link);
+        window.open(url, '_self');
     };
 
     if (!currentVersion?.link) {
