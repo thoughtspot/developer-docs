@@ -8,35 +8,67 @@ import './index.scss';
 const Header = (props: { location: Location }) => {
     const headerLinks = [
         {
-            name: 'APIs and SDK',
-            href: '?pageid=apis-sdk',
+            name: 'APIs & SDKs',
+            href: '',
             child: [
-                { label: 'Embed Analytics', link: 'embed-analytics' },
-                { label: 'Rest Apis', link: 'rest-apis' },
-                { label: 'Customize Links', link: 'customize-links' },
-            ],
-        },
-        {
-            name: 'CodeSpot',
-            child: [
-                {
-                    label: 'CodeSpot',
-                    link: 'https://developers.thoughtspot.com/codespot/',
-                    external: true,
-                },
-                { label: 'VisualEmbedSdk', link: 'VisualEmbedSdk' },
+                { label: 'Visual Embed SDK', link: 'VisualEmbedSdk' },
+                { label: 'REST API', link: 'rest-apis' },
+                { label: '', link: '' },
             ],
         },
         {
             name: 'Playground',
-
-            child: [{ label: 'Play Ground 2.0', link: 'restV2-playground' }],
+            child: [
+                {
+                    label: 'Visual Embed',
+                    link: 'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/playground/search',
+                    external: true
+                },
+                {
+                    label: 'REST API',
+                    link: 'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/rest/playgroundV2_0',
+                    external: true
+                },
+                {   label: 'GraphQL',
+                    link: 'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/graphql/playground',
+                    external: true
+                },
+            ],
         },
         {
-            name: 'Product Guides',
+            name: 'Resources',
+            child: [
+                    {
+                       label: 'Community',
+                       link: 'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers-embedding',
+                       external: true
+                    },
+                    {
+                       label: 'Product documentation',
+                       link: 'https://docs.thoughtspot.com',
+                       external: true
+                    },
+                    {
+                       label: 'Support',
+                       link: 'https://www.thoughtspot.com/support',
+                       external: true
+                    },
+            ]
         },
         {
-            name: 'Community',
+            name: 'On GitHub',
+            child: [
+                     {
+                         label: 'Visual Embed SDK',
+                         link: 'https://github.com/thoughtspot/visual-embed-sdk',
+                         external: true
+                     },
+                     {
+                         label: 'REST API SDK',
+                         link: 'https://github.com/thoughtspot/rest-api-sdk',
+                         external: true
+                     },
+              ]
         },
     ];
 
