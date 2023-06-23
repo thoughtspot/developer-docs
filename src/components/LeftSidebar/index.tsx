@@ -29,7 +29,7 @@ import './index.scss';
 const LeftSideBar = (props: {
     navTitle: string;
     navContent: string;
-    backLink: string;
+    backLink?: string;
     docWidth: number;
     leftNavOpen: boolean;
     isMaxMobileResolution: boolean;

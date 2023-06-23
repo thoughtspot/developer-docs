@@ -1,11 +1,25 @@
 import React from 'react';
+import { useResizeDetector } from 'react-resize-detector';
+import { IconContext } from '@react-icons/all-files';
+import { RiMoonClearLine } from '@react-icons/all-files/ri/RiMoonClearLine';
+import { FiSun } from '@react-icons/all-files/fi/FiSun';
+
 import TSLogo from '../../assets/svg/ts-logo-white-developer.svg';
 import t from '../../utils/lang-utils';
 import Dropdown from '../Dropdown';
 import Menu from '../Menu';
+import { MAX_MOBILE_RESOLUTION } from '../../constants/uiConstants';
 import './index.scss';
 
-const Header = (props: { location: Location }) => {
+const Header = (props: {
+    location: Location;
+    setDarkMode: Function;
+    isDarkMode: boolean;
+}) => {
+    const { width, ref } = useResizeDetector();
+
+    const isMaxMobileResolution = !(width < MAX_MOBILE_RESOLUTION);
+
     const headerLinks = [
         {
             name: 'APIs & SDKs',
@@ -13,7 +27,6 @@ const Header = (props: { location: Location }) => {
             child: [
                 { label: 'Visual Embed SDK', link: 'VisualEmbedSdk' },
                 { label: 'REST API', link: 'rest-apis' },
-                { label: '', link: '' },
             ],
         },
         {
@@ -21,60 +34,68 @@ const Header = (props: { location: Location }) => {
             child: [
                 {
                     label: 'Visual Embed',
-                    link: 'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/playground/search',
-                    external: true
+                    link:
+                        'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/playground/search',
+                    external: true,
                 },
                 {
                     label: 'REST API',
-                    link: 'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/rest/playgroundV2_0',
-                    external: true
+                    link:
+                        'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/rest/playgroundV2_0',
+                    external: true,
                 },
-                {   label: 'GraphQL',
-                    link: 'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/graphql/playground',
-                    external: true
+                {
+                    label: 'GraphQL',
+                    link:
+                        'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/graphql/playground',
+                    external: true,
                 },
             ],
         },
         {
             name: 'Resources',
             child: [
-                    {
-                       label: 'Community',
-                       link: 'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers-embedding',
-                       external: true
-                    },
-                    {
-                       label: 'Product documentation',
-                       link: 'https://docs.thoughtspot.com',
-                       external: true
-                    },
-                    {
-                       label: 'Support',
-                       link: 'https://www.thoughtspot.com/support',
-                       external: true
-                    },
-            ]
+                {
+                    label: 'Community',
+                    link:
+                        'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers-embedding',
+                    external: true,
+                },
+                {
+                    label: 'Product documentation',
+                    link: 'https://docs.thoughtspot.com',
+                    external: true,
+                },
+                {
+                    label: 'Support',
+                    link: 'https://www.thoughtspot.com/support',
+                    external: true,
+                },
+            ],
         },
         {
             name: 'On GitHub',
             child: [
-                     {
-                         label: 'Visual Embed SDK',
-                         link: 'https://github.com/thoughtspot/visual-embed-sdk',
-                         external: true
-                     },
-                     {
-                         label: 'REST API SDK',
-                         link: 'https://github.com/thoughtspot/rest-api-sdk',
-                         external: true
-                     },
-              ]
+                {
+                    label: 'Visual Embed SDK',
+                    link: 'https://github.com/thoughtspot/visual-embed-sdk',
+                    external: true,
+                },
+                {
+                    label: 'REST API SDK',
+                    link: 'https://github.com/thoughtspot/rest-api-sdk',
+                    external: true,
+                },
+            ],
         },
     ];
 
     return (
         <header>
-            <section className="containerWrapper">
+            <section
+                className="containerWrapper"
+                ref={ref as React.RefObject<HTMLDivElement>}
+            >
                 <div className="headerWrapper">
                     <div>
                         <h2 className="m-0 d-inline-block logo">
@@ -91,20 +112,27 @@ const Header = (props: { location: Location }) => {
                         </h2>
                     </div>
                     <Menu config={headerLinks} />
-
-                    {/* <div className="d-inline-block headerLink">
-                            {headerLinkSelf.map(({ name, href }) => (
-                                <a href={href}>{name}</a>
-                            ))}
-                        </div> */}
-                    {/* <div className="d-inline-block headerLink">
-                            {headerLinks.map(({ name, href }) => (
-                                <a href={href} target="_blank">
-                                    {name}
-                                </a>
-                            ))}
-                        </div> */}
-                    <Dropdown location={props.location} />
+                    {isMaxMobileResolution && (
+                        <div className="themeSwitcher">
+                            <IconContext.Provider
+                                value={{ className: 'theme-icon' }}
+                            >
+                                {props.isDarkMode ? (
+                                    <RiMoonClearLine
+                                        onClick={() => props.setDarkMode(false)}
+                                    />
+                                ) : (
+                                    <FiSun
+                                        onClick={() => props.setDarkMode(true)}
+                                    />
+                                )}
+                            </IconContext.Provider>
+                        </div>
+                    )}
+                    <Dropdown
+                        location={props.location}
+                        isMobile={isMaxMobileResolution}
+                    />
                 </div>
             </section>
         </header>

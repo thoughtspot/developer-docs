@@ -532,7 +532,7 @@ class TypeDocParser {
             this.childrenIdMap[grandParent]?.kindString ===
             TypeDocReflectionKind.Project
         ) {
-            let newLinkText = `[.typeodc-${node.kindString.replace(
+            let newLinkText = `[.typedoc-${node.kindString.replace(
                 / /g,
                 '_',
             )}]#xref:${this.childrenIdMap[parent].name}.adoc`;
@@ -549,15 +549,15 @@ class TypeDocParser {
         const pageTitle = `= ${node.name}`;
 
         const mainPageContent = '';
-
-        let enumIndexContent = '';
+        let enumIndexContent = '\n\n[div boxDiv boxFullWidth]\n--\n';
         // Special handling
-        if (node.kindString === 'Enumeration') {
+        if (node.kindString === 'Enumeration','Class','Interface') {
             enumIndexContent += `${this.createTypeDocTable(
                 node.children?.map(this.convertNodeToLink) || [],
-                5,
+                3,
             )}`;
         }
+        enumIndexContent += '\n--\n\n';
 
         // Crate content for children ( Enum members , Parameters, Properties, etc..)
         const groupContent = node.groups
@@ -574,10 +574,10 @@ class TypeDocParser {
 
         return [
             pageTitle,
-            enumIndexContent,
             TypeDocInternalParser.parseComment(node.comment),
             TypeDocInternalParser.parseTags(node.comment?.tags),
-
+            '== Index',
+            enumIndexContent,
             mainPageContent,
             groupContent,
         ].join('\n\n');
