@@ -10,7 +10,7 @@ import {
 } from '../../constants/keystrokeConstants';
 import t from '../../utils/lang-utils';
 import SearchResult from './SearchResult';
-import ToggleButton from '../ToggleButton';
+// import ToggleButton from '../ToggleButton';
 
 type SearchProps = {
     options: SearchQueryResult[];
@@ -23,6 +23,7 @@ type SearchProps = {
     updateKeyword: Function;
     setDarkMode: Function;
     isPublicSiteOpen: boolean;
+    leftNavWidth: Number;
 };
 
 const Search: React.FC<SearchProps> = (props) => {
@@ -186,7 +187,12 @@ const Search: React.FC<SearchProps> = (props) => {
                 !props.isPublicSiteOpen ? 'inClusterSite' : ''
             }`}
         >
-            <div className="searchInputWrapper">
+            <div
+                className="searchInputWrapper"
+                style={{
+                    marginLeft: `${props?.leftNavWidth}px`,
+                }}
+            >
                 <div className="searchInputContainer">
                     <IconContext.Provider
                         value={{
@@ -222,14 +228,14 @@ const Search: React.FC<SearchProps> = (props) => {
                     ''
                 )}
             </div>
-            {props.isMaxMobileResolution && (
+            {/* {props.isMaxMobileResolution && (
                 <div className="ml-4">
                     <ToggleButton
                         setDarkMode={props.setDarkMode}
                         isDarkMode={props.isDarkMode}
                     />
                 </div>
-            )}
+            )} */}
         </div>
     );
 };
