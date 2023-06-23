@@ -155,7 +155,6 @@ const queries = [
                     }, []),
             ];
 
-            console.log('hihii', data1.length);
             return data1;
         },
         indexName: getAlgoliaIndex(),

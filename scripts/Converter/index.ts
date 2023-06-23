@@ -550,7 +550,7 @@ class TypeDocParser {
 
         const mainPageContent = '';
 
-        let enumIndexContent = '';
+        let enumIndexContent = '\n\n[div boxDiv boxFullWidth]\n--\n';
         // Special handling
         if (node.kindString === 'Enumeration') {
             enumIndexContent += `${this.createTypeDocTable(
@@ -558,11 +558,12 @@ class TypeDocParser {
                 5,
             )}`;
         }
+        enumIndexContent += '\n--\n\n';
 
         // Crate content for children ( Enum members , Parameters, Properties, etc..)
         const groupContent = node.groups
             ?.map((group) => {
-                const groupHeading = `== ${group.title}`;
+                const groupHeading = '';
                 return [
                     groupHeading,
                     ...group.children.map((id) => {
