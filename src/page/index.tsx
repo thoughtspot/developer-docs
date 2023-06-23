@@ -274,7 +274,13 @@ const IndexPage = ({ location }) => {
 
     return (
         <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
-            {isPublicSiteOpen && <Header location={location} />}
+            {isPublicSiteOpen && (
+                <Header
+                    location={location}
+                    setDarkMode={setDarkMode}
+                    isDarkMode={isDarkMode}
+                />
+            )}
             <main
                 ref={ref as React.RefObject<HTMLDivElement>}
                 className={`dark ${isPublicSiteOpen ? 'withHeaderFooter' : ''}`}
@@ -282,21 +288,39 @@ const IndexPage = ({ location }) => {
                     height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                 }}
             >
-                <LeftSidebar
-                    navTitle={navTitle}
-                    navContent={navContent}
-                    backLink={backLink}
-                    docWidth={width}
-                    handleLeftNavChange={setLeftNavWidth}
-                    location={location}
-                    setLeftNavOpen={setLeftNavOpen}
+                <Search
+                    keyword={keyword}
+                    onChange={(e: React.FormEvent<HTMLInputElement>) =>
+                        updateKeyword((e.target as HTMLInputElement).value)
+                    }
+                    options={results}
+                    optionSelected={optionSelected}
                     leftNavOpen={leftNavOpen}
-                    isPublicSiteOpen={isPublicSiteOpen}
+                    updateKeyword={updateKeyword}
                     isMaxMobileResolution={isMaxMobileResolution}
                     setDarkMode={setDarkMode}
                     isDarkMode={isDarkMode}
-                    curPageid={params[TS_PAGE_ID_PARAM]}
+                    isPublicSiteOpen={isPublicSiteOpen}
+                    leftNavWidth={leftNavWidth}
+                    backLink={backLink}
                 />
+
+                <div className="leftNavContainer">
+                    <LeftSidebar
+                        navTitle={navTitle}
+                        navContent={navContent}
+                        docWidth={width}
+                        handleLeftNavChange={setLeftNavWidth}
+                        location={location}
+                        setLeftNavOpen={setLeftNavOpen}
+                        leftNavOpen={leftNavOpen}
+                        isPublicSiteOpen={isPublicSiteOpen}
+                        isMaxMobileResolution={isMaxMobileResolution}
+                        setDarkMode={setDarkMode}
+                        isDarkMode={isDarkMode}
+                        curPageid={params[TS_PAGE_ID_PARAM]}
+                    />
+                </div>
                 <div
                     className="documentBody"
                     style={{
@@ -306,21 +330,6 @@ const IndexPage = ({ location }) => {
                             : '0px',
                     }}
                 >
-                    <Search
-                        keyword={keyword}
-                        onChange={(e: React.FormEvent<HTMLInputElement>) =>
-                            updateKeyword((e.target as HTMLInputElement).value)
-                        }
-                        options={results}
-                        optionSelected={optionSelected}
-                        leftNavOpen={leftNavOpen}
-                        updateKeyword={updateKeyword}
-                        isMaxMobileResolution={isMaxMobileResolution}
-                        setDarkMode={setDarkMode}
-                        isDarkMode={isDarkMode}
-                        isPublicSiteOpen={isPublicSiteOpen}
-                    />
-
                     <div className="introWrapper">
                         <Document
                             shouldShowRightNav={shouldShowRightNav}

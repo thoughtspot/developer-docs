@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown';
 import { VERSION_DROPDOWN, TS_Version } from '../../configs/doc-configs';
+
 import './index.scss';
 
-const Dropdown = (props: { location: Location }) => {
+const Dropdown = (props: { location: Location; isMobile: Boolean }) => {
     const { location } = props;
     const options = VERSION_DROPDOWN;
     const [currentVersion, setCurrentVersion] = useState({});
+
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const version =
@@ -21,7 +23,8 @@ const Dropdown = (props: { location: Location }) => {
     const handelClick = (link: string) => {
         const params = new URLSearchParams(location.search);
         params.set('version', link);
-        const url = location.origin + '?' + params.toString();
+        const url =
+            location.origin + location?.pathname + '?' + params.toString();
         localStorage.setItem('version', link);
         window.open(url, '_self');
     };
@@ -32,27 +35,31 @@ const Dropdown = (props: { location: Location }) => {
 
     return (
         <div className="dropdownWrapper">
-            <div className="dropdown">
-                <button className="dropbtn">
-                    {`${TS_Version} ${currentVersion?.label}`}
-
-                    <AiOutlineCaretDown className="arrowDown" />
-                </button>
-                <div className="dropdownContent">
-                    {options.map(({ label, link, subLabel }) => {
-                        return (
-                            <div
-                                data-testid={`option-${label}`}
-                                key={link}
-                                onClick={() => handelClick(link)}
-                            >
-                                {label}
-                                <div className="subLabel">
-                                    <span>{subLabel}</span>
+            <div className="dropdownContainer">
+                <div className={props?.isMobile ? 'versionLabel' : 'hide'}>
+                    {TS_Version}
+                </div>
+                <div className="dropdown">
+                    <button className="dropbtn">
+                        {currentVersion?.label}
+                        <AiOutlineCaretDown className="arrowDown" />
+                    </button>
+                    <div className="dropdownContent">
+                        {options.map(({ label, link, subLabel }) => {
+                            return (
+                                <div
+                                    data-testid={`option-${label}`}
+                                    key={link}
+                                    onClick={() => handelClick(link)}
+                                >
+                                    {label}
+                                    <div className="subLabel">
+                                        <span>{subLabel}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         </div>

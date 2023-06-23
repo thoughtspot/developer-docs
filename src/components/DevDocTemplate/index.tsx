@@ -213,21 +213,38 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const renderDocTemplate = () => (
         <>
-            <LeftSidebar
-                navTitle={navTitle}
-                navContent={navContent}
-                backLink={backLink}
-                docWidth={width}
-                handleLeftNavChange={setLeftNavWidth}
-                location={location}
-                setLeftNavOpen={setLeftNavOpen}
-                leftNavOpen={leftNavOpen}
-                isPublicSiteOpen={isPublicSiteOpen}
+            <Search
+                keyword={keyword}
+                onChange={(e: React.FormEvent<HTMLInputElement>) =>
+                    updateKeyword((e.target as HTMLInputElement).value)
+                }
+                options={results}
+                optionSelected={optionSelected}
+                leftNavOpen={true}
+                updateKeyword={updateKeyword}
                 isMaxMobileResolution={isMaxMobileResolution}
                 setDarkMode={setDarkMode}
                 isDarkMode={isDarkMode}
-                curPageid={curPageNode.pageAttributes.pageid}
+                isPublicSiteOpen={isPublicSiteOpen}
+                leftNavWidth={leftNavWidth}
+                backLink={backLink}
             />
+            <div className="leftNavContainer">
+                <LeftSidebar
+                    navTitle={navTitle}
+                    navContent={navContent}
+                    docWidth={width}
+                    handleLeftNavChange={setLeftNavWidth}
+                    location={location}
+                    setLeftNavOpen={setLeftNavOpen}
+                    leftNavOpen={leftNavOpen}
+                    isPublicSiteOpen={isPublicSiteOpen}
+                    isMaxMobileResolution={isMaxMobileResolution}
+                    setDarkMode={setDarkMode}
+                    isDarkMode={isDarkMode}
+                    curPageid={curPageNode.pageAttributes.pageid}
+                />
+            </div>
             <div
                 className="documentBody"
                 style={{
@@ -237,21 +254,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         : '0px',
                 }}
             >
-                <Search
-                    keyword={keyword}
-                    onChange={(e: React.FormEvent<HTMLInputElement>) =>
-                        updateKeyword((e.target as HTMLInputElement).value)
-                    }
-                    options={results}
-                    optionSelected={optionSelected}
-                    leftNavOpen={leftNavOpen}
-                    updateKeyword={updateKeyword}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={setDarkMode}
-                    isDarkMode={isDarkMode}
-                    isPublicSiteOpen={isPublicSiteOpen}
-                />
-
                 <div className="introWrapper">
                     <Document
                         shouldShowRightNav={shouldShowRightNav}
@@ -287,7 +289,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         <>
             <Seo title={docTitle} description={docDescription} />
             <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
-                {isPublicSiteOpen && <Header location={location} />}
+                {isPublicSiteOpen && (
+                    <Header
+                        location={location}
+                        setDarkMode={setDarkMode}
+                        isDarkMode={isDarkMode}
+                    />
+                )}
                 <main
                     ref={ref as React.RefObject<HTMLDivElement>}
                     className={getClassName()}
