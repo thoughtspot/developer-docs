@@ -227,12 +227,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 isDarkMode={isDarkMode}
                 isPublicSiteOpen={isPublicSiteOpen}
                 leftNavWidth={leftNavWidth}
+                backLink={backLink}
             />
             <div className="leftNavContainer">
                 <LeftSidebar
                     navTitle={navTitle}
                     navContent={navContent}
-                    backLink={backLink}
                     docWidth={width}
                     handleLeftNavChange={setLeftNavWidth}
                     location={location}

@@ -10,7 +10,7 @@ import {
 } from '../../constants/keystrokeConstants';
 import t from '../../utils/lang-utils';
 import SearchResult from './SearchResult';
-// import ToggleButton from '../ToggleButton';
+import BackButton from '../BackButton';
 
 type SearchProps = {
     options: SearchQueryResult[];
@@ -24,6 +24,7 @@ type SearchProps = {
     setDarkMode: Function;
     isPublicSiteOpen: boolean;
     leftNavWidth: Number;
+    backLink: string;
 };
 
 const Search: React.FC<SearchProps> = (props) => {
@@ -187,12 +188,16 @@ const Search: React.FC<SearchProps> = (props) => {
                 !props.isPublicSiteOpen ? 'inClusterSite' : ''
             }`}
         >
-            <div
-                className="searchInputWrapper"
-                style={{
-                    marginLeft: `${props?.leftNavWidth}px`,
-                }}
-            >
+            <div style={{ width: `${props.leftNavWidth}px` }}>
+                {props.backLink && (
+                    <BackButton
+                        title={t('NAV_BACK_BTN_TEXT')}
+                        backLink={props.backLink}
+                        customStyles={{ paddingLeft: '0px' }}
+                    />
+                )}
+            </div>
+            <div className="searchInputWrapper">
                 <div className="searchInputContainer">
                     <IconContext.Provider
                         value={{
@@ -228,14 +233,6 @@ const Search: React.FC<SearchProps> = (props) => {
                     ''
                 )}
             </div>
-            {/* {props.isMaxMobileResolution && (
-                <div className="ml-4">
-                    <ToggleButton
-                        setDarkMode={props.setDarkMode}
-                        isDarkMode={props.isDarkMode}
-                    />
-                </div>
-            )} */}
         </div>
     );
 };
