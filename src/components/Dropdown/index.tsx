@@ -36,9 +36,6 @@ const Dropdown = (props: { location: Location; isMobile: Boolean }) => {
     return (
         <div className="dropdownWrapper">
             <div className="dropdownContainer">
-                <div className={props?.isMobile ? 'versionLabel' : 'hide'}>
-                    {TS_Version}
-                </div>
                 <div className="dropdown">
                     <button className="dropbtn">
                         {currentVersion?.label}
