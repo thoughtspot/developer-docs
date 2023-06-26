@@ -43,11 +43,8 @@ const NavContent = (props: {
                             data-testid="search-input"
                             type="Search"
                             placeholder={t('SEARCH_PLACEHOLDER')}
-                            onClick={() => {
-                                console.log('clicked');
-                                props.searchClickHandler();
-                            }}
-                            onKeyDown={() => null}
+                            onClick={() => props.searchClickHandler()}
+                            readOnly
                         />
                     </div>
                 </div>

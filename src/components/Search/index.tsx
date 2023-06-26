@@ -206,6 +206,7 @@ const Search: React.FC<SearchProps> = (props) => {
                         onKeyDown={onKeyDown}
                         value={props.keyword}
                         onChange={props.onChange}
+                        autoFocus
                     />
                 </div>
                 {showSearchResult && props.options?.length ? (

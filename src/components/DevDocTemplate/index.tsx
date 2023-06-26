@@ -220,11 +220,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 left: 'auro',
                 right: 'auto',
                 bottom: 'auto',
-                width: '40%',
+                width: isMaxMobileResolution ? '40%' : '100%',
                 margin: 'auto',
-                transform: 'translate(80%, 70px)',
+                transform: `translate(${
+                    isMaxMobileResolution ? '80%' : '0'
+                }, 70px)`,
                 border: 'none',
-                height: '400px',
+                height: isMaxMobileResolution ? '400px' : '250px',
                 boxShadow: 'none',
                 background: 'transparent',
             },
@@ -242,7 +244,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     }
                     options={results}
                     optionSelected={optionSelected}
-                    leftNavOpen={true}
+                    leftNavOpen={leftNavOpen}
                     updateKeyword={updateKeyword}
                     isMaxMobileResolution={isMaxMobileResolution}
                     setDarkMode={setDarkMode}
@@ -272,7 +274,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     setDarkMode={setDarkMode}
                     isDarkMode={isDarkMode}
                     curPageid={curPageNode.pageAttributes.pageid}
-                    searchClickHandler={() => setShowSearch(true)}
+                    searchClickHandler={() => {
+                        setShowSearch(true);
+                        if (!isMaxMobileResolution) setLeftNavOpen(false);
+                    }}
                 />
             </div>
             <div
