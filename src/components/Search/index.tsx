@@ -121,8 +121,9 @@ const Search: React.FC<SearchProps> = (props) => {
                             index={index}
                             keyword={option.title}
                             title={
-                                option._snippetResult &&
-                                option._snippetResult.body.value
+                                (option._snippetResult &&
+                                    option._snippetResult?.body?.value) ??
+                                ''
                             }
                         />
                     </a>
@@ -141,8 +142,9 @@ const Search: React.FC<SearchProps> = (props) => {
                             index={index}
                             keyword={props.keyword}
                             title={
-                                option._snippetResult &&
-                                option._snippetResult.body.value
+                                (option._snippetResult &&
+                                    option._snippetResult?.body?.value) ??
+                                ''
                             }
                             isKeywordNotFound={true}
                         />
@@ -169,8 +171,9 @@ const Search: React.FC<SearchProps> = (props) => {
                             index={index}
                             keyword={`${option.title} | ${option.sectionTitle}`}
                             title={
-                                option._snippetResult &&
-                                option._snippetResult.body.value
+                                (option._snippetResult &&
+                                    option._snippetResult?.body?.value) ??
+                                ''
                             }
                         />
                     </div>
