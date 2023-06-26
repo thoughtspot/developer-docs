@@ -289,7 +289,8 @@ const IndexPage = ({ location }) => {
                     isMaxMobileResolution ? '80%' : '0'
                 }, 70px)`,
                 border: 'none',
-                height: isMaxMobileResolution ? '400px' : '250px',
+                minHeight: '150px',
+                maxHeight: '400px',
                 boxShadow: 'none',
                 background: 'transparent',
             },
@@ -300,22 +301,24 @@ const IndexPage = ({ location }) => {
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
             >
-                <Search
-                    keyword={keyword}
-                    onChange={(e: React.FormEvent<HTMLInputElement>) =>
-                        updateKeyword((e.target as HTMLInputElement).value)
-                    }
-                    options={results}
-                    optionSelected={optionSelected}
-                    leftNavOpen={leftNavOpen}
-                    updateKeyword={updateKeyword}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={setDarkMode}
-                    isDarkMode={isDarkMode}
-                    isPublicSiteOpen={isPublicSiteOpen}
-                    leftNavWidth={leftNavWidth}
-                    backLink={backLink}
-                />
+                <div id="docsModal" data-theme={isDarkMode ? 'dark' : 'light'}>
+                    <Search
+                        keyword={keyword}
+                        onChange={(e: React.FormEvent<HTMLInputElement>) =>
+                            updateKeyword((e.target as HTMLInputElement).value)
+                        }
+                        options={results}
+                        optionSelected={optionSelected}
+                        leftNavOpen={leftNavOpen}
+                        updateKeyword={updateKeyword}
+                        isMaxMobileResolution={isMaxMobileResolution}
+                        setDarkMode={setDarkMode}
+                        isDarkMode={isDarkMode}
+                        isPublicSiteOpen={isPublicSiteOpen}
+                        leftNavWidth={leftNavWidth}
+                        backLink={backLink}
+                    />
+                </div>
             </Modal>
         );
     };
