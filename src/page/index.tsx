@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStaticQuery, graphql, navigate } from 'gatsby';
+import Modal from 'react-modal';
+
 import { useResizeDetector } from 'react-resize-detector';
 import { useFlexSearch } from 'react-use-flexsearch';
 import algoliasearch from 'algoliasearch';
@@ -54,6 +56,8 @@ const IndexPage = ({ location }) => {
     const [breadcrumsData, setBreadcrumsData] = useState([]);
     const [backLink, setBackLink] = useState('');
     const [allPageIds, setAllPageIds] = useState([]);
+    const [showSearch, setShowSearch] = useState(false);
+
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
             ? LEFT_NAV_WIDTH_DESKTOP
@@ -271,6 +275,48 @@ const IndexPage = ({ location }) => {
         return '100%';
     };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
+    Modal.setAppElement('#___gatsby');
+    const renderSearch = () => {
+        const customStyles = {
+            content: {
+                top: '50px',
+                left: 'auro',
+                right: 'auto',
+                bottom: 'auto',
+                width: '40%',
+                margin: 'auto',
+                transform: 'translate(80%, 70px)',
+                border: 'none',
+                height: '400px',
+                boxShadow: 'none',
+                background: 'transparent',
+            },
+        };
+        return (
+            <Modal
+                isOpen={showSearch}
+                onRequestClose={() => setShowSearch(false)}
+                style={customStyles}
+            >
+                <Search
+                    keyword={keyword}
+                    onChange={(e: React.FormEvent<HTMLInputElement>) =>
+                        updateKeyword((e.target as HTMLInputElement).value)
+                    }
+                    options={results}
+                    optionSelected={optionSelected}
+                    leftNavOpen={true}
+                    updateKeyword={updateKeyword}
+                    isMaxMobileResolution={isMaxMobileResolution}
+                    setDarkMode={setDarkMode}
+                    isDarkMode={isDarkMode}
+                    isPublicSiteOpen={isPublicSiteOpen}
+                    leftNavWidth={leftNavWidth}
+                    backLink={backLink}
+                />
+            </Modal>
+        );
+    };
 
     return (
         <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
@@ -288,22 +334,7 @@ const IndexPage = ({ location }) => {
                     height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                 }}
             >
-                <Search
-                    keyword={keyword}
-                    onChange={(e: React.FormEvent<HTMLInputElement>) =>
-                        updateKeyword((e.target as HTMLInputElement).value)
-                    }
-                    options={results}
-                    optionSelected={optionSelected}
-                    leftNavOpen={leftNavOpen}
-                    updateKeyword={updateKeyword}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={setDarkMode}
-                    isDarkMode={isDarkMode}
-                    isPublicSiteOpen={isPublicSiteOpen}
-                    leftNavWidth={leftNavWidth}
-                    backLink={backLink}
-                />
+                {renderSearch()}
 
                 <div className="leftNavContainer">
                     <LeftSidebar
@@ -319,6 +350,7 @@ const IndexPage = ({ location }) => {
                         setDarkMode={setDarkMode}
                         isDarkMode={isDarkMode}
                         curPageid={params[TS_PAGE_ID_PARAM]}
+                        searchClickHandler={() => setShowSearch(true)}
                     />
                 </div>
                 <div

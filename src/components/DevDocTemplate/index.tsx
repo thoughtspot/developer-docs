@@ -224,7 +224,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 margin: 'auto',
                 transform: 'translate(80%, 70px)',
                 border: 'none',
-                height: '200px',
+                height: '400px',
                 boxShadow: 'none',
                 background: 'transparent',
             },
@@ -258,7 +258,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const renderDocTemplate = () => (
         <>
             {renderSearch()}
-
             <div className="leftNavContainer">
                 <LeftSidebar
                     navTitle={navTitle}
@@ -273,10 +272,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     setDarkMode={setDarkMode}
                     isDarkMode={isDarkMode}
                     curPageid={curPageNode.pageAttributes.pageid}
-                    searchClickHandler={() => {
-                        setShowSearch(true);
-                        console.log('update', showSearch);
-                    }}
+                    searchClickHandler={() => setShowSearch(true)}
                 />
             </div>
             <div
