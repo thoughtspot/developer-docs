@@ -226,8 +226,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     isMaxMobileResolution ? '80%' : '0'
                 }, 70px)`,
                 border: 'none',
-                minHeight: '150px',
-                maxHeight: '400px',
+                height: isMaxMobileResolution ? '400px' : '250px',
                 boxShadow: 'none',
                 background: 'transparent',
             },
