@@ -1,4 +1,6 @@
 import React from 'react';
+import { IconContext } from '@react-icons/all-files';
+import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import BackButton from '../BackButton';
 import t from '../../utils/lang-utils';
 
@@ -12,6 +14,7 @@ const NavContent = (props: {
     isMaxMobileResolution: boolean;
     isDarkMode: boolean;
     setDarkMode: Function;
+    searchClickHandler: Function;
 }) => {
     return (
         <aside
@@ -24,6 +27,31 @@ const NavContent = (props: {
                     backLink={props.backLink}
                 />
             )}
+
+            <div className="searchInputSelector">
+                <div className="searchInputWrapper">
+                    <div className="searchInputContainer">
+                        <IconContext.Provider
+                            value={{
+                                className: `icon searchIcon`,
+                            }}
+                        >
+                            <BiSearch />
+                        </IconContext.Provider>
+
+                        <input
+                            data-testid="search-input"
+                            type="Search"
+                            placeholder={t('SEARCH_PLACEHOLDER')}
+                            onClick={() => {
+                                console.log('clicked');
+                                props.searchClickHandler();
+                            }}
+                            onKeyDown={() => null}
+                        />
+                    </div>
+                </div>
+            </div>
             <nav>
                 <h2 className="heading">{props.navTitle}</h2>
                 <div

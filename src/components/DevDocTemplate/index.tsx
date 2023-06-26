@@ -1,4 +1,5 @@
 import React, { useState, useEffect, FC } from 'react';
+import Modal from 'react-modal';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { graphql, navigate } from 'gatsby';
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -66,6 +67,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [breadcrumsData, setBreadcrumsData] = useState([]);
     const [prevPageId, setPrevPageId] = useState('introduction');
     const [backLink, setBackLink] = useState('');
+    const [showSearch, setShowSearch] = useState(false);
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
             ? LEFT_NAV_WIDTH_DESKTOP
@@ -210,25 +212,53 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return '100%';
     };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
+    Modal.setAppElement('#___gatsby');
+    const renderSearch = () => {
+        const customStyles = {
+            content: {
+                top: '50px',
+                left: 'auro',
+                right: 'auto',
+                bottom: 'auto',
+                width: '40%',
+                margin: 'auto',
+                transform: 'translate(80%, 70px)',
+                border: 'none',
+                height: '200px',
+                boxShadow: 'none',
+                background: 'transparent',
+            },
+        };
+        return (
+            <Modal
+                isOpen={showSearch}
+                onRequestClose={() => setShowSearch(false)}
+                style={customStyles}
+            >
+                <Search
+                    keyword={keyword}
+                    onChange={(e: React.FormEvent<HTMLInputElement>) =>
+                        updateKeyword((e.target as HTMLInputElement).value)
+                    }
+                    options={results}
+                    optionSelected={optionSelected}
+                    leftNavOpen={true}
+                    updateKeyword={updateKeyword}
+                    isMaxMobileResolution={isMaxMobileResolution}
+                    setDarkMode={setDarkMode}
+                    isDarkMode={isDarkMode}
+                    isPublicSiteOpen={isPublicSiteOpen}
+                    leftNavWidth={leftNavWidth}
+                    backLink={backLink}
+                />
+            </Modal>
+        );
+    };
 
     const renderDocTemplate = () => (
         <>
-            <Search
-                keyword={keyword}
-                onChange={(e: React.FormEvent<HTMLInputElement>) =>
-                    updateKeyword((e.target as HTMLInputElement).value)
-                }
-                options={results}
-                optionSelected={optionSelected}
-                leftNavOpen={true}
-                updateKeyword={updateKeyword}
-                isMaxMobileResolution={isMaxMobileResolution}
-                setDarkMode={setDarkMode}
-                isDarkMode={isDarkMode}
-                isPublicSiteOpen={isPublicSiteOpen}
-                leftNavWidth={leftNavWidth}
-                backLink={backLink}
-            />
+            {renderSearch()}
+
             <div className="leftNavContainer">
                 <LeftSidebar
                     navTitle={navTitle}
@@ -243,6 +273,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     setDarkMode={setDarkMode}
                     isDarkMode={isDarkMode}
                     curPageid={curPageNode.pageAttributes.pageid}
+                    searchClickHandler={() => {
+                        setShowSearch(true);
+                        console.log('update', showSearch);
+                    }}
                 />
             </div>
             <div

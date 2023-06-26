@@ -10,7 +10,7 @@ import {
 } from '../../constants/keystrokeConstants';
 import t from '../../utils/lang-utils';
 import SearchResult from './SearchResult';
-import BackButton from '../BackButton';
+// import BackButton from '../BackButton';
 
 type SearchProps = {
     options: SearchQueryResult[];
@@ -184,19 +184,10 @@ const Search: React.FC<SearchProps> = (props) => {
 
     return (
         <div
-            className={`searchWrapper ${props.leftNavOpen ? 'visHidden' : ''} ${
-                !props.isPublicSiteOpen ? 'inClusterSite' : ''
-            }`}
+        // className={`searchWrapper ${props.leftNavOpen ? 'visHidden' : ''} ${
+        //     !props.isPublicSiteOpen ? 'inClusterSite' : ''
+        // }`}
         >
-            <div style={{ width: `${props.leftNavWidth}px` }}>
-                {props.backLink && (
-                    <BackButton
-                        title={t('NAV_BACK_BTN_TEXT')}
-                        backLink={props.backLink}
-                        customStyles={{ paddingLeft: '0px' }}
-                    />
-                )}
-            </div>
             <div className="searchInputWrapper">
                 <div className="searchInputContainer">
                     <IconContext.Provider
