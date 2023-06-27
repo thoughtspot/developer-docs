@@ -119,11 +119,23 @@ const Header = (props: {
                             >
                                 {props.isDarkMode ? (
                                     <RiMoonClearLine
-                                        onClick={() => props.setDarkMode(false)}
+                                        onClick={() => {
+                                            localStorage.setItem(
+                                                'theme',
+                                                'light',
+                                            );
+                                            props.setDarkMode(false);
+                                        }}
                                     />
                                 ) : (
                                     <FiSun
-                                        onClick={() => props.setDarkMode(true)}
+                                        onClick={() => {
+                                            localStorage.setItem(
+                                                'theme',
+                                                'dark',
+                                            );
+                                            props.setDarkMode(true);
+                                        }}
                                     />
                                 )}
                             </IconContext.Provider>
