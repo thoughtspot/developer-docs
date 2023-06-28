@@ -935,7 +935,7 @@ const main = async () => {
         cliPrefix: `--${key}=`,
         optionKey: key,
     }));
-    const cliOptions = process.argv.reduce((acc, arg) => {
+    let cliOptions = process.argv.reduce((acc, arg) => {
         const newAcc = acc;
         cliKeys.forEach((cliKey) => {
             if (arg.startsWith(cliKey.cliPrefix))
@@ -943,6 +943,15 @@ const main = async () => {
         });
         return newAcc;
     }, defaultCliOptions);
+
+    const typeDocConfig = JSON.parse(
+        fs.readFileSync('./typedocConverter.json').toString(),
+    );
+
+    cliOptions = {
+        ...cliOptions,
+        ...typeDocConfig,
+    };
 
     cliOptions.typeDocFilePath = cliOptions.typeDocFilePath.replace(
         '{branch}',
