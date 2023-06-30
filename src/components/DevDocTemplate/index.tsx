@@ -79,7 +79,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const checkout =
         typeof window !== 'undefined'
             ? localStorage.getItem('theme') === 'dark'
-            : null;
+            : false;
+    console.log(checkout, window);
     const [isDarkMode, setDarkMode] = useState(checkout);
 
     const isAPIPlayGround =
