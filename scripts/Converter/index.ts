@@ -551,7 +551,7 @@ class TypeDocParser {
         const mainPageContent = '';
         let enumIndexContent = '\n\n[div boxDiv boxFullWidth]\n--\n';
         // Special handling
-        if (node.kindString === 'Enumeration','Class','Interface') {
+        if (['Enumeration', 'Class', 'Interface'].includes(node.kindString)) {
             enumIndexContent += `${this.createTypeDocTable(
                 node.children?.map(this.convertNodeToLink) || [],
                 3,
@@ -562,7 +562,7 @@ class TypeDocParser {
         // Crate content for children ( Enum members , Parameters, Properties, etc..)
         const groupContent = node.groups
             ?.map((group) => {
-                const groupHeading = '';
+                const groupHeading = `== ${group.title}`;
                 return [
                     groupHeading,
                     ...group.children.map((id) => {
@@ -935,7 +935,7 @@ const main = async () => {
         cliPrefix: `--${key}=`,
         optionKey: key,
     }));
-    const cliOptions = process.argv.reduce((acc, arg) => {
+    let cliOptions = process.argv.reduce((acc, arg) => {
         const newAcc = acc;
         cliKeys.forEach((cliKey) => {
             if (arg.startsWith(cliKey.cliPrefix))
@@ -943,6 +943,15 @@ const main = async () => {
         });
         return newAcc;
     }, defaultCliOptions);
+
+    const typeDocConfig = JSON.parse(
+        fs.readFileSync('./typedocConverter.json').toString(),
+    );
+
+    cliOptions = {
+        ...cliOptions,
+        ...typeDocConfig,
+    };
 
     cliOptions.typeDocFilePath = cliOptions.typeDocFilePath.replace(
         '{branch}',
