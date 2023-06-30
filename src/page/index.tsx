@@ -66,10 +66,8 @@ const IndexPage = ({ location }) => {
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
     const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(false);
-    const checkout =
-        typeof window !== 'undefined'
-            ? localStorage.getItem('theme') === 'dark'
-            : null;
+    const checkout = localStorage && localStorage?.getItem('theme') === 'dark';
+
     const [isDarkMode, setDarkMode] = useState(checkout);
 
     useEffect(() => {

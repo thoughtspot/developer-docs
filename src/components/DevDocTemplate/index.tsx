@@ -76,11 +76,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
     const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(false);
-    const checkout =
-        typeof window !== 'undefined'
-            ? localStorage.getItem('theme') === 'dark'
-            : false;
-    console.log(checkout, window);
+    const checkout = localStorage && localStorage?.getItem('theme') === 'dark';
     const [isDarkMode, setDarkMode] = useState(checkout);
 
     const isAPIPlayGround =
