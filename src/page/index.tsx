@@ -340,6 +340,8 @@ const IndexPage = ({ location }) => {
 
     return (
         <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
+            {isDarkMode}
+
             {isPublicSiteOpen && (
                 <Header
                     location={location}

@@ -341,6 +341,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         <>
             <Seo title={docTitle} description={docDescription} />
             <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
+                {isDarkMode}
                 {isPublicSiteOpen && (
                     <Header
                         location={location}
