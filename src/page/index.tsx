@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useStaticQuery, graphql, navigate } from 'gatsby';
 import Modal from 'react-modal';
 
-import Modal from 'react-modal';
-
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
 import { queryStringParser, isPublicSite } from '../utils/app-utils';
