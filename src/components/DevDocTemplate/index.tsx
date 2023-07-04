@@ -326,6 +326,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return cName;
     };
 
+    if (typeof window !== 'undefined')
+        console.log('theme', localStorage.getItem('theme'), isDarkMode);
+
     return (
         <>
             <Seo title={docTitle} description={docDescription} />

@@ -325,6 +325,8 @@ const IndexPage = ({ location }) => {
             </Modal>
         );
     };
+    if (typeof window !== 'undefined')
+        console.log('theme', localStorage.getItem('theme'), isDarkMode);
 
     return (
         <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
