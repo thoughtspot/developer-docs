@@ -329,7 +329,11 @@ const IndexPage = ({ location }) => {
         console.log('theme', localStorage.getItem('theme'), isDarkMode);
 
     return (
-        <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
+        <div
+            id="wrapper"
+            data-theme={isDarkMode ? 'dark' : 'light'}
+            key={isDarkMode ? 'dark' : 'light'}
+        >
             {isPublicSiteOpen && (
                 <Header
                     location={location}
