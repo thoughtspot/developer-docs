@@ -82,6 +82,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
 
+    const [key, setKey] = useState('');
+
     const isAPIPlayGround =
         CUSTOM_PAGE_ID.API_PLAYGROUND === params[TS_PAGE_ID_PARAM];
 
@@ -96,6 +98,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     useEffect(() => {
         if (typeof window !== 'undefined')
             setDarkMode(localStorage.getItem('theme') === 'dark');
+    }, []);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setDarkMode(localStorage.getItem('theme') === 'dark');
+            setKey('dark');
+        }
     }, []);
 
     useEffect(() => {
@@ -329,7 +338,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
-            <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
+            <div
+                id="wrapper"
+                data-theme={isDarkMode ? 'dark' : 'light'}
+                key={key}
+            >
                 {isPublicSiteOpen && (
                     <Header
                         location={location}

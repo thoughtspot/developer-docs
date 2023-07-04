@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useStaticQuery, graphql, navigate } from 'gatsby';
 import Modal from 'react-modal';
 
+import Modal from 'react-modal';
+
 import { useResizeDetector } from 'react-resize-detector';
 import { useFlexSearch } from 'react-use-flexsearch';
 import algoliasearch from 'algoliasearch';
@@ -57,6 +59,7 @@ const IndexPage = ({ location }) => {
     const [backLink, setBackLink] = useState('');
     const [allPageIds, setAllPageIds] = useState([]);
     const [showSearch, setShowSearch] = useState(false);
+    const [key, setKey] = useState('');
 
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
@@ -72,8 +75,10 @@ const IndexPage = ({ location }) => {
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
     useEffect(() => {
-        if (typeof window !== 'undefined')
+        if (typeof window !== 'undefined') {
             setDarkMode(localStorage.getItem('theme') === 'dark');
+            setKey('dark');
+        }
     }, []);
 
     useEffect(() => {
@@ -327,7 +332,7 @@ const IndexPage = ({ location }) => {
     };
 
     return (
-        <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
+        <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'} key={key}>
             {isPublicSiteOpen && (
                 <Header
                     location={location}
