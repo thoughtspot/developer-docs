@@ -81,7 +81,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             ? localStorage.getItem('theme') === 'dark'
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
-
     const [key, setKey] = useState('');
 
     const isAPIPlayGround =
@@ -95,13 +94,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
         setParams({ ...paramObj, ...params });
     }, [location.search]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            setDarkMode(localStorage.getItem('theme') === 'dark');
-            setKey('dark');
-        }
-    }, []);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -268,7 +260,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         isDarkMode={isDarkMode}
                         isPublicSiteOpen={isPublicSiteOpen}
                         leftNavWidth={leftNavWidth}
-                        backLink={backLink}
                     />
                 </div>
             </Modal>
