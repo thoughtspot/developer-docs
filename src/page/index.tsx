@@ -59,7 +59,7 @@ const IndexPage = ({ location }) => {
     const [showSearch, setShowSearch] = useState(false);
     const [initialized, setInitialized] = useState(false);
     const [windowLoaded, setWindowLoaded] = useState(false);
-
+    const [key, setKey] = useState('');
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
             ? LEFT_NAV_WIDTH_DESKTOP
@@ -85,6 +85,7 @@ const IndexPage = ({ location }) => {
         if (!initialized && windowLoaded) {
             setDarkMode(localStorage.getItem('theme') === 'dark');
             setInitialized(true);
+            setKey('dark');
         }
     }, [initialized, windowLoaded]);
 
@@ -340,7 +341,7 @@ const IndexPage = ({ location }) => {
     const getTheme = () => (isDarkMode ? 'dark' : 'light');
 
     return (
-        <div id="wrapper" data-theme={getTheme()} key={new Date().getTime()}>
+        <div id="wrapper" data-theme={getTheme()} key={key}>
             {isPublicSiteOpen && (
                 <Header
                     location={location}
