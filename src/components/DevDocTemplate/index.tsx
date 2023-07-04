@@ -1,4 +1,5 @@
 import React, { useState, useEffect, FC } from 'react';
+import Modal from 'react-modal';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { graphql, navigate } from 'gatsby';
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -66,6 +67,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [breadcrumsData, setBreadcrumsData] = useState([]);
     const [prevPageId, setPrevPageId] = useState('introduction');
     const [backLink, setBackLink] = useState('');
+    const [showSearch, setShowSearch] = useState(false);
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
             ? LEFT_NAV_WIDTH_DESKTOP
@@ -91,6 +93,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
         setParams({ ...paramObj, ...params });
     }, [location.search]);
+    useEffect(() => {
+        if (typeof window !== 'undefined')
+            setDarkMode(localStorage.getItem('theme') === 'dark');
+    }, []);
 
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)
@@ -210,25 +216,56 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return '100%';
     };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
+    Modal.setAppElement('#___gatsby');
+    const renderSearch = () => {
+        const customStyles = {
+            content: {
+                top: '50px',
+                left: 'auro',
+                right: 'auto',
+                bottom: 'auto',
+                width: isMaxMobileResolution ? '40%' : '100%',
+                margin: 'auto',
+                transform: `translate(${
+                    isMaxMobileResolution ? '80%' : '0'
+                }, 70px)`,
+                border: 'none',
+                height: isMaxMobileResolution ? '400px' : '250px',
+                boxShadow: 'none',
+                background: 'transparent',
+            },
+        };
+        return (
+            <Modal
+                isOpen={showSearch}
+                onRequestClose={() => setShowSearch(false)}
+                style={customStyles}
+            >
+                <div id="docsModal" data-theme={isDarkMode ? 'dark' : 'light'}>
+                    <Search
+                        keyword={keyword}
+                        onChange={(e: React.FormEvent<HTMLInputElement>) =>
+                            updateKeyword((e.target as HTMLInputElement).value)
+                        }
+                        options={results}
+                        optionSelected={optionSelected}
+                        leftNavOpen={leftNavOpen}
+                        updateKeyword={updateKeyword}
+                        isMaxMobileResolution={isMaxMobileResolution}
+                        setDarkMode={setDarkMode}
+                        isDarkMode={isDarkMode}
+                        isPublicSiteOpen={isPublicSiteOpen}
+                        leftNavWidth={leftNavWidth}
+                        backLink={backLink}
+                    />
+                </div>
+            </Modal>
+        );
+    };
 
     const renderDocTemplate = () => (
         <>
-            <Search
-                keyword={keyword}
-                onChange={(e: React.FormEvent<HTMLInputElement>) =>
-                    updateKeyword((e.target as HTMLInputElement).value)
-                }
-                options={results}
-                optionSelected={optionSelected}
-                leftNavOpen={true}
-                updateKeyword={updateKeyword}
-                isMaxMobileResolution={isMaxMobileResolution}
-                setDarkMode={setDarkMode}
-                isDarkMode={isDarkMode}
-                isPublicSiteOpen={isPublicSiteOpen}
-                leftNavWidth={leftNavWidth}
-                backLink={backLink}
-            />
+            {renderSearch()}
             <div className="leftNavContainer">
                 <LeftSidebar
                     navTitle={navTitle}
@@ -243,6 +280,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     setDarkMode={setDarkMode}
                     isDarkMode={isDarkMode}
                     curPageid={curPageNode.pageAttributes.pageid}
+                    searchClickHandler={() => {
+                        setShowSearch(true);
+                        if (!isMaxMobileResolution) setLeftNavOpen(false);
+                    }}
                 />
             </div>
             <div

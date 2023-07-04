@@ -10,7 +10,7 @@ import {
 } from '../../constants/keystrokeConstants';
 import t from '../../utils/lang-utils';
 import SearchResult from './SearchResult';
-import BackButton from '../BackButton';
+// import BackButton from '../BackButton';
 
 type SearchProps = {
     options: SearchQueryResult[];
@@ -121,8 +121,9 @@ const Search: React.FC<SearchProps> = (props) => {
                             index={index}
                             keyword={option.title}
                             title={
-                                option._snippetResult &&
-                                option._snippetResult.body.value
+                                (option._snippetResult &&
+                                    option._snippetResult?.body?.value) ??
+                                ''
                             }
                         />
                     </a>
@@ -141,8 +142,9 @@ const Search: React.FC<SearchProps> = (props) => {
                             index={index}
                             keyword={props.keyword}
                             title={
-                                option._snippetResult &&
-                                option._snippetResult.body.value
+                                (option._snippetResult &&
+                                    option._snippetResult?.body?.value) ??
+                                ''
                             }
                             isKeywordNotFound={true}
                         />
@@ -169,8 +171,9 @@ const Search: React.FC<SearchProps> = (props) => {
                             index={index}
                             keyword={`${option.title} | ${option.sectionTitle}`}
                             title={
-                                option._snippetResult &&
-                                option._snippetResult.body.value
+                                (option._snippetResult &&
+                                    option._snippetResult?.body?.value) ??
+                                ''
                             }
                         />
                     </div>
@@ -184,19 +187,10 @@ const Search: React.FC<SearchProps> = (props) => {
 
     return (
         <div
-            className={`searchWrapper ${props.leftNavOpen ? 'visHidden' : ''} ${
-                !props.isPublicSiteOpen ? 'inClusterSite' : ''
-            }`}
+        // className={`searchWrapper ${props.leftNavOpen ? 'visHidden' : ''} ${
+        //     !props.isPublicSiteOpen ? 'inClusterSite' : ''
+        // }`}
         >
-            <div style={{ width: `${props.leftNavWidth}px` }}>
-                {props.backLink && (
-                    <BackButton
-                        title={t('NAV_BACK_BTN_TEXT')}
-                        backLink={props.backLink}
-                        customStyles={{ paddingLeft: '0px' }}
-                    />
-                )}
-            </div>
             <div className="searchInputWrapper">
                 <div className="searchInputContainer">
                     <IconContext.Provider
@@ -215,6 +209,7 @@ const Search: React.FC<SearchProps> = (props) => {
                         onKeyDown={onKeyDown}
                         value={props.keyword}
                         onChange={props.onChange}
+                        autoFocus
                     />
                 </div>
                 {showSearchResult && props.options?.length ? (

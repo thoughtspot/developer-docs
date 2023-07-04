@@ -44,7 +44,10 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
     );
 
     const isExternal = () =>
-        !location?.href?.includes('developers.thoughtspot.com');
+        !(
+            location?.href?.includes('thoughtspot') ||
+            location?.href?.includes('vercel.app')
+        );
 
     const getParentURL = () => {
         let parentUrl = location?.origin;
