@@ -66,9 +66,15 @@ const IndexPage = ({ location }) => {
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
     const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(false);
-    const checkout = localStorage && localStorage?.getItem('theme') === 'dark';
-
+    const checkout =
+        typeof window !== 'undefined'
+            ? localStorage.getItem('theme') === 'dark'
+            : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
+    useEffect(() => {
+        if (typeof window !== 'undefined')
+            setDarkMode(localStorage.getItem('theme') === 'dark');
+    }, []);
 
     useEffect(() => {
         // based on query params set if public site is open or not
