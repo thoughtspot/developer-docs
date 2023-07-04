@@ -81,6 +81,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             ? localStorage.getItem('theme') === 'dark'
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
+    const [initialized, setInitialized] = useState(false);
+    const [windowLoaded, setWindowLoaded] = useState(false);
 
     const isAPIPlayGround =
         CUSTOM_PAGE_ID.API_PLAYGROUND === params[TS_PAGE_ID_PARAM];
@@ -94,9 +96,18 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         setParams({ ...paramObj, ...params });
     }, [location.search]);
     useEffect(() => {
-        if (typeof window !== 'undefined')
+        if (!windowLoaded) {
+            if (typeof window !== 'undefined' && window) {
+                setWindowLoaded(true);
+            }
+        }
+    }, [windowLoaded]);
+    useEffect(() => {
+        if (!initialized && windowLoaded) {
             setDarkMode(localStorage.getItem('theme') === 'dark');
-    }, []);
+            setInitialized(true);
+        }
+    }, [initialized, windowLoaded]);
 
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)

@@ -57,6 +57,8 @@ const IndexPage = ({ location }) => {
     const [backLink, setBackLink] = useState('');
     const [allPageIds, setAllPageIds] = useState([]);
     const [showSearch, setShowSearch] = useState(false);
+    const [initialized, setInitialized] = useState(false);
+    const [windowLoaded, setWindowLoaded] = useState(false);
 
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
@@ -71,12 +73,20 @@ const IndexPage = ({ location }) => {
             ? localStorage.getItem('theme') === 'dark'
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
+
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            setDarkMode(localStorage.getItem('theme') === 'dark');
-            console.log('theme', localStorage.getItem('theme'), isDarkMode);
+        if (!windowLoaded) {
+            if (typeof window !== 'undefined' && window) {
+                setWindowLoaded(true);
+            }
         }
-    }, []);
+    }, [windowLoaded]);
+    useEffect(() => {
+        if (!initialized && windowLoaded) {
+            setDarkMode(localStorage.getItem('theme') === 'dark');
+            setInitialized(true);
+        }
+    }, [initialized, windowLoaded]);
 
     useEffect(() => {
         // based on query params set if public site is open or not
