@@ -336,11 +336,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         if (isAPIPlayGround) cName += ' pgHeader';
         return cName;
     };
+    const getTheme = () => (isDarkMode ? 'dark' : 'light');
 
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
-            <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
+            <div id="wrapper" data-theme={getTheme()}>
                 {isDarkMode}
                 {isPublicSiteOpen && (
                     <Header

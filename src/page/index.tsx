@@ -337,9 +337,10 @@ const IndexPage = ({ location }) => {
             </Modal>
         );
     };
+    const getTheme = () => (isDarkMode ? 'dark' : 'light');
 
     return (
-        <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'}>
+        <div id="wrapper" data-theme={getTheme()}>
             {isDarkMode}
 
             {isPublicSiteOpen && (
