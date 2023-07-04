@@ -81,7 +81,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             ? localStorage.getItem('theme') === 'dark'
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
-
     const [key, setKey] = useState('');
 
     const isAPIPlayGround =
