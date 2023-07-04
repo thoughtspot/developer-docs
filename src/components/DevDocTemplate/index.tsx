@@ -81,8 +81,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             ? localStorage.getItem('theme') === 'dark'
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
-    const [initialized, setInitialized] = useState(false);
-    const [windowLoaded, setWindowLoaded] = useState(false);
+
     const [key, setKey] = useState('');
 
     const isAPIPlayGround =
@@ -96,20 +95,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
         setParams({ ...paramObj, ...params });
     }, [location.search]);
+
     useEffect(() => {
-        if (!windowLoaded) {
-            if (typeof window !== 'undefined' && window) {
-                setWindowLoaded(true);
-            }
-        }
-    }, [windowLoaded]);
-    useEffect(() => {
-        if (!initialized && windowLoaded) {
+        if (typeof window !== 'undefined') {
             setDarkMode(localStorage.getItem('theme') === 'dark');
-            setInitialized(true);
             setKey('dark');
         }
-    }, [initialized, windowLoaded]);
+    }, []);
 
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)
@@ -338,12 +330,15 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         if (isAPIPlayGround) cName += ' pgHeader';
         return cName;
     };
-    const getTheme = () => (isDarkMode ? 'dark' : 'light');
 
     return (
-        <div id="wrapper" data-theme={getTheme()} key={key}>
+        <>
             <Seo title={docTitle} description={docDescription} />
-            <div>
+            <div
+                id="wrapper"
+                data-theme={isDarkMode ? 'dark' : 'light'}
+                key={key}
+            >
                 {isPublicSiteOpen && (
                     <Header
                         location={location}
@@ -361,7 +356,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     {isAPIPlayGround ? renderPlayGround() : renderDocTemplate()}
                 </main>
             </div>
-        </div>
+        </>
     );
 };
 

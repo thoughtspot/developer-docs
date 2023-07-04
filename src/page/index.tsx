@@ -57,9 +57,8 @@ const IndexPage = ({ location }) => {
     const [backLink, setBackLink] = useState('');
     const [allPageIds, setAllPageIds] = useState([]);
     const [showSearch, setShowSearch] = useState(false);
-    const [initialized, setInitialized] = useState(false);
-    const [windowLoaded, setWindowLoaded] = useState(false);
     const [key, setKey] = useState('');
+
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
             ? LEFT_NAV_WIDTH_DESKTOP
@@ -73,21 +72,12 @@ const IndexPage = ({ location }) => {
             ? localStorage.getItem('theme') === 'dark'
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
-
     useEffect(() => {
-        if (!windowLoaded) {
-            if (typeof window !== 'undefined' && window) {
-                setWindowLoaded(true);
-            }
-        }
-    }, [windowLoaded]);
-    useEffect(() => {
-        if (!initialized && windowLoaded) {
+        if (typeof window !== 'undefined') {
             setDarkMode(localStorage.getItem('theme') === 'dark');
-            setInitialized(true);
             setKey('dark');
         }
-    }, [initialized, windowLoaded]);
+    }, []);
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -338,10 +328,9 @@ const IndexPage = ({ location }) => {
             </Modal>
         );
     };
-    const getTheme = () => (isDarkMode ? 'dark' : 'light');
 
     return (
-        <div id="wrapper" data-theme={getTheme()} key={key}>
+        <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'} key={key}>
             {isPublicSiteOpen && (
                 <Header
                     location={location}
