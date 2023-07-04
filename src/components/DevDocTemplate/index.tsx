@@ -339,10 +339,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const getTheme = () => (isDarkMode ? 'dark' : 'light');
 
     return (
-        <>
+        <div id="wrapper" data-theme={getTheme()} key={new Date().toString()}>
             <Seo title={docTitle} description={docDescription} />
-            <div id="wrapper" data-theme={getTheme()}>
-                {isDarkMode}
+            <div>
                 {isPublicSiteOpen && (
                     <Header
                         location={location}
@@ -360,7 +359,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     {isAPIPlayGround ? renderPlayGround() : renderDocTemplate()}
                 </main>
             </div>
-        </>
+        </div>
     );
 };
 
