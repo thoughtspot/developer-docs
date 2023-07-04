@@ -261,7 +261,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         isDarkMode={isDarkMode}
                         isPublicSiteOpen={isPublicSiteOpen}
                         leftNavWidth={leftNavWidth}
-                        backLink={backLink}
                     />
                 </div>
             </Modal>
