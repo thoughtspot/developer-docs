@@ -95,10 +95,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
         setParams({ ...paramObj, ...params });
     }, [location.search]);
-    useEffect(() => {
-        if (typeof window !== 'undefined')
-            setDarkMode(localStorage.getItem('theme') === 'dark');
-    }, []);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
