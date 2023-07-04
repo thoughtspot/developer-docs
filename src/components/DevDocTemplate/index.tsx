@@ -339,7 +339,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const getTheme = () => (isDarkMode ? 'dark' : 'light');
 
     return (
-        <div id="wrapper" data-theme={getTheme()} key={new Date().toString()}>
+        <div id="wrapper" data-theme={getTheme()} key={new Date().getTime()}>
             <Seo title={docTitle} description={docDescription} />
             <div>
                 {isPublicSiteOpen && (

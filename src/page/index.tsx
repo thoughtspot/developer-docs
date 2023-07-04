@@ -340,7 +340,7 @@ const IndexPage = ({ location }) => {
     const getTheme = () => (isDarkMode ? 'dark' : 'light');
 
     return (
-        <div id="wrapper" data-theme={getTheme()} key={new Date().toString()}>
+        <div id="wrapper" data-theme={getTheme()} key={new Date().getTime()}>
             {isPublicSiteOpen && (
                 <Header
                     location={location}
