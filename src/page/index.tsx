@@ -72,8 +72,10 @@ const IndexPage = ({ location }) => {
             : null;
     const [isDarkMode, setDarkMode] = useState(checkout);
     useEffect(() => {
-        if (typeof window !== 'undefined')
+        if (typeof window !== 'undefined') {
             setDarkMode(localStorage.getItem('theme') === 'dark');
+            console.log('theme', localStorage.getItem('theme'), isDarkMode);
+        }
     }, []);
 
     useEffect(() => {
