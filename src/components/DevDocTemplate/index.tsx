@@ -5,12 +5,12 @@ import { graphql, navigate } from 'gatsby';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
+import _ from 'lodash';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
 import Header from '../Header';
 import LeftSidebar from '../LeftSidebar';
-import _ from 'lodash';
 import Docmap from '../Docmap';
 import Document from '../Document';
 import Search from '../Search';
@@ -84,7 +84,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [isDarkMode, setDarkMode] = useState(checkout);
     const [key, setKey] = useState('');
 
-    const isCustomPage = _.values(CUSTOM_PAGE_ID).some((pageId: string) => pageId === params[TS_PAGE_ID_PARAM]);
+    const isCustomPage = _.values(CUSTOM_PAGE_ID).some(
+        (pageId: string) => pageId === params[TS_PAGE_ID_PARAM],
+    );
+    const isApiPlaygroundPage =
+        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND;
+    const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -288,45 +293,45 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     }}
                 />
             </div>
-            <div
-                className="documentBody"
-                style={{
-                    width: calculateDocumentBodyWidth(),
-                    marginLeft: isMaxMobileResolution
-                        ? `${leftNavWidth}px`
-                        : '0px',
-                }}
-            >
-                <div className="introWrapper">
-                    <Document
-                        shouldShowRightNav={shouldShowRightNav}
-                        pageid={params[TS_PAGE_ID_PARAM]}
-                        docTitle={docTitle}
-                        docContent={docContent}
-                        breadcrumsData={breadcrumsData}
-                        isPublicSiteOpen={isPublicSiteOpen}
-                    />
-                    {shouldShowRightNav && (
-                        <div>
-                            <Docmap
-                                docContent={docContent}
-                                location={location}
-                                options={results}
-                            />
-                        </div>
-                    )}
+            {isAskDocsPage ? (
+                <AskDocs />
+            ) : (
+                <div
+                    className="documentBody"
+                    style={{
+                        width: calculateDocumentBodyWidth(),
+                        marginLeft: isMaxMobileResolution
+                            ? `${leftNavWidth}px`
+                            : '0px',
+                    }}
+                >
+                    <div className="introWrapper">
+                        <Document
+                            shouldShowRightNav={shouldShowRightNav}
+                            pageid={params[TS_PAGE_ID_PARAM]}
+                            docTitle={docTitle}
+                            docContent={docContent}
+                            breadcrumsData={breadcrumsData}
+                            isPublicSiteOpen={isPublicSiteOpen}
+                        />
+                        {shouldShowRightNav && (
+                            <div>
+                                <Docmap
+                                    docContent={docContent}
+                                    location={location}
+                                    options={results}
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
         </>
     );
 
-    const renderCustomPage = () => {
-        if (params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND) {
-            return <RenderPlayGround location={location} />;
-        } else {
-            return <AskDocs />;
-        }
-    }
+    const renderPlayGround = () => {
+        return <RenderPlayGround location={location} />;
+    };
 
     const getClassName = () => {
         let cName = isDarkMode ? 'dark ' : '';
@@ -357,7 +362,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                     }}
                 >
-                    {isCustomPage ? renderCustomPage() : renderDocTemplate()}
+                    {isApiPlaygroundPage
+                        ? renderPlayGround()
+                        : renderDocTemplate()}
                 </main>
             </div>
         </>
