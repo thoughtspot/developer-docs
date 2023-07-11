@@ -5,18 +5,19 @@ import { graphql, navigate } from 'gatsby';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
+import _ from 'lodash';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
 import Header from '../Header';
 import LeftSidebar from '../LeftSidebar';
-import _ from 'lodash';
 import Docmap from '../Docmap';
 import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './renderPlayGround';
+import { AskDocs } from './askDocs';
 import {
     DOC_NAV_PAGE_ID,
     TS_HOST_PARAM,
@@ -83,8 +84,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [isDarkMode, setDarkMode] = useState(checkout);
     const [key, setKey] = useState('');
 
-    const isAPIPlayGround =
-        CUSTOM_PAGE_ID.API_PLAYGROUND === params[TS_PAGE_ID_PARAM];
+    const isCustomPage = _.values(CUSTOM_PAGE_ID).some(
+        (pageId: string) => pageId === params[TS_PAGE_ID_PARAM],
+    );
+    const isApiPlaygroundPage =
+        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND;
+    const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -211,7 +216,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }
 
     const calculateDocumentBodyWidth = () => {
-        if (isMaxMobileResolution && !isAPIPlayGround) {
+        if (isMaxMobileResolution && !isCustomPage) {
             if (width > MAX_CONTENT_WIDTH_DESKTOP) {
                 return `${MAX_CONTENT_WIDTH_DESKTOP - 300}px`;
             }
@@ -230,9 +235,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 bottom: 'auto',
                 width: isMaxMobileResolution ? '40%' : '100%',
                 margin: 'auto',
-                transform: `translate(${
-                    isMaxMobileResolution ? '80%' : '0'
-                }, 70px)`,
+                transform: `translate(${isMaxMobileResolution ? '80%' : '0'
+                    }, 70px)`,
                 border: 'none',
                 height: isMaxMobileResolution ? '400px' : '250px',
                 boxShadow: 'none',
@@ -289,43 +293,50 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     }}
                 />
             </div>
-            <div
-                className="documentBody"
-                style={{
-                    width: calculateDocumentBodyWidth(),
-                    marginLeft: isMaxMobileResolution
-                        ? `${leftNavWidth}px`
-                        : '0px',
-                }}
-            >
-                <div className="introWrapper">
-                    <Document
-                        shouldShowRightNav={shouldShowRightNav}
-                        pageid={params[TS_PAGE_ID_PARAM]}
-                        docTitle={docTitle}
-                        docContent={docContent}
-                        breadcrumsData={breadcrumsData}
-                        isPublicSiteOpen={isPublicSiteOpen}
-                    />
-                    {shouldShowRightNav && (
-                        <div>
-                            <Docmap
-                                docContent={docContent}
-                                location={location}
-                                options={results}
-                            />
-                        </div>
-                    )}
+            {isAskDocsPage ? (
+                <AskDocs />
+            ) : (
+                <div
+                    className="documentBody"
+                    style={{
+                        width: calculateDocumentBodyWidth(),
+                        marginLeft: isMaxMobileResolution
+                            ? `${leftNavWidth}px`
+                            : '0px',
+                    }}
+                >
+                    <div className="introWrapper">
+                        <Document
+                            shouldShowRightNav={shouldShowRightNav}
+                            pageid={params[TS_PAGE_ID_PARAM]}
+                            docTitle={docTitle}
+                            docContent={docContent}
+                            breadcrumsData={breadcrumsData}
+                            isPublicSiteOpen={isPublicSiteOpen}
+                        />
+                        {shouldShowRightNav && (
+                            <div>
+                                <Docmap
+                                    docContent={docContent}
+                                    location={location}
+                                    options={results}
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
         </>
     );
-    const renderPlayGround = () => <RenderPlayGround location={location} />;
+
+    const renderPlayGround = () => {
+        return <RenderPlayGround location={location} />;
+    };
 
     const getClassName = () => {
         let cName = isDarkMode ? 'dark ' : '';
         if (isPublicSiteOpen) cName += 'withHeaderFooter';
-        if (isAPIPlayGround) cName += ' pgHeader';
+        if (isCustomPage) cName += ' pgHeader';
         return cName;
     };
 
@@ -351,7 +362,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                     }}
                 >
-                    {isAPIPlayGround ? renderPlayGround() : renderDocTemplate()}
+                    {isApiPlaygroundPage
+                        ? renderPlayGround()
+                        : renderDocTemplate()}
                 </main>
             </div>
         </>
