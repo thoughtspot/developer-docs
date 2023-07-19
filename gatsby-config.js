@@ -6,7 +6,7 @@ const getPathPrefix = () => {
     if (process.env.BUILD_ENV === config.BUILD_ENVS.LOCAL) {
         return null;
     }
-    return 'docs';
+    return null;
 };
 
 const getPath = (path) =>
@@ -87,7 +87,7 @@ module.exports = {
     pathPrefix: getPath(config.DOC_REPO_NAME),
     siteMetadata: {
         title: 'tseverywhere-docs',
-        url: 'https://developers.thoughtspot.com/docs',
+        url: 'https://developer-docs-zeta.vercel.app',
         image: './images/favicon.svg',
     },
     plugins: [
@@ -212,7 +212,7 @@ module.exports = {
                     });
                     const paths = [];
                     for (const item of asciiNodeSet) {
-                        paths.push({ path: `?pageid=${item}` });
+                        paths.push({ path: `/${item}` });
                     }
                     return paths;
                 },

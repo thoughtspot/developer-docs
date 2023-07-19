@@ -1,5 +1,5 @@
 module.exports = {
-    SITE_URL: 'https://developers.thoughtspot.com/docs/',
+    SITE_URL: 'https://developer-docs-zeta.vercel.app',
     DOC_REPO_NAME: '',
     DOC_NAV_PAGE_ID: 'nav',
     TS_HOST_PARAM: 'tshost',
