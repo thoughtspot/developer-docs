@@ -50,6 +50,7 @@ interface TypeDocNode {
     groups?: TypeDocGroup[];
     comment?: TypeDocComment;
     flags?: any;
+    parentId?: number;
 }
 
 interface TypeDocComment {
@@ -76,12 +77,13 @@ interface ConstructorNode extends TypeDocNode {
 }
 interface TypeDocType {
     type:
-        | 'reference'
-        | 'union'
-        | 'intrinsic'
-        | 'reflection'
-        | 'array'
-        | 'literal';
+    | 'reference'
+    | 'union'
+    | 'intrinsic'
+    | 'reflection'
+    | 'array'
+    | 'literal'
+    | 'intersection';
     id?: number;
     name?: string;
     types?: TypeDocType[];
@@ -210,8 +212,7 @@ class TypeDocInternalParser {
 
         let content = '';
         content += this.covertTypeDocText(
-            `${comment?.shortText?.trim() || ''}\n${
-                comment?.text?.trim() || ''
+            `${comment?.shortText?.trim() || ''}\n${comment?.text?.trim() || ''
             }\n\n`,
         );
 
@@ -284,9 +285,8 @@ class TypeDocInternalParser {
                 );
             }
             case 'array': {
-                return `${
-                    this.parseTypeDocType(node.elementType, link) + typeArg
-                }[]`;
+                return `${this.parseTypeDocType(node.elementType, link) + typeArg
+                    }[]`;
             }
             default: {
                 console.error(`${node.type} not handled`);
@@ -418,7 +418,7 @@ class TypeDocParser {
                 if (link)
                     return (
                         TypeDocInternalParser.convertToItalic(node.name) +
-                            typeArg || ''
+                        typeArg || ''
                     );
                 return node.name + typeArg || '';
             case 'reference': {
@@ -447,9 +447,15 @@ class TypeDocParser {
                 );
             }
             case 'array': {
-                return `${
-                    this.parseTypeDocType(node.elementType, link) + typeArg
-                }[]`;
+                return `${this.parseTypeDocType(node.elementType, link) + typeArg
+                    }[]`;
+            }
+            case 'intersection': {
+                return (
+                    node.types
+                        ?.map((type) => this.parseTypeDocType(type, link))
+                        .join(' & ') + typeArg || ''
+                );
             }
             default: {
                 console.error(`${node.type} not handled`);
@@ -498,6 +504,13 @@ class TypeDocParser {
     };
 
     private generateMap = (node: TypeDocLinkingNode) => {
+        if (!node || node.kindString === TypeDocReflectionKind.Reference)
+            return;
+
+        if (node.name === 'Action') {
+            console.log(node.name, node.kindString, node.children?.length);
+        }
+
         const groupTag =
             node.comment?.tags?.filter((e) => e.tag === 'group')[0] ||
             node?.signatures?.[0].comment?.tags?.filter(
@@ -509,28 +522,34 @@ class TypeDocParser {
             this.groupMap[groupTag.text].push(node);
         }
         if (!this.childrenIdMap[node.id]) this.childrenIdMap[node.id] = node;
+
         if (!this.childrenNameMap[node.name])
             this.childrenNameMap[node.name] = node;
-        node?.children?.forEach((childNode) => {
+
+        node?.children?.forEach((childNode, i) => {
             const child = childNode as TypeDocLinkingNode;
             child.parentId = node.id;
             this.childrenIdMap[child.id] = child;
-            this.childrenNameMap[child.name] = child;
+            if (child.kindString !== TypeDocReflectionKind.Reference)
+                this.childrenNameMap[child.name] = child;
             this.generateMap(child);
         });
     };
 
     private convertNodeToLink = (node: TypeDocNode, includeParent = false) => {
+        if (!node) {
+            return 'not found';
+        }
         const parent = this.childrenIdMap[node.id]?.parentId;
         if (parent === undefined) return node.name;
 
         if (
             this.childrenIdMap[parent]?.kindString ===
-            TypeDocReflectionKind.Project
+            TypeDocReflectionKind.Project ||
+            TypeDocReflectionKind.Module
         ) {
-            return `[.typedoc-${node.kindString.replace(/ /g, '_')}]#xref:${
-                node.name
-            }.adoc[${node.name}]#`;
+            return `[.typedoc-${node.kindString.replace(/ /g, '_')}]#xref:${node.name
+                }.adoc[${node.name}]#`;
         }
 
         const grandParent = this.childrenIdMap[parent]?.parentId;
@@ -538,7 +557,8 @@ class TypeDocParser {
 
         if (
             this.childrenIdMap[grandParent]?.kindString ===
-            TypeDocReflectionKind.Project
+            TypeDocReflectionKind.Project ||
+            TypeDocReflectionKind.Module
         ) {
             let newLinkText = `[.typedoc-${node.kindString.replace(
                 / /g,
@@ -649,9 +669,8 @@ class TypeDocParser {
     private handleParameterNode = (node: ParameterNode) => {
         return [
             `${node.name}::: ${node.flags.isOptional ? '_Optional_\n' : ''}`,
-            `* ${node.name}: ${this.parseTypeDocType(node.type, true)}${
-                node?.defaultValue ? ` = ${node.defaultValue}` : ''
-            }`,
+            `* ${node.name}: ${this.parseTypeDocType(node.type, true)}
+            ${node?.defaultValue ? ` = ${node.defaultValue}` : ''}`,
             TypeDocInternalParser.parseComment(node.comment),
             this.handleTypeNode(node.type),
             TypeDocInternalParser.parseTags(node.comment?.tags),
@@ -659,9 +678,8 @@ class TypeDocParser {
     };
 
     private handlePropertyNode = (node: ParameterNode) => {
-        const sig = `\`${node.name}: ${this.parseTypeDocType(node.type, true)}${
-            node?.defaultValue ? ` = ${node.defaultValue}` : ''
-        }\``;
+        const sig = `\`${node.name}: ${this.parseTypeDocType(node.type, true)}
+        ${node?.defaultValue ? ` = ${node.defaultValue}` : ''}\``;
 
         return [
             `=== ${node.name}`,
@@ -750,14 +768,34 @@ class TypeDocParser {
             `\`${node.name} : ${this.parseTypeDocType(node.type, true)}\``,
             TypeDocInternalParser.parseComment(node.comment),
             TypeDocInternalParser.parseSources(node.sources),
+            TypeDocInternalParser.parseTags(node.comment?.tags),
             `${this.handleTypeNode(node.type)}`,
         ].join('\n\n');
+    };
+
+    private handleVariableNode = (node: TypeAliasNode) => {
+        return [
+            `= ${node.name}`,
+            `\` ${node.flags.isConst ? 'const' : ''} ${node.name
+            } : ${this.parseTypeDocType(node.type, true)}\``,
+            TypeDocInternalParser.parseComment(node.comment),
+            TypeDocInternalParser.parseSources(node.sources),
+            TypeDocInternalParser.parseTags(node.comment?.tags),
+            `${this.handleTypeNode(node.type)}`,
+        ].join('\n\n');
+    };
+
+    private handleReferenceNode = (node: TypeDocNode) => {
+        return `Refering this ${this.convertNodeToLink(
+            this.childrenNameMap[node.name],
+        )}`;
     };
 
     private convertTypeDocNode = (
         rootNode: TypeDocNode | undefined,
     ): string => {
         if (!rootNode) return '';
+
         switch (rootNode.kindString) {
             case TypeDocReflectionKind.Enumeration: {
                 return this.handleMainNode(rootNode);
@@ -795,34 +833,85 @@ class TypeDocParser {
             case TypeDocReflectionKind.CallSignature: {
                 return this.handleCallSignatureNode(rootNode as SignatureNode);
             }
+            case TypeDocReflectionKind.Reference: {
+                return this.handleReferenceNode(rootNode as TypeAliasNode);
+            }
+            case TypeDocReflectionKind.Variable: {
+                return this.handleVariableNode(rootNode as TypeAliasNode);
+            }
             default: {
                 console.error(
                     `No handler defined for : ${rootNode.kindString}, Name : ${rootNode.name}`,
                 );
+
                 return '';
             }
         }
     };
 
-    public handleProjectNode = (
-        node: TypeDocNode,
-        indexPageId = 'VisualEmbedSdk',
-        callBack: (pageId: string, content: string) => void,
-    ) => {
+    public indexPageId = 'VisualEmbedSdk';
+
+    public fileWriteCallBack: (
+        pageId: string,
+        content: string,
+        module: string,
+    ) => void = () => {
+        console.warn('No fileWriteCallBack is set');
+    };
+
+    constructor(
+        fileWriteCallBack: (
+            pageId: string,
+            content: string,
+            module: string,
+        ) => void,
+    ) {
+        this.fileWriteCallBack = fileWriteCallBack;
+    }
+
+    public handleRootNode = (rootNode: TypeDocNode) => {
+        console.log('Converting root node');
+
+        this.generateMap(rootNode);
+
+        if (rootNode.kindString === TypeDocReflectionKind.Project) {
+            this.handleProjectNode(rootNode);
+        } else {
+            this.handleModules(rootNode);
+        }
+    };
+
+    public handleModules = (rootNode: TypeDocNode) => {
+        const modules = rootNode.children?.filter(
+            (node) => node.kindString === TypeDocReflectionKind.Module,
+        );
+
+        console.log(`Found ${modules?.length}`, ' nodes');
+
+        modules?.forEach((module) => {
+            this.handleProjectNode(module);
+        });
+    };
+
+    public handleProjectNode = (node: TypeDocNode) => {
         const projectNode = node;
-        this.generateMap(projectNode);
+
         // creating an index page
-        let indexPageContent = '= Visual Embed SDK\n\n';
+
+        const moduleSuffix = node.name === 'index' ? '' : node.name;
+        const curIndexPageId = this.indexPageId + moduleSuffix;
+
+        let indexPageContent = `= Visual Embed SDK${moduleSuffix}\n\n`;
         /* const indexPageHeading = '';
          */
         const indexPageHeading = this.getHeadingString({
-            title: indexPageId,
-            pageId: indexPageId,
+            title: curIndexPageId,
+            pageId: curIndexPageId,
             description: node?.comment?.shortText,
         });
 
         let sideNavContent = `* link:{{navprefix}}/${encodePageId(
-            indexPageId,
+            this.indexPageId,
         )}[Visual Embed SDK Reference]\n`;
 
         projectNode?.groups?.forEach((group) => {
@@ -862,22 +951,50 @@ class TypeDocParser {
                 )}[${child.name}]\n`;
 
                 const content = this.convertTypeDocNode(child);
-                callBack(pageId, `${heading}\n\n${content}`);
+                this.fileWriteCallBack(
+                    pageId,
+                    `${heading}\n\n${content}`,
+                    node.name,
+                );
             });
 
-            callBack(groupPageId, `${groupHeading}\n\n${groupContent}`);
+            this.fileWriteCallBack(
+                groupPageId,
+                `${groupHeading}\n\n${groupContent}`,
+                node.name,
+            );
 
             indexPageContent += groupContent;
         });
 
-        callBack('VisualEmbedSdkNavLinks', sideNavContent);
+        this.fileWriteCallBack(
+            'VisualEmbedSdkNavLinks',
+            sideNavContent,
+            node.name,
+        );
 
-        callBack(indexPageId, `${indexPageHeading}\n\n${indexPageContent}`);
+        this.fileWriteCallBack(
+            curIndexPageId,
+            `${indexPageHeading}\n\n${indexPageContent}`,
+            node.name,
+        );
     };
 }
 
 class TypedocConverter {
-    private typedDocParser = new TypeDocParser();
+    fwCb = (pageId, content, module) => {
+        const updatedPageId = pageId
+            .replace('_', '/')
+            .replace('Reference/', 'Reference/Reference_');
+
+        const filePath =
+            pageId === 'VisualEmbedSdkNavLinks'
+                ? `modules/ROOT/pages/common/generated/typedoc/${module}/${updatedPageId}.adoc`
+                : `modules/ROOT/pages/generated/typedoc/${module}/${updatedPageId}.adoc`;
+        this.writeFile(filePath, content);
+    };
+
+    private typedDocParser = new TypeDocParser(this.fwCb);
 
     constructor(branch: string) {
         TypeDocInternalParser.convertNameToLink = this.typedDocParser.convertNameToLink;
@@ -898,23 +1015,7 @@ class TypedocConverter {
     }
 
     public generateFiles = (typedocNode: TypeDocNode) => {
-        // starting node should be a project node
-        if (typedocNode.kindString !== TypeDocReflectionKind.Project) {
-            return;
-        }
-        const indexPageId = 'VisualEmbedSdk';
-        this.typedDocParser.handleProjectNode(
-            typedocNode,
-            indexPageId,
-            (pageId, content) => {
-                const updatedPageId = pageId.replace('_', '/');
-                const filePath =
-                    pageId === 'VisualEmbedSdkNavLinks'
-                        ? `modules/ROOT/pages/common/generated/typedoc/${updatedPageId}.adoc`
-                        : `modules/ROOT/pages/generated/typedoc/${updatedPageId}.adoc`;
-                this.writeFile(filePath, content);
-            },
-        );
+        this.typedDocParser.handleRootNode(typedocNode);
     };
 }
 
@@ -940,8 +1041,7 @@ const getFile = async (filePath: string) => {
 const main = async () => {
     const defaultCliOptions = {
         branch: 'main',
-        typeDocFilePath:
-            'https://raw.githubusercontent.com/thoughtspot/visual-embed-sdk/{branch}/static/typedoc/typedoc.json',
+        typeDocFilePath: '',
     };
 
     const cliKeys = Object.keys(defaultCliOptions).map((key) => ({
@@ -957,8 +1057,9 @@ const main = async () => {
         return newAcc;
     }, defaultCliOptions);
 
+    const TYPEDOC_CONFIG_FILE = './typedocConverterConfig.json';
     const typeDocConfig = JSON.parse(
-        fs.readFileSync('./typedocConverter.json').toString(),
+        fs.readFileSync(TYPEDOC_CONFIG_FILE).toString(),
     );
 
     cliOptions = {
