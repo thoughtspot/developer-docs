@@ -19,6 +19,9 @@ const buildJSON = (element) => {
 };
 
 export const fetchChild = (html: string) => {
+    if (typeof window === 'undefined') {
+        return [];
+    }
     const divElement = document.createElement('div');
     divElement.innerHTML = html;
     const data = Array.from(

@@ -60,14 +60,29 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [NAV_PREFIX]: '',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
-    const [docTitle, setDocTitle] = useState('');
-    const [docContent, setDocContent] = useState('');
-    const [navTitle, setNavTitle] = useState('');
-    const [docDescription, setDocDescription] = useState('');
-    const [navContent, setNavContent] = useState('');
-    const [breadcrumsData, setBreadcrumsData] = useState([]);
+    const [docTitle, setDocTitle] = useState(
+        curPageNode.document.title || curPageNode.pageAttributes.title || '',
+    );
+    const [docContent, setDocContent] = useState(
+        passThroughHandler(curPageNode.html, { ...params, ...namePageIdMap }) ||
+            '',
+    );
+    const [navTitle, setNavTitle] = useState(
+        navNode.pageAttributes.title || '',
+    );
+    const [docDescription, setDocDescription] = useState(
+        curPageNode.document.description ||
+            curPageNode.pageAttributes.description ||
+            '',
+    );
+
+    const initialNavContentData = passThroughHandler(navNode.html, params);
+    const [navContent, setNavContent] = useState(initialNavContentData || '');
+    const [breadcrumsData, setBreadcrumsData] = useState(
+        fetchChild(initialNavContentData) || [],
+    );
     const [prevPageId, setPrevPageId] = useState('introduction');
-    const [backLink, setBackLink] = useState('');
+    const [backLink, setBackLink] = useState(params[TS_ORIGIN_PARAM]);
     const [showSearch, setShowSearch] = useState(false);
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
@@ -124,6 +139,16 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }, [location.search, location.hash]);
 
     const setPageContentFromSingleNode = (node: AsciiDocNode) => {
+        // get & set left navigation title
+        setNavTitle(navNode.pageAttributes.title);
+
+        // get & set left navigation area content with dynamic link creation
+        const navContentData = passThroughHandler(navNode.html, params);
+        setNavContent(navContentData);
+
+        // set breadcrums data
+        setBreadcrumsData(fetchChild(navContentData));
+
         setDocTitle(node.document.title || node.pageAttributes.title);
 
         // set description
@@ -137,21 +162,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     };
 
     useEffect(() => {
-        // get & set left navigation title
-        setNavTitle(navNode.pageAttributes.title);
-
-        // get & set left navigation area content with dynamic link creation
-        const navContentData = passThroughHandler(navNode.html, params);
-        setNavContent(navContentData);
-
-        // set breadcrums data
-        setBreadcrumsData(fetchChild(navContentData));
-
-        // get & set left navigation 'Back' button url
-        setBackLink(params[TS_ORIGIN_PARAM]);
-
         // set page title , description and content based on the page node
         setPageContentFromSingleNode(curPageNode);
+    });
+
+    useEffect(() => {
+        // get & set left navigation 'Back' button url
+        setBackLink(params[TS_ORIGIN_PARAM]);
     }, [params]);
 
     // fetch adoc translated doc edges using graphql
@@ -235,8 +252,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 bottom: 'auto',
                 width: isMaxMobileResolution ? '40%' : '100%',
                 margin: 'auto',
-                transform: `translate(${isMaxMobileResolution ? '80%' : '0'
-                    }, 70px)`,
+                transform: `translate(${
+                    isMaxMobileResolution ? '80%' : '0'
+                }, 70px)`,
                 border: 'none',
                 height: isMaxMobileResolution ? '400px' : '250px',
                 boxShadow: 'none',
