@@ -2,7 +2,7 @@ import React from 'react';
 import hljs from 'highlight.js';
 import t from '../../utils/lang-utils';
 import { RiFileCopyFill } from '@react-icons/all-files/ri/RiFileCopyFill';
-import { getHTMLFromComponent } from '../LeftSidebar/helper';
+import { getHTMLFromComponent } from '../../utils/react-utils';
 import selectors from '../../constants/selectorsContant';
 
 export const enableCopyToClipboard = (
