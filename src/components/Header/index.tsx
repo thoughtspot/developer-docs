@@ -100,7 +100,7 @@ const Header = (props: {
                     <div>
                         <h2 className="m-0 d-inline-block logo">
                             <a
-                                href="?pageid=introduction"
+                                href="/introduction"
                                 title={t('TS_LOGO_ALT_TEXT')}
                             >
                                 <img

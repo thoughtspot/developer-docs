@@ -5,14 +5,7 @@ import { BiLinkExternal } from '@react-icons/all-files/bi/BiLinkExternal';
 import { IoIosArrowForward } from '@react-icons/all-files/io/IoIosArrowForward';
 import { RiArrowDownSLine } from '@react-icons/all-files/ri/RiArrowDownSLine';
 import selectors from '../../constants/selectorsContant';
-
-export const getHTMLFromComponent = (icon: JSX.Element, iconClass?: string) => {
-    return ReactDOMServer.renderToStaticMarkup(
-        <IconContext.Provider value={{ className: `icon ${iconClass}` }}>
-            {icon}
-        </IconContext.Provider>,
-    );
-};
+import { getHTMLFromComponent } from '../../utils/react-utils';
 
 const ArrowForwardHTML = getHTMLFromComponent(
     <IoIosArrowForward />,

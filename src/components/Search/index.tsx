@@ -190,7 +190,7 @@ const Search: React.FC<SearchProps> = (props) => {
         //     !props.isPublicSiteOpen ? 'inClusterSite' : ''
         // }`}
         >
-            <div className="searchInputWrapper">
+            <div className="searchInputWrapper modal-search">
                 <div className="searchInputContainer">
                     <IconContext.Provider
                         value={{
@@ -202,7 +202,7 @@ const Search: React.FC<SearchProps> = (props) => {
                     <input
                         ref={searchInput}
                         data-testid="search-input"
-                        type="Search"
+                        type="text"
                         placeholder={t('SEARCH_PLACEHOLDER')}
                         onFocus={onFocus}
                         onKeyDown={onKeyDown}

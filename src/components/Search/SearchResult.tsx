@@ -8,25 +8,27 @@ type SearchResultProps = {
     isKeywordNotFound?: boolean;
 };
 
-const SearchResult = (props: SearchResultProps) => { 
+const SearchResult = (props: SearchResultProps) => {
     const searchResultContent = props.title + '...';
     return (
         <div
-            className={ cx(
-              { textContainer : !props.isKeywordNotFound },
-              { active: props.index === props.highlightedIndex }
+            className={cx(
+                'list-search-item',
+                { textContainer: !props.isKeywordNotFound },
+                { active: props.index === props.highlightedIndex },
             )}
             data-testid="search-result"
         >
-            <p className="title"
-                dangerouslySetInnerHTML = {{ __html: props.keyword }}
+            <p
+                className="title"
+                dangerouslySetInnerHTML={{ __html: props.keyword }}
             ></p>
             <p
                 className="footer"
                 dangerouslySetInnerHTML={{ __html: searchResultContent }}
             ></p>
         </div>
-    )
+    );
 };
 
 export default SearchResult;
