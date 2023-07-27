@@ -172,33 +172,28 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         );
     }, [location.search, location.hash]);
 
-    const setPageContentFromSingleNode = (node: AsciiDocNode) => {
-        // get & set left navigation title
-        setNavTitle(navNode.pageAttributes.title);
+    // const setPageContentFromSingleNode = (node: AsciiDocNode) => {
+    //     // get & set left navigation title
+    //     setNavTitle(navNode.pageAttributes.title);
 
-        // get & set left navigation area content with dynamic link creation
-        const navContentData = passThroughHandler(navNode.html, params);
-        setNavContent(navContentData);
+    //     // get & set left navigation area content with dynamic link creation
+    //     const navContentData = passThroughHandler(navNode.html, params);
+    //     setNavContent(navContentData);
 
-        // set breadcrums data
-        setBreadcrumsData(fetchChild(navContentData));
+    //     // set breadcrums data
+    //     setBreadcrumsData(fetchChild(navContentData));
 
-        setDocTitle(node.document.title || node.pageAttributes.title);
+    //     setDocTitle(node.document.title || node.pageAttributes.title);
 
-        // set description
-        setDocDescription(
-            node.document.description || node.pageAttributes.description,
-        );
-        // get and set doc page content with dynamic data replaced
-        setDocContent(
-            passThroughHandler(node.html, { ...params, ...namePageIdMap }),
-        );
-    };
-
-    useEffect(() => {
-        // set page title , description and content based on the page node
-        setPageContentFromSingleNode(curPageNode);
-    });
+    //     // set description
+    //     setDocDescription(
+    //         node.document.description || node.pageAttributes.description,
+    //     );
+    //     // get and set doc page content with dynamic data replaced
+    //     setDocContent(
+    //         passThroughHandler(node.html, { ...params, ...namePageIdMap }),
+    //     );
+    // };
 
     useEffect(() => {
         // get & set left navigation 'Back' button url
