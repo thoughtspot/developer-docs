@@ -66,6 +66,7 @@ const isInViewport = (el: HTMLElement) => {
 export const addScrollListener = () => {
     document.addEventListener('scroll', () => {
         const subLinks = document.querySelectorAll(selectors.docmapLinks);
+        console.log(subLinks);
         let flag = false;
         subLinks.forEach((link, i: number) => {
             const href = (link as HTMLAnchorElement).href;
@@ -79,9 +80,12 @@ export const addScrollListener = () => {
                     );
                     if (isVisible && !flag) {
                         link.classList.add('active');
+                        link.parentElement?.classList.add('active');
                         flag = !flag;
                     } else {
                         link.classList.remove('active');
+                        link.parentElement?.classList.remove('active');
+
                     }
                 }
             }
