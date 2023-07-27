@@ -227,23 +227,28 @@ const Search: React.FC<SearchProps> = (props) => {
                 )}
             </div>
             <div className="search-hint">
-                {t("SEARCH_HINT_1")} <IconContext.Provider
-                    value={{
-                        className: `icon searchIcon`,
-                    }}
-                >
-                    <BiUpArrowAlt />
-                </IconContext.Provider>
-                <IconContext.Provider
-                    value={{
-                        className: `icon searchIcon`,
-                    }}
-                >
-                    <BiDownArrowAlt />
-                </IconContext.Provider>
-                {`${t("SEARCH_HINT_2")} ${t("SEARCH_HINT_3")}`} 
-                 <span className='search-hint-strong'><b> {` ${t("SEARCH_HINT_4")} `} </b></span> {t("SEARCH_HINT_5")} 
-                
+                {t('SEARCH_HINT_1')}{' '}
+                <span className="search-hint-icon">
+                    <IconContext.Provider
+                        value={{
+                            className: `icon searchIcon`,
+                        }}
+                    >
+                        <BiUpArrowAlt />
+                    </IconContext.Provider>
+                    <IconContext.Provider
+                        value={{
+                            className: `icon searchIcon`,
+                        }}
+                    >
+                        <BiDownArrowAlt />
+                    </IconContext.Provider>
+                </span>
+                {`${t('SEARCH_HINT_2')} ${t('SEARCH_HINT_3')}`}
+                <span className="search-hint-strong">
+                    <b> {` ${t('SEARCH_HINT_4')} `} </b>
+                </span>{' '}
+                {t('SEARCH_HINT_5')}
             </div>
         </div>
     );
