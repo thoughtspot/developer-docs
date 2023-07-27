@@ -60,6 +60,10 @@ export const addExpandCollapseImages = (
                 paragraphElement.appendChild(spanElementParent);
             }
         }
+        else {
+            const paragraphElement = el.children[0];
+            paragraphElement.classList.add('node-child');
+        }
     });
 
     nav.innerHTML = addExternalLinkIcon(nav.innerHTML);

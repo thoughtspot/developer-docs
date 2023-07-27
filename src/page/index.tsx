@@ -304,7 +304,7 @@ const IndexPage = ({ location }) => {
                 height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',
                 background: isDarkMode ? '#21252c' : '#fff',
-                padding: '20px 0',
+                padding:  0,
 
             },
         };

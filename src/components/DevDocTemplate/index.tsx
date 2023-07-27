@@ -291,7 +291,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',
                 background: isDarkMode ? '#21252c' : '#fff',
-                padding: '20px 0',
+                padding: 0,
             },
         };
         return (
@@ -300,7 +300,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
             >
-                <div id="docsModal" data-theme={isDarkMode ? 'dark' : 'light'}>
+                <div
+                    id="docsModal"
+                    data-theme={isDarkMode ? 'dark' : 'light'}
+                    style={{ height: '100%' }}
+                >
                     <Search
                         keyword={keyword}
                         onChange={(e: React.FormEvent<HTMLInputElement>) =>
