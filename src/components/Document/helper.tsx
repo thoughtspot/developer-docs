@@ -81,6 +81,10 @@ export const addScrollListener = () => {
                     if (isVisible && !flag) {
                         link.classList.add('active');
                         link.parentElement?.classList.add('active');
+                        if(link?.parentElement?.parentElement?.parentElement?.tagName === "LI"){
+                            link?.parentElement?.parentElement?.parentElement?.classList?.add("active")
+
+                        }
                         flag = !flag;
                     } else {
                         link.classList.remove('active');
