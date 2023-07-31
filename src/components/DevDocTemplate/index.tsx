@@ -18,6 +18,7 @@ import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './renderPlayGround';
 import { AskDocs } from './askDocs';
+import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import {
     DOC_NAV_PAGE_ID,
     TS_HOST_PARAM,
@@ -42,6 +43,7 @@ import {
 } from '../../constants/uiConstants';
 import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
+import { getHTMLFromComponent } from '../../utils/react-utils';
 
 // markup
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
@@ -50,6 +52,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         location,
         pageContext: { namePageIdMap },
     } = props;
+    const homePagePaths = ['/', '/introduction', '/introduction/'];
+    const isHomePage = homePagePaths.includes(location?.pathname);
 
     const { curPageNode, navNode } = data;
     const { width, ref } = useResizeDetector();
@@ -120,6 +124,36 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             setDarkMode(localStorage.getItem('theme') === 'dark');
             setKey('dark');
         }
+    }, []);
+    const getSearch = () => {
+        const SearchIconHTML = getHTMLFromComponent(<BiSearch />, 'searchIcon');
+
+        const template = `<div class="searchInputBanner">
+            <div class="searchInputWrapper">
+                <div class="searchInputContainer">
+                    ${SearchIconHTML}
+                    <div id="search-input-banner" class="search-input-banner" >${t(
+                        'SEARCH_PLACEHOLDER',
+                    )}</div>
+                </div>
+            </div>
+        </div>`;
+        return template;
+    };
+
+    useEffect(() => {
+        setTimeout(() => {
+            const el = document.querySelector('#homePageSearchBar');
+
+            if (el !== null) {
+                el.innerHTML = getSearch();
+
+                const searchEl = document.querySelector('#search-input-banner');
+                searchEl.addEventListener('click', () => {
+                    setShowSearch(true);
+                });
+            }
+        }, 200);
     }, []);
 
     useEffect(() => {
@@ -228,7 +262,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }
 
     const calculateDocumentBodyWidth = () => {
-        if (isMaxMobileResolution && !isCustomPage) {
+        if (isMaxMobileResolution && !isCustomPage && !isHomePage) {
             if (width > MAX_CONTENT_WIDTH_DESKTOP) {
                 return `${MAX_CONTENT_WIDTH_DESKTOP - 300}px`;
             }
@@ -240,6 +274,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
+            overlay: {
+                background: 'rgba(50,57,70, 0.9)',
+            },
             content: {
                 top: '50px',
                 left: 'auro',
@@ -251,9 +288,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     isMaxMobileResolution ? '80%' : '0'
                 }, 70px)`,
                 border: 'none',
-                height: isMaxMobileResolution ? '400px' : '250px',
+                height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',
-                background: 'transparent',
+                background: isDarkMode ? '#21252c' : '#fff',
+                padding: 0,
             },
         };
         return (
@@ -262,7 +300,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
             >
-                <div id="docsModal" data-theme={isDarkMode ? 'dark' : 'light'}>
+                <div
+                    id="docsModal"
+                    data-theme={isDarkMode ? 'dark' : 'light'}
+                    style={{ height: '100%' }}
+                >
                     <Search
                         keyword={keyword}
                         onChange={(e: React.FormEvent<HTMLInputElement>) =>
@@ -310,7 +352,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 <AskDocs />
             ) : (
                 <div
-                    className="documentBody"
+                    className={`documentBody ${
+                        isHomePage ? 'doc-home' : 'doc-wrapper-detail'
+                    }`}
                     style={{
                         width: calculateDocumentBodyWidth(),
                         marginLeft: isMaxMobileResolution
