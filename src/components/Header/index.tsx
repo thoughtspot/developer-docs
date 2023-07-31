@@ -112,39 +112,41 @@ const Header = (props: {
                         </h2>
                     </div>
                     <Menu config={headerLinks} />
-                    {isMaxMobileResolution && (
-                        <div className="themeSwitcher">
-                            <IconContext.Provider
-                                value={{ className: 'theme-icon' }}
-                            >
-                                {props.isDarkMode ? (
-                                    <RiMoonClearLine
-                                        onClick={() => {
-                                            localStorage.setItem(
-                                                'theme',
-                                                'light',
-                                            );
-                                            props.setDarkMode(false);
-                                        }}
-                                    />
-                                ) : (
-                                    <FiSun
-                                        onClick={() => {
-                                            localStorage.setItem(
-                                                'theme',
-                                                'dark',
-                                            );
-                                            props.setDarkMode(true);
-                                        }}
-                                    />
-                                )}
-                            </IconContext.Provider>
-                        </div>
-                    )}
-                    <Dropdown
-                        location={props.location}
-                        isMobile={isMaxMobileResolution}
-                    />
+                    <div className="theme-version-wrapper">
+                        {isMaxMobileResolution && (
+                            <div className="themeSwitcher">
+                                <IconContext.Provider
+                                    value={{ className: 'theme-icon' }}
+                                >
+                                    {props.isDarkMode ? (
+                                        <RiMoonClearLine
+                                            onClick={() => {
+                                                localStorage.setItem(
+                                                    'theme',
+                                                    'light',
+                                                );
+                                                props.setDarkMode(false);
+                                            }}
+                                        />
+                                    ) : (
+                                        <FiSun
+                                            onClick={() => {
+                                                localStorage.setItem(
+                                                    'theme',
+                                                    'dark',
+                                                );
+                                                props.setDarkMode(true);
+                                            }}
+                                        />
+                                    )}
+                                </IconContext.Provider>
+                            </div>
+                        )}
+                        <Dropdown
+                            location={props.location}
+                            isMobile={isMaxMobileResolution}
+                        />
+                    </div>
                 </div>
             </section>
         </header>
