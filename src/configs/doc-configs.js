@@ -2,6 +2,7 @@ module.exports = {
     SITE_URL: 'https://developer-docs-zeta.vercel.app',
     DOC_REPO_NAME: '',
     DOC_NAV_PAGE_ID: 'nav',
+    DOC_SUBDOMAIN: 'docs',
     TS_HOST_PARAM: 'tshost',
     TS_ORIGIN_PARAM: 'origin',
     TS_APP_ROOT_PARAM: 'appRoot',

@@ -6,6 +6,7 @@ import { graphql, navigate } from 'gatsby';
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
 import _ from 'lodash';
+import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
@@ -18,7 +19,6 @@ import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './renderPlayGround';
 import { AskDocs } from './askDocs';
-import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import {
     DOC_NAV_PAGE_ID,
     TS_HOST_PARAM,
@@ -32,6 +32,7 @@ import {
     DEFAULT_APP_ROOT,
     HOME_PAGE_ID,
     CUSTOM_PAGE_ID,
+    DOC_SUBDOMAIN,
 } from '../../configs/doc-configs';
 import {
     LEFT_NAV_WIDTH_DESKTOP,
@@ -61,15 +62,17 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [TS_HOST_PARAM]: DEFAULT_HOST,
         [TS_ORIGIN_PARAM]: '',
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
-        [NAV_PREFIX]: '',
+        [NAV_PREFIX]: `/${DOC_SUBDOMAIN}`,
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
     const [docTitle, setDocTitle] = useState(
         curPageNode.document.title || curPageNode.pageAttributes.title || '',
     );
     const [docContent, setDocContent] = useState(
-        passThroughHandler(curPageNode.html, { ...params, ...namePageIdMap }) ||
-            '',
+        passThroughHandler(curPageNode.html, {
+            ...params,
+            ...namePageIdMap,
+        }) || '',
     );
     const [navTitle, setNavTitle] = useState(
         navNode.pageAttributes.title || '',

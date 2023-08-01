@@ -2,6 +2,7 @@ const fsExtra = require('fs-extra');
 const {
     DOC_NAV_PAGE_ID,
     NOT_FOUND_PAGE_ID,
+    DOC_SUBDOMAIN,
 } = require('./src/configs/doc-configs');
 
 exports.onPostBuild = () => {
@@ -44,7 +45,7 @@ exports.createPages = async function ({ actions, graphql }) {
         const { pageid: pageId } = edge.node.pageAttributes;
 
         actions.createPage({
-            path: `/${pageId}`,
+            path: `/${DOC_SUBDOMAIN}/${pageId}`,
             component: require.resolve(
                 './src/components/DevDocTemplate/index.tsx',
             ),
