@@ -183,7 +183,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     //     const navContentData = passThroughHandler(navNode.html, params);
     //     setNavContent(navContentData);
 
-    //     // set breadcrums data
+    //     // set breadcrums data.
     //     setBreadcrumsData(fetchChild(navContentData));
 
     //     setDocTitle(node.document.title || node.pageAttributes.title);
