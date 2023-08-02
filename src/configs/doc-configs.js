@@ -38,6 +38,11 @@ module.exports = {
             link: '9.4.0',
             subLabel: 'Cloud (Latest)',
         },
+        {
+            label: '9.0.1.sw',
+            link: 'https://visual-embed-sdk-9-0.vercel.app/docs',
+            subLabel: 'Software (Latest)',
+        },
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
@@ -47,22 +52,3 @@ module.exports = {
         PROD: 'PROD',
     },
 };
-
-
-/***
- {
-            label: '9.0.1.sw',
-            link: 'https://visual-embed-sdk-9-0.vercel.app/docs',
-            subLabel: 'Software (Latest)',
-        },
-        {
-            label: '8.8.1.sw',
-            link: 'https://visual-embed-sdk-8-8.vercel.app/docs/',
-            subLabel: 'Software',
-        },
-        {
-            label: '8.4.1.sw',
-            link: 'https://visual-embed-sdk-8-4.vercel.app/docs/',
-            subLabel: 'Software',
-        },
-
