@@ -34,12 +34,23 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '9.3.0.cl',
-            link: '9.3.0',
+            label: '9.4.0.cl',
+            link: '9.4.0',
             subLabel: 'Cloud (Latest)',
         },
+    ],
+    CUSTOM_PAGE_ID: {
+        API_PLAYGROUND: 'restV2-playground',
+        ASK_DOCS: 'ask-docs',
+    },
+    CLUSTER_TYPES: {
+        PROD: 'PROD',
+    },
+};
 
-        {
+
+/***
+ {
             label: '9.0.1.sw',
             link: 'https://visual-embed-sdk-9-0.vercel.app/docs',
             subLabel: 'Software (Latest)',
@@ -54,12 +65,4 @@ module.exports = {
             link: 'https://visual-embed-sdk-8-4.vercel.app/docs/',
             subLabel: 'Software',
         },
-    ],
-    CUSTOM_PAGE_ID: {
-        API_PLAYGROUND: 'restV2-playground',
-        ASK_DOCS: 'ask-docs',
-    },
-    CLUSTER_TYPES: {
-        PROD: 'PROD',
-    },
-};
+
