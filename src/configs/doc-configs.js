@@ -34,25 +34,14 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '9.3.0.cl',
-            link: '9.3.0',
+            label: '9.4.0.cl',
+            link: '9.4.0',
             subLabel: 'Cloud (Latest)',
         },
-
         {
             label: '9.0.1.sw',
             link: 'https://visual-embed-sdk-9-0.vercel.app/docs',
             subLabel: 'Software (Latest)',
-        },
-        {
-            label: '8.8.1.sw',
-            link: 'https://visual-embed-sdk-8-8.vercel.app/docs/',
-            subLabel: 'Software',
-        },
-        {
-            label: '8.4.1.sw',
-            link: 'https://visual-embed-sdk-8-4.vercel.app/docs/',
-            subLabel: 'Software',
         },
     ],
     CUSTOM_PAGE_ID: {
