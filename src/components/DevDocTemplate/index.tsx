@@ -55,11 +55,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const homePagePaths = ['/', '/introduction', '/introduction/'];
     const isHomePage = homePagePaths.includes(location?.pathname);
 
-    // redirect to pageid
-
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            console.log('called', window.location.search);
             const queryParams = new URLSearchParams(window.location.search);
             const pageId = queryParams.get('pageid');
             if (pageId) {
@@ -71,7 +68,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 }
             }
         }
-    }, [window.location.search]);
+    }, [location.search]);
 
     const { curPageNode, navNode } = data;
     const { width, ref } = useResizeDetector();
