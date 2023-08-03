@@ -25,8 +25,8 @@ const Header = (props: {
             name: 'APIs & SDKs',
             href: '',
             child: [
-                { label: 'Visual Embed SDK', link: 'VisualEmbedSdk' },
-                { label: 'REST API', link: 'rest-apis' },
+                { label: 'Visual Embed SDK', link: '/docs/VisualEmbedSdk' },
+                { label: 'REST API', link: '/docs/rest-apis' },
             ],
         },
         {
@@ -100,7 +100,7 @@ const Header = (props: {
                     <div>
                         <h2 className="m-0 d-inline-block logo">
                             <a
-                                href="/introduction"
+                                href="/docs/introduction"
                                 title={t('TS_LOGO_ALT_TEXT')}
                             >
                                 <img

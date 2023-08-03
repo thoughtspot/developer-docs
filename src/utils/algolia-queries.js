@@ -107,7 +107,7 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
         pageid,
         type: 'ASCII',
         title: node.document.title,
-        link: `/${pageid}`,
+        link: `/docs/${pageid}`,
     }));
 };
 

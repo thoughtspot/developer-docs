@@ -44,7 +44,7 @@ exports.createPages = async function ({ actions, graphql }) {
         const { pageid: pageId } = edge.node.pageAttributes;
 
         actions.createPage({
-            path: `/${pageId}`,
+            path: `/docs/${pageId}`,
             component: require.resolve(
                 './src/components/DevDocTemplate/index.tsx',
             ),
@@ -52,6 +52,13 @@ exports.createPages = async function ({ actions, graphql }) {
         });
 
         if (pageId === 'introduction') {
+            actions.createPage({
+                path: '/docs',
+                component: require.resolve(
+                    './src/components/DevDocTemplate/index.tsx',
+                ),
+                context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+            });
             actions.createPage({
                 path: '/',
                 component: require.resolve(

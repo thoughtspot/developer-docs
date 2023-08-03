@@ -57,18 +57,22 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
+            if (location.pathname === '/') {
+                navigate('/docs');
+            }
+
             const queryParams = new URLSearchParams(window.location.search);
             const pageId = queryParams.get('pageid');
             if (pageId) {
                 queryParams.delete('pageid');
                 if (queryParams.toString()) {
-                    navigate(`/${pageId}?${queryParams.toString()}`);
+                    navigate(`/docs/${pageId}?${queryParams.toString()}`);
                 } else {
-                    navigate(`/${pageId}`);
+                    navigate(`/docs/${pageId}`);
                 }
             }
         }
-    }, [location.search]);
+    }, [location.search, location.pathname]);
 
     const { curPageNode, navNode } = data;
     const { width, ref } = useResizeDetector();
@@ -76,7 +80,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [TS_HOST_PARAM]: DEFAULT_HOST,
         [TS_ORIGIN_PARAM]: '',
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
-        [NAV_PREFIX]: '',
+        [NAV_PREFIX]: '/docs',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
     const [docTitle, setDocTitle] = useState(

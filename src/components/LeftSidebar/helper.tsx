@@ -59,8 +59,7 @@ export const addExpandCollapseImages = (
                 spanElementParent.appendChild(spanElementChild);
                 paragraphElement.appendChild(spanElementParent);
             }
-        }
-        else {
+        } else {
             const paragraphElement = el.children[0];
             paragraphElement.classList.add('node-child');
         }
@@ -174,7 +173,6 @@ export const collapseAndExpandLeftNav = (
                 } else {
                     // Adding click listener to the headings with links
                     spanElement.addEventListener('click', () => {
-                        console.log('here2');
                         toggleExpandOnTab(
                             (el.children[0] as HTMLParagraphElement).innerText,
                         );
