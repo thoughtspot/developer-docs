@@ -2,7 +2,7 @@ import React from 'react';
 import hljs from 'highlight.js';
 import t from '../../utils/lang-utils';
 import { RiFileCopyFill } from '@react-icons/all-files/ri/RiFileCopyFill';
-import { getHTMLFromComponent } from '../LeftSidebar/helper';
+import { getHTMLFromComponent } from '../../utils/react-utils';
 import selectors from '../../constants/selectorsContant';
 
 export const enableCopyToClipboard = (
@@ -66,6 +66,7 @@ const isInViewport = (el: HTMLElement) => {
 export const addScrollListener = () => {
     document.addEventListener('scroll', () => {
         const subLinks = document.querySelectorAll(selectors.docmapLinks);
+        console.log(subLinks);
         let flag = false;
         subLinks.forEach((link, i: number) => {
             const href = (link as HTMLAnchorElement).href;
@@ -79,9 +80,16 @@ export const addScrollListener = () => {
                     );
                     if (isVisible && !flag) {
                         link.classList.add('active');
+                        link.parentElement?.classList.add('active');
+                        if(link?.parentElement?.parentElement?.parentElement?.tagName === "LI"){
+                            link?.parentElement?.parentElement?.parentElement?.classList?.add("active")
+
+                        }
                         flag = !flag;
                     } else {
                         link.classList.remove('active');
+                        link.parentElement?.classList.remove('active');
+
                     }
                 }
             }

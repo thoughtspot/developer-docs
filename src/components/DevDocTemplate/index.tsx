@@ -18,6 +18,7 @@ import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './renderPlayGround';
 import { AskDocs } from './askDocs';
+import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import {
     DOC_NAV_PAGE_ID,
     TS_HOST_PARAM,
@@ -42,6 +43,7 @@ import {
 } from '../../constants/uiConstants';
 import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
+import { getHTMLFromComponent } from '../../utils/react-utils';
 
 // markup
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
@@ -50,6 +52,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         location,
         pageContext: { namePageIdMap },
     } = props;
+    const homePagePaths = ['/', '/introduction', '/introduction/'];
+    const isHomePage = homePagePaths.includes(location?.pathname);
 
     const { curPageNode, navNode } = data;
     const { width, ref } = useResizeDetector();
@@ -60,14 +64,29 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [NAV_PREFIX]: '',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
-    const [docTitle, setDocTitle] = useState('');
-    const [docContent, setDocContent] = useState('');
-    const [navTitle, setNavTitle] = useState('');
-    const [docDescription, setDocDescription] = useState('');
-    const [navContent, setNavContent] = useState('');
-    const [breadcrumsData, setBreadcrumsData] = useState([]);
+    const [docTitle, setDocTitle] = useState(
+        curPageNode.document.title || curPageNode.pageAttributes.title || '',
+    );
+    const [docContent, setDocContent] = useState(
+        passThroughHandler(curPageNode.html, { ...params, ...namePageIdMap }) ||
+            '',
+    );
+    const [navTitle, setNavTitle] = useState(
+        navNode.pageAttributes.title || '',
+    );
+    const [docDescription, setDocDescription] = useState(
+        curPageNode.document.description ||
+            curPageNode.pageAttributes.description ||
+            '',
+    );
+
+    const initialNavContentData = passThroughHandler(navNode.html, params);
+    const [navContent, setNavContent] = useState(initialNavContentData || '');
+    const [breadcrumsData, setBreadcrumsData] = useState(
+        fetchChild(initialNavContentData) || [],
+    );
     const [prevPageId, setPrevPageId] = useState('introduction');
-    const [backLink, setBackLink] = useState('');
+    const [backLink, setBackLink] = useState(params[TS_ORIGIN_PARAM]);
     const [showSearch, setShowSearch] = useState(false);
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
@@ -106,6 +125,36 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             setKey('dark');
         }
     }, []);
+    const getSearch = () => {
+        const SearchIconHTML = getHTMLFromComponent(<BiSearch />, 'searchIcon');
+
+        const template = `<div class="searchInputBanner">
+            <div class="searchInputWrapper">
+                <div class="searchInputContainer">
+                    ${SearchIconHTML}
+                    <div id="search-input-banner" class="search-input-banner" >${t(
+                        'SEARCH_PLACEHOLDER',
+                    )}</div>
+                </div>
+            </div>
+        </div>`;
+        return template;
+    };
+
+    useEffect(() => {
+        setTimeout(() => {
+            const el = document.querySelector('#homePageSearchBar');
+
+            if (el !== null) {
+                el.innerHTML = getSearch();
+
+                const searchEl = document.querySelector('#search-input-banner');
+                searchEl.addEventListener('click', () => {
+                    setShowSearch(true);
+                });
+            }
+        }, 200);
+    }, []);
 
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)
@@ -123,35 +172,32 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         );
     }, [location.search, location.hash]);
 
-    const setPageContentFromSingleNode = (node: AsciiDocNode) => {
-        setDocTitle(node.document.title || node.pageAttributes.title);
+    // const setPageContentFromSingleNode = (node: AsciiDocNode) => {
+    //     // get & set left navigation title
+    //     setNavTitle(navNode.pageAttributes.title);
 
-        // set description
-        setDocDescription(
-            node.document.description || node.pageAttributes.description,
-        );
-        // get and set doc page content with dynamic data replaced
-        setDocContent(
-            passThroughHandler(node.html, { ...params, ...namePageIdMap }),
-        );
-    };
+    //     // get & set left navigation area content with dynamic link creation
+    //     const navContentData = passThroughHandler(navNode.html, params);
+    //     setNavContent(navContentData);
+
+    //     // set breadcrums data
+    //     setBreadcrumsData(fetchChild(navContentData));
+
+    //     setDocTitle(node.document.title || node.pageAttributes.title);
+
+    //     // set description
+    //     setDocDescription(
+    //         node.document.description || node.pageAttributes.description,
+    //     );
+    //     // get and set doc page content with dynamic data replaced
+    //     setDocContent(
+    //         passThroughHandler(node.html, { ...params, ...namePageIdMap }),
+    //     );
+    // };
 
     useEffect(() => {
-        // get & set left navigation title
-        setNavTitle(navNode.pageAttributes.title);
-
-        // get & set left navigation area content with dynamic link creation
-        const navContentData = passThroughHandler(navNode.html, params);
-        setNavContent(navContentData);
-
-        // set breadcrums data
-        setBreadcrumsData(fetchChild(navContentData));
-
         // get & set left navigation 'Back' button url
         setBackLink(params[TS_ORIGIN_PARAM]);
-
-        // set page title , description and content based on the page node
-        setPageContentFromSingleNode(curPageNode);
     }, [params]);
 
     // fetch adoc translated doc edges using graphql
@@ -216,7 +262,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }
 
     const calculateDocumentBodyWidth = () => {
-        if (isMaxMobileResolution && !isCustomPage) {
+        if (isMaxMobileResolution && !isCustomPage && !isHomePage) {
             if (width > MAX_CONTENT_WIDTH_DESKTOP) {
                 return `${MAX_CONTENT_WIDTH_DESKTOP - 300}px`;
             }
@@ -228,6 +274,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
+            overlay: {
+                background: 'rgba(50,57,70, 0.9)',
+            },
             content: {
                 top: '50px',
                 left: 'auro',
@@ -235,12 +284,14 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 bottom: 'auto',
                 width: isMaxMobileResolution ? '40%' : '100%',
                 margin: 'auto',
-                transform: `translate(${isMaxMobileResolution ? '80%' : '0'
-                    }, 70px)`,
+                transform: `translate(${
+                    isMaxMobileResolution ? '80%' : '0'
+                }, 70px)`,
                 border: 'none',
-                height: isMaxMobileResolution ? '400px' : '250px',
+                height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',
-                background: 'transparent',
+                background: isDarkMode ? '#21252c' : '#fff',
+                padding: 0,
             },
         };
         return (
@@ -249,7 +300,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
             >
-                <div id="docsModal" data-theme={isDarkMode ? 'dark' : 'light'}>
+                <div
+                    id="docsModal"
+                    data-theme={isDarkMode ? 'dark' : 'light'}
+                    style={{ height: '100%' }}
+                >
                     <Search
                         keyword={keyword}
                         onChange={(e: React.FormEvent<HTMLInputElement>) =>
@@ -297,7 +352,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 <AskDocs />
             ) : (
                 <div
-                    className="documentBody"
+                    className={`documentBody ${
+                        isHomePage ? 'doc-home' : 'doc-wrapper-detail'
+                    }`}
                     style={{
                         width: calculateDocumentBodyWidth(),
                         marginLeft: isMaxMobileResolution

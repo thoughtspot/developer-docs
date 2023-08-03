@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useStaticQuery, graphql, navigate } from 'gatsby';
 import Modal from 'react-modal';
 
+import { IconContext } from '@react-icons/all-files';
+import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
 import { queryStringParser, isPublicSite } from '../utils/app-utils';
@@ -37,6 +39,7 @@ import {
 import { SearchQueryResult } from '../interfaces';
 import { getAllPageIds } from '../components/LeftSidebar/helper';
 import t from '../utils/lang-utils';
+import { getHTMLFromComponent } from '../utils/react-utils';
 
 // markup
 const IndexPage = ({ location }) => {
@@ -284,6 +287,9 @@ const IndexPage = ({ location }) => {
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
+            overlay: {
+                background: 'rgba(50,57,70, 0.9)',
+            },
             content: {
                 top: '50px',
                 left: 'auro',
@@ -295,9 +301,10 @@ const IndexPage = ({ location }) => {
                     isMaxMobileResolution ? '80%' : '0'
                 }, 70px)`,
                 border: 'none',
-                height: isMaxMobileResolution ? '400px' : '250px',
+                height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',
-                background: 'transparent',
+                background: isDarkMode ? '#21252c' : '#fff',
+                padding: 0,
             },
         };
         return (
@@ -306,7 +313,11 @@ const IndexPage = ({ location }) => {
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
             >
-                <div id="docsModal" data-theme={isDarkMode ? 'dark' : 'light'}>
+                <div
+                    id="docsModal"
+                    data-theme={isDarkMode ? 'dark' : 'light'}
+                    style={{ height: '100%' }}
+                >
                     <Search
                         keyword={keyword}
                         onChange={(e: React.FormEvent<HTMLInputElement>) =>
@@ -327,6 +338,37 @@ const IndexPage = ({ location }) => {
         );
     };
 
+    const getSearch = () => {
+        const SearchIconHTML = getHTMLFromComponent(<BiSearch />, 'searchIcon');
+
+        const template = `<div class="searchInputBanner">
+            <div class="searchInputWrapper">
+                <div class="searchInputContainer">
+                    ${SearchIconHTML}
+                    <div id="search-input-banner" class="search-input-banner" >${t(
+                        'SEARCH_PLACEHOLDER',
+                    )}</div>
+                </div>
+            </div>
+        </div>`;
+        return template;
+    };
+
+    useEffect(() => {
+        setTimeout(() => {
+            const el = document.querySelector('#homePageSearchBar');
+
+            if (el !== null) {
+                el.innerHTML = getSearch();
+
+                const searchEl = document.querySelector('#search-input-banner');
+                searchEl.addEventListener('click', () => {
+                    setShowSearch(true);
+                });
+            }
+        }, 200);
+    }, []);
+
     return (
         <div id="wrapper" data-theme={isDarkMode ? 'dark' : 'light'} key={key}>
             {isPublicSiteOpen && (
@@ -336,6 +378,7 @@ const IndexPage = ({ location }) => {
                     isDarkMode={isDarkMode}
                 />
             )}
+
             <main
                 ref={ref as React.RefObject<HTMLDivElement>}
                 className={`dark ${isPublicSiteOpen ? 'withHeaderFooter' : ''}`}
@@ -365,7 +408,7 @@ const IndexPage = ({ location }) => {
                 <div
                     className="documentBody"
                     style={{
-                        width: calculateDocumentBodyWidth(),
+                        // width: calculateDocumentBodyWidth(),
                         marginLeft: isMaxMobileResolution
                             ? `${leftNavWidth}px`
                             : '0px',

@@ -158,7 +158,10 @@ class TypeDocInternalParser {
     static convertToItalic = (name: string | undefined) =>
         name ? `_${name}_` : '';
 
-    static convertNameToLink: (node: string | undefined) => string;
+    static convertNameToLink: (
+        node: string | undefined,
+        includeParent?: boolean,
+    ) => string;
 
     static GITHUB_LINK =
         'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
@@ -166,11 +169,11 @@ class TypeDocInternalParser {
     static covertTypeDocText = (text: string) => {
         // convert all {@link Name.hash}
         // to xref:Name.adoc#hash[Name]
-        const matches = text.match(/{@link [^{]+}/g);
+        const matches = text.match(/{@link\s[^{]+}/g);
         if (!matches) return text;
         const updatedText = matches?.reduce((prevUpdatedText, curLinkText) => {
-            const linkTo = curLinkText.split(' ')[1].replace('}', '');
-            const newLinkText = this.convertNameToLink(linkTo);
+            const linkTo = curLinkText.split(/\s/)[1].replace('}', '');
+            const newLinkText = this.convertNameToLink(linkTo, true);
 
             if (!newLinkText) return prevUpdatedText;
 
@@ -367,19 +370,29 @@ class TypeDocParser {
 
     private groupMap: Record<string, TypeDocLinkingNode[]> = {};
 
-    public convertNameToLink = (linkTo: string | undefined) => {
+    public convertNameToLink = (
+        linkTo: string | undefined,
+        includeParent = false,
+    ) => {
         if (!linkTo) return '';
 
         const [name, hash] = linkTo.split('.');
 
-        const hashNode = this.childrenNameMap[hash || ''];
-
-        if (hashNode) return this.convertNodeToLink(hashNode);
-
         const nameNode = this.childrenNameMap[name || ''];
 
-        if (nameNode) return this.convertNodeToLink(nameNode);
+        if (hash) {
+            const hashNode = nameNode.children?.filter(
+                (node) => node.name === hash,
+            )[0];
 
+            if (hashNode)
+                return this.convertNodeToLink(hashNode, includeParent);
+        }
+
+        if (nameNode) return this.convertNodeToLink(nameNode, includeParent);
+
+        // could not be resolved, so passing back the name to be displayed.
+        if (hash && includeParent) return `${name}.${hash}`;
         return hash || name;
     };
 
@@ -415,11 +428,6 @@ class TypeDocParser {
                     if (nodeToLink) {
                         return this.convertNodeToLink(nodeToLink);
                     }
-                    // console.log('\t', node.name, 'not found in map');
-                    // return (
-                    //     TypeDocInternalParser.convertNameToLink(node.name) +
-                    //     typeArg
-                    // );
                 }
                 return node.name + typeArg || '';
             }
@@ -512,7 +520,7 @@ class TypeDocParser {
         });
     };
 
-    private convertNodeToLink = (node: TypeDocNode) => {
+    private convertNodeToLink = (node: TypeDocNode, includeParent = false) => {
         const parent = this.childrenIdMap[node.id]?.parentId;
         if (parent === undefined) return node.name;
 
@@ -537,7 +545,10 @@ class TypeDocParser {
                 '_',
             )}]#xref:${this.childrenIdMap[parent].name}.adoc`;
             newLinkText += `#_${node.name.toLowerCase()}`;
-            newLinkText += `[${node.name}]#`;
+            const visibleName = includeParent
+                ? `${this.childrenIdMap[parent].name}.${node.name}`
+                : node.name;
+            newLinkText += `[${visibleName}]#`;
             return newLinkText;
         }
 
@@ -553,7 +564,9 @@ class TypeDocParser {
         // Special handling
         if (['Enumeration', 'Class', 'Interface'].includes(node.kindString)) {
             enumIndexContent += `${this.createTypeDocTable(
-                node.children?.map(this.convertNodeToLink) || [],
+                node.children?.map((childNode) =>
+                    this.convertNodeToLink(childNode),
+                ) || [],
                 3,
             )}`;
         }
