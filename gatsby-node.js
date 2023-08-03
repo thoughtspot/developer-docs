@@ -50,5 +50,15 @@ exports.createPages = async function ({ actions, graphql }) {
             ),
             context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
         });
+
+        if (pageId === 'introduction') {
+            actions.createPage({
+                path: '/',
+                component: require.resolve(
+                    './src/components/DevDocTemplate/index.tsx',
+                ),
+                context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+            });
+        }
     });
 };

@@ -6,7 +6,7 @@ const getPathPrefix = () => {
     if (process.env.BUILD_ENV === config.BUILD_ENVS.LOCAL) {
         return null;
     }
-    return null;
+    return 'docs';
 };
 
 const getPath = (path) =>
