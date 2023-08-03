@@ -345,7 +345,16 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 />
             </div>
             {isAskDocsPage ? (
+                <div className="documentBody"
+                style={{
+                    width: calculateDocumentBodyWidth(),
+                    display: 'flex',
+                    marginLeft: isMaxMobileResolution
+                        ? `${leftNavWidth}px`
+                        : '0px',
+                }}>
                 <AskDocs />
+                </div>
             ) : (
                 <div
                     className={`documentBody ${
