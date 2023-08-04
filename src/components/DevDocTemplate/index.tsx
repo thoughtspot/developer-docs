@@ -52,7 +52,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         location,
         pageContext: { namePageIdMap },
     } = props;
-    const homePagePaths = ['/', '/introduction', '/introduction/'];
+    const homePagePaths = ['/', '/docs', '/docs/introduction', '/docs/introduction/'];
     const isHomePage = homePagePaths.includes(location?.pathname);
 
     useEffect(() => {
