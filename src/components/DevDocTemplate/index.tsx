@@ -243,7 +243,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
-        navigate(`/${pageid}#${sectionId}`);
+        navigate(`/docs/${pageid}#${sectionId}`);
     };
 
     const isMaxMobileResolution = !(width < MAX_MOBILE_RESOLUTION);
