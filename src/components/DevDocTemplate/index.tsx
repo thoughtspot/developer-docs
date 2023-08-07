@@ -52,13 +52,18 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         location,
         pageContext: { namePageIdMap },
     } = props;
-    const homePagePaths = ['/', '/docs', '/docs/introduction', '/docs/introduction/'];
+    const homePagePaths = [
+        '/',
+        '/docs',
+        '/docs/introduction',
+        '/docs/introduction/',
+    ];
     const isHomePage = homePagePaths.includes(location?.pathname);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
             if (location.pathname === '/') {
-                navigate('/docs');
+                navigate('/docs', { replace: true });
             }
 
             const queryParams = new URLSearchParams(window.location.search);
@@ -66,9 +71,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             if (pageId) {
                 queryParams.delete('pageid');
                 if (queryParams.toString()) {
-                    navigate(`/docs/${pageId}?${queryParams.toString()}`);
+                    navigate(`/docs/${pageId}?${queryParams.toString()}`, {
+                        replace: true,
+                    });
                 } else {
-                    navigate(`/docs/${pageId}`);
+                    navigate(`/docs/${pageId}`, { replace: true });
                 }
             }
         }
@@ -345,15 +352,17 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 />
             </div>
             {isAskDocsPage ? (
-                <div className="documentBody"
-                style={{
-                    width: calculateDocumentBodyWidth(),
-                    display: 'flex',
-                    marginLeft: isMaxMobileResolution
-                        ? `${leftNavWidth}px`
-                        : '0px',
-                }}>
-                <AskDocs />
+                <div
+                    className="documentBody"
+                    style={{
+                        width: calculateDocumentBodyWidth(),
+                        display: 'flex',
+                        marginLeft: isMaxMobileResolution
+                            ? `${leftNavWidth}px`
+                            : '0px',
+                    }}
+                >
+                    <AskDocs />
                 </div>
             ) : (
                 <div
