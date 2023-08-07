@@ -149,12 +149,12 @@ module.exports = {
                 converterFactory: CustomDocConverter,
             },
         },
-        {
-            resolve: 'gatsby-transformer-rehype',
-            options: {
-                mediaType: 'text/html',
-            },
-        },
+        // {
+        //     resolve: 'gatsby-transformer-rehype',
+        //     options: {
+        //         mediaType: 'text/html',
+        //     },
+        // },
         {
             resolve: 'gatsby-source-git',
             options: {

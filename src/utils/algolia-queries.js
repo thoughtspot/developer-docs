@@ -59,10 +59,7 @@ query {
             dir
             name
             relativePath
-            childHtmlRehype {
-              html
-              htmlAst
-            }
+       
         }
     }
   }
