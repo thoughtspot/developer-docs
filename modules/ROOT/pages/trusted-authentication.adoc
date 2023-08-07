@@ -8,9 +8,11 @@
 
 Trusted authentication allows a web application to authenticate a user to a ThoughtSpot instance using *login tokens* requested from a ThoughtSpot instance. 
 
-It is the most seamless method of single sign-on (SSO) but the actual *authentication* of the user is performed by the web application, requiring unique effort by the developer building the ThoughtSpot integration.
+It is the most seamless method of single sign-on (SSO) available to embed ThoughtSpot, but the actual *authentication* of the user is performed by a *token request service* that must be developed and added to the web application.
 
-The Trusted authentication supports cookie-based and cookieless authentication. 
+
+== Cookie-based vs. cookieless authentication
+The trusted authentication method supports cookie-based and cookieless authentication. 
 
 In cookie-based authentication, the login token is only necessary during the login process, after which any request to ThoughtSpot will include session cookies that identify the signed-in user.
 
@@ -26,8 +28,8 @@ The process for trusted authentication is as follows:
 
  1. The Visual Embed SDK, loaded within the embedded application page, calls the `init()` function with the correct set of parameters to request a *login token*.
  2. The request for the *login token* securely provides the username and any additional details to the *authenticator service*.
- 3. The *authenticator service* verifies and parses the username and other details, and issues REST API commands to ThoughtSpot, such as requesting a *login token* for the provided username.
- 4. The *authenticator service* returns the *login token* to the browser and the Visual Embed SDK.
+ 3. The *token request service* verifies and parses the username and other details, and issues REST API commands to ThoughtSpot, such as requesting a *login token* for the provided username.
+ 4. The *token request service* returns the *login token* to the browser and the Visual Embed SDK.
  5. The Visual Embed SDK issues requests to establish a ThoughtSpot session in the browser.
 
 The following figure illustrates the trusted authentication workflow with session cookies and REST API calls to v1 endpoints:
@@ -150,10 +152,26 @@ init({
 
 [#login-token]
 == Login token expiration
+Login tokens from the V1 and V2 REST APIs have different expiration rules.
 
-The login token, also referred to as the authentication token, allows users to access the requested object. It is a proprietary token format that cannot be decoded or used for any purpose other than to create a ThoughtSpot session.
+V1 login tokens only work for cookie-based Trusted Authentication, while the V2 tokens can be used for cookie-based or cookieless Trusted Auth. 
 
-Tokens stay valid for a length of time based on the following rules:
+=== V2 token
+The V2 REST API token is a standard OAuth 2.0 token that encodes several properties with in the token, most notably the username and the expiration time.
+
+The validity time of the token is never extended by any activity, so a new token must be requested after the intiial token passes its expiration time.
+
+The V2 token REST API endpoint has a request argument called `validity_time_in_sec` that defaults to 300 seconds (5 minutes). 
+
+For cookie-based Trusted Authentication, you may want to shorten the `validity_time_in_sec` to less than one minute, since the token is only used once and then there is a long-lived cookie-based session. The ThoughtSpot session end time will extend naturally as the user interacts with ThoughtSpot.
+
+For cookieless Trusted Authentication, you will want to request the token with a longer validity, possibly 20 or 30 minutes or more. 
+
+
+=== V1 token
+The V1 REST API login token is a proprietary token format that cannot be decoded or used for any purpose other than to create a ThoughtSpot session.
+
+V1 tokens stay valid for a length of time based on the following rules:
 
 * A token stays valid indefinitely until another token for any user is generated.
 * When a new token is generated using the same `secret_key`, the previous token will expire after five minutes.
