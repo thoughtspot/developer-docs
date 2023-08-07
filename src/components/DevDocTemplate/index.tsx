@@ -6,6 +6,7 @@ import { graphql, navigate } from 'gatsby';
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
 import _ from 'lodash';
+import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
@@ -18,7 +19,6 @@ import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './renderPlayGround';
 import { AskDocs } from './askDocs';
-import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import {
     DOC_NAV_PAGE_ID,
     TS_HOST_PARAM,
@@ -55,13 +55,32 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const homePagePaths = ['/', '/introduction', '/introduction/'];
     const isHomePage = homePagePaths.includes(location?.pathname);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            if (location.pathname === '/') {
+                navigate('/docs');
+            }
+
+            const queryParams = new URLSearchParams(window.location.search);
+            const pageId = queryParams.get('pageid');
+            if (pageId) {
+                queryParams.delete('pageid');
+                if (queryParams.toString()) {
+                    navigate(`/docs/${pageId}?${queryParams.toString()}`);
+                } else {
+                    navigate(`/docs/${pageId}`);
+                }
+            }
+        }
+    }, [location.search, location.pathname]);
+
     const { curPageNode, navNode } = data;
     const { width, ref } = useResizeDetector();
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
         [TS_ORIGIN_PARAM]: '',
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
-        [NAV_PREFIX]: '',
+        [NAV_PREFIX]: '/docs',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
     const [docTitle, setDocTitle] = useState(
@@ -171,29 +190,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             '*',
         );
     }, [location.search, location.hash]);
-
-    // const setPageContentFromSingleNode = (node: AsciiDocNode) => {
-    //     // get & set left navigation title
-    //     setNavTitle(navNode.pageAttributes.title);
-
-    //     // get & set left navigation area content with dynamic link creation
-    //     const navContentData = passThroughHandler(navNode.html, params);
-    //     setNavContent(navContentData);
-
-    //     // set breadcrums data
-    //     setBreadcrumsData(fetchChild(navContentData));
-
-    //     setDocTitle(node.document.title || node.pageAttributes.title);
-
-    //     // set description
-    //     setDocDescription(
-    //         node.document.description || node.pageAttributes.description,
-    //     );
-    //     // get and set doc page content with dynamic data replaced
-    //     setDocContent(
-    //         passThroughHandler(node.html, { ...params, ...namePageIdMap }),
-    //     );
-    // };
 
     useEffect(() => {
         // get & set left navigation 'Back' button url

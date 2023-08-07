@@ -59,10 +59,7 @@ query {
             dir
             name
             relativePath
-            childHtmlRehype {
-              html
-              htmlAst
-            }
+       
         }
     }
   }
@@ -107,7 +104,7 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
         pageid,
         type: 'ASCII',
         title: node.document.title,
-        link: `/${pageid}`,
+        link: `/docs/${pageid}`,
     }));
 };
 

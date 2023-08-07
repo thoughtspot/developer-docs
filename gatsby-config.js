@@ -3,10 +3,11 @@ const asciidoc = require('asciidoctor')();
 const config = require('./src/configs/doc-configs');
 
 const getPathPrefix = () => {
-    if (process.env.BUILD_ENV === config.BUILD_ENVS.LOCAL) {
-        return null;
-    }
-    return null;
+    // if (process.env.BUILD_ENV === config.BUILD_ENVS.LOCAL) {
+    //     return null;
+    // }
+    // return null;
+    return 'docs';
 };
 
 const getPath = (path) =>
@@ -148,12 +149,12 @@ module.exports = {
                 converterFactory: CustomDocConverter,
             },
         },
-        {
-            resolve: 'gatsby-transformer-rehype',
-            options: {
-                mediaType: 'text/html',
-            },
-        },
+        // {
+        //     resolve: 'gatsby-transformer-rehype',
+        //     options: {
+        //         mediaType: 'text/html',
+        //     },
+        // },
         {
             resolve: 'gatsby-source-git',
             options: {
