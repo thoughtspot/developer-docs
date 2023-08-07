@@ -52,7 +52,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         location,
         pageContext: { namePageIdMap },
     } = props;
-    const homePagePaths = ['/', '/docs', '/docs/introduction', '/docs/introduction/'];
+    const homePagePaths = [
+        '/',
+        '/docs',
+        '/docs/introduction',
+        '/docs/introduction/',
+    ];
     const isHomePage = homePagePaths.includes(location?.pathname);
 
     useEffect(() => {
@@ -321,75 +326,78 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         );
     };
 
-    const renderDocTemplate = () => (
-        <>
-            {renderSearch()}
-            <div className="leftNavContainer">
-                <LeftSidebar
-                    navTitle={navTitle}
-                    navContent={navContent}
-                    docWidth={width}
-                    handleLeftNavChange={setLeftNavWidth}
-                    location={location}
-                    setLeftNavOpen={setLeftNavOpen}
-                    leftNavOpen={leftNavOpen}
-                    isPublicSiteOpen={isPublicSiteOpen}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={setDarkMode}
-                    isDarkMode={isDarkMode}
-                    curPageid={curPageNode.pageAttributes.pageid}
-                    searchClickHandler={() => {
-                        setShowSearch(true);
-                        if (!isMaxMobileResolution) setLeftNavOpen(false);
-                    }}
-                />
-            </div>
-            {isAskDocsPage ? (
-                <div className="documentBody"
-                style={{
-                    width: calculateDocumentBodyWidth(),
-                    display: 'flex',
-                    marginLeft: isMaxMobileResolution
-                        ? `${leftNavWidth}px`
-                        : '0px',
-                }}>
-                <AskDocs />
+    const renderDocTemplate = () =>
+        navContent ? (
+            <>
+                {renderSearch()}
+                <div className="leftNavContainer">
+                    <LeftSidebar
+                        navTitle={navTitle}
+                        navContent={navContent}
+                        docWidth={width}
+                        handleLeftNavChange={setLeftNavWidth}
+                        location={location}
+                        setLeftNavOpen={setLeftNavOpen}
+                        leftNavOpen={leftNavOpen}
+                        isPublicSiteOpen={isPublicSiteOpen}
+                        isMaxMobileResolution={isMaxMobileResolution}
+                        setDarkMode={setDarkMode}
+                        isDarkMode={isDarkMode}
+                        curPageid={curPageNode.pageAttributes.pageid}
+                        searchClickHandler={() => {
+                            setShowSearch(true);
+                            if (!isMaxMobileResolution) setLeftNavOpen(false);
+                        }}
+                    />
                 </div>
-            ) : (
-                <div
-                    className={`documentBody ${
-                        isHomePage ? 'doc-home' : 'doc-wrapper-detail'
-                    }`}
-                    style={{
-                        width: calculateDocumentBodyWidth(),
-                        marginLeft: isMaxMobileResolution
-                            ? `${leftNavWidth}px`
-                            : '0px',
-                    }}
-                >
-                    <div className="introWrapper">
-                        <Document
-                            shouldShowRightNav={shouldShowRightNav}
-                            pageid={params[TS_PAGE_ID_PARAM]}
-                            docTitle={docTitle}
-                            docContent={docContent}
-                            breadcrumsData={breadcrumsData}
-                            isPublicSiteOpen={isPublicSiteOpen}
-                        />
-                        {shouldShowRightNav && (
-                            <div>
-                                <Docmap
-                                    docContent={docContent}
-                                    location={location}
-                                    options={results}
-                                />
-                            </div>
-                        )}
+                {isAskDocsPage ? (
+                    <div
+                        className="documentBody"
+                        style={{
+                            width: calculateDocumentBodyWidth(),
+                            display: 'flex',
+                            marginLeft: isMaxMobileResolution
+                                ? `${leftNavWidth}px`
+                                : '0px',
+                        }}
+                    >
+                        <AskDocs />
                     </div>
-                </div>
-            )}
-        </>
-    );
+                ) : (
+                    <div
+                        className={`documentBody ${
+                            isHomePage ? 'doc-home' : 'doc-wrapper-detail'
+                        }`}
+                        style={{
+                            width: calculateDocumentBodyWidth(),
+                            marginLeft: isMaxMobileResolution
+                                ? `${leftNavWidth}px`
+                                : '0px',
+                        }}
+                    >
+                        <div className="introWrapper">
+                            <Document
+                                shouldShowRightNav={shouldShowRightNav}
+                                pageid={params[TS_PAGE_ID_PARAM]}
+                                docTitle={docTitle}
+                                docContent={docContent}
+                                breadcrumsData={breadcrumsData}
+                                isPublicSiteOpen={isPublicSiteOpen}
+                            />
+                            {shouldShowRightNav && (
+                                <div>
+                                    <Docmap
+                                        docContent={docContent}
+                                        location={location}
+                                        options={results}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </>
+        ) : null;
 
     const renderPlayGround = () => {
         return <RenderPlayGround location={location} />;
