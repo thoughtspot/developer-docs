@@ -61,13 +61,13 @@ import { LiveboardEmbed } from '@thoughtspot/visual-embed-sdk';
 
 // NPM <script>
 <script src="https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.js"></script>;
-// Makes the SDK available on global namespace window.tsembed
+// Make the SDK available on global namespace window.tsembed
 
 // ES6 from web
 import {
-LiveboardEmbed,
-AuthType,
-init,
+    LiveboardEmbed,
+    AuthType,
+    init,
 } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 ----
 
@@ -107,23 +107,20 @@ Use the **SearchBarEmbed** component to embed only the ThoughtSpot Search bar an
 ++++
 
 [#initSdk]
-=== Initialize the SDK
+== Initialize the SDK
 
-After importing the package, specify the hostname or IP address of your ThoughtSpot application instance and the authentication type.
+After importing the package, specify the hostname or IP address of your ThoughtSpot application instance and the authentication type. For other supported authentication methods, see xref:embed-authentication.adoc[Authentication].
 
 [source,JavaScript]
 ----
 init({
     thoughtSpotHost: "https://<hostname>:<port>",
-    authType: AuthType.EmbeddedSSO,
+    authType: <AuthType>,
+    ... // other authType dependent properties.
 });
 ----
-thoughtSpotHost::
-_String_. Hostname or IP address of the ThoughtSpot application.
 
-For other supported authentication methods, see xref:embed-authentication.adoc[Authentication].
-
-== Define the object instance and properties
+=== Define the object instance and properties
 Create an object instance and define object properties. This example shows the code sample for a Liveboard object:
 
 [source,JavaScript]
@@ -142,10 +139,18 @@ const liveboardEmbed = new LiveboardEmbed(
 
 == Register events
 
-Subscribe and listen to events triggered when the embedded object interacts with your app.
+Subscribe and listen to events triggered when the embedded object interacts with your app. The following example registers `LiveboardRendered` and `SetVisibleVizs` events. The `LiveboardRendered` embed event is emitted when the embedding application renders the Liveboard and triggers the `SetVisibleVizs` event to show specific visualizations on the Liveboard.
+
+[source,JavaScript]
+----
+liveboardEmbed.on(EmbedEvent.LiveboardRendered, () => {
+    liveboardEmbed.trigger(HostEvent.SetVisibleVizs, ['viz1', 'viz2']);
+});
+----
 
 * xref:HostEvent.adoc[HostEvent]
 * xref:EmbedEvent.adoc[EmbedEvent]
+
 
 == Render the embedded object
 
@@ -159,34 +164,70 @@ liveboardEmbed.render();
 == Code sample
 [source,Javascript]
 ----
-// NPM
-import { LiveboardEmbed, AuthType, init } from '@thoughtspot/visual-embed-sdk';
-// or ES6
-// import { LiveboardEmbed, AuthType, init } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+import {
+    LiveboardEmbed,
+    EmbedEvent,
+    HostEvent,
+} from '@thoughtspot/visual-embed-sdk';
 
-init({
-    thoughtSpotHost: '<%=tshost%>',
-    authType: AuthType.None,
-});
-
-const liveboardEmbed = new LiveboardEmbed(
-    document.getElementById('ts-embed'),
-    {
-        frameParams: {
-            width: '100%',
-            height: '100%',
-        },
-        liveboardId: '<%=liveboardGUID%>',
-        vizId: '<%=vizGUID%>',
+const lb = new LiveboardEmbed('#container', {
+    frameParams: {
+        width: '100%',
+        height: '100%',
     },
+    liveboardId: '<%=liveboardGUID%>',
+    runtimeFilters: [],
+});
+// [Optional]: Register event listeners.
+lb.on(EmbedEvent.LiveboardRendered, (e) => {
+    /* handler */
 });
 
-liveboardEmbed.render();
+// Do not forget to call render.
+lb.render();
 
-liveboardEmbed.on(EmbedEvent.LiveboardRendered, () => {
-    liveboardEmbed.trigger(HostEvent.SetVisibleVizs, ['viz1', 'viz2']);
-});
+// [Optional]: Trigger events on the lb
+lb.trigger(HostEvent.UpdateRuntimeFilters, [
+    {
+        columnName: 'col1',
+        operator: RuntimeFilterOp.EQ,
+        values: ['val1'],
+    },
+]);
 ----
+
+`#container` is a selector for the DOM node which the code assumes is already attached to DOM. The SDK will render the ThoughtSpot component inside this container element.
+
+
+== Embed in a React app
+ThoughtSpot provides React components for embedding Search, Liveboard, and the full ThoughtSpot application in a React app. The following code sample shows how to embed a Liveboard component in a React app:
+
+[source,TypeScript]
+----
+import { LiveboardEmbed } from '@thoughtspot/visual-embed-sdk/react';
+
+const App = () => {
+    const embedRef = useEmbedRef();
+    const onLiveboardRendered = () => {
+        embedRef.current.trigger(HostEvent.UpdateRuntimeFilters, [
+            {
+                columnName: 'col1',
+                operator: RuntimeFilterOp.EQ,
+                values: ['val1'],
+            },
+        ]);
+    };
+    return (
+        <LiveboardEmbed
+            ref={embedRef}
+            liveboardId="<liveboard-guid>"
+            onLiveboardRendered={onLiveboardRendered}
+        />
+    );
+};
+----
+
+For more information, see xref:embed-ts-react-app.adoc[Embed ThoughtSpot in a React app].
 
 ////
 === Embed ThoughtSpot objects
@@ -208,4 +249,3 @@ For more information about embedding ThoughtSpot app or its objects using SDK, s
 * link:https://github.com/thoughtspot/visual-embed-sdk/blob/main/README.md[Visual Embed SDK GitHub repository, window=_blank]
 * link:https://github.com/thoughtspot/ts_everywhere_resources[ThoughtSpot Everywhere Resources on GitHub, window=_blank]
 * link:https://developers.thoughtspot.com/guides[Visual Embed Tutorials, window=_blank]
-
