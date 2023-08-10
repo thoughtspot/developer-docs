@@ -55,6 +55,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const homePagePaths = [
         '/',
         '/docs',
+        '/docs/',
         '/docs/introduction',
         '/docs/introduction/',
     ];
