@@ -61,6 +61,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     ];
     const isHomePage = homePagePaths.includes(location?.pathname);
 
+    const isBrowser = () => typeof window !== 'undefined';
+
     useEffect(() => {
         if (typeof window !== 'undefined') {
             if (location.pathname === '/') {
@@ -142,15 +144,15 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         const paramObj = queryStringParser(location.search);
 
         setParams({ ...paramObj, ...params });
-        const {pathname} = location;
-        console.log(pathname, 'rijad')
-        if (pathname !== '/docs/restV2-playground'){
-            localStorage.setItem("prevPath", pathname)
+        const { pathname } = location;
+        console.log(pathname, 'rijad');
+        if (isBrowser() && pathname !== '/docs/restV2-playground') {
+            localStorage.setItem('prevPath', pathname);
         }
     }, [location.search]);
 
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        if (isBrowser()) {
             setDarkMode(localStorage.getItem('theme') === 'dark');
             setKey('dark');
         }
@@ -242,8 +244,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 });
         }
     }, [keyword]);
-
-
 
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
@@ -398,7 +398,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     );
 
     const renderPlayGround = () => {
-        const backLink = localStorage.getItem("prevPath") || 'introduction'
+        const backLink = isBrowser()
+            ? localStorage.getItem('prevPath')
+            : 'introduction';
         return <RenderPlayGround location={location} backLink={backLink} />;
     };
 
