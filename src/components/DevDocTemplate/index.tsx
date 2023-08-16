@@ -63,6 +63,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const isBrowser = () => typeof window !== 'undefined';
 
+    const isBrowser = () => typeof window !== 'undefined';
+
     useEffect(() => {
         if (typeof window !== 'undefined') {
             if (location.pathname === '/') {
@@ -243,8 +245,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 });
         }
     }, [keyword]);
-
-
 
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
