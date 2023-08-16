@@ -884,14 +884,14 @@ class TypeDocParser {
 
         let customSideNavContent = '';
         Object.keys(this.groupMap).forEach((k) => {
-            customSideNavContent += `* ${k}\n`;
+            customSideNavContent += `*** ${k}\n`;
 
             this.groupMap[k].forEach((toLinkNode) => {
                 const linkToNode = `link:{{navprefix}}/${this.getPageId(
                     toLinkNode,
                 )}`;
 
-                customSideNavContent += `** [.${this.getTypeCSSClass(
+                customSideNavContent += `**** [.${this.getTypeCSSClass(
                     toLinkNode,
                 )}]#${linkToNode}[${toLinkNode.name}]#\n`;
             });
