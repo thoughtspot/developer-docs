@@ -145,7 +145,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
         setParams({ ...paramObj, ...params });
         const { pathname } = location;
-        console.log(pathname, 'rijad');
         if (isBrowser() && pathname !== '/docs/restV2-playground') {
             localStorage.setItem('prevPath', pathname);
         }
@@ -244,6 +243,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 });
         }
     }, [keyword]);
+
+
 
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
