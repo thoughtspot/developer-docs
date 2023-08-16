@@ -17,8 +17,7 @@ import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
-import RenderPlayGround from './RESTAPIV2PlayGround';
-import RenderGQPL from './GraphQLPlayGround';
+import RenderPlayGround from './renderPlayGround';
 import { AskDocs } from './askDocs';
 import {
     DOC_NAV_PAGE_ID,
@@ -136,11 +135,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     );
     const isApiPlaygroundPage =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND;
-
-        const isGraphQLPlaygroundPage =
-        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GRAPHQL_PLAYGROUND;
-
-      const isPlayGround = isGraphQLPlaygroundPage ||   isApiPlaygroundPage;
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
     useEffect(() => {
@@ -407,10 +401,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         </>
     );
 
-    const renderPlayGround = () => 
-        isApiPlaygroundPage? <RenderPlayGround location={location} />:<RenderGQPL />
-    
-
+    const renderPlayGround = () => {
+        return <RenderPlayGround location={location} />;
+    };
 
     const getClassName = () => {
         let cName = isDarkMode ? 'dark ' : '';
@@ -434,20 +427,17 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         isDarkMode={isDarkMode}
                     />
                 )}
-                {!navContent ? null : (
-                    <main
-                        ref={ref as React.RefObject<HTMLDivElement>}
-                        className={getClassName()}
-                        style={{
-                            height:
-                                !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
-                        }}
-                    >
-                        {isPlayGround
-                            ? renderPlayGround()
-                            : renderDocTemplate()}
-                    </main>
-                )}
+                <main
+                    ref={ref as React.RefObject<HTMLDivElement>}
+                    className={getClassName()}
+                    style={{
+                        height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
+                    }}
+                >
+                    {isApiPlaygroundPage
+                        ? renderPlayGround()
+                        : renderDocTemplate()}
+                </main>
             </div>
         </>
     );
