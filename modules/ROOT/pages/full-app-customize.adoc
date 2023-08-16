@@ -10,7 +10,20 @@ The xref:/full-embed.adoc[AppEmbed component] embeds the entire ThoughtSpot appl
 == Choosing the page to load
 The `pageId` parameter of the AppEmbed xref:full-embed#_create_an_instance_of_the_appembed_object[parameters object] lets you specify which of the defined pages in the `Page` enumeration that the AppEmbed components loads to.
 
-Alternatively you can use the `path` parameter to directly specify a page path.
+Alternatively you can use the `path` parameter to directly specify a page path, to load a specific Liveboard or answer.
+
+[source,javascript]
+----
+const embed = new AppEmbed("#embed", {
+    pageId: Page.Liveboards,
+    // path: 'pinboard/96a1cf0b-a159-4cc8-8af4-1a297c492ff9',  // Alternative direct path rather than pageId
+    showPrimaryNavbar: false, 
+    frameParams: {
+        height: '100%',
+        width: '100%'
+    }
+});
+----
 
 == Customizing the ThoughtSpot top menu
 You cannot change the ThoughtSpot top menu directly, but you can hide it and replace with your own navigation menu (it can even look exactly the same as ThoughtSpot default). 
@@ -32,41 +45,20 @@ embed.navigateToPage(Page.Answers);
 embed.navigateToPage(Page.Answers, true);
 ----
 
-== Detecting changes in the current loaded page
+== Detecting changes in the currently loaded page
 Various actions the user takes within the embedded ThoughtSpot application may cause navigation within ThoughtSpot. 
 
-The embedding web application can listen for the `EmbedEvent.RouteChange` event by attaching an event listener to the AppEmbed object. 
+The embedding web application can listen for the `EmbedEvent.RouteChange` event by attaching an event listener to the AppEmbed object. The response has a `currentPath` property which is the path after the ThoughtSpot domain, ex: `pinboard/96a1cf0b-a159-4cc8-8af4-1a297c492ff9`.
 
-The following is the event listener code to update a global `tsAppState` object whenever there is a change (the `tsAppState` code example is below):
-[source,javascript]
-----
-embed.on(EmbedEvent.RouteChange, (response) => {
-  // console.log("RouteChange fires");
-  // console.log(response);
-  // Updated tsAppState object currentPath property
-  // Other calls call to tsAppState for detecting the page, object type, GUIDs etc.
-  tsAppState.currentPath = response.data.currentPath;
-  tsAppState.currentDatasources = []; // Reset until you find out 
-  console.log("TS App page is now: ", tsAppState.currentPath);
-  if (tsAppState.objectId != null) {
-      console.log("Showing a " + tsAppState.pageType + " with Id", tsAppState.objectId)
-  }
-  else {
-      console.log("Showing page " + tsAppState.pageType);
-  }
-
-  // Update elements within your web application based on the new state of ThoughtSpot (adjust menu selections, etc.)
-
-})
-----
+To parse the `currentPath` into varying useful components, this `tsAppState` object code can be created in the global scope for use by any other web application code:
 
 [source,javascript]
 ----
 // Simple global object to handle details about what is visible in the AppEmbed component at a given moment
 let tsAppState = {
   currentPath: startPath,
-  currentDatasources: [], // Can be set later when detected
-  // return back what is being viewed at the moment
+  currentDatasources: [], // Can be set later when detected from TML or other events
+  // return back what is being viewed at the moment, in the form that will translate to the pageId property if captialized, or path property if not
   get pageType() {
       if (this.currentPath.includes('/saved-answer/')){
           return 'answer';
@@ -122,7 +114,22 @@ let tsAppState = {
 }
 ----
 
-== Navigating from a custom action
+The following shows the event listener code updating the global `tsAppState` object above whenever there is a change within the embedded ThoughtSpot app:
+[source,javascript]
+----
+embed.on(EmbedEvent.RouteChange, (response) => {
+  // console.log("RouteChange fires");
+  // console.log(response);
+  // tsAppState object has currentPath property, which allows its other methods to parse out pageId, object type, GUIDs etc.
+  tsAppState.currentPath = response.data.currentPath;
+  console.log("TS App page is now: ", tsAppState.currentPath);
+  
+  // Update elements within your web application based on the new state of ThoughtSpot (adjust menu selections, etc.)
+
+})
+----
+
+== Navigating using a custom action
 To add a custom action for in-app navigation, follow these steps:
 
 . xref:custom-actions-callback.adoc[Add a custom action].
