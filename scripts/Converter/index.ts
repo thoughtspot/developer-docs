@@ -520,6 +520,10 @@ class TypeDocParser {
         });
     };
 
+    public getTypeCSSClass = (node) => {
+        return `typedoc-${node.kindString.replace(/ /g, '_')}`;
+    };
+
     private convertNodeToLink = (node: TypeDocNode, includeParent = false) => {
         const parent = this.childrenIdMap[node.id]?.parentId;
         if (parent === undefined) return node.name;
@@ -804,6 +808,10 @@ class TypeDocParser {
         }
     };
 
+    private getPageId = (node: TypeDocNode) => {
+        return encodePageId(`${node.kindString}_${node.name}`);
+    };
+
     public handleProjectNode = (
         node: TypeDocNode,
         indexPageId = 'VisualEmbedSdk',
@@ -873,6 +881,25 @@ class TypeDocParser {
         callBack('VisualEmbedSdkNavLinks', sideNavContent);
 
         callBack(indexPageId, `${indexPageHeading}\n\n${indexPageContent}`);
+
+        let customSideNavContent = '';
+        Object.keys(this.groupMap).forEach((k) => {
+            customSideNavContent += `* ${k}\n`;
+
+            this.groupMap[k].forEach((toLinkNode) => {
+                const linkToNode = `link:{{navprefix}}/${this.getPageId(
+                    toLinkNode,
+                )}`;
+
+                customSideNavContent += `** [.${this.getTypeCSSClass(
+                    toLinkNode,
+                )}]#${linkToNode}[${toLinkNode.name}]#\n`;
+            });
+
+            customSideNavContent += '\n';
+        });
+
+        callBack('CustomSideNav', customSideNavContent);
     };
 }
 
@@ -909,7 +936,8 @@ class TypedocConverter {
             (pageId, content) => {
                 const updatedPageId = pageId.replace('_', '/');
                 const filePath =
-                    pageId === 'VisualEmbedSdkNavLinks'
+                    pageId === 'VisualEmbedSdkNavLinks' ||
+                    pageId === 'CustomSideNav'
                         ? `modules/ROOT/pages/common/generated/typedoc/${updatedPageId}.adoc`
                         : `modules/ROOT/pages/generated/typedoc/${updatedPageId}.adoc`;
                 this.writeFile(filePath, content);
