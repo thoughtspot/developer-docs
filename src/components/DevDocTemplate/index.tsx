@@ -63,8 +63,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const isBrowser = () => typeof window !== 'undefined';
 
-    const isBrowser = () => typeof window !== 'undefined';
-
     useEffect(() => {
         if (typeof window !== 'undefined') {
             if (location.pathname === '/') {
@@ -93,7 +91,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [TS_ORIGIN_PARAM]: '',
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
         [NAV_PREFIX]: '/docs',
-        [PREVIEW_PREFIX]: `/docs`,
+        [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
     const [docTitle, setDocTitle] = useState(
         curPageNode.document.title || curPageNode.pageAttributes.title || '',
