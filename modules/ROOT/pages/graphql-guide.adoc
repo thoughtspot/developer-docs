@@ -1,0 +1,182 @@
+= GraphQL quick setup guide
+:toc: true
+
+:page-title: GraphQL Guide
+:page-pageid: graphql-guide
+:page-description: ThoughtSpot Guide to GraphQL
+
+This section serves as a quick guide for initiating your interaction with ThoughtSpot's GraphQL endpoint.
+We will be using Apllo client to interact with thoughtspot's GraphQL endpoint.
+
+== Pre-requisites
+
+Before we proceed, make sure you have a JavaScript environment set up for your application. This requires Node.js, which you can download and install from https://nodejs.org/en/download/.
+
+Once Node.js is successfully installed, you can initiate a new project using the npm init command.
+
+== Install dependencies
+
+* @apollo/client
+* graphql
+
+With npm
+[source, shell]
+----
+npm install @apollo/client graphql
+----
+
+With yarn
+[source, shell]
+----
+yarn add @apollo/client graphql
+----
+
+== Initializing Apollo client
+
+
+We need to import the following from the apollo client library
+
+[source, javascript]
+----
+import { ApolloClient, InMemoryCache, gql } from '@apollo/client';
+----
+
+We can initialize the client in one of the two ways.
+
+=== Using cookies
+
+For this method we will utilize the cookies set by the browser for authentication.
+
+[source, javascript]
+----
+const client = new ApolloClient({
+  uri: BASE_URL + "/api/graphql/2.0",
+  cache: new InMemoryCache(),
+  credentials: "include",
+});
+----
+
+With the client defined above, we can link up to ThoughtSpot's GraphQL endpoint and run queries.
+
+Because we're relying on cookies for authentication, it's important to have the cookies set up correctly before we run the queries.
+
+To make sure the cookies are in place, we need to call the login api once before we run any queries.
+
+[source, javascript]
+----
+client
+  .mutate({
+    mutation: gql`
+      mutation Login {
+        login(username: "<YOUR_USERNAME>", password: "<YOUR_PASSWORD>")
+      }
+    `,
+  })
+  .then((result) => console.log(result))
+  .catch((err) => console.log(err));
+----
+
+NOTE : You can also use your cluster's secret key here for authentication.
+
+=== Cookieless authentication
+
+For this method we need to generate the full access token and use it for authentication.
+
+let us first create a function to get a fill access token 
+[source, javascript]
+----
+const getToken = async () => {
+  const fullAccessRes = await fetch(
+    BASE_URL + "/api/rest/2.0/auth/token/full",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username: "tsadmin", password: "admin" }),
+    }
+  );
+  const fullAccessData = await fullAccessRes.json();
+  return fullAccessData.token;
+};
+----
+
+Using this function we can setup our client as follows
+
+Along with the imported functions above we also need the setContext from the apollo client library
+
+[source, javascript]
+----
+import { setContext } from "@apollo/client/link/context";
+----
+
+[source, javascript]
+----
+const authLink = setContext(async (_, { headers }) => {
+  // get the authentication token
+  const token = await getToken();
+  // return the headers to the context so httpLink can read them
+  return {
+    headers: {
+      ...headers,
+      authorization: token ? `Bearer ${token}` : "",
+    },
+  };
+});
+
+// httpLink is the link to the graphql endpoint
+const httpLink = createHttpLink({
+  uri: BASE_URL + "/api/graphql/2.0"
+});
+----
+
+Now we can initialize the client as follows
+
+[source, javascript]
+----
+const client = new ApolloClient({
+  link: authLink.concat(httpLink),
+  cache: new InMemoryCache(),
+});
+----
+
+== Using the client
+
+Once the client is setup we can use it to run queries.
+
+[source, javascript]
+----
+client
+  .query({
+    query: gql`
+      query GetCurrentUserInfo {
+        getCurrentUserInfo {
+          id
+          name
+        }
+      }
+    `,
+  })
+  .then((result) => console.log(result))
+  .catch((err) => console.log(err));
+----
+
+
+== Reset store on logout
+
+Apollo caches our requests so we should ideally reset the store on logout.
+
+[source, javascript]
+----
+client.resetStore()
+----
+
+To learn more about reset store : https://www.apollographql.com/docs/react/networking/authentication/#reset-store-on-logout
+
+
+== Next Steps
+
+Above we have setup an basic client to interact with thoughtspot's GraphQL endpoint.
+
+You can integrate the above with React application as well , to leanr more about it :  https://www.apollographql.com/docs/react
+
