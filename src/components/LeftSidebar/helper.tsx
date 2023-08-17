@@ -129,13 +129,13 @@ export const collapseAndExpandLeftNav = (
     activePageid: string,
 ) => {
     // Adding click listener to close left nav when in mobile resolution
-    doc.querySelectorAll(selectors.links).forEach((link) => {
+    doc?.querySelectorAll(selectors.links).forEach((link) => {
         link.addEventListener('click', () => {
             setLeftNavOpen(false);
         });
     });
 
-    doc.querySelectorAll('li').forEach((el, i) => {
+    doc?.querySelectorAll('li').forEach((el, i) => {
         if (el.children.length === 2) {
             const spanElement =
                 el.children[0].children.length === 2

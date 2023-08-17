@@ -1,4 +1,4 @@
-= REST API v2.0 in JavaScript
+= Browser Javascript
 :toc: true
 :toclevels: 2
 
@@ -6,9 +6,9 @@
 :page-pageid: rest-apiv2-js
 :page-description: Examples in JavaScript of REST API v2.0 calls
 
-REST API v2.0 uses JSON for the request and the response format, so it is easy to implement any v2.0 call in JavaScript.
+REST API v2.0 uses JSON for the request and the response format, so it is easy to implement any v2.0 call in JavaScript. 
 
-Every REST API v2.0 endpoint uses either an HTTP GET or POST request, with or without a JSON request, so this simple async wrapper function can be used generically to build out any specific endpoint request.
+Every REST API v2.0 endpoint uses either an HTTP GET or POST request, with or without a JSON request, so this simple async wrapper function can be used generically to build out any specific endpoint request. Before making an API request to a REST API v2.0 endpoint, make sure you xref:authentication.adoc[obtain a bearer token or set session cookies].
 
 [source,javascript]
 ----
@@ -76,31 +76,64 @@ Here's a function to call a specific endpoint:
 
 [source,javascript]
 ----
-async function callSearchDataApi(tmlSearchString, datasourceId){
+async function callSearchDataApi(tmlSearchString, datasourceId, recordOffset, recordSize){
     console.log("Using following Search String for Search Data API: ", tmlSearchString);
     let searchDataEndpoint = 'searchdata';
     let apiRequestForSearchData = { 
           "query_string": tmlSearchString
         , "logical_table_identifier": datasourceId
         , data_format: "COMPACT"
-        , record_offset: 0
-        , record_size: 1000
+        , record_offset: recordOffset
+        , record_size: recordSize
     }
 
-    return await restApiCallV2(searchDataEndpoint, 'POST', apiRequestForSearchData).then(
-        response => {
-            console.log("Search Data response:");
-            console.log(response);
-            //let tmlObject = JSON.parse(response[0].edoc);
-            //console.log(tmlObject);
-            return response;
-        }
-    );
+    return restApiCallV2(searchDataEndpoint, 'POST', apiRequestForSearchData);
 }
 
 let vizTmlSearchString = '[Product] [Region]';
 let dsId = '80c9b38f-1b2a-4ff4-a759-378259130f58';
-callSearchDataApi(vizTmlSearchString, dsId).then(
-  // process the response
-)
+
+let recordSize = 10000; 
+let offset = 0;
+
+// The function above is async, so you can assign this variable and the next steps won't occur until Promise is fulfilled
+let searchResult = await callSearchDataApi(vizTmlSearchString, dsId, offset, recordSize)
+console.log("Search Data response:");
+console.log(searchResult);
+
+----
+
+=== Pagination and offsets
+
+The data APIs have limits to how much data can be returned in a single call. These APIs have `record_offset` and `record_size` arguments that can be used in multiple calls to paginate through and retrieve all of the data.
+
+There *must be a sort clause in the search or saved viz* to guarantee that you are getting the full set of unique results, because each API call results in an indepedent SQL query to the data warehouse, and databases typically do not maintain any sort order unless there are specified sort clauses.
+
+The following function implements an algorithm for paging through all results and storing the results into a single `allResults` array that can then be processed for later:
+
+
+[source,javascript]
+----
+ async function getAllSearch(){
+    let allResults = [];
+    let resultCount = 0;
+    let recordSize = 300; // Set this to 10000 in all production cases, it is set LOW to see the iteration working
+    let offset = 0;
+    let searchResult = await callSearchDataApi(vizTmlSearchString, tsAppState.currentDatasources[0], offset, recordSize);
+    console.log("Got the searchResult: ", searchResult);
+    allResults.push(searchResult);
+    resultCount = searchResult['contents'][0]['returned_data_row_count'];
+    console.log("This many records returned " + resultCount);
+    while (resultCount == recordSize) {
+        console.log('Need another batch');
+        offset += recordSize;
+        searchResult = await callSearchDataApi(vizTmlSearchString, tsAppState.currentDatasources[0], offset, recordSize);
+        allResults.push(searchResult);
+        resultCount = searchResult['contents'][0]['returned_data_row_count'];
+    }
+
+    console.log(allResults);
+}
+// Call the async function from directly above to do the full search
+getAllSearch();
 ----
