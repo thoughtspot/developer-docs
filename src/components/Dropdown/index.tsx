@@ -14,19 +14,18 @@ const Dropdown = (props: { location: Location; isMobile: Boolean }) => {
         const version =
             params.get('version') || localStorage.getItem('version');
         const selectedOption =
-            options.find(({ link }) => {
-                return link.includes(version);
+            options.find(({ label }) => {   
+                return label===version;
             }) || options[0];
         if (selectedOption) setCurrentVersion(selectedOption);
     }, []);
 
-    const handelClick = (link: string) => {
-        const params = new URLSearchParams(location.search);
-        params.set('version', link);
-        const url =
-            location.origin + location?.pathname + '?' + params.toString();
-        localStorage.setItem('version', link);
-        window.open(url, '_self');
+    const handelClick = ({label, link}) => {
+        // const params = new URLSearchParams(location.search);
+        // params.set('version', label);
+       
+        localStorage.setItem('version', label);
+        window?.location?.replace(link);
     };
 
     if (!currentVersion?.link) {
@@ -42,16 +41,16 @@ const Dropdown = (props: { location: Location; isMobile: Boolean }) => {
                         <AiOutlineCaretDown className="arrowDown" />
                     </button>
                     <div className="dropdownContent">
-                        {options.map(({ label, link, subLabel }) => {
+                        {options.map((d) => {
                             return (
                                 <div
-                                    data-testid={`option-${label}`}
-                                    key={link}
-                                    onClick={() => handelClick(link)}
+                                    data-testid={`option-${d?.label}`}
+                                    key={d?.link}
+                                    onClick={() => handelClick(d)}
                                 >
-                                    {label}
+                                    {d?.label}
                                     <div className="subLabel">
-                                        <span>{subLabel}</span>
+                                        <span>{d?.subLabel}</span>
                                     </div>
                                 </div>
                             );
