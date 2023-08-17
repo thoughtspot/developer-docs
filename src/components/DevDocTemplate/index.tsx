@@ -45,7 +45,6 @@ import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 
-// markup
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
         data,
