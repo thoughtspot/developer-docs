@@ -19,7 +19,7 @@ const EXTERNAL_PLAYGROUND_EVENTS = {
 };
 
 const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
-    const { location } = props;
+    const { location, backLink } = props;
 
     const isBrowser = () => typeof window !== 'undefined';
 
@@ -131,10 +131,6 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
     }, []);
 
     React.useEffect(() => {
-        setPrevPageId(location?.pathname.split('/')[1] || 'introduction');
-    }, [location]);
-
-    React.useEffect(() => {
         const handler = (event: MessageEvent) => {
             if (event.data?.type === EXTERNAL_PLAYGROUND_EVENTS.URL_CHANGE) {
                 if (event.data?.data && event.data.data !== 'http') {
@@ -206,9 +202,10 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
         }
     }, [token, isPlaygroundReady]);
 
+  
     return (
         <div className="restApiWrapper">
-            <BackButton title="Back" backLink="rest-api-v2" />
+            <BackButton title="Back" backLink={backLink} />
             <iframe
                 ref={playgroundRef}
                 src={playgroundUrl}
@@ -225,4 +222,5 @@ export default RenderPlayGround;
 
 type RenderPlayGroundProps = {
     location: Location;
+    backLink: string
 };

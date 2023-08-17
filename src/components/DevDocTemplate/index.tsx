@@ -45,7 +45,6 @@ import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 
-// markup
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
         data,
@@ -55,10 +54,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const homePagePaths = [
         '/',
         '/docs',
+        '/docs/',
         '/docs/introduction',
         '/docs/introduction/',
     ];
     const isHomePage = homePagePaths.includes(location?.pathname);
+
+    const isBrowser = () => typeof window !== 'undefined';
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -89,6 +91,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
         [NAV_PREFIX]: '/docs',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
+
     });
     const [docTitle, setDocTitle] = useState(
         curPageNode.document.title || curPageNode.pageAttributes.title || '',
@@ -111,8 +114,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [breadcrumsData, setBreadcrumsData] = useState(
         fetchChild(initialNavContentData) || [],
     );
-    const [prevPageId, setPrevPageId] = useState('introduction');
-    const [backLink, setBackLink] = useState(params[TS_ORIGIN_PARAM]);
     const [showSearch, setShowSearch] = useState(false);
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
@@ -143,10 +144,15 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         const paramObj = queryStringParser(location.search);
 
         setParams({ ...paramObj, ...params });
+        const { pathname } = location;
+        console.log(pathname, 'rijad');
+        if (isBrowser() && pathname !== '/docs/restV2-playground') {
+            localStorage.setItem('prevPath', pathname);
+        }
     }, [location.search]);
 
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        if (isBrowser()) {
             setDarkMode(localStorage.getItem('theme') === 'dark');
             setKey('dark');
         }
@@ -198,11 +204,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         );
     }, [location.search, location.hash]);
 
-    useEffect(() => {
-        // get & set left navigation 'Back' button url
-        setBackLink(params[TS_ORIGIN_PARAM]);
-    }, [params]);
-
     // fetch adoc translated doc edges using graphql
 
     const [results, setResults] = useState([]);
@@ -243,10 +244,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 });
         }
     }, [keyword]);
-
-    React.useEffect(() => {
-        setPrevPageId(location?.pathname.split('/')[1] || 'introduction');
-    }, [location]);
 
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
@@ -401,7 +398,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     );
 
     const renderPlayGround = () => {
-        return <RenderPlayGround location={location} />;
+        const backLink = isBrowser()
+            ? localStorage.getItem('prevPath')
+            : 'introduction';
+        return <RenderPlayGround location={location} backLink={backLink} />;
     };
 
     const getClassName = () => {
