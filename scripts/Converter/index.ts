@@ -198,10 +198,7 @@ class TypeDocInternalParser {
             return `\nParameter::\n${tag.text}\n`;
         }
         if (tag.tag === 'deprecated') {
-            return `[deprecated]#Deprecated : ${tag.text.replace(
-                /\n/g,
-                '',
-            )}#\n`;
+            return `++++\n\n<br/><span class='deprecated'><span class='heading'> Deprecated: </span><span class='new-label'>${tag.text.replace(/\n/g, '')}\n</span></span>\n++++\n`;
         }
         if (tag.tag === 'tryItOut') {
             return `++++\n<a href="{{previewPrefix}}${tag.text}" id="preview-in-playground" target="_blank">Try it out</a>\n++++\n`;
