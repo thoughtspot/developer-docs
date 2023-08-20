@@ -191,7 +191,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         // So that the parent can sync the url.
         window.parent.postMessage(
             {
-                params: curPageNode.pageAttributes.pageid,
+                params,
                 subsection: location.hash.split('#')[1] || '',
             },
             '*',
