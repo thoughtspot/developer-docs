@@ -73,11 +73,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             if (pageId) {
                 queryParams.delete('pageid');
                 if (queryParams.toString()) {
-                    navigate(`/docs/${pageId}?${queryParams.toString()}`, {
+                    navigate(`/${pageId}?${queryParams.toString()}`, {
                         replace: true,
                     });
                 } else {
-                    navigate(`/docs/${pageId}`, { replace: true });
+                    navigate(`/${pageId}`, { replace: true });
                 }
             }
         }
