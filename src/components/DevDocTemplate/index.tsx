@@ -91,7 +91,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
         [NAV_PREFIX]: '/docs',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
-
     });
     const [docTitle, setDocTitle] = useState(
         curPageNode.document.title || curPageNode.pageAttributes.title || '',
@@ -190,13 +189,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)
         // So that the parent can sync the url.
-        const newParms: {
-            pageid?: string;
-        } = queryStringParser(location.search);
-        newParms.pageid = location?.pathname?.split('/')[1] || '';
         window.parent.postMessage(
             {
-                params: newParms,
+                params: curPageNode.pageAttributes.pageid,
                 subsection: location.hash.split('#')[1] || '',
             },
             '*',
