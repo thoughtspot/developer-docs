@@ -85,7 +85,7 @@ class CustomDocConverter {
 
 console.log(getPath(config.DOC_REPO_NAME));
 module.exports = {
-    // pathPrefix: getPath(config.DOC_REPO_NAME),
+    pathPrefix: getPath(config.DOC_REPO_NAME),
     siteMetadata: {
         title: 'tseverywhere-docs',
         url: 'https://developer-docs-zeta.vercel.app',
