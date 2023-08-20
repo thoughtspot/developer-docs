@@ -76,7 +76,15 @@ export const isPublicSite = (queryParamStr: string) => {
             return false;
         }
     }
-    return true;
+
+    if (typeof window === 'undefined') {
+        return true;
+    }
+    try {
+        return window.self === window.top;
+    } catch (e) {
+        return false;
+    }
 };
 
 export default queryStringParser;
