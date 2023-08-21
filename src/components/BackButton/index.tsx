@@ -24,7 +24,10 @@ const BackButton = (props: {
             style={props?.customStyles ?? {}}
         >
             <button onClick={clickHandler}>
-                <a href={!internalRedirect ? backLink : '#'} target="_parent">
+                <a
+                    href={!internalRedirect ? backLink : null}
+                    target={!internalRedirect ? '_parent' : null}
+                >
                     <IconContext.Provider
                         value={{ className: 'icon leftIcon' }}
                     >

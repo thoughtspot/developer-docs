@@ -89,7 +89,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [TS_HOST_PARAM]: DEFAULT_HOST,
         [TS_ORIGIN_PARAM]: '',
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
-        [NAV_PREFIX]: '/docs',
+        [NAV_PREFIX]: '',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
     const [docTitle, setDocTitle] = useState(
@@ -141,11 +141,17 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         setIsPublicSiteOpen(isPublicSite(location.search));
 
         const paramObj = queryStringParser(location.search);
+        if (paramObj?.origin && paramObj?.origin !== '')
+            localStorage.setItem('origin', paramObj?.origin);
 
         setParams({ ...paramObj, ...params });
         const { pathname } = location;
-        if (isBrowser() && curPageNode.pageAttributes.pageid !== 'restV2-playground') {
-            localStorage.setItem('prevPath', pathname?.replace("/docs", ''));
+
+        if (
+            isBrowser() &&
+            curPageNode.pageAttributes.pageid !== 'restV2-playground'
+        ) {
+            localStorage.setItem('prevPath', pathname?.replace('/docs', ''));
         }
     }, [location.search]);
 
@@ -325,9 +331,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             </Modal>
         );
     };
-    const getParentBackButtonLink = () =>
-        !isPublicSiteOpen ? params[TS_ORIGIN_PARAM] : '';
-
+    const getParentBackButtonLink = () => {
+        let path = '';
+        if (!isPublicSite) path = localStorage.getItem('origin') || '';
+        return path;
+    };
     const renderDocTemplate = () => (
         <>
             {renderSearch()}
