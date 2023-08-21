@@ -333,7 +333,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     };
     const getParentBackButtonLink = () => {
         let path = '';
-        if (!isPublicSite) path = localStorage.getItem('origin') || '';
+        if (!isPublicSiteOpen) path = localStorage.getItem('origin') || '';
+        console.log(path)
         return path;
     };
     const renderDocTemplate = () => (
