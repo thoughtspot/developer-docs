@@ -51,14 +51,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         location,
         pageContext: { namePageIdMap },
     } = props;
-    const homePagePaths = [
-        '/',
-        '/docs',
-        '/docs/',
-        '/docs/introduction',
-        '/docs/introduction/',
-    ];
-    const isHomePage = homePagePaths.includes(location?.pathname);
 
     const isBrowser = () => typeof window !== 'undefined';
 
@@ -84,6 +76,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }, [location.search, location.pathname]);
 
     const { curPageNode, navNode } = data;
+
+    const isHomePage = curPageNode?.pageAttributes?.pageid === HOME_PAGE_ID;
+
     const { width, ref } = useResizeDetector();
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
@@ -141,11 +136,17 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         setIsPublicSiteOpen(isPublicSite(location.search));
 
         const paramObj = queryStringParser(location.search);
+        if (paramObj?.origin && paramObj?.origin !== '')
+            localStorage.setItem('origin', paramObj?.origin);
 
         setParams({ ...paramObj, ...params });
         const { pathname } = location;
-        if (isBrowser() && pathname !== '/docs/restV2-playground') {
-            localStorage.setItem('prevPath', pathname?.replace("/docs", ''));
+
+        if (
+            isBrowser() &&
+            curPageNode.pageAttributes.pageid !== 'restV2-playground'
+        ) {
+            localStorage.setItem('prevPath', pathname?.replace('/docs', ''));
         }
     }, [location.search]);
 
@@ -325,12 +326,18 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             </Modal>
         );
     };
-
+    const getParentBackButtonLink = () => {
+        let path = '';
+        if (isBrowser() && !isPublicSiteOpen)
+            path = localStorage.getItem('origin') || '';
+        return path;
+    };
     const renderDocTemplate = () => (
         <>
             {renderSearch()}
             <div className="leftNavContainer">
                 <LeftSidebar
+                    backLink={getParentBackButtonLink()}
                     navTitle={navTitle}
                     navContent={navContent}
                     docWidth={width}
@@ -402,7 +409,14 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         const backLink = isBrowser()
             ? localStorage.getItem('prevPath')
             : '/introduction';
-        return <RenderPlayGround location={location} backLink={backLink} />;
+        return (
+            <RenderPlayGround
+                location={location}
+                backLink={backLink}
+                isPublisSiteOpen={isPublicSiteOpen}
+                params={params}
+            />
+        );
     };
 
     const getClassName = () => {
