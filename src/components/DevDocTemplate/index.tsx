@@ -402,7 +402,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         const backLink = isBrowser()
             ? localStorage.getItem('prevPath')
             : '/introduction';
-            console.log("backLink", backLink)
         return <RenderPlayGround location={location} backLink={backLink} />;
     };
 
