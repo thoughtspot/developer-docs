@@ -45,21 +45,14 @@ import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 
-// markup
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
         data,
         location,
         pageContext: { namePageIdMap },
     } = props;
-    const homePagePaths = [
-        '/',
-        '/docs',
-        '/docs/',
-        '/docs/introduction',
-        '/docs/introduction/',
-    ];
-    const isHomePage = homePagePaths.includes(location?.pathname);
+
+    const isBrowser = () => typeof window !== 'undefined';
 
     const isBrowser = () => typeof window !== 'undefined';
 
@@ -74,17 +67,20 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             if (pageId) {
                 queryParams.delete('pageid');
                 if (queryParams.toString()) {
-                    navigate(`/docs/${pageId}?${queryParams.toString()}`, {
+                    navigate(`/${pageId}?${queryParams.toString()}`, {
                         replace: true,
                     });
                 } else {
-                    navigate(`/docs/${pageId}`, { replace: true });
+                    navigate(`/${pageId}`, { replace: true });
                 }
             }
         }
     }, [location.search, location.pathname]);
 
     const { curPageNode, navNode } = data;
+
+    const isHomePage = curPageNode?.pageAttributes?.pageid === HOME_PAGE_ID;
+
     const { width, ref } = useResizeDetector();
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
@@ -143,12 +139,17 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         setIsPublicSiteOpen(isPublicSite(location.search));
 
         const paramObj = queryStringParser(location.search);
+        if (paramObj?.origin && paramObj?.origin !== '')
+            localStorage.setItem('origin', paramObj?.origin);
 
         setParams({ ...paramObj, ...params });
         const { pathname } = location;
-        console.log(pathname, 'rijad');
-        if (isBrowser() && pathname !== '/docs/restV2-playground') {
-            localStorage.setItem('prevPath', pathname);
+
+        if (
+            isBrowser() &&
+            curPageNode.pageAttributes.pageid !== 'restV2-playground'
+        ) {
+            localStorage.setItem('prevPath', pathname?.replace('/docs', ''));
         }
     }, [location.search]);
 
@@ -192,13 +193,15 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)
         // So that the parent can sync the url.
-        const newParms: {
-            pageid?: string;
-        } = queryStringParser(location.search);
-        newParms.pageid = location?.pathname?.split('/')[1] || '';
         window.parent.postMessage(
             {
-                params: newParms,
+                params: {
+                    [TS_HOST_PARAM]: DEFAULT_HOST,
+                    [TS_ORIGIN_PARAM]: '',
+                    [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
+                    [NAV_PREFIX]: '/docs',
+                    [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
+                },
                 subsection: location.hash.split('#')[1] || '',
             },
             '*',
@@ -248,7 +251,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
-        navigate(`/docs/${pageid}#${sectionId}`);
+        if (sectionId) navigate(`/${pageid}#${sectionId}`);
+        else navigate(`/${pageid}`);
     };
 
     const isMaxMobileResolution = !(width < MAX_MOBILE_RESOLUTION);
@@ -263,8 +267,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }
 
     const calculateDocumentBodyWidth = () => {
-        if (isMaxMobileResolution && !isCustomPage && !isHomePage) {
+        if (isMaxMobileResolution && !isCustomPage) {
             if (width > MAX_CONTENT_WIDTH_DESKTOP) {
+                if (isHomePage) return width - leftNavWidth;
                 return `${MAX_CONTENT_WIDTH_DESKTOP - 300}px`;
             }
             return `${width - 300}px`;
@@ -325,12 +330,18 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             </Modal>
         );
     };
-
+    const getParentBackButtonLink = () => {
+        let path = '';
+        if (isBrowser() && !isPublicSiteOpen)
+            path = localStorage.getItem('origin') || '';
+        return path;
+    };
     const renderDocTemplate = () => (
         <>
             {renderSearch()}
             <div className="leftNavContainer">
                 <LeftSidebar
+                    backLink={getParentBackButtonLink()}
                     navTitle={navTitle}
                     navContent={navContent}
                     docWidth={width}
@@ -401,8 +412,15 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const renderPlayGround = () => {
         const backLink = isBrowser()
             ? localStorage.getItem('prevPath')
-            : 'introduction';
-        return <RenderPlayGround location={location} backLink={backLink} />;
+            : '/introduction';
+        return (
+            <RenderPlayGround
+                location={location}
+                backLink={backLink}
+                isPublisSiteOpen={isPublicSiteOpen}
+                params={params}
+            />
+        );
     };
 
     const getClassName = () => {

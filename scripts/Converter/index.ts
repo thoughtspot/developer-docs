@@ -76,12 +76,12 @@ interface ConstructorNode extends TypeDocNode {
 }
 interface TypeDocType {
     type:
-        | 'reference'
-        | 'union'
-        | 'intrinsic'
-        | 'reflection'
-        | 'array'
-        | 'literal';
+    | 'reference'
+    | 'union'
+    | 'intrinsic'
+    | 'reflection'
+    | 'array'
+    | 'literal';
     id?: number;
     name?: string;
     types?: TypeDocType[];
@@ -197,7 +197,12 @@ class TypeDocInternalParser {
         if (tag.tag === 'param') {
             return `\nParameter::\n${tag.text}\n`;
         }
-
+        if (tag.tag === 'deprecated') {
+            return `[deprecated]#Deprecated : ${tag.text.replace(
+                /\n/g,
+                '',
+            )}#\n`;
+        }
         if (tag.tag === 'tryItOut') {
             return `++++\n<a href="{{previewPrefix}}${tag.text}" id="preview-in-playground" target="_blank">Try it out</a>\n++++\n`;
         }
@@ -210,8 +215,7 @@ class TypeDocInternalParser {
 
         let content = '';
         content += this.covertTypeDocText(
-            `${comment?.shortText?.trim() || ''}\n${
-                comment?.text?.trim() || ''
+            `${comment?.shortText?.trim() || ''}\n${comment?.text?.trim() || ''
             }\n\n`,
         );
 
@@ -222,10 +226,24 @@ class TypeDocInternalParser {
         // process tags
         let content = '';
 
-        if (tags) {
-            tags.forEach((tag) => {
+        const addTagsToContent = (tagsToAdd: TypeDocCommentTag[]) => {
+            tagsToAdd.forEach((tag) => {
                 content += `\n${this.parseTag(tag)}\n\n`;
             });
+        };
+
+        if (tags) {
+            const versionTags = tags.filter((tag) => tag.tag === 'version');
+            const deprecatedTags = tags.filter(
+                (tag) => tag.tag === 'deprecated',
+            );
+            const restTags = tags.filter(
+                (tag) => tag.tag !== 'version' && tag.tag !== 'deprecated',
+            );
+
+            addTagsToContent(versionTags);
+            addTagsToContent(deprecatedTags);
+            addTagsToContent(restTags);
         }
 
         return content;
@@ -284,9 +302,8 @@ class TypeDocInternalParser {
                 );
             }
             case 'array': {
-                return `${
-                    this.parseTypeDocType(node.elementType, link) + typeArg
-                }[]`;
+                return `${this.parseTypeDocType(node.elementType, link) + typeArg
+                    }[]`;
             }
             default: {
                 console.error(`${node.type} not handled`);
@@ -418,7 +435,7 @@ class TypeDocParser {
                 if (link)
                     return (
                         TypeDocInternalParser.convertToItalic(node.name) +
-                            typeArg || ''
+                        typeArg || ''
                     );
                 return node.name + typeArg || '';
             case 'reference': {
@@ -447,9 +464,8 @@ class TypeDocParser {
                 );
             }
             case 'array': {
-                return `${
-                    this.parseTypeDocType(node.elementType, link) + typeArg
-                }[]`;
+                return `${this.parseTypeDocType(node.elementType, link) + typeArg
+                    }[]`;
             }
             default: {
                 console.error(`${node.type} not handled`);
@@ -524,6 +540,28 @@ class TypeDocParser {
         return `typedoc-${node.kindString.replace(/ /g, '_')}`;
     };
 
+    private convertToAdocSectionLink = (str: string) => {
+        // special handling for -- in the name
+        let convertedStr = `_${str.replace(/--/g, '')}`;
+
+        // convert all - to _
+        convertedStr = convertedStr.replace(/-/g, '_');
+
+        // convert multiple _ to single _
+        convertedStr = convertedStr.replace(/_+/g, '_');
+
+        // remove all special characters
+        convertedStr = convertedStr.replace(/[^a-zA-Z0-9_]/g, '');
+
+        // convert all spaces to -
+        convertedStr = convertedStr.replace(/ /g, '-');
+
+        // convert all uppercase to lowercase
+        convertedStr = convertedStr.toLowerCase();
+
+        return convertedStr;
+    };
+
     private convertNodeToLink = (node: TypeDocNode, includeParent = false) => {
         const parent = this.childrenIdMap[node.id]?.parentId;
         if (parent === undefined) return node.name;
@@ -532,9 +570,8 @@ class TypeDocParser {
             this.childrenIdMap[parent]?.kindString ===
             TypeDocReflectionKind.Project
         ) {
-            return `[.typedoc-${node.kindString.replace(/ /g, '_')}]#xref:${
-                node.name
-            }.adoc[${node.name}]#`;
+            return `[.typedoc-${node.kindString.replace(/ /g, '_')}]#xref:${node.name
+                }.adoc[${node.name}]#`;
         }
 
         const grandParent = this.childrenIdMap[parent]?.parentId;
@@ -548,7 +585,7 @@ class TypeDocParser {
                 / /g,
                 '_',
             )}]#xref:${this.childrenIdMap[parent].name}.adoc`;
-            newLinkText += `#_${node.name.toLowerCase()}`;
+            newLinkText += `#${this.convertToAdocSectionLink(node.name)}`;
             const visibleName = includeParent
                 ? `${this.childrenIdMap[parent].name}.${node.name}`
                 : node.name;
@@ -653,8 +690,7 @@ class TypeDocParser {
     private handleParameterNode = (node: ParameterNode) => {
         return [
             `${node.name}::: ${node.flags.isOptional ? '_Optional_\n' : ''}`,
-            `* ${node.name}: ${this.parseTypeDocType(node.type, true)}${
-                node?.defaultValue ? ` = ${node.defaultValue}` : ''
+            `* ${node.name}: ${this.parseTypeDocType(node.type, true)}${node?.defaultValue ? ` = ${node.defaultValue}` : ''
             }`,
             TypeDocInternalParser.parseComment(node.comment),
             this.handleTypeNode(node.type),
@@ -663,9 +699,8 @@ class TypeDocParser {
     };
 
     private handlePropertyNode = (node: ParameterNode) => {
-        const sig = `\`${node.name}: ${this.parseTypeDocType(node.type, true)}${
-            node?.defaultValue ? ` = ${node.defaultValue}` : ''
-        }\``;
+        const sig = `\`${node.name}: ${this.parseTypeDocType(node.type, true)}${node?.defaultValue ? ` = ${node.defaultValue}` : ''
+            }\``;
 
         return [
             `=== ${node.name}`,
@@ -937,7 +972,7 @@ class TypedocConverter {
                 const updatedPageId = pageId.replace('_', '/');
                 const filePath =
                     pageId === 'VisualEmbedSdkNavLinks' ||
-                    pageId === 'CustomSideNav'
+                        pageId === 'CustomSideNav'
                         ? `modules/ROOT/pages/common/generated/typedoc/${updatedPageId}.adoc`
                         : `modules/ROOT/pages/generated/typedoc/${updatedPageId}.adoc`;
                 this.writeFile(filePath, content);

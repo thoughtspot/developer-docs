@@ -7,7 +7,15 @@ import {
     TS_SESSION_TOKEN,
     TS_INFO,
     CLUSTER_TYPES,
+    TS_HOST_PARAM,
+    TS_ORIGIN_PARAM,
+    TS_PAGE_ID_PARAM,
+    NAV_PREFIX,
+    PREVIEW_PREFIX,
+    DEFAULT_PREVIEW_HOST,
+    DEFAULT_APP_ROOT,
 } from '../../configs/doc-configs';
+
 import { DOC_VERSION_DEV, DOC_VERSION_PROD } from '../../constants/uiConstants';
 import BackButton from '../BackButton';
 
@@ -19,7 +27,7 @@ const EXTERNAL_PLAYGROUND_EVENTS = {
 };
 
 const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
-    const { location, backLink } = props;
+    const { location, backLink, isPublisSiteOpen = false } = props;
 
     const isBrowser = () => typeof window !== 'undefined';
 
@@ -43,12 +51,6 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
         'https://rest-api-sdk-v2-0${version}.vercel.app',
     );
 
-    const isExternal = () =>
-        !(
-            location?.href?.includes('thoughtspot') ||
-            location?.href?.includes('vercel.app')
-        );
-
     const getParentURL = () => {
         let parentUrl = location?.origin;
         if (isBrowser()) {
@@ -60,7 +62,7 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
         }
         return parentUrl;
     };
-    const baseUrl = isExternal() ? getParentURL() : DEFAULT_HOST;
+    const baseUrl = isPublisSiteOpen ? DEFAULT_HOST : getParentURL();
 
     const playgroundUrl =
         clusterType === CLUSTER_TYPES.PROD
@@ -70,7 +72,7 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
     useEffect(() => {
         async function fetchData() {
             try {
-                if (!isExternal()) {
+                if (isPublisSiteOpen) {
                     await fetch(baseUrl + TS_DEMO_LOGIN, {
                         method: 'POST',
                         headers: {
@@ -133,27 +135,24 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
     React.useEffect(() => {
         const handler = (event: MessageEvent) => {
             if (event.data?.type === EXTERNAL_PLAYGROUND_EVENTS.URL_CHANGE) {
-                if (event.data?.data && event.data.data !== 'http') {
+                const locationHash = event?.data?.data || '';
+                if (locationHash && locationHash !== 'http') {
                     const path = window?.location?.pathname;
                     const currentUrl = window.location.search;
                     var searchParams = new URLSearchParams(currentUrl);
                     const queryParams = window.location.search;
                     var searchParams = new URLSearchParams(queryParams);
-                    searchParams.set('apiResourceId', event.data.data);
+                    searchParams.set('apiResourceId', locationHash);
                     const newUrl = `${getParentURL()}${path}?${searchParams?.toString()}`;
-                    if (window.self !== window.top) {
-                        if (isAppEmbedded) {
-                            window.parent.postMessage(
-                                {
-                                    type: 'url-change',
-                                    data: event.data.data,
-                                },
-                                '*',
-                            );
-                        } else window.history.replaceState(null, '', newUrl);
-                    } else {
-                        window.history.replaceState(null, '', newUrl);
-                    }
+                    if (isAppEmbedded) {
+                        window.parent.postMessage(
+                            {
+                                params:props?.params,
+                                subsection: locationHash,
+                            },
+                            '*',
+                        );
+                    } else window.history.replaceState(null, '', newUrl);
                 }
             }
         };
@@ -202,10 +201,10 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
         }
     }, [token, isPlaygroundReady]);
 
-  
+
     return (
         <div className="restApiWrapper">
-            <BackButton title="Back" backLink={backLink} />
+            <BackButton title="Back" backLink={backLink} internalRedirect />
             <iframe
                 ref={playgroundRef}
                 src={playgroundUrl}
@@ -222,5 +221,7 @@ export default RenderPlayGround;
 
 type RenderPlayGroundProps = {
     location: Location;
-    backLink: string
+    backLink: string;
+    isPublisSiteOpen: boolean;
+    params:Object
 };

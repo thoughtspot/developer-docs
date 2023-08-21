@@ -88,7 +88,7 @@ module.exports = {
     // pathPrefix: getPath(config.DOC_REPO_NAME),
     siteMetadata: {
         title: 'tseverywhere-docs',
-        url: 'https://developer-docs-zeta.vercel.app',
+        url: 'https://developers.thoughtspot.com/docs',
         image: './images/favicon.svg',
     },
     plugins: [
@@ -213,7 +213,7 @@ module.exports = {
                     });
                     const paths = [];
                     for (const item of asciiNodeSet) {
-                        paths.push({ path: `/${item}` });
+                        paths.push({ path: `/docs/${item}` });
                     }
                     return paths;
                 },
