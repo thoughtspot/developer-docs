@@ -145,7 +145,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         setParams({ ...paramObj, ...params });
         const { pathname } = location;
         if (isBrowser() && pathname !== '/docs/restV2-playground') {
-            localStorage.setItem('prevPath', pathname);
+            localStorage.setItem('prevPath', pathname?.replace("/docs", ''));
         }
     }, [location.search]);
 
@@ -401,7 +401,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const renderPlayGround = () => {
         const backLink = isBrowser()
             ? localStorage.getItem('prevPath')
-            : 'introduction';
+            : '/introduction';
+            console.log("backLink", backLink)
         return <RenderPlayGround location={location} backLink={backLink} />;
     };
 
