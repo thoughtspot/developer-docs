@@ -144,7 +144,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
         setParams({ ...paramObj, ...params });
         const { pathname } = location;
-        if (isBrowser() && pathname !== '/docs/restV2-playground') {
+        if (isBrowser() && curPageNode.pageAttributes.pageid !== 'restV2-playground') {
             localStorage.setItem('prevPath', pathname?.replace("/docs", ''));
         }
     }, [location.search]);
@@ -325,12 +325,15 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             </Modal>
         );
     };
+    const getParentBackButtonLink = () =>
+        !isPublicSiteOpen ? params[TS_ORIGIN_PARAM] : '';
 
     const renderDocTemplate = () => (
         <>
             {renderSearch()}
             <div className="leftNavContainer">
                 <LeftSidebar
+                    backLink={getParentBackButtonLink()}
                     navTitle={navTitle}
                     navContent={navContent}
                     docWidth={width}

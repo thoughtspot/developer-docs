@@ -205,7 +205,7 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
   
     return (
         <div className="restApiWrapper">
-            <BackButton title="Back" backLink={backLink} />
+            <BackButton title="Back" backLink={backLink} internalRedirect/>
             <iframe
                 ref={playgroundRef}
                 src={playgroundUrl}
