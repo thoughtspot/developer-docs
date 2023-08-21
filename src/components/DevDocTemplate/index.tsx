@@ -7,6 +7,7 @@ import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
 import _ from 'lodash';
 import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
+import { Analytics } from '@vercel/analytics/react';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
@@ -430,6 +431,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
+            <Analytics />
             <div
                 id="wrapper"
                 data-theme={isDarkMode ? 'dark' : 'light'}
