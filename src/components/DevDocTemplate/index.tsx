@@ -330,7 +330,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         let path = '';
         if (isBrowser() && !isPublicSiteOpen)
             path = localStorage.getItem('origin') || '';
-        console.log(path);
         return path;
     };
     const renderDocTemplate = () => (
@@ -410,7 +409,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         const backLink = isBrowser()
             ? localStorage.getItem('prevPath')
             : '/introduction';
-        return <RenderPlayGround location={location} backLink={backLink} />;
+        return (
+            <RenderPlayGround
+                location={location}
+                backLink={backLink}
+                isPublisSiteOpen={isPublicSiteOpen}
+            />
+        );
     };
 
     const getClassName = () => {

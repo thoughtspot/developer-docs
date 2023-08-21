@@ -19,7 +19,7 @@ const EXTERNAL_PLAYGROUND_EVENTS = {
 };
 
 const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
-    const { location, backLink } = props;
+    const { location, backLink, isPublisSiteOpen = false } = props;
 
     const isBrowser = () => typeof window !== 'undefined';
 
@@ -43,12 +43,6 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
         'https://rest-api-sdk-v2-0${version}.vercel.app',
     );
 
-    const isExternal = () =>
-        !(
-            location?.href?.includes('thoughtspot') ||
-            location?.href?.includes('vercel.app')
-        );
-
     const getParentURL = () => {
         let parentUrl = location?.origin;
         if (isBrowser()) {
@@ -60,7 +54,7 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
         }
         return parentUrl;
     };
-    const baseUrl = isExternal() ? getParentURL() : DEFAULT_HOST;
+    const baseUrl = isPublisSiteOpen ? DEFAULT_HOST : getParentURL();
 
     const playgroundUrl =
         clusterType === CLUSTER_TYPES.PROD
@@ -70,7 +64,7 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
     useEffect(() => {
         async function fetchData() {
             try {
-                if (!isExternal()) {
+                if (isPublisSiteOpen) {
                     await fetch(baseUrl + TS_DEMO_LOGIN, {
                         method: 'POST',
                         headers: {
@@ -202,10 +196,9 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
         }
     }, [token, isPlaygroundReady]);
 
-  
     return (
         <div className="restApiWrapper">
-            <BackButton title="Back" backLink={backLink} internalRedirect/>
+            <BackButton title="Back" backLink={backLink} internalRedirect />
             <iframe
                 ref={playgroundRef}
                 src={playgroundUrl}
@@ -222,5 +215,6 @@ export default RenderPlayGround;
 
 type RenderPlayGroundProps = {
     location: Location;
-    backLink: string
+    backLink: string;
+    isPublisSiteOpen: boolean;
 };
