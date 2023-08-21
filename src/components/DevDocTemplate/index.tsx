@@ -414,6 +414,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 location={location}
                 backLink={backLink}
                 isPublisSiteOpen={isPublicSiteOpen}
+                params={params}
             />
         );
     };
