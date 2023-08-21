@@ -51,14 +51,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         location,
         pageContext: { namePageIdMap },
     } = props;
-    const homePagePaths = [
-        '/',
-        '/docs',
-        '/docs/',
-        '/docs/introduction',
-        '/docs/introduction/',
-    ];
-    const isHomePage = homePagePaths.includes(location?.pathname);
 
     const isBrowser = () => typeof window !== 'undefined';
 
@@ -84,6 +76,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }, [location.search, location.pathname]);
 
     const { curPageNode, navNode } = data;
+
+    const isHomePage = curPageNode?.pageAttributes?.pageid === HOME_PAGE_ID;
+
     const { width, ref } = useResizeDetector();
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
@@ -333,8 +328,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     };
     const getParentBackButtonLink = () => {
         let path = '';
-        if (isBrowser() && !isPublicSiteOpen) path = localStorage.getItem('origin') || '';
-        console.log(path)
+        if (isBrowser() && !isPublicSiteOpen)
+            path = localStorage.getItem('origin') || '';
+        console.log(path);
         return path;
     };
     const renderDocTemplate = () => (
