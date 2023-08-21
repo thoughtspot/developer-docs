@@ -262,8 +262,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }
 
     const calculateDocumentBodyWidth = () => {
-        if (isMaxMobileResolution && !isCustomPage && !isHomePage) {
+        if (isMaxMobileResolution && !isCustomPage) {
             if (width > MAX_CONTENT_WIDTH_DESKTOP) {
+                if (isHomePage) return width - leftNavWidth;
                 return `${MAX_CONTENT_WIDTH_DESKTOP - 300}px`;
             }
             return `${width - 300}px`;
