@@ -89,7 +89,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [TS_HOST_PARAM]: DEFAULT_HOST,
         [TS_ORIGIN_PARAM]: '',
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
-        [NAV_PREFIX]: '',
+        [NAV_PREFIX]: '/docs',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
     const [docTitle, setDocTitle] = useState(
