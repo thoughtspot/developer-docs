@@ -18,7 +18,8 @@ import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
-import RenderPlayGround from './renderPlayGround';
+import RenderPlayGround from './RESTAPIPlayGround';
+import GraphQLPlayGround from './GraphQLPlayGround';
 import { AskDocs } from './askDocs';
 import {
     DOC_NAV_PAGE_ID,
@@ -128,8 +129,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const isCustomPage = _.values(CUSTOM_PAGE_ID).some(
         (pageId: string) => pageId === params[TS_PAGE_ID_PARAM],
     );
-    const isApiPlaygroundPage =
+    const isApiPlayground =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND;
+    const isGQPlayGround =
+        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
+    const isPlayGround = isGQPlayGround || isApiPlayground;
+
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
     useEffect(() => {
@@ -143,10 +148,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         setParams({ ...paramObj, ...params });
         const { pathname } = location;
 
-        if (
-            isBrowser() &&
-            curPageNode.pageAttributes.pageid !== 'restV2-playground'
-        ) {
+        if (isBrowser() && !isPlayGround) {
             localStorage.setItem('prevPath', pathname?.replace('/docs', ''));
         }
     }, [location.search]);
@@ -411,12 +413,20 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         const backLink = isBrowser()
             ? localStorage.getItem('prevPath')
             : '/introduction';
+        if (isApiPlayground)
+            return (
+                <RenderPlayGround
+                    location={location}
+                    backLink={backLink}
+                    isPublisSiteOpen={isPublicSiteOpen}
+                    params={params}
+                />
+            );
         return (
-            <RenderPlayGround
+            <GraphQLPlayGround
                 location={location}
                 backLink={backLink}
                 isPublisSiteOpen={isPublicSiteOpen}
-                params={params}
             />
         );
     };
@@ -451,9 +461,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                     }}
                 >
-                    {isApiPlaygroundPage
-                        ? renderPlayGround()
-                        : renderDocTemplate()}
+                    {isPlayGround ? renderPlayGround() : renderDocTemplate()}
                 </main>
             </div>
         </>
