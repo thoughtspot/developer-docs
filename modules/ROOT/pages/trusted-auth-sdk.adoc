@@ -1,0 +1,117 @@
+= Front-end trusted authentication integration
+:toc: true
+:toclevels: 2
+
+:page-title: Front-end trusted authentication integration
+:page-pageid: trusted-auth-sdk
+:page-description: Front-end trusted authentication integration using Visual Embed SDK
+
+[#trusted-auth-sdk]
+== Visual Embed SDK / front-end
+
+The Visual Embed SDK automates the login token request, and the login process using the token obtained from ThoughtSpot.
+
+The request to the *authenticator service* is defined in the `init()` function of the Visual Embed SDK. When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL or the `getAuthToken` callback function.
+
+You can use cookie-based or cookieless authentication as per your deployment needs. If you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance, and your web browser blocks third-party cookies, use cookieless authentication.
+
+For more information, see xref:embed-authentication.adoc#trusted-auth-embed[Embed user authentication page].
+
+=== Secure the authentication details request
+For the request to the *authenticator service* to be secure, the user in the browser cannot modify the request or make their own valid request to the *authenticator service*.
+
+How your particular application can most easily securely request the *login token* is up to you, but how you choose to send the message will constrain your choice between `authEndpoint` or `getAuthToken`.
+
+* If you choose `AuthType.TrustedAuthToken` and `authEndpoint`, a GET request is made directly to the provided URL. The authentication details must be included by the browser in this automated GET request, typically in the cookies. Cookies are not sent across domains (only to sub-domains), so your *authenticator service* must be *hosted in the same domain* as the embedding application.
+
+* If you choose `AuthType.TrustedAuthTokenCookieless`, a bearer token is issued for the given username. This token is stored in the app's memory and used for maintaining subsequent user sessions. You can use this authentication type if your *authenticator service* is not *hosted in the same domain* as the embedding application, and your browser restricts using third-party cookies.
+
+* When using `getAuthToken`, you specify a function that returns a Promise that resolves with the *login token*. Within the callback function, you can define the request to the *authenticator service* with far greater control than the automated `GET` request to a URL used by the `authEndpoint` option. `getAuthToken` is the preferred method for production deployments unless your *authenticator service* is implemented within the existing API endpoints of your application and a simple GET request provides the necessary authentication details as shown here.
+
++
+The following example shows a callback function with a custom request using link:https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch[Fetch, window=_blank], which returns a Promise. You can also use link:https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest[XHR, window=_blank] and build the link:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise[Promise, window=_blank] manually.
+
++
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: tsURL,
+    authType:  AuthType.TrustedAuthToken,
+    getAuthToken: getAuthToken,
+    username: username
+  });
+
+function async getAuthToken {
+  const tokenURL = tokenServiceURL + "/gettoken/";
+  console.log("calling token server at " + tokenURL);
+
+  const timeoutSecs = 5 * 1000; // seconds to milliseconds
+
+  const response = await timeout(timeoutSecs, fetch(
+    tokenURL,
+    {
+      method: 'POST',
+      mode: 'cors',
+      cache: 'no-cache',
+      headers: {
+        'Content-Type': "text/plain",
+        'X-TS-Auth-Token': tsAuthJWT
+      },
+      credentials: 'include'
+    }
+  ))
+
+  // Have to return a promise for the auth SDK.
+  //console.log(await response.text());
+  return response.text()
+}
+----
+
+==== Cookie-based authentication examples
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: "https://<hostname>:<port>",
+    authType: AuthType.TrustedAuthToken,
+    username: "<username>",
+    authEndpoint: "https://authenticator-server:<port>/endpoint",
+});
+----
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: <ThoughtSPot-Host-URL>
+    authType: AuthType.TrustedAuthToken,
+    username: "<username>",
+    getAuthToken: () => {
+        return fetch('https://my-backend.app/ts-token')
+            .then((response) => response.json())
+            .then((data) => data.token);
+ });
+----
+
+==== Cookieless authentication examples
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: "https://<hostname>:<port>",
+    authType: AuthType.TrustedAuthTokenCookieless,
+    username: "<username>",
+    authEndpoint: "https://authenticator-server:<port>/endpoint",
+});
+----
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: <ThoughtSPot-Host-URL>
+    authType: AuthType.TrustedAuthTokenCookieless,
+    getAuthToken: () => {
+        return fetch('https://my-backend.app/ts-token')
+            .then((response) => response.json())
+            .then((data) => data.token);
+ });
+----
