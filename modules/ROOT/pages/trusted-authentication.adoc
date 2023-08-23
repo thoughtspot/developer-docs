@@ -8,17 +8,18 @@
 
 Trusted authentication allows a web application to authenticate a user to a ThoughtSpot instance using *login tokens* requested from a ThoughtSpot instance. 
 
-It is the most seamless method of single sign-on (SSO) available to embed ThoughtSpot, but the actual *authentication* of the user is performed by a *token request service* that must be developed and added to the web application.
+It is the most seamless method of single sign-on (SSO) available to embed ThoughtSpot, but the actual *authentication* of the user is performed only by the *web application*, which then securely passes the user details to a *token request service* that must be developed and added to the web application.
 
 == Quick start
 The Trusted authentication implementation method includes the following steps:
 
 . xref:trusted-authentication.adoc#_get_a_secret_key_for_trusted_authentication[Enable Trusted authentication on ThoughtSpot] in the **Develop** > **Customizations** > **Security Settings** page. Copy the `secret_key` and place where the *token request service* can xref:trusted-auth-secret-key.adoc[securely access it].
 . Create the *token request service*, typically a REST API endpoint in the embedding application. This service returns the login token for the user signed-in by the web application. 
-. In the Visual Embed SDK, define the authentication type in `init`. You can configure cookie-based (`AuthType.TrustedAuthToken`) or cookieless authentication (`AuthType.TrustedAuthTokenCookieless`) as per your deployment needs. If you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance, and your web browser blocks third-party cookies, use cookieless authentication.
+. Include the Visual Embed SDK into the embedding web application. The authentication type is defined in the `init` function. You can configure cookie-based (`AuthType.TrustedAuthToken`) or cookieless authentication (`AuthType.TrustedAuthTokenCookieless`) as per your deployment needs. 
 +
-When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL specified in the SDK or the `getAuthToken` callback function.  For `authEndPoint`, specify the authentication endpoint URL from which you want to obtain the authentication token. If using `getAuthToken`, call the `getAuthToken` function to invoke your login endpoint. The login endpoint then returns a `Promise` string that resolves to an authentication token.
+. When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL specified in the SDK or the `getAuthToken` callback function.  For `authEndPoint`, specify the authentication endpoint URL from which you want to obtain the authentication token. If using `getAuthToken`, call the `getAuthToken` function to invoke your login endpoint. The login endpoint then returns a `Promise` string that resolves to an authentication token.
 
+If you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance, and your web browser blocks third-party cookies, use cookieless authentication.
 == Cookie-based vs. cookieless authentication
 The trusted authentication method supports cookie-based and cookieless authentication. 
 
@@ -155,50 +156,11 @@ init({
  });
 ----
 
-
-
-
 [#login-token]
-== Login token expiration
-Login tokens from the V1 and V2 REST APIs have different expiration rules.
-
-V1 login tokens only work for cookie-based Trusted Authentication, while the V2 tokens can be used for cookie-based or cookieless Trusted Auth. 
-
-=== V2 token
-The V2 REST API token is a standard OAuth 2.0 token that encodes several properties with in the token, most notably the username and the expiration time.
-
-The validity time of the token is never extended by any activity, so a new token must be requested after the intiial token passes its expiration time.
-
-The V2 token REST API endpoint has a request argument called `validity_time_in_sec` that defaults to 300 seconds (5 minutes). 
-
-For cookie-based Trusted Authentication, you may want to shorten the `validity_time_in_sec` to less than one minute, since the token is only used once and then there is a long-lived cookie-based session. The ThoughtSpot session end time will extend naturally as the user interacts with ThoughtSpot.
-
-For cookieless Trusted Authentication, you will want to request the token with a longer validity, possibly 20 or 30 minutes or more. 
-
-
-=== V1 token
-The V1 REST API login token is a proprietary token format that cannot be decoded or used for any purpose other than to create a ThoughtSpot session.
-
-V1 tokens stay valid for a length of time based on the following rules:
-
-* A token stays valid indefinitely until another token for any user is generated.
-* When a new token is generated using the same `secret_key`, the previous token will expire after five minutes.
-* When a new `secret_key` is generated for the ThoughtSpot server and the first new login token is obtained using the new `secret_key`, all tokens generated using the previous `secret_key` become invalid.
-* If users make multiple attempts to log in to ThoughtSpot using an invalid or expired token, they may get locked out of their accounts.
-
-To set a consistent five-minute expiration time, you can generate a second token to start the expiration clock for the previous login token that is sent to the user's browser.
-
-[NOTE]
-====
-On multi-tenant clusters with Orgs, users must use the Org-specific tokens when switching between Orgs.
-====
 
 == Troubleshoot trusted authentication
+Please see the xref:trusted-auth-troubleshoot.adoc[troubleshooting steps] if you encounter issues with the browse-side aspects of the trusted authentication implementation.
 
-[NOTE]
-====
-When implementing trusted authentication with session cookies, check if your browser allows third-party cookies. Chrome now blocks third-party cookies in Incognito mode by default, while Safari blocks them by default even in standard mode. If your Web browser rejects third-party cookies, the embedded content will be blocked. To workaround this issue, you can enable cookieless authentication (`AuthType.TrustedAuthTokenCookieless`) in the SDK.
-====
 
 == Implement without Visual Embed SDK
 The Visual Embed SDK handles the final REST API request to create the session, but it is possible to perform the login using xref:session-api.adoc#session-loginToken[/session/login/token] or the xref:rest-api-v2-reference.adoc#_authentication[ REST API v2.0 token access endpoints]. For more information, see xref:api-auth-session.adoc#_authenticate_and_log_in_with_a_token_trusted_authentication[REST API v1 authentication] and xref:authentication.adoc#trusted-auth-v2[REST API v2.0 authentication].
@@ -248,7 +210,5 @@ https://<redirect-domain>/?embedV2=true#/pinboard/7a9a6715-e154-431b-baaf-7b5824
 
 == Additional resources
 
-* A simple Python Flask implementation of an Authenticator Service is available in the link:https://github.com/thoughtspot/ts_everywhere_resources/tree/master/examples/token_auth[ts_everywhere_resources GitHub repository, window=_blank].  +
- The token_auth directory contains a link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/examples/token_auth/trusted_auth_tester.html[trusted_auth_tester.html, window=_blank] page to help verify each step of the trusted authentication process.
-* link:https://github.com/thoughtspot/node-token-auth-server-example[https://github.com/thoughtspot/node-token-auth-server-example, window=_blank]
+
 * link:https://github.com/thoughtspot/big-react-demo[React code samples, window=_blank]
