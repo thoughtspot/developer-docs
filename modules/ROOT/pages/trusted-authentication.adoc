@@ -10,16 +10,19 @@ Trusted authentication allows a web application to authenticate a user to a Thou
 
 It is the most seamless method of single sign-on (SSO) available to embed ThoughtSpot, but the actual *authentication* of the user is performed only by the *web application*, which then securely passes the user details to a *token request service* that must be developed and added to the web application.
 
+image::./images/trusted-auth-workflow.png[Trusted Authentication Workflow]
+
 == Quick start
 The Trusted authentication implementation method includes the following steps:
 
 . xref:trusted-authentication.adoc#_get_a_secret_key_for_trusted_authentication[Enable Trusted authentication on ThoughtSpot] in the **Develop** > **Customizations** > **Security Settings** page. Copy the `secret_key` and place where the *token request service* can xref:trusted-auth-secret-key.adoc[securely access it].
 . Create the *xref:rusted-auth-token-request-service.adoc[token request service]*, typically a REST API endpoint in the embedding application. This service returns the login token for the user signed-in by the web application. 
-. Include the Visual Embed SDK into the embedding web application. The authentication type is defined in the `init` function. You can configure cookie-based (`AuthType.TrustedAuthToken`) or cookieless authentication (`AuthType.TrustedAuthTokenCookieless`) as per your deployment needs. 
+. Include the xref:trusted-auth-sdk.adoc[Visual Embed SDK] into the embedding web application. The authentication type is defined in the `init` function. You can configure cookie-based (`AuthType.TrustedAuthToken`) or cookieless authentication (`AuthType.TrustedAuthTokenCookieless`) as per your deployment needs. 
 +
 . When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL specified in the SDK or the `getAuthToken` callback function.  For `authEndPoint`, specify the authentication endpoint URL from which you want to obtain the authentication token. If using `getAuthToken`, call the `getAuthToken` function to invoke your login endpoint. The login endpoint then returns a `Promise` string that resolves to an authentication token.
 
 If you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance, and your web browser blocks third-party cookies, use cookieless authentication.
+
 == Cookie-based vs. cookieless authentication
 The trusted authentication method supports cookie-based and cookieless authentication. 
 
@@ -27,134 +30,10 @@ In cookie-based authentication, the login token is only necessary during the log
 
 In cookieless authentication, the bearer token issued by the authentication server is used to authenticate API requests to ThoughtSpot.
 
-== Overview
-
-*Securely requesting the login token* requires passing authentication details from the embedding application securely to a *token request service* with access to the `secret_key` for the ThoughtSpot instance and ThoughtSpot admin user's credentials.
-
-The *token request service* is part of the web application and must be developed by your team.
-
-The process for trusted authentication is as follows:
-
- 1. The Visual Embed SDK, loaded within the embedded application page, calls the `init()` function with the correct set of parameters to request a *login token*.
- 2. The request for the *login token* securely provides the username and any additional details to the *token request service*.
- 3. The *token request service* verifies and parses the username and other details, and issues REST API commands to ThoughtSpot, such as requesting a *login token* for the provided username.
- 4. The *token request service* returns the *login token* to the browser and the Visual Embed SDK.
- 5. The Visual Embed SDK issues requests to establish a ThoughtSpot session in the browser.
-
-The following figure illustrates the trusted authentication workflow with session cookies and REST API calls to v1 endpoints:
-
-image::./images/trusted-auth-workflow.png[Trusted Authentication Workflow]
 
 
-[#trusted-auth-sdk]
-== Visual Embed SDK / front-end
 
-The Visual Embed SDK automates the login token request, and the login process using the token obtained from ThoughtSpot.
 
-The request to the *authenticator service* is defined in the `init()` function of the Visual Embed SDK. When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL or the `getAuthToken` callback function.
-
-You can use cookie-based or cookieless authentication as per your deployment needs. If you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance, and your web browser blocks third-party cookies, use cookieless authentication.
-
-For more information, see xref:embed-authentication.adoc#trusted-auth-embed[Embed user authentication page].
-
-=== Secure the authentication details request
-For the request to the *authenticator service* to be secure, the user in the browser cannot modify the request or make their own valid request to the *authenticator service*.
-
-How your particular application can most easily securely request the *login token* is up to you, but how you choose to send the message will constrain your choice between `authEndpoint` or `getAuthToken`.
-
-* If you choose `AuthType.TrustedAuthToken` and `authEndpoint`, a GET request is made directly to the provided URL. The authentication details must be included by the browser in this automated GET request, typically in the cookies. Cookies are not sent across domains (only to sub-domains), so your *authenticator service* must be *hosted in the same domain* as the embedding application.
-
-* If you choose `AuthType.TrustedAuthTokenCookieless`, a bearer token is issued for the given username. This token is stored in the app's memory and used for maintaining subsequent user sessions. You can use this authentication type if your *authenticator service* is not *hosted in the same domain* as the embedding application, and your browser restricts using third-party cookies.
-
-* When using `getAuthToken`, you specify a function that returns a Promise that resolves with the *login token*. Within the callback function, you can define the request to the *authenticator service* with far greater control than the automated `GET` request to a URL used by the `authEndpoint` option. `getAuthToken` is the preferred method for production deployments unless your *authenticator service* is implemented within the existing API endpoints of your application and a simple GET request provides the necessary authentication details as shown here.
-
-+
-The following example shows a callback function with a custom request using link:https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch[Fetch, window=_blank], which returns a Promise. You can also use link:https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest[XHR, window=_blank] and build the link:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise[Promise, window=_blank] manually.
-
-+
-[source,JavaScript]
-----
-init({
-    thoughtSpotHost: tsURL,
-    authType:  AuthType.TrustedAuthToken,
-    getAuthToken: getAuthToken,
-    username: username
-  });
-
-function async getAuthToken {
-  const tokenURL = tokenServiceURL + "/gettoken/";
-  console.log("calling token server at " + tokenURL);
-
-  const timeoutSecs = 5 * 1000; // seconds to milliseconds
-
-  const response = await timeout(timeoutSecs, fetch(
-    tokenURL,
-    {
-      method: 'POST',
-      mode: 'cors',
-      cache: 'no-cache',
-      headers: {
-        'Content-Type': "text/plain",
-        'X-TS-Auth-Token': tsAuthJWT
-      },
-      credentials: 'include'
-    }
-  ))
-
-  // Have to return a promise for the auth SDK.
-  //console.log(await response.text());
-  return response.text()
-}
-----
-
-==== Cookie-based authentication examples
-
-[source,JavaScript]
-----
-init({
-    thoughtSpotHost: "https://<hostname>:<port>",
-    authType: AuthType.TrustedAuthToken,
-    username: "<username>",
-    authEndpoint: "https://authenticator-server:<port>/endpoint",
-});
-----
-
-[source,JavaScript]
-----
-init({
-    thoughtSpotHost: <ThoughtSPot-Host-URL>
-    authType: AuthType.TrustedAuthToken,
-    username: "<username>",
-    getAuthToken: () => {
-        return fetch('https://my-backend.app/ts-token')
-            .then((response) => response.json())
-            .then((data) => data.token);
- });
-----
-
-==== Cookieless authentication examples
-
-[source,JavaScript]
-----
-init({
-    thoughtSpotHost: "https://<hostname>:<port>",
-    authType: AuthType.TrustedAuthTokenCookieless,
-    username: "<username>",
-    authEndpoint: "https://authenticator-server:<port>/endpoint",
-});
-----
-
-[source,JavaScript]
-----
-init({
-    thoughtSpotHost: <ThoughtSPot-Host-URL>
-    authType: AuthType.TrustedAuthTokenCookieless,
-    getAuthToken: () => {
-        return fetch('https://my-backend.app/ts-token')
-            .then((response) => response.json())
-            .then((data) => data.token);
- });
-----
 
 [#login-token]
 
