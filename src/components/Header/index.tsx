@@ -22,56 +22,14 @@ const Header = (props: {
 
     const headerLinks = [
         {
-            name: 'APIs & SDKs',
-            href: '',
-            child: [
-                { label: 'Visual Embed SDK', link: '/docs/VisualEmbedSdk' },
-                { label: 'REST API', link: '/docs/rest-apis' },
-            ],
+             label: 'Community',
+             link: 'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers-embedding',
+             external: true,
         },
         {
-            name: 'Playground',
-            child: [
-                {
-                    label: 'Visual Embed',
-                    link:
-                        'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/playground/search',
-                    external: true,
-                },
-                {
-                    label: 'REST API',
-                    link:
-                        'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/rest/playgroundV2_0',
-                    external: true,
-                },
-                {
-                    label: 'GraphQL',
-                    link:
-                        'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/graphql/playground',
-                    external: true,
-                },
-            ],
-        },
-        {
-            name: 'Resources',
-            child: [
-                {
-                    label: 'Community',
-                    link:
-                        'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers-embedding',
-                    external: true,
-                },
-                {
-                    label: 'Product documentation',
-                    link: 'https://docs.thoughtspot.com',
-                    external: true,
-                },
-                {
-                    label: 'Support',
-                    link: 'https://www.thoughtspot.com/support',
-                    external: true,
-                },
-            ],
+             label: 'Support',
+             link: 'https://www.thoughtspot.com/support',
+             external: true,
         },
         {
             name: 'On GitHub',
