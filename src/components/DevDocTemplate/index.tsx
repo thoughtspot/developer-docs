@@ -18,8 +18,8 @@ import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
-import RenderPlayGround from './RESTAPIPlayGround';
-import GraphQLPlayGround from './GraphQLPlayGround';
+import RenderPlayGround from './playGround/RESTAPI';
+import GraphQLPlayGround from './playGround/GraphQL';
 import { AskDocs } from './askDocs';
 import {
     DOC_NAV_PAGE_ID,

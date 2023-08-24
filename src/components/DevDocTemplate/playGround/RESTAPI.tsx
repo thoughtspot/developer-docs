@@ -7,10 +7,10 @@ import {
     TS_SESSION_TOKEN,
     TS_INFO,
     CLUSTER_TYPES,
-} from '../../configs/doc-configs';
+} from '../../../configs/doc-configs';
 
-import { DOC_VERSION_DEV, DOC_VERSION_PROD } from '../../constants/uiConstants';
-import BackButton from '../BackButton';
+import { DOC_VERSION_DEV, DOC_VERSION_PROD } from '../../../constants/uiConstants';
+import BackButton from '../../BackButton';
 
 const EXTERNAL_PLAYGROUND_EVENTS = {
     READY: 'api-playground-ready',

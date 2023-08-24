@@ -1,7 +1,7 @@
 import React, { useState, useEffect, FC } from 'react';
 
-import { DEFAULT_HOST } from '../../configs/doc-configs';
-import BackButton from '../BackButton';
+import { DEFAULT_HOST } from '../../../configs/doc-configs';
+import BackButton from '../../BackButton';
 
 const GraphQLPlayGround: FC<GraphQLPlayGroundProps> = (props) => {
     const isBrowser = () => typeof window !== 'undefined';
