@@ -7,6 +7,7 @@ import { FiSun } from '@react-icons/all-files/fi/FiSun';
 import TSLogo from '../../assets/svg/ts-logo-white-developer.svg';
 import t from '../../utils/lang-utils';
 import Dropdown from '../Dropdown';
+import References from './references';
 import Menu from '../Menu';
 import { MAX_MOBILE_RESOLUTION } from '../../constants/uiConstants';
 import './index.scss';
@@ -23,11 +24,9 @@ const Header = (props: {
     const headerLinks = [
         {
             name: 'APIs & SDKs',
-            href: '',
-            child: [
-                { label: 'Visual Embed SDK', link: '/docs/VisualEmbedSdk' },
-                { label: 'REST API', link: '/docs/rest-apis' },
-            ],
+            link:
+                'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/rest/playgroundV2_0',
+            external: true,
         },
         {
             name: 'Playground',
@@ -97,7 +96,7 @@ const Header = (props: {
                 ref={ref as React.RefObject<HTMLDivElement>}
             >
                 <div className="headerWrapper">
-                    <div>
+                    <div className="header-logo">
                         <h2 className="m-0 d-inline-block logo">
                             <a
                                 href="/docs/introduction"
@@ -147,6 +146,7 @@ const Header = (props: {
                             isMobile={isMaxMobileResolution}
                         />
                     </div>
+                    <References />
                 </div>
             </section>
         </header>

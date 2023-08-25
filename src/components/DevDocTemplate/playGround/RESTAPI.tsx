@@ -7,17 +7,10 @@ import {
     TS_SESSION_TOKEN,
     TS_INFO,
     CLUSTER_TYPES,
-    TS_HOST_PARAM,
-    TS_ORIGIN_PARAM,
-    TS_PAGE_ID_PARAM,
-    NAV_PREFIX,
-    PREVIEW_PREFIX,
-    DEFAULT_PREVIEW_HOST,
-    DEFAULT_APP_ROOT,
-} from '../../configs/doc-configs';
+} from '../../../configs/doc-configs';
 
-import { DOC_VERSION_DEV, DOC_VERSION_PROD } from '../../constants/uiConstants';
-import BackButton from '../BackButton';
+import { DOC_VERSION_DEV, DOC_VERSION_PROD } from '../../../constants/uiConstants';
+import BackButton from '../../BackButton';
 
 const EXTERNAL_PLAYGROUND_EVENTS = {
     READY: 'api-playground-ready',
