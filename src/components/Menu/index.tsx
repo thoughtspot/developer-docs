@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown';
+import { IconContext } from '@react-icons/all-files';
+
 import './index.scss';
 
 const Menu = (props: { config: {} }) => {
@@ -15,6 +16,17 @@ const Menu = (props: { config: {} }) => {
         window.open(url, target);
     };
 
+    const getIcon = (icon) => {
+        const Icon = icon;
+        return (
+            <div className="icon-item">
+                <IconContext.Provider value={{ className: 'icon imgOpacity' }}>
+                    <Icon />
+                </IconContext.Provider>
+            </div>
+        );
+    };
+
     return (
         <div className="d-inline-block headerLink menuWrapper">
             {config?.map((c) => (
@@ -23,6 +35,8 @@ const Menu = (props: { config: {} }) => {
                         className="menubtn"
                         onClick={() => (c.link ? handelClick(c) : null)}
                     >
+                        {c?.icon ? getIcon(c.icon) : null}
+
                         {c.name}
                     </button>
                     {c?.child ? (
