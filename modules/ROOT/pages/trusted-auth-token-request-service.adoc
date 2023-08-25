@@ -6,21 +6,61 @@
 :page-pageid: trusted-auth-token-request-service
 :page-description: You can configure support for token-based authentication service on ThoughtSpot.
 
-== Token request service overview
-The *token request service* is the portion of the web application with access to the ThoughtSpot `secret_key` that issues the request to ThoughtSpot to generate tokens.
+== Overview
+The *token request service* is the portion of the web application with access to the ThoughtSpot `xref:trusted-auth-secret-key.adoc[secret_key]` that issues the request to ThoughtSpot to generate tokens.
 
-In most cases, this is an API endpoint added to the web application, that will be called from the browser by the Visual Embed SDK `init()` function.
+In most cases, the *token request service* is a REST API endpoint added to the web application. Providing a REST API service allows the Visual Embed SDK to request new tokens whenever they are needed to start a new ThoughtSpot session.
 
-The `init()` function calls the *token request service*, which returns the *token* to the web browser.
+The `init()` function will call the *token request service* endpoint, which returns the *token* to the web browser, triggering the Visual Embed SDK to handle the rest of the login flow. The token request can instead happen on the back-end of the web app and the token embedded into the returned web page directly, but this will require a page reload if there is a need for a new token.
 
 There are no requirements for how the *token request service* is built or hosted, other than being able to issue REST API commands to the ThoughtSpot instance and having access to the `secret_key`.  When using a ThoughtSpot cloud instance, the authenticator service will need outbound request access to the hosted ThoughtSpot cloud instance.
 
-== Storing the secret_key securely
-The `secret_key` allows a REST API request for a login token for *any username*. 
+== Quick code example
+Every web application framework has its own way of handling users, sessions, and making REST API requests to other services.
 
-ThoughtSpot generates a new `xref:trusted-auth-secret-key.adoc[secret_key]` when trusted authentication is enabled on a ThoughtSpot instance. See the xref:trusted-auth-secret-key.adoc[secret_key documentation] for more details.
+The following example show how a *token request service* might look in Node.js with Express and the `express-session` package used to manage a session in the embedding web application. 
 
-The `secret_key` must be stored by the *token request service* securely and never revealed to the user in their browser. Any examples using the `secret_key` from a front-end page are purely *for testing only*.
+[source,javascript]
+----
+app.get('/ts-token',(req,res) => {
+  // req.session will be set by another endpoint handling login into the web application
+  session=req.session;
+  
+ // secret_key must be stored securely; here we assume the ThoughtSpot server name and secret_key are stored in env file
+ let thoughtspot_url = process.env.TS_SERVER_URI;
+ let thoughtspot_secret_key = process.env.TS_SECRET_KEY;
+
+  // Short-time out for cookie-based login; make longer for cookieless
+  const timeout_in_sec = 60; 
+
+  // Assuming 'user_email' is the session value that matches to the username in ThoughtSpot
+  if (session.user_email) {
+        let tsTokenUrl = thoughtspot_url + "api/rest/2.0/auth/token/full";
+        let tsTokenBody = {
+            "username": session.user_email,
+            "validity_time_in_sec": 300,
+            "auto_create": false,
+            "secret_key": thoughtspot_secret_key
+        };
+        // using Fetch to make HTTP request; you may use other package
+        const response = await fetch(tsTokenUrl, {
+          method: 'POST',
+          body: JSON.stringify(tsTokenBody),
+          headers: { Accept: "application/json",
+                     "X-Requested-By": "ThoughtSpot",
+                     "Content-Type": "application/json"
+          }
+        });
+
+        const results = await response.json();
+        res.send(results.token);
+    }
+    else{
+        res.send('No user session exists');
+    }
+})
+----
+
 
 == Authenticating the user
 The *token request service* must access the authentication details of the web application logged-in user (at minimum, the *ThoughtSpot username* value), and then use those values in the subsequent REST API requests to ThoughtSpot.
@@ -52,6 +92,7 @@ The V1 `/session/token/login` API endpoint can accept V1 or V2 tokens to establi
 If you are on an older software release, please use the features that are available in your deployed release.
 
 === V2 REST API
+The REST API V2 *
 
 === V1 REST API
 REST API call *necessary* after sign-in is the xref:session-api.adoc#session-authToken[request for the login token]. This is the call that utilizes the `secret_key`, which the *authenticator service* must also securely store and access along with the service account user credentials.
@@ -173,3 +214,10 @@ _String_. The URL to which the user is redirected after successful authenticatio
 https://<redirect-domain>/?embedV2=true#/pinboard/7a9a6715-e154-431b-baaf-7b58246c13dd%2F
 ----
 ////
+
+== Storing the secret_key securely
+The `secret_key` allows a REST API request for a login token for *any username*. 
+
+ThoughtSpot generates a new `xref:trusted-auth-secret-key.adoc[secret_key]` when trusted authentication is enabled on a ThoughtSpot instance. See the xref:trusted-auth-secret-key.adoc[secret_key documentation] for more details.
+
+The `secret_key` must be stored by the *token request service* securely and never revealed to the user in their browser. Any examples using the `secret_key` from a front-end page are purely *for testing only*.
