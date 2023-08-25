@@ -17,21 +17,30 @@ const Menu = (props: { config: {} }) => {
 
     return (
         <div className="d-inline-block headerLink menuWrapper">
-            {config?.map(({ name, child }) => (
+            {config?.map((c) => (
                 <div className="menu">
-                    <button className="menubtn">{name}</button>
-                    <div className="menuContent">
-                        {child?.map((d: { label: string; link: string }) => {
-                            return (
-                                <div
-                                    data-testid={`menu-${d?.label}`}
-                                    onClick={() => handelClick(d)}
-                                >
-                                    {d?.label}
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <button
+                        className="menubtn"
+                        onClick={() => (c.link ? handelClick(c) : null)}
+                    >
+                        {c.name}
+                    </button>
+                    {c?.child ? (
+                        <div className="menuContent">
+                            {c?.child?.map(
+                                (d: { label: string; link: string }) => {
+                                    return (
+                                        <div
+                                            data-testid={`menu-${d?.label}`}
+                                            onClick={() => handelClick(d)}
+                                        >
+                                            {d?.label}
+                                        </div>
+                                    );
+                                },
+                            )}
+                        </div>
+                    ) : null}
                 </div>
             ))}
         </div>
