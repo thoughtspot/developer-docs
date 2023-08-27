@@ -8,24 +8,20 @@
 
 The Visual Embed SDK uses the `init()` function to automate the login token request, and using the returned token to establish authentication with ThoughtSpot.
 
+== Overview
+When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL or the `getAuthToken` callback function.
+
 Cookieless authentication, specified using `AuthType.TrustedAuthTokenCookieless`, uses the token as a bearer token for all subsequent requests to ThoughtSpot, without establishing a session in the browser.
 
 Cookie-based authentication, specified using `AuthType.TrustedAuthToken`, uses the token to create a session in the browser immediately, and does not use the token afterward, instead relying on the established session with the ThoughtSpot instance.
 
-== Automated token request
-When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL or the `getAuthToken` callback function.
-
-You can use cookie-based or cookieless authentication as per your deployment needs. If you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance, and your web browser blocks third-party cookies, use cookieless authentication.
-
-For more information, see xref:embed-authentication.adoc#trusted-auth-embed[Embed user authentication page].
+For the request to be *secure*, the user in the browser cannot modify the request or make their own valid request to the *token request service* in a way the requests a token for any other user. 
 
 == Define token request service
-For the request to the *token request service* to be secure, the user in the browser cannot modify the request or make their own valid request to the *token request service*.
-
-There are two options for defining the request to the *token request service*:  `authEndpoint` or `getAuthToken`.
+There are two options in the `init()` function for defining the request to the *token request service* : `authEndpoint` or `getAuthToken`.
 
 === authEndpoint
-The `authEndpoint` parameter of the `init()` function specifies a URL for a *GET request* to the *token request service*.
+The `authEndpoint` parameter of the `init()` function specifies a URL for a direct *GET request* to the *token request service*.
 
 Any authentication details must be included by the browser in this automated GET request, typically in the cookies. 
 
@@ -44,7 +40,7 @@ You can even use the callback function to reference a hard-coded login token, in
 [source,JavaScript]
 ----
 init({
-    thoughtSpotHost: <ThoughtSPot-Host-URL>
+    thoughtSpotHost: <ThoughtSpot-Host-URL>
     authType: AuthType.TrustedAuthToken,
     username: "<username>",
     getAuthToken: () => {
@@ -56,10 +52,27 @@ init({
 See examples section below for more variations on the `getAuthToken` callback function.
 
 == Cookieless vs. cookie-based authentication
+The second decision is whether to use cookie-based or cookieless authentication.
 
+Cookieless authentication only works with login tokens returned from the V2 REST API, while cookie-based works with V1 and V2 tokens.
 
-If you choose `AuthType.TrustedAuthTokenCookieless`, a bearer token is issued for the given username. This token is stored in the app's memory and used for maintaining subsequent user sessions. You can use this authentication type if your *authenticator service* is not *hosted in the same domain* as the embedding application, and your browser restricts using third-party cookies.
+Cookie-based authentication (`AuthType.TrustedAuthToken`) establishes a browser-wide ThoughtSpot session,   For it to work in the most situations, you also need to customize the ThoughtSpot domain to be on the same top-level domain as the embedding app.
 
+Cookieless authentication (`AuthType.TrustedAuthTokenCookieless`) is useful if you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance. Many web browsers blocks third-party cookies (Safari, Edge, mobile browsers), and cookieless authentication avoids this restriction. For more information, see xref:embed-authentication.adoc#trusted-auth-embed[Embed user authentication page].
+
+If you choose `AuthType.TrustedAuthTokenCookieless`, a bearer token is issued for the given username. This token is stored in the app's memory and used for maintaining subsequent user sessions. 
+
+=== Session length
+The ThoughtSpot session established by cookie-based naturally extends as the user interacts with ThoughtSpot content.
+
+When used as a bearer token, the lifespan of the token is established when it is requeste and does not extend.
+
+The `init()` function will request a new token automatically when it detects either the session or the token has expired, when the `autoLogin: true` option is set.
+
+=== REST API requests
+Because cookie-based authentication has a ThoughtSpot session cookie in the browser, REST API requests for the user can be made simply by including credentials in the REST API request.
+
+With cookieless authentication, you will need to add the token as the bearer token in any REST API request you make to ThoughtSpot. This means you'll want to store the token as part of the callback function you define for
 
 == Code examples
 
