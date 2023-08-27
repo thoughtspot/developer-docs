@@ -6,7 +6,7 @@
 :page-pageid: trusted-auth-sdk
 :page-description: Front-end trusted authentication integration using Visual Embed SDK
 
-The Visual Embed SDK uses the `init()` function to automate the login token request, and using the returned token to establish authentication with ThoughtSpot.
+The Visual Embed SDK uses the `init()` function to automate the request to the xref:trusted-auth-token-request-service.adoc[token request service] and properly use the returned token to establish authentication with ThoughtSpot.
 
 == Overview
 When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL or the `getAuthToken` callback function.
@@ -43,6 +43,7 @@ init({
     authType: AuthType.TrustedAuthToken,
     username: "<username>",
     getAuthToken: () => {
+        // fetch() returns a Promise naturally. Assumes a JSON response from token request service with a 'token' property 
         return fetch('https://my-backend.app/ts-token')
             .then((response) => response.json())
             .then((data) => data.token);
@@ -73,19 +74,20 @@ Cookie-based authentication (`AuthType.TrustedAuthToken`) establishes a browser-
 
 Cookieless authentication (`AuthType.TrustedAuthTokenCookieless`) is useful if you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance. Many web browsers blocks third-party cookies (Safari, Edge, mobile browsers), and cookieless authentication avoids this restriction. For more information, see xref:embed-authentication.adoc#trusted-auth-embed[Embed user authentication page].
 
-If you choose `AuthType.TrustedAuthTokenCookieless`, a bearer token is issued for the given username. This token is stored in the app's memory and used for maintaining subsequent user sessions. 
-
 === Session length
 The ThoughtSpot session established by cookie-based naturally extends as the user interacts with ThoughtSpot content.
 
-When used as a bearer token, the lifespan of the token is established when it is requeste and does not extend.
+When used as a bearer token, the lifespan of the token is established when it is requested and does not ever extend. You can however request any length of lifespan for the token.
 
-The `init()` function will request a new token automatically when it detects either the session or the token has expired, when the `autoLogin: true` option is set. You may also set `disableLoginRedirect: true` to customize the behavior when `autoLogin` is in place. See the xref:getting-started.adoc#_configure_security_and_login_parameters_optional[init() function documentation] for a full description of the available customizations.
+The `init()` function can automatically request a new token when it detects either the session or the token has expired, when the `autoLogin: true` option is set. You may also set `disableLoginRedirect: true` to customize the behavior when `autoLogin` is in place. See the xref:getting-started.adoc#_configure_security_and_login_parameters_optional[init() function documentation] for a full description of the available customizations.
 
 === REST API requests
 Because cookie-based authentication has a ThoughtSpot session cookie in the browser, REST API requests for the user can be made simply by including credentials in the REST API request.
 
 With cookieless authentication, you will need to add the token as the bearer token in any REST API request you make to ThoughtSpot. This means you'll want to store the returned token in the global scope as part of the callback function you define for `getAuthToken`.
+
+=== Multiple user sessions in one browser
+Cookieless authentication is also useful for scenarios where the embedding application allows for being logged into mutliple user accounts in different tabs, or quick switches between users. Cookie-based authentication restricts the whole browser to a single logged-in user per ThoughtSpot instance, while cookie-less allows each tab to use a different token without conflicts.
 
 == Code examples
 The only difference between cookie-based trusted authentication and cookieless authentication in the `init()` function is the value used for the `authType` property. 
