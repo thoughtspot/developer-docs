@@ -82,25 +82,30 @@ If your *token request service* must also create users and give them access, add
 
 ThoughtSpot user account passwords are neither checked nor modified by any single sign-on method.
 
-== Login token request via REST API
-If you are using ThoughtSpot Cloud, best practice is to use the V2 REST API Full Access Token. 
+== Login token REST API requests
+If you are using ThoughtSpot Cloud, best practice is to use xref:authentication.adoc#trusted-auth-v2[V2 REST API Full Access Tokens]. 
 
-V1 login tokens only work for cookie-based Trusted Authentication, while the V2 tokens can be used for cookie-based or cookieless Trusted Auth. 
+Access control in ThoughtSpot (called Sharing) prohibits a signed-in user from loading any content to which they don't have access. Access control (sharing) can be granted during the login token request process by adding the user to the appropriate ThoughtSpot groups.
 
-The V1 `/session/token/login` API endpoint can accept V1 or V2 tokens to establish a ThoughtSpot session.
+V2 tokens can be used for cookie-based or cookieless Trusted Auth. 
+
+V1 login tokens only work for cookie-based Trusted Authentication.
+
+The V1 `/session/token/login` API endpoint used by the Visual Embed SDK can accept V1 or V2 tokens to establish a ThoughtSpot session.
 
 If you are on an older software release, please use the features that are available in your deployed release.
 
 === V2 REST API
-The REST API V2 *
+The REST API V2 has separate endpoints for requesting full access or object access tokens. The vast majority of implementations use full access tokens, The `xref:authentication.adoc#trusted-auth-v2[/api/rest/2.0/auth/token/full]` endpoint 
+
+The quick code example above shows how the V2 full access token request would be implemented within a *token request service*.
 
 === V1 REST API
-REST API call *necessary* after sign-in is the xref:session-api.adoc#session-authToken[request for the login token]. This is the call that utilizes the `secret_key`, which the *authenticator service* must also securely store and access along with the service account user credentials.
+V1 tokens are are requested from the xref:session-api.adoc#session-authToken[/tspublic/v1/session/login/token] endpoint. 
 
 When a token has been requested in `FULL` mode, it will create a full ThoughtSpot session in the browser and application. The token for `FULL` access mode persists through several sessions and stays valid until another token is generated.
 
-You can request a limited token using the `access_level=REPORT_BOOK_VIEW` option in REST API v1 and `/api/rest/2.0/auth/token/object` endpoint in REST API v2.0, but this is rarely used and not recommended.
-Access control in ThoughtSpot (called Sharing) prohibits a signed-in user from loading any content to which they don't have access. Access control (sharing) can be granted during the login token request process by adding the user to the appropriate ThoughtSpot groups.
+You can request a limited token using the `access_level=REPORT_BOOK_VIEW` option in REST API v1 but this is rarely used and not recommended.
 
 === Login token expiration
 Login tokens from the V1 and V2 REST APIs have different expiration rules.
@@ -108,7 +113,7 @@ Login tokens from the V1 and V2 REST APIs have different expiration rules.
 ==== V2 token
 The V2 REST API token is a standard OAuth 2.0 token that encodes several properties with in the token, most notably the username and the expiration time.
 
-The validity time of the token is never extended by any activity, so a new token must be requested after the intiial token passes its expiration time.
+The validity time of the token is never extended by any activity, so a new token must be requested after the intiial token passes its expiration time. The Visual Embed SDK can be configured to xref:trusted-auth-sdk.adoc#session-length[handle this automatically].
 
 The V2 token REST API endpoint has a request argument called `validity_time_in_sec` that defaults to 300 seconds (5 minutes). 
 
@@ -128,10 +133,13 @@ V1 tokens stay valid for a length of time based on the following rules:
 
 To set a consistent five-minute expiration time, you can generate a second token to start the expiration clock for the previous login token that is sent to the user's browser.
 
-[NOTE]
-====
-On multi-tenant clusters with Orgs, users must use the Org-specific tokens when switching between Orgs.
-====
+== Org-enabled clusters
+On multi-tenant clusters with xref:orgs.adoc[Orgs] enabled, tokens are scoped to one given Org at a time. The *token request service* will also need to be aware of the `org_id` of the matching ThoughtSpot org for a given user at token request time.
+
+== Revoking a token
+There is a xref:authentication.adoc#revoke-a-token[REST API for revoking a V2 Token], which could be incorporated into an additional endpoint of the *token request service* if you have concerns of longer-lived tokens existing beyond the web application's own session lifespan. 
+
+For example, the sign-out process of the web application could call to the *token request service* to revoke the previously requested token.
 
 == Just-in-time user provisioning and group assignment
 
