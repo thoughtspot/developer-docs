@@ -6,32 +6,66 @@
 :page-pageid: trusted-auth-sdk
 :page-description: Front-end trusted authentication integration using Visual Embed SDK
 
-[#trusted-auth-sdk]
-== Visual Embed SDK / front-end
+The Visual Embed SDK uses the `init()` function to automate the login token request, and using the returned token to establish authentication with ThoughtSpot.
 
-The Visual Embed SDK automates the login token request, and the login process using the token obtained from ThoughtSpot.
+Cookieless authentication, specified using `AuthType.TrustedAuthTokenCookieless`, uses the token as a bearer token for all subsequent requests to ThoughtSpot, without establishing a session in the browser.
 
-The request to the *authenticator service* is defined in the `init()` function of the Visual Embed SDK. When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL or the `getAuthToken` callback function.
+Cookie-based authentication, specified using `AuthType.TrustedAuthToken`, uses the token to create a session in the browser immediately, and does not use the token afterward, instead relying on the established session with the ThoughtSpot instance.
+
+== Automated token request
+When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL or the `getAuthToken` callback function.
 
 You can use cookie-based or cookieless authentication as per your deployment needs. If you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance, and your web browser blocks third-party cookies, use cookieless authentication.
 
 For more information, see xref:embed-authentication.adoc#trusted-auth-embed[Embed user authentication page].
 
-=== Secure the authentication details request
-For the request to the *authenticator service* to be secure, the user in the browser cannot modify the request or make their own valid request to the *authenticator service*.
+== Define token request service
+For the request to the *token request service* to be secure, the user in the browser cannot modify the request or make their own valid request to the *token request service*.
 
-How your particular application can most easily securely request the *login token* is up to you, but how you choose to send the message will constrain your choice between `authEndpoint` or `getAuthToken`.
+There are two options for defining the request to the *token request service*:  `authEndpoint` or `getAuthToken`.
 
-* If you choose `AuthType.TrustedAuthToken` and `authEndpoint`, a GET request is made directly to the provided URL. The authentication details must be included by the browser in this automated GET request, typically in the cookies. Cookies are not sent across domains (only to sub-domains), so your *authenticator service* must be *hosted in the same domain* as the embedding application.
+=== authEndpoint
+The `authEndpoint` parameter of the `init()` function specifies a URL for a *GET request* to the *token request service*.
 
-* If you choose `AuthType.TrustedAuthTokenCookieless`, a bearer token is issued for the given username. This token is stored in the app's memory and used for maintaining subsequent user sessions. You can use this authentication type if your *authenticator service* is not *hosted in the same domain* as the embedding application, and your browser restricts using third-party cookies.
+Any authentication details must be included by the browser in this automated GET request, typically in the cookies. 
 
-* When using `getAuthToken`, you specify a function that returns a Promise that resolves with the *login token*. Within the callback function, you can define the request to the *authenticator service* with far greater control than the automated `GET` request to a URL used by the `authEndpoint` option. `getAuthToken` is the preferred method for production deployments unless your *authenticator service* is implemented within the existing API endpoints of your application and a simple GET request provides the necessary authentication details as shown here.
+It is *insecure* to allow specifying the username of the desired login token in the URL called by `authEndpoint`, because any user could request tokens for other users. Instead the *token request service* itself must be able to determine which user is logged in from the backend.
 
-+
+Cookies are not sent across domains (only to sub-domains), so your *tokenr request service* must be *hosted in the same domain* as the embedding application.
+
+If you need more control beyond a GET request, use `getAuthToken` instead to define a customized request.
+
+=== getAuthToken
+The `getAuthToken` parameter of the `init()` function specifies a *callback function* to return the login token.
+
+The callback function must return a *Promise* that resolves with the *login token*. 
+
+You can even use the callback function to reference a hard-coded login token, in a testing or other appropriate situation: 
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: <ThoughtSPot-Host-URL>
+    authType: AuthType.TrustedAuthToken,
+    username: "<username>",
+    getAuthToken: () => {
+        let tsToken = '{long-lived-token};
+        return tsToken;
+ });
+----
+
+See examples section below for more variations on the `getAuthToken` callback function.
+
+== Cookieless vs. cookie-based authentication
+
+
+If you choose `AuthType.TrustedAuthTokenCookieless`, a bearer token is issued for the given username. This token is stored in the app's memory and used for maintaining subsequent user sessions. You can use this authentication type if your *authenticator service* is not *hosted in the same domain* as the embedding application, and your browser restricts using third-party cookies.
+
+
+== Code examples
+
 The following example shows a callback function with a custom request using link:https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch[Fetch, window=_blank], which returns a Promise. You can also use link:https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest[XHR, window=_blank] and build the link:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise[Promise, window=_blank] manually.
 
-+
+
 [source,JavaScript]
 ----
 init({
@@ -67,7 +101,7 @@ function async getAuthToken {
 }
 ----
 
-==== Cookie-based authentication examples
+=== Cookie-based authentication examples
 
 [source,JavaScript]
 ----
@@ -92,7 +126,7 @@ init({
  });
 ----
 
-==== Cookieless authentication examples
+=== Cookieless authentication examples
 
 [source,JavaScript]
 ----
