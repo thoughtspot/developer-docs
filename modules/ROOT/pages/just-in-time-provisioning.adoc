@@ -1,0 +1,62 @@
+= Just-in-time provisioning
+:toc: true
+:toclevels: 1
+
+:page-title: Just-in-time provisioning of users and groups
+:page-pageid: just-in-time-provisioning
+:page-description: Just-in-time provisioning using SSO
+
+ThoughtSpot can use the SSO process to create users and assign them to ThoughtSpot groups. 
+
+The capabilities are the same between SAML, OIDC, and trusted authentication methods, but the implementations of each are slightly different.
+
+== User creation
+Just-in-time provisioning (JIT) *creates* a user if they do not already exist at the time of SSO sign-in. 
+
+Users created via JIT are identical to users created manually or via the REST APIs, except they *do not have passwords* in Thoughtspot; they cannot enter ThoughtSpot other than through the SSO method. You can assign a password to any user later using the UI or a REST API call.
+
+Creating a user via JIT requires the assertion contain *username*, *email address* and *org* (if Orgs are enabled).
+
+== Group assignment
+Users can be assigned to ThoughtSpot groups via JIT as well. The list of groups should be composed of `group_name` properties, rather than `display_name`.
+
+
+JIT group assignment is a *full replacement* of the user's set of groups. 
+
+Groups that do not exist *will be created*, but a ThoughtSpot group by default provides no access control or privileges.
+
+Groups created via JIT will have the same `group_name` and `display_name`. This name will be what is used by the `ts_groups` property in any RLS rules.
+
+== Trusted authentication
+
+Starting from 8.9.0.cl, the xref:session-api.adoc#session-authToken[/tspublic/v1/session/auth/token] endpoint supports just-in-time provisioning of users. If the user specified in the API request does not exist in the ThoughtSpot system, you can set the `autocreate` property to `true` to add the user to ThoughtSpot and assign the user to `groups`.
+
+The typical flow of REST API requests for user creation at the time of a login token request is as follows: +
+
+1. Make a REST API request to xref:user-api.adoc#get-user-details[get the user details].
+2. If the user already exists, check the `assignedGroups` property. On clusters with Orgs feature enabled, check the `orgIds` property to verify if the user mapped to any Org.
+3. If the user doesn't exist in ThoughtSpot, you can either xref:user-api.adoc#create-user[create a new user] or set the `autocreate` property to `true` in your API request to the `/tspublic/v1/session/auth/token` endpoint. You can also specify the Org ID and group name to add the user to the Org and groups in the same API request.
+4. If the user should be logged in to a different Org context, specify the Org ID in the `orgid` property and set `autocreate` to `true`. +
++
+[NOTE]
+====
+Org IDs are integers that are created automatically when a cluster administrator creates an Org. To know the Org IDs of Orgs, you can send a `GET` request to the `/tspublic/v1/session/orgs` API endpoint. If you have cluster administrator privileges, you can use the `/tspublic/v1/org/search` endpoint to get a list of all Orgs available on your cluster.
+====
+
+5. If the user should belong to other groups, add group names in the `groups` property when making an API call to the `/tspublic/v1/session/auth/token` endpoint. If these groups don't exist in the specified `orgid`, set `autocreate` to `true` to add these groups to the Org.
+6. Request a login token from ThoughtSpot via `/tspublic/v1/session/auth/token` API endpoint.
+7. Return the token to the user's web browser.
+
+[NOTE]
+====
+The `/api/rest/2.0/auth/token/object` and `/api/rest/2.0/auth/token/full` endpoints in REST API v2.0 also support JIT  provisioning and assigning the user to groups and Orgs.
+====
+
+== SAML
+
+== OIDC
+  
+== Additional REST API requests
+Because all of ThoughtSpot administration is possible via the REST API, you can incorporate even more functionality into the *authenticator service* if necessary, building it into an authentication and authorization service. The xref:api-user-management.adoc[user and group privileges] REST API documentation covers the additional requests related to authorization.
+
+For example, you could use the xref:rest-api-reference.adoc#_groups_and_privileges[REST API v1] or xref:rest-api-v2-reference.adoc#_groups[REST API v2.0] group endpoints to implement ThoughtSpot groups that are intended for use in Row Level Security (RLS) rules. For these groups, the group name must match exactly with a value in a column in the data warehouse, so the name of the group itself serves as a __data entitlement__. You could adjust the flow described in the preceding section to create any group for RLS that did not already exist and assign it to the user, which would bring the process closer to a Role-based access control (RBAC) or Attribute-based access control (ABAC) pattern.
