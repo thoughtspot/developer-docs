@@ -39,28 +39,7 @@ The `autocreate: true` parameter of the xref:authentication.adoc#trusted-auth-v2
 The `group_identifiers` parameter should only be specified if you want to enable JIT group assignment. Passing `group_identifiers: []` will set the user to be assigned to *no groups*, while excluding the `group_identifiers` parameter altogether will leave the user assigned to their existing set of groups.
 
 === V1
-Starting from 8.9.0.cl, the xref:session-api.adoc#session-authToken[/tspublic/v1/session/auth/token] endpoint . If the user specified in the API request does not exist in the ThoughtSpot system, you can set the `autocreate` property to `true` to add the user to ThoughtSpot and assign the user to `groups`.
-
-The typical flow of REST API requests for user creation at the time of a login token request is as follows: +
-
-1. Make a REST API request to xref:user-api.adoc#get-user-details[get the user details].
-2. If the user already exists, check the `assignedGroups` property. On clusters with Orgs feature enabled, check the `orgIds` property to verify if the user mapped to any Org.
-3. If the user doesn't exist in ThoughtSpot, you can either xref:user-api.adoc#create-user[create a new user] or set the `autocreate` property to `true` in your API request to the `/tspublic/v1/session/auth/token` endpoint. You can also specify the Org ID and group name to add the user to the Org and groups in the same API request.
-4. If the user should be logged in to a different Org context, specify the Org ID in the `orgid` property and set `autocreate` to `true`. +
-+
-[NOTE]
-====
-Org IDs are integers that are created automatically when a cluster administrator creates an Org. To know the Org IDs of Orgs, you can send a `GET` request to the `/tspublic/v1/session/orgs` API endpoint. If you have cluster administrator privileges, you can use the `/tspublic/v1/org/search` endpoint to get a list of all Orgs available on your cluster.
-====
-
-5. If the user should belong to other groups, add group names in the `groups` property when making an API call to the `/tspublic/v1/session/auth/token` endpoint. If these groups don't exist in the specified `orgid`, set `autocreate` to `true` to add these groups to the Org.
-6. Request a login token from ThoughtSpot via `/tspublic/v1/session/auth/token` API endpoint.
-7. Return the token to the user's web browser.
-
-[NOTE]
-====
-The `/api/rest/2.0/auth/token/object` and `/api/rest/2.0/auth/token/full` endpoints in REST API v2.0 also support JIT  provisioning and assigning the user to groups and Orgs.
-====
+Starting from 8.9.0.cl, the xref:session-api.adoc#session-authToken[/tspublic/v1/session/auth/token] endpoint is able to provision a new user by setting the `autocreate` property to `true`.
 
 == SAML
 SAML SSO can be configured with the option *Automatically add SAML users to ThoughtSpot upon first authentication*. Please see the xref:configure-saml.adoc#configuration-steps[SAML SSO configuration documentation] for the full instructions.
@@ -73,11 +52,22 @@ JIT group assignment can be enabled for SAML SSO via a support ticket.
 OIDC SSO can be configured for JIT user creation, as the necessary properties should already be xref:configure-oidc.adoc#configureTS[configured as part of the claims]. 
 
 JIT group assignment xref:configure-oidc.adoc#group-synchronization[can be enabled for OIDC via a support ticket].
-  
+
+== Determine Org IDs
+Org IDs are integers that are created automatically when a cluster administrator creates an Org. 
+
+If Orgs is enabled, you do need to specify the Org ID when creating a user.
+
+An account with cluster administrator privileges can use the `/tspublic/v1/org/search` or `/api/rest/2.0/orgs/search` endpoints to get a list of all Orgs available on your cluster.
+
+To know the Org ID of the current Org, you can send a `GET` request to the `/tspublic/v1/session/orgs` API endpoint within the browser.
+
 == REST API creation and update methods
 Since JIT group provisioning does not provide full configuration of groups or assign access control, you can use the REST APIs to create, edit, and sychronize groups with the embedding application.
 
 The xref:api-user-management.adoc[user and group privileges] REST API documentation covers the additional requests related to authorization.
+
+User creation can be accomplished using xref:user-api.adoc#get-user-details[get user details] and xref:user-api.adoc#create-user[create user] REST APIs.
 
 REST APIs other than *token requests* must be performed using a ThoughtSpot user account with the appropriate level of administrative privileges, versus simply using the `secret_key`.
 
