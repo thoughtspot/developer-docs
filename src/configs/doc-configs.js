@@ -37,12 +37,7 @@ module.exports = {
             label: '9.4.0.cl',
             link: '9.4.0',
             subLabel: 'Cloud (Latest)',
-        },
-        {
-            label: '9.0.1.sw',
-            link: 'https://visual-embed-sdk-9-0.vercel.app/docs',
-            subLabel: 'Software (Latest)',
-        },
+        }
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
