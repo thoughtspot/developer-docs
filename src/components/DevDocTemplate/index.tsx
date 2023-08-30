@@ -1,4 +1,5 @@
 import React, { useState, useEffect, FC } from 'react';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import Modal from 'react-modal';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { graphql, navigate } from 'gatsby';
@@ -6,6 +7,7 @@ import { graphql, navigate } from 'gatsby';
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
 import _ from 'lodash';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { Analytics } from '@vercel/analytics/react';
 import { Seo } from '../Seo';
