@@ -6,6 +6,8 @@ import { graphql, navigate } from 'gatsby';
 import { useResizeDetector } from 'react-resize-detector';
 import algoliasearch from 'algoliasearch';
 import _ from 'lodash';
+import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
+import { Analytics } from '@vercel/analytics/react';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
@@ -16,7 +18,8 @@ import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
-import RenderPlayGround from './renderPlayGround';
+import RenderPlayGround from './playGround/RESTAPI';
+import GraphQLPlayGround from './playGround/GraphQL';
 import { AskDocs } from './askDocs';
 import {
     DOC_NAV_PAGE_ID,
@@ -42,8 +45,8 @@ import {
 } from '../../constants/uiConstants';
 import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
+import { getHTMLFromComponent } from '../../utils/react-utils';
 
-// markup
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
         data,
@@ -51,13 +54,39 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         pageContext: { namePageIdMap },
     } = props;
 
+    const isBrowser = () => typeof window !== 'undefined';
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            if (location.pathname === '/') {
+                navigate('/docs', { replace: true });
+            }
+
+            const queryParams = new URLSearchParams(window.location.search);
+            const pageId = queryParams.get('pageid');
+            if (pageId) {
+                queryParams.delete('pageid');
+                if (queryParams.toString()) {
+                    navigate(`/${pageId}?${queryParams.toString()}`, {
+                        replace: true,
+                    });
+                } else {
+                    navigate(`/${pageId}`, { replace: true });
+                }
+            }
+        }
+    }, [location.search, location.pathname]);
+
     const { curPageNode, navNode } = data;
+
+    const isHomePage = curPageNode?.pageAttributes?.pageid === HOME_PAGE_ID;
+
     const { width, ref } = useResizeDetector();
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
         [TS_ORIGIN_PARAM]: '',
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
-        [NAV_PREFIX]: '',
+        [NAV_PREFIX]: '/docs',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
     const [docTitle, setDocTitle] = useState(
@@ -81,8 +110,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [breadcrumsData, setBreadcrumsData] = useState(
         fetchChild(initialNavContentData) || [],
     );
-    const [prevPageId, setPrevPageId] = useState('introduction');
-    const [backLink, setBackLink] = useState(params[TS_ORIGIN_PARAM]);
     const [showSearch, setShowSearch] = useState(false);
     const [leftNavWidth, setLeftNavWidth] = useState(
         width > MAX_TABLET_RESOLUTION
@@ -102,8 +129,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const isCustomPage = _.values(CUSTOM_PAGE_ID).some(
         (pageId: string) => pageId === params[TS_PAGE_ID_PARAM],
     );
-    const isApiPlaygroundPage =
+    const isApiPlayground =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND;
+    const isGQPlayGround =
+        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
+    const isPlayGround = isGQPlayGround || isApiPlayground;
+
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
     useEffect(() => {
@@ -111,60 +142,71 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         setIsPublicSiteOpen(isPublicSite(location.search));
 
         const paramObj = queryStringParser(location.search);
+        if (paramObj?.origin && paramObj?.origin !== '')
+            localStorage.setItem('origin', paramObj?.origin);
 
         setParams({ ...paramObj, ...params });
+        const { pathname } = location;
+
+        if (isBrowser() && !isPlayGround) {
+            localStorage.setItem('prevPath', pathname?.replace('/docs', ''));
+        }
     }, [location.search]);
 
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        if (isBrowser()) {
             setDarkMode(localStorage.getItem('theme') === 'dark');
             setKey('dark');
         }
     }, []);
+    const getSearch = () => {
+        const SearchIconHTML = getHTMLFromComponent(<BiSearch />, 'searchIcon');
+
+        const template = `<div class="searchInputBanner">
+            <div class="searchInputWrapper">
+                <div class="searchInputContainer">
+                    ${SearchIconHTML}
+                    <div id="search-input-banner" class="search-input-banner" >${t(
+                        'SEARCH_PLACEHOLDER',
+                    )}</div>
+                </div>
+            </div>
+        </div>`;
+        return template;
+    };
+
+    useEffect(() => {
+        setTimeout(() => {
+            const el = document.querySelector('#homePageSearchBar');
+
+            if (el !== null) {
+                el.innerHTML = getSearch();
+
+                const searchEl = document.querySelector('#search-input-banner');
+                searchEl.addEventListener('click', () => {
+                    setShowSearch(true);
+                });
+            }
+        }, 200);
+    }, []);
 
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)
-        // So that the parent can sync the url.
-        const newParms: {
-            pageid?: string;
-        } = queryStringParser(location.search);
-        newParms.pageid = location?.pathname?.split('/')[1] || '';
+        // So that the parent can sync the url
         window.parent.postMessage(
             {
-                params: newParms,
+                params: {
+                    [TS_HOST_PARAM]: DEFAULT_HOST,
+                    [TS_ORIGIN_PARAM]: '',
+                    [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
+                    [NAV_PREFIX]: '/docs',
+                    [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
+                },
                 subsection: location.hash.split('#')[1] || '',
             },
             '*',
         );
     }, [location.search, location.hash]);
-
-    // const setPageContentFromSingleNode = (node: AsciiDocNode) => {
-    //     // get & set left navigation title
-    //     setNavTitle(navNode.pageAttributes.title);
-
-    //     // get & set left navigation area content with dynamic link creation
-    //     const navContentData = passThroughHandler(navNode.html, params);
-    //     setNavContent(navContentData);
-
-    //     // set breadcrums data
-    //     setBreadcrumsData(fetchChild(navContentData));
-
-    //     setDocTitle(node.document.title || node.pageAttributes.title);
-
-    //     // set description
-    //     setDocDescription(
-    //         node.document.description || node.pageAttributes.description,
-    //     );
-    //     // get and set doc page content with dynamic data replaced
-    //     setDocContent(
-    //         passThroughHandler(node.html, { ...params, ...namePageIdMap }),
-    //     );
-    // };
-
-    useEffect(() => {
-        // get & set left navigation 'Back' button url
-        setBackLink(params[TS_ORIGIN_PARAM]);
-    }, [params]);
 
     // fetch adoc translated doc edges using graphql
 
@@ -207,13 +249,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         }
     }, [keyword]);
 
-    React.useEffect(() => {
-        setPrevPageId(location?.pathname.split('/')[1] || 'introduction');
-    }, [location]);
-
     const optionSelected = (pageid: string, sectionId: string) => {
         updateKeyword('');
-        navigate(`/${pageid}#${sectionId}`);
+        if (sectionId) navigate(`/${pageid}#${sectionId}`);
+        else navigate(`/${pageid}`);
     };
 
     const isMaxMobileResolution = !(width < MAX_MOBILE_RESOLUTION);
@@ -230,6 +269,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const calculateDocumentBodyWidth = () => {
         if (isMaxMobileResolution && !isCustomPage) {
             if (width > MAX_CONTENT_WIDTH_DESKTOP) {
+                if (isHomePage) return width - leftNavWidth;
                 return `${MAX_CONTENT_WIDTH_DESKTOP - 300}px`;
             }
             return `${width - 300}px`;
@@ -240,6 +280,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
+            overlay: {
+                background: 'rgba(50,57,70, 0.9)',
+            },
             content: {
                 top: '50px',
                 left: 'auro',
@@ -251,9 +294,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     isMaxMobileResolution ? '80%' : '0'
                 }, 70px)`,
                 border: 'none',
-                height: isMaxMobileResolution ? '400px' : '250px',
+                height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',
-                background: 'transparent',
+                background: isDarkMode ? '#21252c' : '#fff',
+                padding: 0,
             },
         };
         return (
@@ -262,7 +306,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
             >
-                <div id="docsModal" data-theme={isDarkMode ? 'dark' : 'light'}>
+                <div
+                    id="docsModal"
+                    data-theme={isDarkMode ? 'dark' : 'light'}
+                    style={{ height: '100%' }}
+                >
                     <Search
                         keyword={keyword}
                         onChange={(e: React.FormEvent<HTMLInputElement>) =>
@@ -282,12 +330,18 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             </Modal>
         );
     };
-
+    const getParentBackButtonLink = () => {
+        let path = '';
+        if (isBrowser() && !isPublicSiteOpen)
+            path = localStorage.getItem('origin') || '';
+        return path;
+    };
     const renderDocTemplate = () => (
         <>
             {renderSearch()}
             <div className="leftNavContainer">
                 <LeftSidebar
+                    backLink={getParentBackButtonLink()}
                     navTitle={navTitle}
                     navContent={navContent}
                     docWidth={width}
@@ -307,10 +361,23 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 />
             </div>
             {isAskDocsPage ? (
-                <AskDocs />
-            ) : (
                 <div
                     className="documentBody"
+                    style={{
+                        width: calculateDocumentBodyWidth(),
+                        display: 'flex',
+                        marginLeft: isMaxMobileResolution
+                            ? `${leftNavWidth}px`
+                            : '0px',
+                    }}
+                >
+                    <AskDocs />
+                </div>
+            ) : (
+                <div
+                    className={`documentBody ${
+                        isHomePage ? 'doc-home' : 'doc-wrapper-detail'
+                    }`}
                     style={{
                         width: calculateDocumentBodyWidth(),
                         marginLeft: isMaxMobileResolution
@@ -343,7 +410,25 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     );
 
     const renderPlayGround = () => {
-        return <RenderPlayGround location={location} />;
+        const backLink = isBrowser()
+            ? localStorage.getItem('prevPath')
+            : '/introduction';
+        if (isApiPlayground)
+            return (
+                <RenderPlayGround
+                    location={location}
+                    backLink={backLink}
+                    isPublisSiteOpen={isPublicSiteOpen}
+                    params={params}
+                />
+            );
+        return (
+            <GraphQLPlayGround
+                location={location}
+                backLink={backLink}
+                isPublisSiteOpen={isPublicSiteOpen}
+            />
+        );
     };
 
     const getClassName = () => {
@@ -356,6 +441,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
+            <Analytics />
             <div
                 id="wrapper"
                 data-theme={isDarkMode ? 'dark' : 'light'}
@@ -375,9 +461,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                     }}
                 >
-                    {isApiPlaygroundPage
-                        ? renderPlayGround()
-                        : renderDocTemplate()}
+                    {isPlayGround ? renderPlayGround() : renderDocTemplate()}
                 </main>
             </div>
         </>

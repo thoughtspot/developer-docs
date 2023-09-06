@@ -3,10 +3,11 @@ const asciidoc = require('asciidoctor')();
 const config = require('./src/configs/doc-configs');
 
 const getPathPrefix = () => {
-    if (process.env.BUILD_ENV === config.BUILD_ENVS.LOCAL) {
-        return null;
-    }
-    return null;
+    // if (process.env.BUILD_ENV === config.BUILD_ENVS.LOCAL) {
+    //     return null;
+    // }
+    // return null;
+    return 'docs';
 };
 
 const getPath = (path) =>
@@ -87,7 +88,7 @@ module.exports = {
     pathPrefix: getPath(config.DOC_REPO_NAME),
     siteMetadata: {
         title: 'tseverywhere-docs',
-        url: 'https://developer-docs-zeta.vercel.app',
+        url: 'https://developers.thoughtspot.com/docs',
         image: './images/favicon.svg',
     },
     plugins: [
@@ -148,12 +149,12 @@ module.exports = {
                 converterFactory: CustomDocConverter,
             },
         },
-        {
-            resolve: 'gatsby-transformer-rehype',
-            options: {
-                mediaType: 'text/html',
-            },
-        },
+        // {
+        //     resolve: 'gatsby-transformer-rehype',
+        //     options: {
+        //         mediaType: 'text/html',
+        //     },
+        // },
         {
             resolve: 'gatsby-source-git',
             options: {
@@ -212,7 +213,7 @@ module.exports = {
                     });
                     const paths = [];
                     for (const item of asciiNodeSet) {
-                        paths.push({ path: `/${item}` });
+                        paths.push({ path: `/docs/${item}` });
                     }
                     return paths;
                 },

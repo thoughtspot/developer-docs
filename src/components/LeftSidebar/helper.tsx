@@ -5,14 +5,7 @@ import { BiLinkExternal } from '@react-icons/all-files/bi/BiLinkExternal';
 import { IoIosArrowForward } from '@react-icons/all-files/io/IoIosArrowForward';
 import { RiArrowDownSLine } from '@react-icons/all-files/ri/RiArrowDownSLine';
 import selectors from '../../constants/selectorsContant';
-
-export const getHTMLFromComponent = (icon: JSX.Element, iconClass?: string) => {
-    return ReactDOMServer.renderToStaticMarkup(
-        <IconContext.Provider value={{ className: `icon ${iconClass}` }}>
-            {icon}
-        </IconContext.Provider>,
-    );
-};
+import { getHTMLFromComponent } from '../../utils/react-utils';
 
 const ArrowForwardHTML = getHTMLFromComponent(
     <IoIosArrowForward />,
@@ -66,6 +59,9 @@ export const addExpandCollapseImages = (
                 spanElementParent.appendChild(spanElementChild);
                 paragraphElement.appendChild(spanElementParent);
             }
+        } else {
+            const paragraphElement = el.children[0];
+            paragraphElement.classList.add('node-child');
         }
     });
 
@@ -105,7 +101,9 @@ const isCurrentNavOpen = (liEle: HTMLLIElement, activePageid: string) => {
     const isLinkParentOpen =
         paraEle &&
         isLinkMatching(
-            (paraEle.children[0] as HTMLAnchorElement).href,
+            (paraEle.children[0] as HTMLAnchorElement)?.href ||
+                (paraEle.children?.[0].children?.[0] as HTMLAnchorElement)
+                    ?.href,
             window.location,
             activePageid,
         );
@@ -133,13 +131,13 @@ export const collapseAndExpandLeftNav = (
     activePageid: string,
 ) => {
     // Adding click listener to close left nav when in mobile resolution
-    doc.querySelectorAll(selectors.links).forEach((link) => {
+    doc?.querySelectorAll(selectors.links).forEach((link) => {
         link.addEventListener('click', () => {
             setLeftNavOpen(false);
         });
     });
 
-    doc.querySelectorAll('li').forEach((el, i) => {
+    doc?.querySelectorAll('li').forEach((el, i) => {
         if (el.children.length === 2) {
             const spanElement =
                 el.children[0].children.length === 2
@@ -177,7 +175,6 @@ export const collapseAndExpandLeftNav = (
                 } else {
                     // Adding click listener to the headings with links
                     spanElement.addEventListener('click', () => {
-                        console.log('here2');
                         toggleExpandOnTab(
                             (el.children[0] as HTMLParagraphElement).innerText,
                         );

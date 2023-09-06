@@ -1,0 +1,232 @@
+= GraphQL quick setup guide
+:toc: true
+
+:page-title: GraphQL Guide
+:page-pageid: graphql-guide
+:page-description: ThoughtSpot Guide to GraphQL
+
+This section serves as a quick guide for initiating an interaction with ThoughtSpot's GraphQL endpoint. We will be using the Apollo client to interact with ThoughtSpot's GraphQL endpoint.
+
+== Pre-requisites
+
+Before you begin, make sure you have a JavaScript environment set up for your application. This requires `Node.js`, which you can download and install from link:https://nodejs.org/en/download/[https://nodejs.org/en/download/, window=_blank].
+
+After Node.js is successfully installed, you can initiate a new project using the `npm init` command.
+
+== Install dependencies
+
+* @apollo/client
+* graphql
+
+With npm
+[source, shell]
+----
+npm install @apollo/client graphql
+----
+
+With yarn
+[source, shell]
+----
+yarn add @apollo/client graphql
+----
+
+== Initializing Apollo client
+
+Import the following from the Apollo client library:
+
+[source, javascript]
+----
+import { ApolloClient, InMemoryCache, gql } from '@apollo/client';
+----
+
+Initialize the client using one of the methods described in the following sections.
+
+=== Using cookies
+
+For this method, we will utilize the cookies set by the browser for authentication.
+
+[source, javascript]
+----
+const client = new ApolloClient({
+  uri: BASE_URL + "/api/graphql/2.0",
+  cache: new InMemoryCache(),
+  credentials: "include",
+});
+----
+
+With the client defined above, add a link to ThoughtSpot's GraphQL endpoint and run queries.
+
+Because we're relying on cookies for authentication, it's important to have the cookies set up correctly before we run the queries.
+
+To make sure the cookies are in place, call the `login api` before running other queries.
+
+[source, javascript]
+----
+client
+  .mutate({
+    mutation: gql`
+      mutation Login {
+        login(username: "<YOUR_USERNAME>", password: "<YOUR_PASSWORD>")
+      }
+    `,
+  })
+  .then((result) => console.log(result))
+  .catch((err) => console.log(err));
+----
+
+[NOTE]
+====
+You can also use your cluster's secret key here for authentication. For more information, see link:{{navprefix}}/trusted-auth#_secret_key_generation[Secret key generation].
+====
+
+=== Cookieless authentication
+
+For this method, you need to obtain a full access token and use it for authentication. Let us first create a function to get a fill access token:
+
+[source, javascript]
+----
+const getToken = async () => {
+  const fullAccessRes = await fetch(
+    BASE_URL + "/api/rest/2.0/auth/token/full",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username: "tsadmin", password: "admin" }),
+    }
+  );
+  const fullAccessData = await fullAccessRes.json();
+  return fullAccessData.token;
+};
+----
+
+Using this function, we can set up our client as shown in the following examples. Along with the imported functions described in the preceding example, you need `setContext` from the Apollo client library.
+
+[source, javascript]
+----
+import { setContext } from "@apollo/client/link/context";
+----
+
+[source, javascript]
+----
+const authLink = setContext(async (_, { headers }) => {
+  // get the authentication token
+  const token = await getToken();
+  // return the headers to the context so httpLink can read them
+  return {
+    headers: {
+      ...headers,
+      authorization: token ? `Bearer ${token}` : "",
+    },
+  };
+});
+
+// httpLink is the link to the graphql endpoint
+const httpLink = createHttpLink({
+  uri: BASE_URL + "/api/graphql/2.0"
+});
+----
+
+Now you can initialize the client as shown in this example:
+
+[source, javascript]
+----
+const client = new ApolloClient({
+  link: authLink.concat(httpLink),
+  cache: new InMemoryCache(),
+});
+----
+
+== Using the client
+
+After the client is set up, run a query.
+
+[source, javascript]
+----
+client
+  .query({
+    query: gql`
+      query GetCurrentUserInfo {
+        getCurrentUserInfo {
+          id
+          name
+        }
+      }
+    `,
+  })
+  .then((result) => console.log(result))
+  .catch((err) => console.log(err));
+----
+
+To learn more about queries and mutations, see link:{{navprefix}}/graphql-play-ground/#_graphql_queries_and_mutations[GraphQL queries and mutations].
+
+== Reset store on logout
+
+Apollo caches requests, so it's recommended to reset the store on logout.
+
+[source, javascript]
+----
+client.resetStore()
+----
+
+To learn more about reset store, go to link:https://www.apollographql.com/docs/react/networking/authentication/#reset-store-on-logout[https://www.apollographql.com/docs/react/networking/authentication/#reset-store-on-logout, window=_blank].
+
+== Integration with React
+
+=== Setting up Apollo Client
+We can connect Apollo Client to React with the `ApolloProvider` component
+Pass the client we created above to the `ApolloProvider` component.
+
+[source, javascript]
+----
+<ApolloProvider client={client}>
+    <App />
+</ApolloProvider>
+----
+
+=== Using the useQuery hook
+Import the following from the Apollo client library:
+
+[source, javascript]
+----
+import { useQuery, gql } from '@apollo/client';
+----
+
+Now you can use the `useQuery` hook to run queries.
+
+
+[source, javascript]
+----
+const GET_CURRENT_USER_INFO = gql`
+  query GetCurrentUserInfo {
+    getCurrentUserInfo {
+      id
+      name
+    }
+  }
+`;
+
+function CurrentUserInfo() {
+  const { loading, error, data } = useQuery(GET_CURRENT_USER_INFO);
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error : {error.message}</p>;
+
+  return (
+    <div>
+      <h2>Current User Info</h2>
+      <p>{data.getCurrentUserInfo.id}</p>
+      <p>{data.getCurrentUserInfo.name}</p>
+    </div>
+  );
+}
+----
+
+For more information, see link:https://www.apollographql.com/docs/react[https://www.apollographql.com/docs/react, window=_blank].
+
+== Next steps
+
+Check the GraphQL APIs on the live playground:
+
++++<a href="{{previewPrefix}}/api/graphql/playground" target="_blank"> GraphQL Playground </a> +++

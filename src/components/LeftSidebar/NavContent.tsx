@@ -28,12 +28,12 @@ const NavContent = (props: {
                 />
             )}
 
-            <div className="searchInputSelector">
+            <div className="searchInputLeftNav">
                 <div className="searchInputWrapper">
                     <div className="searchInputContainer">
                         <IconContext.Provider
                             value={{
-                                className: `icon searchIcon`,
+                                className: `icon searchIconSmall`,
                             }}
                         >
                             <BiSearch />
@@ -41,7 +41,7 @@ const NavContent = (props: {
 
                         <input
                             data-testid="search-input"
-                            type="Search"
+                            type="text"
                             placeholder={t('SEARCH_PLACEHOLDER')}
                             onClick={() => props.searchClickHandler()}
                             readOnly

@@ -3,10 +3,13 @@ import { useResizeDetector } from 'react-resize-detector';
 import { IconContext } from '@react-icons/all-files';
 import { RiMoonClearLine } from '@react-icons/all-files/ri/RiMoonClearLine';
 import { FiSun } from '@react-icons/all-files/fi/FiSun';
+import { RiDiscordLine } from '@react-icons/all-files/ri/RiDiscordLine';
+import { FiGithub } from '@react-icons/all-files/fi/FiGithub';
 
 import TSLogo from '../../assets/svg/ts-logo-white-developer.svg';
 import t from '../../utils/lang-utils';
 import Dropdown from '../Dropdown';
+// import References from './references';
 import Menu from '../Menu';
 import { MAX_MOBILE_RESOLUTION } from '../../constants/uiConstants';
 import './index.scss';
@@ -22,72 +25,33 @@ const Header = (props: {
 
     const headerLinks = [
         {
-            name: 'APIs & SDKs',
-            href: '',
-            child: [
-                { label: 'Visual Embed SDK', link: 'VisualEmbedSdk' },
-                { label: 'REST API', link: 'rest-apis' },
-            ],
+            name: 'Community',
+            link:
+                'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers-embedding',
+            external: true,
         },
         {
-            name: 'Playground',
-            child: [
-                {
-                    label: 'Visual Embed',
-                    link:
-                        'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/playground/search',
-                    external: true,
-                },
-                {
-                    label: 'REST API',
-                    link:
-                        'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/rest/playgroundV2_0',
-                    external: true,
-                },
-                {
-                    label: 'GraphQL',
-                    link:
-                        'https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/graphql/playground',
-                    external: true,
-                },
-            ],
+            name: 'Support',
+            link: 'https://www.thoughtspot.com/support',
+            external: true,
         },
         {
-            name: 'Resources',
-            child: [
-                {
-                    label: 'Community',
-                    link:
-                        'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers-embedding',
-                    external: true,
-                },
-                {
-                    label: 'Product documentation',
-                    link: 'https://docs.thoughtspot.com',
-                    external: true,
-                },
-                {
-                    label: 'Support',
-                    link: 'https://www.thoughtspot.com/support',
-                    external: true,
-                },
-            ],
+            name: 'GitHub',
+            link: 'https://github.com/thoughtspot/visual-embed-sdk',
+            external: true,
+            icon: FiGithub,
         },
         {
-            name: 'On GitHub',
-            child: [
-                {
-                    label: 'Visual Embed SDK',
-                    link: 'https://github.com/thoughtspot/visual-embed-sdk',
-                    external: true,
-                },
-                {
-                    label: 'REST API SDK',
-                    link: 'https://github.com/thoughtspot/rest-api-sdk',
-                    external: true,
-                },
-            ],
+            name: 'Discord',
+            link: 'https://discord.gg/JHPGwCkvjQ',
+            external: true,
+            icon: RiDiscordLine,
         },
+        // {
+        //     name: 'Product documentation',
+        //     link: 'https://docs.thoughtspot.com',
+        //     external: true,
+        // },
     ];
 
     return (
@@ -97,10 +61,10 @@ const Header = (props: {
                 ref={ref as React.RefObject<HTMLDivElement>}
             >
                 <div className="headerWrapper">
-                    <div>
+                    <div className="header-logo">
                         <h2 className="m-0 d-inline-block logo">
                             <a
-                                href="?pageid=introduction"
+                                href="/docs/introduction"
                                 title={t('TS_LOGO_ALT_TEXT')}
                             >
                                 <img
@@ -112,39 +76,42 @@ const Header = (props: {
                         </h2>
                     </div>
                     <Menu config={headerLinks} />
-                    {isMaxMobileResolution && (
-                        <div className="themeSwitcher">
-                            <IconContext.Provider
-                                value={{ className: 'theme-icon' }}
-                            >
-                                {props.isDarkMode ? (
-                                    <RiMoonClearLine
-                                        onClick={() => {
-                                            localStorage.setItem(
-                                                'theme',
-                                                'light',
-                                            );
-                                            props.setDarkMode(false);
-                                        }}
-                                    />
-                                ) : (
-                                    <FiSun
-                                        onClick={() => {
-                                            localStorage.setItem(
-                                                'theme',
-                                                'dark',
-                                            );
-                                            props.setDarkMode(true);
-                                        }}
-                                    />
-                                )}
-                            </IconContext.Provider>
-                        </div>
-                    )}
-                    <Dropdown
-                        location={props.location}
-                        isMobile={isMaxMobileResolution}
-                    />
+                    <div className="theme-version-wrapper">
+                        {isMaxMobileResolution && (
+                            <div className="themeSwitcher">
+                                <IconContext.Provider
+                                    value={{ className: 'theme-icon' }}
+                                >
+                                    {props.isDarkMode ? (
+                                        <RiMoonClearLine
+                                            onClick={() => {
+                                                localStorage.setItem(
+                                                    'theme',
+                                                    'light',
+                                                );
+                                                props.setDarkMode(false);
+                                            }}
+                                        />
+                                    ) : (
+                                        <FiSun
+                                            onClick={() => {
+                                                localStorage.setItem(
+                                                    'theme',
+                                                    'dark',
+                                                );
+                                                props.setDarkMode(true);
+                                            }}
+                                        />
+                                    )}
+                                </IconContext.Provider>
+                            </div>
+                        )}
+                        <Dropdown
+                            location={props.location}
+                            isMobile={isMaxMobileResolution}
+                        />
+                    </div>
+                    {/* <References /> */}
                 </div>
             </section>
         </header>

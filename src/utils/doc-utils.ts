@@ -18,6 +18,13 @@ const buildJSON = (element) => {
     return subObj;
 };
 
+const getPathPrefix = () => {
+    return 'docs';
+};
+
+export const getPath = (path) =>
+    getPathPrefix() ? `${path}/${getPathPrefix()}` : path;
+
 export const fetchChild = (html: string) => {
     if (typeof window === 'undefined') {
         return [];
@@ -50,7 +57,7 @@ export const getBreadcrumsPath = (data: any, pageid?: string) => {
     return data.reduce((previous, current) => {
         if (
             current.href === `?pageid=${pageid}` ||
-            current.href === `/${pageid}`
+            current.href === `/docs/${pageid}`
         ) {
             // To avoid having link for the same page we are setting href to null
             return [{ name: current.name, href: null }];
