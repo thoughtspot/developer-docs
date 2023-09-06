@@ -34,9 +34,14 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '9.4.0.cl',
-            link: '9.4.0',
+            label: '9.5.0.cl',
+            link: ' ',
             subLabel: 'Cloud (Latest)',
+        },
+        {
+            label: '9.4.0.cl',
+            link: 'https://developer-docs-9-4-0-cl.vercel.app/docs',
+            subLabel: 'Cloud',
         },
         {
             label: '9.0.1.sw',
