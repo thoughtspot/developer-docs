@@ -1,0 +1,41 @@
+= Troubleshoot trusted authentication
+:toc: true
+:toclevels: 1
+
+:page-title: troubleshoot trusted authentication
+:page-pageid: trusted-auth-troubleshoot
+:page-description: Troubleshooting steps for trusted authentication
+
+== Initial steps
+CORS and CSP xref:security-settings.doc[must be configured correctly] for any embedding and REST API commands to work from the browser.
+  
+== Third-party cookie issues
+When implementing trusted authentication with session cookies, check if your browser allows third-party cookies. 
+  
+Chrome now blocks third-party cookies in Incognito mode by default, while Safari blocks them by default even in standard mode. 
+  
+If your Web browser rejects third-party cookies, the embedded content will be blocked. 
+  
+To workaround this issue, you can either use cookieless authentication (`AuthType.TrustedAuthTokenCookieless`) in the SDK or xref:custom-domain-configuration.adoc[customize the ThoughtSpot instance domain] to match the top-level domain of your embedding web app.
+
+== Tester HTML page
+The token_auth directory contains a link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/examples/token_auth/trusted_auth_tester.html[trusted_auth_tester.html, window=_blank] page to help verify each step of the trusted authentication process.
+
+== Use browser developer tools
+Using the *Network* and *JavaScript Console* tabs of your browser's Developer Tools, you should see the following steps triggered by the `init()` function when using cookie-based trusted authentication:
+
+1. Make a `GET` request to the `/session/info` API endpoint.
+2. If `/session/info` returns as a 401 error (red), you will see a `GET` request to the URL specified in the `authEndpoint` property or the URL defined in the callback function referred to be `authEndpoint` (GET or POST).
+3. Response from the URL above should return 200 with a *login token*.
+4. When the *login token* is received, the `init()` function makes a `POST` request to the `/session/login/token` REST API v1 endpoint.
+5. The first response to `/session/login/token` will be an HTTP 204. It may show "OPTIONS" rather than "POST"
+6. Immediately following should be an HTTP 302 (Redirect) response to the `POST` request. There should be several *set-cookie* headers in the response, particularly a *JSESSIONID=*.
+
+If the *set-cookie* response does not come through and actually sets the ThoughtSpot cookies in the browser, sign-in will not complete.
+
+With cookie-less trusted authentication, you will see that every request to the ThoughtSpot instance has a request header of the form, including the retrieved token from the *token request service*: 
+----
+`authorization: Bearer YnJ5YW50Lmhvd2VsbDpKSE5vYVhKdk1TUlRTRUV0TWpVMkpEVXdNREF3TUNRNWRGcDZVREY2VUcxMmIyVXZUalEyT1ZaMWIxaEJQVDBrYTFSeVRIRmtZV1k0UjJWUldHTndPVVZIWTJsb1RVVTFVR1lyWWsxU1NtMTVVSEo1TTJkS2Ftc3laejA=`
+----
+
+
