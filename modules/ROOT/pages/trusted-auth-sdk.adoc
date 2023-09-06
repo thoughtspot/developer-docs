@@ -1,0 +1,185 @@
+= Front-end trusted authentication integration
+:toc: true
+:toclevels: 2
+
+:page-title: Front-end trusted authentication integration
+:page-pageid: trusted-auth-sdk
+:page-description: Front-end trusted authentication integration using Visual Embed SDK
+
+The Visual Embed SDK uses the `init()` function to automate the request to the xref:trusted-auth-token-request-service.adoc[token request service] and properly use the returned token to establish authentication with ThoughtSpot.
+
+== Overview
+When `init()` is called, the SDK checks if there is an existing ThoughtSpot session for the instance in the browser. If not, it will request a *login token* from either the `authEndpoint` URL or the `getAuthToken` callback function.
+
+Cookieless authentication, specified using `AuthType.TrustedAuthTokenCookieless`, uses the token as a bearer token for all subsequent requests to ThoughtSpot, without establishing a session in the browser.
+
+Cookie-based authentication, specified using `AuthType.TrustedAuthToken`, uses the token to create a session in the browser immediately, and does not use the token afterward, instead relying on the established session with the ThoughtSpot instance.
+
+For the request to be *secure*, the user in the browser cannot modify the request or make their own valid request to the *token request service* in a way that requests a token for any other user.
+
+== Define token request service
+There are two options in the `init()` function to define the request to the *token request service*: `authEndpoint` or `getAuthToken`.
+
+=== authEndpoint
+The `authEndpoint` parameter of the `init()` function specifies a URL for a direct *GET request* to the *token request service*.
+
+Any authentication details must be included by the browser in this automated GET request, typically in the cookies. 
+
+It is *insecure* to allow specifying the username of the desired login token in the URL called by `authEndpoint`, because any user could request tokens for other users. Instead, the *token request service* itself must be able to determine which user is logged in from the backend.
+
+Cookies are not sent across domains (only to sub-domains), so your *token request service* must be *hosted in the same domain* as the embedding application.
+
+If you need more control beyond a GET request, use `getAuthToken` instead to define a customized request.
+
+=== getAuthToken
+The `getAuthToken` parameter of the `init()` function specifies a *callback function* to return the login token.
+
+The callback function must return a *Promise* that resolves with the *login token*. 
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: <ThoughtSpot-Host-URL>
+    authType: AuthType.TrustedAuthToken,
+    username: "<username>",
+    getAuthToken: () => {
+        // fetch() returns a Promise naturally. Assumes a JSON response from token request service with a 'token' property 
+        return fetch('https://my-backend.app/ts-token')
+            .then((response) => response.json())
+            .then((data) => data.token);
+ });
+----
+
+You can even use the callback function to reference a hard-coded login token, in a testing or other appropriate situation: 
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: <ThoughtSpot-Host-URL>
+    authType: AuthType.TrustedAuthToken,
+    username: "<username>",
+    getAuthToken: () => {
+        let tsToken = '{long-lived-token};
+        return tsToken;
+ });
+----
+
+See the examples in the following section for more variations on the `getAuthToken` callback function.
+
+== Cookieless vs. cookie-based authentication
+The second decision is whether to use cookie-based or cookieless authentication.
+
+Cookieless authentication only works with login tokens returned from the REST API v2 endpoint, while cookie-based authentication works with tokens obtained via REST API v1 or v2 endpoints.
+
+Cookie-based authentication (`AuthType.TrustedAuthToken`) establishes a browser-wide ThoughtSpot session. For it to work in most situations, you also need to customize the ThoughtSpot domain to be on the same top-level domain as the embedding app.
+
+Cookieless authentication (`AuthType.TrustedAuthTokenCookieless`) is useful if you are embedding ThoughtSpot content in an app that is not in the same domain as your ThoughtSpot instance. Many web browsers block third-party cookies (Safari, Edge, mobile browsers), and cookieless authentication avoids this restriction. For more information, see xref:embed-authentication.adoc#trusted-auth-embed[Embed user authentication page].
+
+=== Session length
+The ThoughtSpot session established by cookie-based naturally extends as the user interacts with ThoughtSpot content.
+
+When used as a bearer token, the lifespan of the token is established when it is requested and does not ever extend. You can however request any length of lifespan for the token.
+
+The `init()` function can automatically request a new token when it detects either the session or the token has expired if the `autoLogin: true` option is set. You may also set `disableLoginRedirect: true` to customize the behavior when `autoLogin` is in place. See the xref:getting-started.adoc#_configure_security_and_login_parameters_optional[init() function documentation] for a full description of the available customizations.
+
+=== REST API requests
+Because cookie-based authentication has a ThoughtSpot session cookie in the browser, REST API requests for the user can be made simply by including credentials in the REST API request.
+
+With cookieless authentication, you will need to add the token as the bearer token in any REST API request you make to ThoughtSpot. This means you'll want to store the returned token in the global scope as part of the callback function you define for `getAuthToken`.
+
+=== Multiple user sessions in one browser
+Cookieless authentication is also useful for scenarios where the embedding application allows for being logged into multiple user accounts in different tabs, or quick switches between users. Cookie-based authentication restricts the whole browser to a single logged-in user per ThoughtSpot instance, while cookie-less allows each tab to use a different token without conflicts.
+
+== Code examples
+The only difference between cookie-based trusted authentication and cookieless authentication in the `init()` function is the value used for the `authType` property. 
+
+Cookieeless auth does not require the `username` property, as the `username` value is encoded within the token.
+
+The following example shows a custom callback function with a custom request using link:https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch[Fetch, window=_blank], which returns a Promise. This example shows passing a JWT into the header of the POST request as the method for passing auth details to the *token request service*. See other examples below for simpler request implementations.
+
+[source,JavaScript]
+----
+let tsToken; // global scope to store token for other REST API requests
+init({
+    thoughtSpotHost: tsURL,
+    authType:  AuthType.TrustedAuthTokenCookieless,
+    getAuthToken: getAuthToken
+  });
+
+function async getAuthToken {
+  const tokenURL = tokenServiceURL + "/gettoken/";
+  console.log("calling token server at " + tokenURL);
+
+  const timeoutSecs = 5 * 1000; // seconds to milliseconds
+
+  const response = await timeout(timeoutSecs, fetch(
+    tokenURL,
+    {
+      method: 'POST',
+      mode: 'cors',
+      cache: 'no-cache',
+      headers: {
+        // This Token Request Service returns the token as a plain-text string
+        'Content-Type': "text/plain",
+        // Custom header for passing a JWT with auth details from the web app to the token request service
+        // Instead the token request service may have access to a user session with the details
+        'X-Auth-Token': authJWT
+      },
+      credentials: 'include'
+    }
+  ))
+
+  // Token request service returns plain-text string of the token
+  // set the global tsToken variable for using the token for separate REST API requests
+  tsToken = response.text();
+  // Must return for the Promise to be completed
+  return response.text()
+}
+----
+
+=== Cookie-based authentication examples
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: "https://<hostname>:<port>",
+    authType: AuthType.TrustedAuthToken,
+    username: "<username>",
+    authEndpoint: "https://authenticator-server:<port>/endpoint",
+});
+----
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: <ThoughtSpot-Host-URL>
+    authType: AuthType.TrustedAuthToken,
+    username: "<username>",
+    getAuthToken: () => {
+        return fetch('https://my-backend.app/ts-token')
+            .then((response) => response.json())
+            .then((data) => data.token);
+ });
+----
+
+=== Cookieless authentication examples
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: "https://<hostname>:<port>",
+    authType: AuthType.TrustedAuthTokenCookieless,
+    authEndpoint: "https://authenticator-server:<port>/endpoint",
+});
+----
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: <ThoughtSpot-Host-URL>
+    authType: AuthType.TrustedAuthTokenCookieless,
+    getAuthToken: () => {
+        return fetch('https://my-backend.app/ts-token')
+            .then((response) => response.json())
+            .then((data) => data.token);
+ });
+----
