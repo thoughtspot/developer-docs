@@ -160,6 +160,86 @@ Feel free to use these examples to start your implementations, but please remove
 
 * A fully functioning Node.js example using Axios and Express: link:https://github.com/thoughtspot/node-token-auth-server-example[https://github.com/thoughtspot/node-token-auth-server-example, window=_blank]
 
+The following is a C# example of the ThoughtSpot token request, to be used within a REST API service in the .Net platform, storing the `secret_key` in Azure Key Vault:
+[source,c#]
+----
+using System.Net.Http;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+// For Azure Key Vault
+using Microsoft.Azure.Services.AppAuthentication;
+
+// This example does not include any of the .Net / ASP REST API code
+// but simply defines the Request and Response classes necessary for Full Token Request
+
+public class TSFullTokenRequest
+{
+    public string username  {get; set;}
+    public string? password {get; set;}
+    public string? secret_key {get; set;}
+    public int validity_time_in_sec {get; set;}
+    public int? org_id {get; set;}
+    public string? display_name {get; set;}
+    public bool? auto_create {get; set;}
+}
+
+public class TSTokenScope {
+    public string access_type {get; set;}
+    public int org_id {get; set;}
+    public string? metadata_id {get; set;}
+}
+
+public class TSFullTokenResponse
+{
+    public string token {get; set;}
+    public int creation_time_in_millis {get; set;}
+    public int expiration_time_in_milis {get; set;}
+    public TSTokenScope scope {get; set;}
+    public string valid_for_user_id {get; set;}
+    public string valid_for_username {get; set;}
+}
+
+public static httpClient = new HttpClient();
+
+var tsHost = 'https://{}.thoughtspot.cloud';
+
+var tsTokenEndpoint = '/api/rest/2.0/auth/token/full';
+var fullEndpoint = tsHost + tsTokenEndpoint;
+
+// secret_key stored in the Azure Key Valut
+var azureServiceTokenProvider = new AzureServiceTokenProvider();        
+KeyVaultClient kvc = new KeyVaultClient(azureServiceTokenProvider.KeyVaultTokenCallback);
+SecretBundle tsSecretKey = kvc.GetSecretAsync(baseUrl, "tsSecretKey").Result;
+
+TSFullTokenRequest tsTokenRequest = new (){
+    username = 'usernameFromAuthMiddleware',
+    secret_key = tsSecretKey.Value,
+    validity_time_in_sec = 30
+};
+
+// Ignore any null properties when serializing
+JsonSerializerOptions options = new()
+{
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+};
+
+string jsonString = JsonSerializer.Serialize<TSFullTokenRequest>(tsTokenRequest, options);
+
+var response = await httpClient.PostAsync(fullEndpoint, jsonString);
+if (response.IsSuccessStatusCode)
+{
+    string responseContent = await response.Content.ReadAsStringAsync();
+    TSFullTokenResponse tsTokenResp = JsonSerializer.Deserialize(responseContent, TSFullTokenResponse, options);
+    string token = tsTokenResp.token;
+    // Return token string from the API endpoint
+}
+
+else
+{
+    // handle error, return error from the API endpoint
+}
+----
+
 == Implement token login without the Visual Embed SDK
 The Visual Embed SDK handles the final REST API request to create the session, but it is possible to perform the login using xref:session-api.adoc#session-loginToken[/session/login/token] or the xref:rest-api-v2-reference.adoc#_authentication[ REST API v2.0 token access endpoints]. For more information, see xref:api-auth-session.adoc#_authenticate_and_log_in_with_a_token_trusted_authentication[REST API v1 authentication] and xref:authentication.adoc#trusted-auth-v2[REST API v2.0 authentication].
 
