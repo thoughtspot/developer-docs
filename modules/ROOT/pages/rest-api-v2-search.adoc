@@ -1,7 +1,7 @@
 
 = REST API v2.0 search endpoints
 :toc: true
-:toclevels: 1
+:toclevels: 2
 
 :page-title: Using REST API V2.0 search endpoints
 :page-pageid: rest-apiv2-search
@@ -51,6 +51,7 @@ The response from any call to `metadata/search` will resemble the following:
 ----
 
 The value of `metadata_header` is an complex object with the most important set of attributes of the item. Note that `author` is the creator or current user who has been assigned the "ownership" of the object, while `owner` describes a hierarchical relationship between ThoughtSpot objects (for example, this Liveboard has an `owner` property identical to it's own `id` property, meaning it stands alone):
+
 [source,javascript]
 ----
 "metadata_header":{
@@ -191,6 +192,36 @@ The `sort_options` parameter takes a link:https://developers.thoughtspot.com/doc
 
 If you need multiple levels of sorting, you'll have to parse the response programmatically and apply a sorting algorithm on the properties within each response item.
 
+=== permissions
+You can filter responses based on who can access the object, i.e. who the content has been shared to, using the `permissions` parameter.
+
+This replaces the individual `security` endpoints in the V1 REST API, such as the xref:security-api.adoc#obj-permission-all[get object permission details for a specific object type] endpoint.
+
+The `permissions` object takes an array of objects that define a `principal` and a `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fenumerations%2Fshare-mode[share_mode, target=_blank]`. `principal` is an object with a `type` of `USER` or `USER_GROUP` and an `identifier`, either the name or the GUID of the principal:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ],
+ "permissions" : [
+    {
+      "principal": {
+        "type": "USER_GROUP",
+        "identifier": "Administrators"
+      },
+      "share_mode": "MODIFY"
+    }
+  ]
+}
+----
+
+`share_mode` can be `READ_ONLY` ('Can View' in the UI), `MODIFY` ('Can Edit' in the UI) or `NO_ACCESS`, which shows denial of access, not possible to see in the UI currently.
+
+
 === tag_identifiers
 Thoughtspot objects can be assigned multiple **tags**, and the `/metadata/search` endpoint allows you to filter for items with a set of tags using the `tag_identifiers` parameter, which takes an array of tag names or GUIDs. 
 
@@ -207,7 +238,8 @@ Including multiple tags behaves as a logical **OR** operation, retrieving all co
 "tag_identifiers": [
   'Staging',
   'Accounting'
-]
+ ]
+}
 ----
 
 === created_by_user_identifiers and modified_by_user_identifiers
@@ -224,7 +256,8 @@ The `created_by_user_identifiers` and `modified_by_user_identifiers` parameters 
 "created_by_user_identifiers": [
   'bryant.howell',
   'bill.back'
-]
+ ]
+}
 ----
 
 === favorite_object_options
@@ -242,6 +275,7 @@ To retrieve the favorites for the user making the request, set the `include` pro
   ],
 "favorite_object_options": {
   "include" : true
+ }
 }
 ----
 
@@ -258,11 +292,15 @@ An admin level user can instead request for other users using the `user_identifi
 "favorite_object_options": {
   "include" : true,
   "user_identifiers" : ['bill.back']
+ }
 }
 ----
 
 === exclude_objects
 The `exclude_objects` parameter takes an array of objects that can exclude items from the returned list:
+
+[source,javascript]
+----
 {
  "metadata": [
     {
@@ -294,7 +332,8 @@ In V2, the `include_visualization_headers` parameter adds the visualization head
       "identifier" : "009d8d6c-5026-47a9-96d7-9e0f84896d17"
     }
   ],
-"include_visualization_headers": true
+ "include_visualization_headers": true
+}
 ----
 
 Note from above that the response to **every** request has the `visualization_headers` key, but the value will be `null` unless `include_visualization_headers` is `true` and the object type is `LIVEBOARD`.
@@ -359,7 +398,10 @@ Common use cases for the dependent objects include tagging, auditing proper shar
 === include_stats
 The `include_stats` boolean option causes the `stats` key of the response to be filled with an object with statistics about user access to the object. 
 
-===
+=== include_worksheet_search_assist_data
+
+=== include_hidden_objects, include_incomplete_objects, include_auto_created_objects
+
 
 = users/search
 
