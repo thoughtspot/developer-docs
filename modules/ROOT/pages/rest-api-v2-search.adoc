@@ -232,7 +232,7 @@ The `created_by_user_identfiers` parameter takes a list of user names or GUIDs, 
 == Additional response details
 There are a number of parameters that add new data to the response, allowing the `metadata/search` endpoint to answer questions that required multiple endpoints in the V1 REST API.
 
-=== Visualization headers from a Liveboard
+=== include_visualization_headers
 The V1 REST API has an endpoint called `metadata/listvizheaders`, which receives the header details of all of the individual visualizations on a Liveboard.
 
 In V2, the `include_visualization_headers` parameter adds the visualization headers to the response.
@@ -273,6 +273,38 @@ The `include_details` parameter of `metadata/search` request adds the equivalent
 The details of each object type is a complex object that is unique to each object type within ThoughtSpot. 
 
 === include_dependent_objects
-d
+Data objects in Thoughtspot like tables and worksheets have **dependent objects** that connect to them. Liveboards and answers do not have dependent objects, they can only be a depedennt object.
 
+An object can only be deleted if all of its dependent objects are deleted first.
+
+The V1 REST API had an entire set of xref:dependent-objects-api.adoc[dependent objects APIs] for retrieving these relationships.
+
+The equivalent information is retrieved from `metadata/search` by setting the `include_dependent_objects` parameter to `true`:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "identifier" : "782b50d1-fe89-4fee-812f-b5f9eb0a552d"
+    }
+  ],
+ "include_dependent_objects" : true
+}
+----
+
+The response will now have an object for the `dependent_objects` key. This object is of a complex format, that always starts with a key that is the metadata object's own GUID, with the value being an object with keys of the various internal object type identifiers (note "LOGICAL_TABLE" and "QUESTION_ANSWER_BOOK" in the response below):
+
+[source,javascript]
+----
+"dependent_objects":{
+  "782b50d1-fe89-4fee-812f-b5f9eb0a552d":{
+      "LOGICAL_TABLE": [...]
+      "QUESTION_ANSWER_BOOK": [...]
+  }
+}
+----
+The array for each object type will contain the metadata headers for the various dependent objects, including the GUIDs necessary to do any further actions on those dependent objects as the `id` property.
+
+Common use cases for the dependent objects include tagging, auditing proper sharing, proper deletion, and any other tasks for applying a change in bulk to related objects in one data model.
 
