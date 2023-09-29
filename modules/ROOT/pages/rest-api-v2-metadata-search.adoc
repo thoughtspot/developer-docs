@@ -1,0 +1,389 @@
+= REST API v2.0 metadata/search endpoint
+:toc: true
+:toclevels: 2
+
+:page-title: Using REST API V2.0 metadata/search endpoint
+:page-pageid: rest-apiv2-metadata-search
+:page-description: Many use cases are possible with the very flexible REST API v2.0 search endpoints
+
+`link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fsearch-metadata[/metadata/search, target=_blank]` is the most versatile of all of the metadata endpoints. It can be used to search for lists, or to retrieve back very detailed information about specific objects.
+
+It replaces `metadata/list`, `metadata/listobjectheaders`, `metadata/details` and `metadata/listvizheaders` from REST API V1.
+
+The overall structure of `metadata/search` request is link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fapi-rest-20-metadata-search-request[described as a combination of objects, target=_blank].
+
+The response from any call to `metadata/search` will resemble the following:
+
+[source,javascript]
+----
+[
+  {
+  "metadata_id": "4081f38c-1f26-4354-a418-af14136e3bd7",
+  "metadata_name": "Snowflake",
+  "metadata_type": "LIVEBOARD",
+  "dependent_objects": null,
+  "incomplete_objects": null,
+  "metadata_detail": null,
+  "metadata_header":{...},
+  "visualization_headers": null,
+  "stats": null,
+  },
+...
+]
+----
+
+The value of `metadata_header` is an complex object with the most important set of attributes of the item. Note that `author` is the creator or current user who has been assigned the "ownership" of the object, while `owner` describes a hierarchical relationship between ThoughtSpot objects (for example, this Liveboard has an `owner` property identical to it's own `id` property, meaning it stands alone):
+
+[source,javascript]
+----
+"metadata_header":{
+  "hasTabs": false
+  "modelVersion": "V1"
+  "hasMandatoryFilter": false
+  "isMandatoryFilterValueSelected": true
+  "totalContainerCount": 2
+  "id": "4081f38c-1f26-4354-a418-af14136e3bd7"
+  "indexVersion": 627937
+  "generationNum": 865262
+  "name": "Snowflake"
+  "author": "09ba9ffe-a923-47e3-ae37-152249c2fda4"
+  "authorName": "bryant.howell"
+  "hasLenientDiscoverability": false
+  "authorDisplayName": "Bryant Howell"
+  "created": 1625693060555
+  "modified": 1625693061955
+  "modifiedBy": "09ba9ffe-a923-47e3-ae37-152249c2fda4"
+  "owner": "4081f38c-1f26-4354-a418-af14136e3bd7"
+  "isDeleted": false
+  "isHidden": false
+  "isAutoCreated": false
+  "isAutoDelete": false
+  "resolvedObjects": {}
+  "tags":[]
+  "aiAnswerGenerationDisabled": false
+  "isExternal":f alse
+  "isDeprecated": false
+  "isSharedViaConnection": false
+}
+----
+
+You'll notice a number of other keys with a `null` value. Various request parameters cause those sections of the response to be filled in with additional details.
+
+== Lists of metadata
+`/metadata/search` performs listing functions when you do not send specific object IDs as part of your request. 
+
+The basic metadata selectors are placed in the `metadata` parameter as an array of link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fmetadata-list-item-input[Metadata List objects, target=_blank]. 
+
+For example, to see *all liveboards*, you only send the a single Metadata List object with `type` parameter set to `LIVEBOARD`:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ]
+{
+----
+
+To match names against a pattern, you can use the `name_pattern` parameter, including % for wildcard purposes:
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD",
+      "name_pattern": "Standard %"
+    }
+  ]
+}
+----
+You may still want to process the result set further within your programming language.
+
+== Retrieve specific objects
+The `identifier` parameter allows referencing an object by name or by object GUID. 
+  
+Specific objects can be retrieved via the object GUID without specifying `type`:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "identifier" : "009d8d6c-5026-47a9-96d7-9e0f84896d17"
+    }
+  ]
+}
+----
+
+You can specify one item by name using `identifier`, but you must include the `type` in this request:
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD",
+      "identifier" : "My Great Liveboard"
+    }
+  ]
+}
+----
+
+The response to a `metadata/search` request takes the form of an array of link:https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/rest/playgroundV2_0?apiResourceId=http%2Fmodels%2Fstructures%2Fmetadata-search-response[Metadata Response Objects, target=_blank]:
+[source,javascript]
+----
+"[
+  {
+    "metadata_id": "009d8d6c-5026-47a9-96d7-9e0f84896d17"
+    "metadata_name": "New Liveboard"
+    "metadata_type": "LIVEBOARD"
+    "dependent_objects": null
+    "incomplete_objects": null
+    "metadata_detail": null
+    "metadata_header": {...}
+    "visualization_headers": null
+    "stats": null
+  },
+  ...
+]
+----
+
+The `metadata_header` key is always returned with values, regardless of the request. This section resembles the V1 REST API response from `metadata/list` and `metadata/listobjectheaders`.
+
+== Filtering and sorting
+
+=== sort_options
+The `sort_options` parameter takes a link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fmetadata-search-sort-options[Metadata Search Sort Options, target=_blank] object allowing for sorting on one field of the metadata response either **ASC** or **DESC**:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ],
+ "include_visualization_headers": true,
+ "sort_options" : {
+  "field_name": "LAST_ACCESSED",
+  "order": "ASC" 
+ }
+}
+----
+
+If you need multiple levels of sorting, you'll have to parse the response programmatically and apply a sorting algorithm on the properties within each response item.
+
+=== permissions
+You can filter responses based on who can access the object, i.e. who the content has been shared to, using the `permissions` parameter.
+
+This replaces the individual `security` endpoints in the V1 REST API, such as the xref:security-api.adoc#obj-permission-all[get object permission details for a specific object type] endpoint.
+
+The `permissions` object takes an array of objects that define a `principal` and a `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fenumerations%2Fshare-mode[share_mode, target=_blank]`. `principal` is an object with a `type` of `USER` or `USER_GROUP` and an `identifier`, either the name or the GUID of the principal:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ],
+ "permissions" : [
+    {
+      "principal": {
+        "type": "USER_GROUP",
+        "identifier": "Administrators"
+      },
+      "share_mode": "MODIFY"
+    }
+  ]
+}
+----
+
+`share_mode` can be `READ_ONLY` ('Can View' in the UI), `MODIFY` ('Can Edit' in the UI) or `NO_ACCESS`, which shows denial of access, not possible to see in the UI currently.
+
+
+=== tag_identifiers
+Thoughtspot objects can be assigned multiple **tags**, and the `/metadata/search` endpoint allows you to filter for items with a set of tags using the `tag_identifiers` parameter, which takes an array of tag names or GUIDs. 
+
+Including multiple tags behaves as a logical **OR** operation, retrieving all content with **any** of the listed tags. The following will retrieve any content tagged with 'Staging' or 'Accounting' tags:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ],
+"tag_identifiers": [
+  'Staging',
+  'Accounting'
+ ]
+}
+----
+
+=== created_by_user_identifiers and modified_by_user_identifiers
+The `created_by_user_identifiers` and `modified_by_user_identifiers` parameters take a list of user names or GUIDs, and filters the results to only those with objects that were created by or modified by those users.
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ],
+"created_by_user_identifiers": [
+  'bryant.howell',
+  'bill.back'
+ ]
+}
+----
+
+=== favorite_object_options
+The `favorite_object_options` parameter takes an object that filters the result list to only objects that have been favorited. 
+
+To retrieve the favorites for the user making the request, set the `include` property to `true`:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ],
+"favorite_object_options": {
+  "include" : true
+ }
+}
+----
+
+An admin level user can instead request for other users using the `user_identifiers` array, which takes a username or GUID. If you send multiple user identifiers, the result is the full set of all items favorited by all listed users, with no particular way to identified who favorited which content.
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ],
+"favorite_object_options": {
+  "include" : true,
+  "user_identifiers" : ['bill.back']
+ }
+}
+----
+
+=== exclude_objects
+The `exclude_objects` parameter takes an array of objects that can exclude items from the returned list:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "type": "LOGICAL_TABLE"
+    }
+  ],
+ "exclude_objects": [
+    {
+      "identifier": "Retail Sales",
+      "type": "LOGICAL_TABLE"
+    }
+ ]
+}
+----
+
+== Additional response details
+There are a number of parameters that add new data to the response, allowing the `metadata/search` endpoint to answer questions that required multiple endpoints in the V1 REST API.
+
+=== include_visualization_headers
+The V1 REST API has an endpoint called `metadata/listvizheaders`, which receives the header details of all of the individual visualizations on a Liveboard.
+
+In V2, the `include_visualization_headers` parameter adds the visualization headers to the response.
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "identifier" : "009d8d6c-5026-47a9-96d7-9e0f84896d17"
+    }
+  ],
+ "include_visualization_headers": true
+}
+----
+
+Note from above that the response to **every** request has the `visualization_headers` key, but the value will be `null` unless `include_visualization_headers` is `true` and the object type is `LIVEBOARD`.
+
+`include_visualization_headers` adds the array of visualization headers for every element in the response, so you can request a list of all Liveboards and all the visualizations on those Liveboards all at once.
+
+=== include_details
+The V1 REST API has an endpoint called `metadata/details` for retrieving a very large and complex object containing as much detail as possible about the requested object and its relationships with other objects within ThoughtSpot.
+
+The `include_details` parameter of `metadata/search` request adds the equivalent details object to each element retrieved by `metadata/search` to the response under the `metadata_detail` key.
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "identifier" : "009d8d6c-5026-47a9-96d7-9e0f84896d17"
+    }
+  ],
+ "include_details" : true
+}
+----
+
+The details of each object type is a complex object that is unique to each object type within ThoughtSpot. 
+
+=== include_dependent_objects
+Data objects in Thoughtspot like tables and worksheets have **dependent objects** that connect to them. Liveboards and answers do not have dependent objects, they can only be a depedennt object.
+
+An object can only be deleted if all of its dependent objects are deleted first.
+
+The V1 REST API had an entire set of xref:dependent-objects-api.adoc[dependent objects APIs] for retrieving these relationships.
+
+The equivalent information is retrieved from `metadata/search` by setting the `include_dependent_objects` parameter to `true`:
+
+[source,javascript]
+----
+{
+ "metadata": [
+    {
+      "identifier" : "782b50d1-fe89-4fee-812f-b5f9eb0a552d"
+    }
+  ],
+ "include_dependent_objects" : true
+}
+----
+
+The response will now have an object for the `dependent_objects` key. This object is of a complex format, that always starts with a key that is the metadata object's own GUID, with the value being an object with keys of the various internal object type identifiers (note "LOGICAL_TABLE" and "QUESTION_ANSWER_BOOK" in the response below):
+
+[source,javascript]
+----
+"dependent_objects":{
+  "782b50d1-fe89-4fee-812f-b5f9eb0a552d":{
+      "LOGICAL_TABLE": [...]
+      "QUESTION_ANSWER_BOOK": [...]
+  }
+}
+----
+The array for each object type will contain the metadata headers for the various dependent objects, including the GUIDs necessary to do any further actions on those dependent objects as the `id` property.
+
+Common use cases for the dependent objects include tagging, auditing proper sharing, proper deletion, and any other tasks for applying a change in bulk to related objects in one data model.
+
+=== include_stats
+The `include_stats` boolean option causes the `stats` key of the response to be filled with an object with statistics about user access to the object. 
+
+=== include_worksheet_search_assist_data
+The `include_worksheet_search_assist_data` boolean parameter includes details about the link:https://docs.thoughtspot.com/cloud/latest/search-assist[Search Assist, target=_blank] feature within the response.
+
+=== include_hidden_objects, include_incomplete_objects, include_auto_created_objects
+The `metadata/search` response typically excludes objects that are "auto-created", "hidden" or "incomplete", as these objects represent internal use cases typically not seen or modified by any end user. 
+
+The `include_hidden_objects`, `include_incomplete_objects`, and `include_auto_created_objects` boolean parameters can be used if you have a known use-case where you need metadata information from an object marked under one of these categories (for example, the internal hidden answer objects that represent each viz on a Liveboard).
