@@ -22,27 +22,27 @@ Throughout this article, requests and responses will be shown as JSON, without a
 }
 ----
 
-= /metadata/search
+== metadata/search
 The `/metadata/search` endpoint in the V2 REST API replaces a large set of distinct endpoints in REST API V1. 
 
 Please see the xref:rest-api-v2-metadata-search.adoc[/metadata/search endpoint documentation] for all of the many use cases of this API.
 
-= users/search
+== users/search
 You can use `metadata/search` with the `type` set to `USER` to get a basic listing, but `users/search` endpoint provides many more filtering options that are specific to properties of user objects.
 
 Please see the xref:rest-api-v2-users-search.adoc[/users/search endpoint documentation] for all of the many use cases of this API.
 
-= groups/search
+== groups/search
 You can use `groups/search` with the `type` set to `USER_GROUP` to get a basic listing, but `groups/search` endpoint provides many more filtering options that are specific to properties of user group objects.
 
 Please see the xref:rest-api-v2-groups-search.adoc[/groups/search endpoint documentation] for all of the many use cases of this API.
 
-= tags/search
-The `tags/search` V2 endpoint allows you request a filterd list of the tag objects in the ThoughtSpot system. 
+== tags/search
+The `tags/search` V2 endpoint allows you request a filtered list of the tag objects in the ThoughtSpot system. 
 
 Searches for which content tags are assigned to are performed using the `xref:rest-api-v2-metadata-search.adoc[metadata/search]` endpoint.
 
-== List all tags
+=== List all tags
 The simplest request to `tags/search` is an empty body, which retrieves all tags in the system. Note that you do need to send an empty object `{ }` in the body of the request, otherwise it will not work:
 
 [source,javascript]
@@ -56,25 +56,25 @@ The response will be an array of tag header objects, with various properties of 
 ----
 [
   {
-    "name":"RetailJP"
-    "id":"000a240f-3029-4d2a-9d60-5fc3885f7bc7"
-    "color":"#63c9ea"
-    "deleted":false
-    "hidden":false
-    "external":false
-    "deprecated":false
-    "creation_time_in_millis":1607307160738
-    "modification_time_in_millis":1607307160974
-    "author_id":"59481331-ee53-42be-a548-bd87be6ddd4a"
-    "modifier_id":"59481331-ee53-42be-a548-bd87be6ddd4a"
-    "owner_id":"000a240f-3029-4d2a-9d60-5fc3885f7bc7"
+    "name": "RetailJP"
+    "id": "000a240f-3029-4d2a-9d60-5fc3885f7bc7"
+    "color": "#63c9ea"
+    "deleted": false
+    "hidden": false
+    "external": false
+    "deprecated": false
+    "creation_time_in_millis": 1607307160738
+    "modification_time_in_millis": 1607307160974
+    "author_id": "59481331-ee53-42be-a548-bd87be6ddd4a"
+    "modifier_id": "59481331-ee53-42be-a548-bd87be6ddd4a"
+    "owner_id": "000a240f-3029-4d2a-9d60-5fc3885f7bc7"
     },
     ...
 ]
 ----
 `name`, `color` and `id` are the most essential tag properties
 
-== Filter to specific tags
+=== Filter to specific tags
 You can specify a particular tag using the `tag_identifier` parameter in the request, which takes either the tag name or GUID:
 
 [source,javascript]
@@ -92,9 +92,208 @@ You can also search for tags by assigned color with the `color` parameter, which
 }
 ----
 
-= orgs/search
+== orgs/search
+Orgs are multi-tenant divisions of a ThoughtSpot cluster. If Orgs are enabled on a cluster, an admin level user can use the `orgs/search` V2 endpoint to retrieve details about the Orgs that exist in the cluster.
 
-= schedules/search
+This is essential for API operations on Orgs that require the `org_id`, which is a numeric identifier that can only be retrieved via API. The Primary Org will always have an `id` property of `0`, which other org_ids are randomly assigned.
 
-= roles/search
+=== List all orgs
+The simplest request to `orgs/search` is an empty body, which retrieves all orgs in the system. Note that you do need to send an empty object `{ }` in the body of the request, otherwise it will not work:
+
+[source,javascript]
+----
+{}
+----
+
+The response will be an array of org header objects:
+
+[source,javascript]
+----
+[
+  {
+    "id":0
+    "name":"Primary"
+    "status":"ACTIVE"
+    "description":"Primary Org"
+    "visibility":"SHOW"
+  },
+  {
+    "id": 164728055
+    "name": "Bill Back"
+    "status": "ACTIVE"
+    "description": "Content and testing for Bill Back."
+    "visibility": "SHOW"
+  }
+  ...
+]
+----
+
+=== Filter to specific orgs
+There are number of parameters that can be set to filter the response of `orgs/search`.
+
+`org_identifier` takes either the name or the org_id for one specific org. 
+
+`description` allows for an exact match on the `description` property of the org.
+
+`visibility` takes either `HIDDEN` or `SHOW` as a value.
+
+`status` takes either `ACTIVE` or `IN_ACTIVE` as a value.
+
+There is also the `user_identifiers` array, which takes a set of usernames or user GUIDs and filters the results to orgs that the set of user belongs to.
+
+The following is a request with several of the filter parameters in effect:
+
+[source,javascript]
+----
+{
+  "visibility": "SHOW",
+  "status": "ACTIVE",
+  "user_identifiers": [
+    "bryant.howell"
+  ]
+}
+----
+
+== schedules/search
+The `schedules/search` V2 endpoint allows you request a filtered list of the schedules that exist for objects in the ThoughtSpot system. 
+
+=== List all schedules
+The simplest request to `schedules/search` is an empty body, which retrieves all schedules in the system. Note that you do need to send an empty object `{ }` in the body of the request, otherwise it will not work:
+
+[source,javascript]
+----
+{}
+----
+
+The response is an array of schedule objects, which have a number of sub-objects providing information about the schedule, the creator of the schedule and the object on which the schedule runs:
+
+[source,javascript]
+----
+[
+ {
+  "author": {
+    "id": "f7fc5c01-5316-41b2-9e8f-8d776f5a7215"
+    "name": "casey.lauer"
+  }
+  "creation_time_in_millis": 1632923213
+  "description": ""
+  "file_format": "PDF"
+  "frequency": {
+    "cron_expression":{
+      "day_of_month":"*"
+      "day_of_week":"1"
+      "hour":"08"
+      "minute":"00"
+      "month":"*"
+      "second":"0"
+    }
+  }
+  "id":"ef6c64e6-bb66-451b-83a5-8b0f0a5fc37f"
+  "liveboard_options": null
+  "metadata": {
+    "name": null
+    "id": "8d927944-7bc1-4ddc-b7a0-a1439b853f7d"
+    "type": "LIVEBOARD"
+    }
+  "name":"Customer 1 - Gross Profit < 20%"
+  "pdf_options":{
+    "complete_liveboard": true
+    "include_cover_page": false
+    "include_custom_logo": false
+    "include_filter_page": false
+    "include_page_number": false
+    "page_footer_text": ""
+    "page_orientation": "LANDSCAPE"
+    "page_size": "A4"
+    "truncate_table": false
+  }
+  "recipient_details": null
+  "status": "PAUSED"
+  "time_zone": ""
+  "history_runs": null
+  },
+  ...
+]
+----
+
+The value of `id` is the GUID for the specific schedule, which can be used with the other `/schedules` endpoints to perform various actions.
+
+The `metadata` key holds information about the object that is scheduled. For additional details about that object, use the `metadata/search` endpoint.
+
+The `author` key holds information about the user who created the schedule. For additional details about that user, user the `users/search` endpoint.
+
+=== Sort the response
+The `sort_options` parameter takes a link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fmetadata-search-sort-options[Metadata Search Sort Options, target=_blank] object allowing for sorting on one field of the metadata response either **ASC** or **DESC**:
+
+[source,javascript]
+----
+{
+ "sort_options" : {
+  "field_name": "NAME",
+  "order": "ASC" 
+ }
+}
+----
+=== Filter to specific schedules
+You can filter to specific schedules by name or id using the `schedule_identifiers` array:
+
+[source,javascript]
+----
+{
+ "schedule_identifiers": [
+    "user.name@place.com"
+  ]
+}
+----
+
+You can search for schedules that are associated with a particular object  using the `metadata` parameter, which takes an array of objects that take `identifier`, either name or GUID, and a `type` (at this time, only Liveboards can have schedules associated):
+
+[source,javascript]
+----
+{
+ "metadata": [
+   {
+      "identifier": "Great Liveboard",
+      "type": "LIVEBOARD"
+    }
+  ]
+}
+----
+
+=== Add history runs details
+The `history_runs_options` parameter takes a complex object of options that make the `history_runs` key of the response go from `null` to an array of details about each historical schedule run:
+
+[source,javascript]
+----
+{
+ "metadata": [
+   {
+      "identifier": "Great Liveboard",
+      "type": "LIVEBOARD"
+    }
+  ],
+ "history_runs_options": {
+    "include_history_runs": true,
+    "record_size": 10,
+    "record_offset": 0
+ }
+}
+----
+
+The response array has items that look like:
+[source,javascript]
+----
+"history_runs": [
+  {
+    "id": "028f4853-89f9-4049-a332-f736a0d84c55"
+    "start_time_in_millis": 1696008900
+    "end_time_in_millis": 1696008960
+    "status": "SUCCESS"
+    "detail": "Scheduled updates generated as expected."
+  },
+  ...
+]
+----
+
+== roles/search
 
