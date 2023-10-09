@@ -738,7 +738,7 @@ class TypeDocParser {
                 return [
                     `\`${node.name}${TypeDocInternalParser.parseCallSignature(
                         node,
-                        true,
+                        false,
                     )}\``,
                     this.handleCallSignatureNode(node),
                 ].join('\n\n');
