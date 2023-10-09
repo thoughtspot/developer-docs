@@ -121,26 +121,26 @@ The `sort_options` parameter takes a link:https://developers.thoughtspot.com/doc
 
 If you need multiple levels of sorting, you'll have to parse the response programmatically and apply a sorting algorithm on the properties within each response item.
 
-=== group_identifiers
-You can filter responses based on which groups the user belongs to.
+=== user_identifiers
+You can filter responses based on which users belong to a group.
 
-This replaces some of the individual `groups` endpoints in the V1 REST API, such as the xref:group-api.adoc#get-users-group[get a list of users assigned to a group] endpoint. 
-
-The `group_identifiers` parameter takes an array of strings of either **group name** or **group GUID**. Note that groups have a `display_name` property separate from **group_name** that cannot be used in the `group_identifiers` array.
+The `user_identifiers` parameter takes an array of strings of either **username** or **user GUID**. Note that users have a `display_name` property separate from **username** that cannot be used in the `user_identifiers` array.
 
 [source,javascript]
 ----
 {
- "group_identifiers" : [
+ "user_identifiers" : [
     "Developers"
   ]
 }
 ----
 
-=== privileges
-Responses can be filtered based on **privileges** assigned to the user. Privileges are assigned through groups or roles rather than directly to a user, but the `users/search` endpoint is able to search the set of privileges the user currently has.
+As with other filters that take arrays, the query treats multiple items as a logical OR operation. If you need to identify groups with an exact set of users, you'll need to process the result and inspect the `users` array of each returned group object.
 
-The array of privileges works as an OR condition, returning any user with any of the privileges listed. If you need know who has a set of privileges, you'll have to check the `privileges` array for each user object in the response.
+=== privileges
+Responses can be filtered based on **privileges** assigned to the user. Privileges are assigned through groups directly or via roles on ThoughtSpot instances with the newer roles feature enabled.
+
+The array of privileges works as an OR condition, returning any group with any of the privileges listed. If you need find a group with a set of privileges, you'll have to check the `privileges` array for each group object in the response.
 
 [source,javascript]
 ----
@@ -153,9 +153,9 @@ The array of privileges works as an OR condition, returning any user with any of
 ----
 
 === visibility
-Every user has a `visibility` property which can either be `SHARABLE` or `NON_SHARABLE`. A `SHARABLE` user can have content shared directly to them by other users who belong to the same sharable group. In multi-tenanted situations, it is most common to have users set to `NON_SHARABLE` so that individual usernames are never revealed to any other users.
+Every group has a `visibility` property which can either be `SHARABLE` or `NON_SHARABLE`. A `SHARABLE` group can have content shared by users who belong to the same sharable group.
 
-You can list out users with a specific visibility setting by specifiying the `visibility` property in the request:
+You can list out groups with a specific visibility setting by specifiying the `visibility` property in the request:
 
 [source,javascript]
 ----
@@ -164,27 +164,52 @@ You can list out users with a specific visibility setting by specifiying the `vi
 }
 ----
 
-=== account_type and account_status
-The `account_type` property tracks which SSO method was used to create a given user. There are many values, but the main options are `LOCAL_USER`, `SAML_USER` and `OIDC_USER`. 
+=== user_identifiers
+You can filter responses based on which users belong to a group.
 
-The response can be filtered to just users created from a particular method using the `account_type` parameter on the request:
+The `user_identifiers` parameter takes an array of strings of either **username** or **user GUID**. Note that users have a `display_name` property separate from **username** that cannot be used in the `user_identifiers` array.
 
 [source,javascript]
 ----
 {
- "account_type": "SAML_USER"
+ "user_identifiers" : [
+    "Developers"
+  ]
 }
 ----
 
-The `account_status` parameter is also available for filtering, but the majority of users are listed as `ACTIVE` and the other avaialble states are not relevant at this time.
-
-=== home_liveboard_identifier
-The `home_liveboard_identifier` parameter filters to users with a specific Liveboard set as their "home" Liveboard. The value can take the GUID of a Liveboard or its name, but because Liveboard names are not guaranteed to be unique, it is best to use a GUID of a specific Liveboard when using this filtering parameter:
+=== type 
+The `type` property tracks which SSO method was used to create a given group. The two options are `LOCAL_GROUP` and `LDAP_GROUP`. 
 
 [source,javascript]
 ----
 {
- "home_liveboard_identifier": "a1fdcb4d-9cf9-466b-b866-22c53db9b1ac"
+ "type": "LDAP_GROUP"
+}
+----
+
+=== sub_group_identifiers
+Groups in ThoughtSpot can belong to other groups. The `sub_group_identifiers` parameter takes an an array of strings of either **group name** or **group GUID** and returns a list of groups with those sub-groups. 
+
+
+[source,javascript]
+----
+{
+ "sub_group_identifiers" : [
+    "A Sub Group Name"
+  ]
+}
+----
+
+
+=== default_liveboard_identifiers
+The `default_liveboard_identifiers` parameter filters to groups with the specified Liveboards set as default Liveboards set for any user who belongs to that group. The value can take the GUID of a Liveboard or its name, but because Liveboard names are not guaranteed to be unique, it is best to use the GUIDs of any specific Liveboards when using this filtering parameter:
+
+[source,javascript]
+----
+{
+ "default_liveboard_identifiers": 
+    ["a1fdcb4d-9cf9-466b-b866-22c53db9b1ac"]
 }
 ----
 
@@ -226,40 +251,9 @@ The `orgs` key of each user item in the response contains the details of the org
 Note that the org `id` is an integer in this portion of the response. 
 
 === role_identifiers
-On ThoughtSpot instances with roles enabled, you can use the `role_identifiers` parameter to send an array of either GUID or name of the roles that a user has access to.
+On ThoughtSpot instances with roles enabled, you can use the `role_identifiers` parameter to send an array of either GUID or name of the roles that a group has been assigned to.
 
-=== Additional optional boolean filters
-`notify_on_share`, `show_onboarding_experience` and `onboarding_experience_completed` are all available as boolean filters to see only users who either have or haven't used a given feature.
 
-Note that the *absence* of the parameter is how you remove the filtering. If the parameter value is present as a key, the value must be set to `true` or `false` and thus the response will be filtered to only those users who match the condition.
-
-== Additional response details
-There are a number of parameters that add new data to the response, allowing the `metadata/search` endpoint to answer questions that required multiple endpoints in the V1 REST API.
-
-=== include_favorite_metadata
-The `user` object in the response always includes a `favorite_metadata` key, but it will always be an empty array unless the  `include_favorite_metadata` parameter is added to the request set to `true`:
-
-[source,javascript]
-----
-{
- "user_identifier": "bryant.howell",
- "include_favorite_metadata": true
-}
-----
-
-The response will now have metadata objects in the array for the `favorite_metadata` key if the user has favorited any content, contained the `id`, `name` and `type` of the content, which is enough to create a listing in an embedding web app's UI that can load the content:
-
-[source,javascript]
-----
-"favorite_metadata":[
-  {
-    "id": "8838d9fc-e56d-4467-859f-1ab9364eb139"
-    "name": "Procurement / Supplier 365"
-    "type": "LIVEBOARD"
-  }
-  ...
-]
-----
 
 
 
