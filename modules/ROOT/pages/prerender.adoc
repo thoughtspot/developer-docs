@@ -1,0 +1,285 @@
+= Prerender components
+:toc: true
+:toclevels: 3
+
+:page-title: Prerender components
+:page-pageid: prerender
+:page-description: Prerender components to optimize user experience of your embedding application
+
+To optimize your user's experience when ThoughtSpot is embedded into your application, we recommend using the following methods.
+
+== Prerender
+
+You can load ThoughtSpot components that are not specific to the user's session before your application user accesses your embedded analytics, so the amount of ThoughtSpot assets left to load when the user accesses the embedded content is reduced.
+
+=== When to use
+
+Use prerender if you have:
+
+* Applications that do not have ThoughtSpot on the landing page.
+* Applications embedding ThoughtSpot Liveboards.
+
+=== How it works
+
+Pre-render allows developers to pre-load the ThoughtSpot application in the background before the user navigates to your embedded analytics
+
+It allows you to create a placeholder element on the page for the Liveboard to eventually populate. To preload, you must place this element into a section of your application that will be viewed before the Liveboard. For example, it is common for analytics applications to have a custom-built landing page that directs users to relevant pieces of embedded content. This would be an ideal place to preload the component, so the frame is ready to render by the time the user clicks on a specific link.
+
+The following figure illustrates the benefits of the pre-render method:
+
+image::./images/prerender.png[prerender]
+
+Depending on the framework and project, you can implement this using xref:_standard_js[Standard JavaScript] or xref:_react[React].
+
+==== Standard JS
+
+If using Javascript:
+
+. Create a container for the Liveboard and a placeholder.
++
+For this approach, you require two containers:
+
+* a `div` container with `absolute` position. This will eventually be used to render the Liveboard.
+* a placeholder `div`. This will be the container designated for the Liveboard, which you will set as the primary embed container in your application code. When it is time to load a Liveboard, you must move the prerender `div` on top of the placeholder `div`.
+
++
+[source,HTML]
+----
+<div id="placeholder"></div>
+<div id="prerender"></div>
+----
+
++
+[source,HTML]
+----
+#prerender{
+  position: absolute;
+  opacity: 0;
+  left: 0;
+  top: 0;
+  height: 0;
+  width: 0;
+}
+----
+
+. PreRender ThoughtSpot
++
+Inside the `prerender div`, you can create a placeholder for Liveboard embedding. Before calling the Liveboard GUID, call `prerenderGeneric`. This will begin the load process for the primary embed transferring the bulk of the information needed by ThoughtSpot to the client browser.
+
++
+[source,JavaScript]
+----
+let renderDiv = document.getElementById("prerender");
+let embed = new LiveboardEmbed(renderDiv, {
+  frameParams: {
+    height: "1200px"
+  }
+});
+embed.prerenderGeneric();
+----
+
+. Render the embedded Liveboard
++
+When it is time for the user to view a specific liveboard, move the `prerender div` onto the placeholder, and instruct the Liveboard Embed to load the required content. To do this, use the `navigateToLiveboard` function on the embed object:
+
++
+[source,JavaScript]
+----
+//Navigate embed container to new liveboard id 
+
+let liveboardID = "16b8c2e2-edfc-4e42-8827-98387f384b1b"
+embed.navigateToLiveboard(liveboardID)
+
+//Obtain the current bounds of the placeholder element
+let placeholderDiv = document.getElementById("placeholder");
+const coords = placeholderDiv.getBoundingClientRect();
+const offset = getOffset(placeholderDiv);
+
+//Move the renderer into those bounds
+renderDiv.style.opacity = 1;
+renderDiv.style.top = offset.top;
+renderDiv.style.left = offset.left;
+renderDiv.style.width = coords.width;
+renderDiv.style.height = coords.height;
+
+function getOffset(el) {
+  var _x = 0;
+  var _y = 0;
+  while (el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {
+    _x += el.offsetLeft - el.scrollLeft;
+    _y += el.offsetTop - el.scrollTop;
+    el = el.offsetParent;
+  }
+  return { top: _y, left: _x };
+}
+----
+
+==== React
+
+If using React, the container not be continuously reloaded with state changes. You can leverage a context provider to achieve this. For more information, see link:https://react.dev/learn/passing-data-deeply-with-context[https://react.dev/learn/passing-data-deeply-with-context, window=_blank]
+
+[Source,TypeScript]
+----
+const prerenderdLiveboardContext = createContext<any>({});
+----
+
+For this approach, you will need two containers. The first is a `div` with absolute position. This will eventually be used to render the liveboard.  
+
+The second is a placeholder. This is the container designated for the Liveboard, which you will set as the primary embed container in your application code. When it is time to load a Liveboard, move the `prerender div` on top of the placeholder div.
+
+. Create render shell
++
+This is a `div` element with absolute position. Use context variables to control the div’s visibility and coordinate position. This div also holds the embedded Liveboard, and the `liveboardId` is set by the respective context variable.
+
++
+By default, this `div` will be invisible and placed into a corner of the page (0 coordinates), with no `liveboardId`.
+
++
+[source,TypeScript]
+----
+export const PrerenderedLiveboardShell = () => {
+  
+  const ref = useRef(null);
+  const lb = useRef<LiveboardEmbed | null>(null);
+  const { isVisible, liveboardId, coords } = useContext(
+    prerenderdLiveboardContext
+  );
+
+  return (
+    <div
+      id="prerender"
+      style={{
+        opacity: isVisible ? 1 : 0,
+        ...coords,
+        position: "absolute"
+      }}
+      ref={ref}
+    ></div>
+  );
+}
+----
+
+. Pre-render the embed container
++
+.. Create a Liveboard embed within this `div`.
+.. Before calling the Liveboard GUID, call `prerenderGeneric`. This will begin the load process for the primary embed, transferring the bulk of the information needed by ThoughtSpot to render content to the client browser.
+.. Pass an empty array into `useEffect`.
+
++
+[source,TypeScript]
+----
+useEffect(() => {
+  if (!ref.current) {
+    return;
+  }
+  lb.current = new LiveboardEmbed(ref.current, {
+    frameParams: {
+      height: "1200px"
+    }
+  });
+  lb.current.prerenderGeneric();
+}, []);
+----
+
+. Navigate to Liveboard
++
+Update the render container when the user is ready to look at a Liveboard. For this, use the previously defined context variable that sets the `liveboardId`, and leverage `useEffect` to register the changes to this ID. When the Liveboard ID is updated, render the new Liveboard by leveraging `navigateToLiveboard` function:
++
+[source,TypeScript]
+----
+useEffect(() => {
+  if (!liveboardId) {
+    return;
+  }
+  lb.current?.navigateToLiveboard(liveboardId);
+}, [liveboardId]);
+----
+
+. Create context provider
++
+To manage context variables and render the shell we next need to create a provider component:
+
++
+[Source,TypeScript]
+----
+export const PrerenderdLiveboardProvider = ({ children }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [liveboardId, setLiveboardId] = useState();
+  const [coords, setCoords] = useState({
+    left: 0,
+    top: 0,
+    height: 0,
+    width: 0
+  });
+  return (
+    <prerenderdLiveboardContext.Provider
+      value={{
+        isVisible,
+        setIsVisible,
+        liveboardId,
+        setLiveboardId,
+        coords,
+        setCoords
+      }}
+    >
+      {children}
+      <PrerenderedLiveboardShell />
+    </prerenderdLiveboardContext.Provider>
+  );
+};
+----
+
+. Add this code to your application
++
+In this example, the primary content is in a component named `LiveboardBrowser`. It includes a list of different liveboards that a user can choose from, and a space on the page to render the Liveboard. The IDs are hard-coded in this example. However, you populate this via a REST call.
+
++
+[source,TypeScript]
+----
+init({
+thoughtSpotHost: "https://my.thoughtspot.cloud/",
+authType: AuthType.None, // AuthType.Passthrough
+})
+
+function App() {
+  return (
+    <div className="App">
+      <PrerenderdLiveboardProvider>
+        <LiveboardBrowser></LiveboardBrowser>
+      </PrerenderdLiveboardProvider>
+    </div>
+  );
+}
+----
+
+. Render a Liveboard
++
+.. Set our context variables
+.. Specify the GUID of the Liveboard
+.. Set coordinates for the element the shell will overlay
+.. Set visibility to `true`.
+
++
+[source,TypeScript]
+----
+function toggleLiveboardSelect(e){
+  setLiveboardId(e.target.value);
+  const coords = ref.current.getBoundingClientRect();
+  const offset = getOffset(ref.current);
+  setCoords({
+    height: coords.height,
+    width: coords.width,
+    top: offset.top,
+    left: offset.left
+  });
+  setIsVisible(true);
+}
+----
+
+== Turn on CDN
+
+Using a Content Delivery Network (CDN) reduces the time to pre-render static or dynamic ThoughtSpot assets by caching resources closer to the end user. When your application users navigate to ThoughtSpot very quickly after the embedding application loads, they need not wait for assets to finish pre-rendering.
+
+The following figure illustrates the benefits of using CDN:
+
+image::./images/cdn.png[CDN]
