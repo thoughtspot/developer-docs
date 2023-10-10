@@ -37,7 +37,7 @@ module.exports = {
             label: '9.6.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
-        },
+        }
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
