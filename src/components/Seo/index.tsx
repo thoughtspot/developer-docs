@@ -34,11 +34,12 @@ export const Seo: FC<SeoProps> = ({
             <title>{seo.title}</title>
             <meta name="description" content={seo.description} />
             <meta name="image" content={seo.image} />
-
-            <link
-                rel="icon"
-                href={seo.image}
-            />
+            <meta name="og:title" content={seo.title} />
+            <meta name="og:description" content={seo.description} />
+            <meta name="og:url" content={seo.url} />
+            <meta name="og:image" content={seo.image} />
+            <meta name="og:type" content="website" />
+            <link rel="icon" href={seo.image} />
             {children}
         </Helmet>
     );
