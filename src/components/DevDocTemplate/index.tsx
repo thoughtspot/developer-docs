@@ -472,6 +472,21 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
 export default DevDocTemplate;
 
+export const Head = ({ data }) => {
+    return (
+        <Seo
+            title={
+                data.curPageNode.document.title ||
+                data.curPageNode.pageAttributes.title
+            }
+            description={
+                data.curPageNode.document.description ||
+                data.curPageNode.pageAttributes.description
+            }
+        ></Seo>
+    );
+};
+
 export const query = graphql`
     query TemplateQuery($pageId: String = "introduction", $navId: String) {
         curPageNode: asciidoc(pageAttributes: { pageid: { eq: $pageId } }) {
