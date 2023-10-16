@@ -30,7 +30,7 @@ export const Seo: FC<SeoProps> = ({
     };
 
     return (
-        <Helmet>
+        <>
             <title>{seo.title}</title>
             <meta name="description" content={seo.description} />
             <meta name="image" content={seo.image} />
@@ -41,6 +41,6 @@ export const Seo: FC<SeoProps> = ({
             <meta name="og:type" content="website" />
             <link rel="icon" href={seo.image} />
             {children}
-        </Helmet>
+        </>
     );
 };

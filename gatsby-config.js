@@ -213,7 +213,7 @@ module.exports = {
                     });
                     const paths = [];
                     for (const item of asciiNodeSet) {
-                        paths.push({ path: `/docs/${item}` });
+                        paths.push({ path: `/${item}` });
                     }
                     return paths;
                 },
