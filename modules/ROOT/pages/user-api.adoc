@@ -17,7 +17,6 @@ You must have administrator access to create, edit, and delete a user, assign us
 
 If you have a multi-tenant instance with Orgs feature enabled, the cluster admin can create a user and associate the user to an `orgid`. For more information about Orgs, see xref:orgs.adoc[Multi-tenancy with Orgs].
 
-
 [#create-user]
 == Create a user
 
@@ -43,20 +42,39 @@ POST /tspublic/v1/user/
 |`name` |Form parameter|__String__. Name of the user. The username string must be unique.
 |`password`|Form parameter|__String__. Password for the user account.
 |`displayname`|Form parameter|__String__. A unique display name string for the user, usually their first and last name.
-|`properties` __Optional__|Form parameter|__String__. A JSON map of user properties fetched from external systems such as LDAP. If you are using Active Directory to authenticate users, and your LDAP configuration requires users to be created manually, you can upload the user properties as a JSON file.
-|`groups` __Optional__|Form parameter|__Array of strings__. A JSON array of the GUIDs of groups to which you want to assign the user. The user privileges are determined by the group to which you assign the user. For example, if you assign the user to a group that has the `ADMINISTRATION` privilege, the user will have admin privileges.
-|`usertype` __Optional__ a|Form parameter|__String__. Type of user. The default value is `LOCAL_USER`, which indicates that the user is created locally in the ThoughtSpot system.
-|`tenantid` __Optional__|Form parameter|__String__. GUID of the tenant for which the user is being created.
-|`visibility` __Optional__|Form parameter|__String__. Visibility of the user. The `visibility` attribute is set to `DEFAULT` when creating a user. The `DEFAULT` attribute makes a user visible to other users and user groups, and thus allows them to share objects.
+|`properties` +
+__Optional__|Form parameter a|__String__. A JSON map of user properties such as email address. +
+`"properties": {
+    "mail": "UserA@example.com"
+}`
+
+|`groups` +
+__Optional__|Form parameter|__Array of strings__. A JSON array of the GUIDs of groups to which you want to assign the user. The user privileges are determined by the group to which you assign the user. For example, if you assign the user to a group that has the `ADMINISTRATION` privilege, the user will have admin privileges.
+|`usertype` +
+__Optional__ a|Form parameter a|__String__. Type of user. The default value is `LOCAL_USER`, which indicates that the user is created locally in the ThoughtSpot system. Valid values include:
+
+* `LDAP_USER` +
+* `SAML_USER` +
+* `OIDC_USER` +
+* `REMOTE_USER` +
+* `LOCAL_USER`
+
+NOTE: If you call this API when importing user properties from an external server, such as Active Directory or IdP, the `usertype` property is automatically assigned to the users. For example, a user from an LDAP server is added as `LDAP_USER` in ThoughtSpot.
+
+|`tenantid` +
+__Optional__|Form parameter|__String__. GUID of the tenant for which the user is being created.
+|`visibility` __Optional__|Form parameter|__String__. Visibility of the user. The `visibility` attribute is set to `DEFAULT` when creating a user. The `DEFAULT` attribute sets the user visibility to *shareable*, which allows other users and groups to share objects with the user.
+To set user's visibility to non-shareable, specify `NON_SHARABLE`.
 |`orgids` +
 __Optional__|Form parameter|__Integer__. A JSON array of org IDs to which you want to add the user. If `orgids` is not defined, ThoughtSpot assigns the user to an Org based on the administrator's session. For example, if the administrator sends the API request from the `Org 0` context, the user is added to `Org 0`.
 |`triggeredbyadmin` a|Form parameter|__Boolean__. Indicates if the API request is initiated by a ThoughtSpot administrator or an external application. The default value is `false`. +
 When set to `true`, the `displayNameLastUpdatedBy` property is set to `ADMIN` in the API response, Else, `displayNameLastUpdatedBy` is set to `AUTO`.
-|`orgScope` __Optional__|Query parameter|__String__. The Org scope. When set to `ALL`, the administrator is authorized to perform cross-Org operations. By default, ThoughtSpot allows administrators to create a user in the Org context from which they make an API request. If you want to add the user to a different Org or multiple Orgs, set the Org scope to `ALL` and specify the Org ID(s) in the `orgids` attribute.
+|`orgScope` __Optional__|Query parameter|__String__. The Org scope. Applicable to ThoughtSpot instances with Orgs feature enabled. When set to `ALL`, the administrator is authorized to perform cross-Org operations. By default, ThoughtSpot allows administrators to create a user in the Org context from which they make an API request. If you want to add the user to a different Org or multiple Orgs, set the Org scope to `ALL` and specify the Org ID(s) in the `orgids` attribute.
+|`sendEmail` | Query parameter|__Boolean__. When set to `true`, a welcome email is to the user's email address.
 |===
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -65,12 +83,12 @@ curl -X POST \
 --header 'Accept: application/json' \
 --header 'X-Requested-By: ThoughtSpot' \
 -d 'name=TS%20User&password=testy1%4022&displayname=TS%20User&usertype=LOCAL_USER&visibility=DEFAULT' \
-'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/'
+'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/?sendEmail=true'
 ----
 
-.Request URL
+.**Request URL**
 ----
-https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/
+https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/?sendEmail=true
 ----
 
 === Example response
@@ -86,7 +104,8 @@ If the user is successfully created in ThoughtSpot, the API returns the user GUI
       "showWalkMe": true,
       "analystOnboardingComplete": false
     },
-     "userProperties": {
+    "userProperties": {
+      "mail": "UserA@thoughtspot.com",
       "displayNameLastUpdatedBy": "ADMIN"
     },
     "userActivityProto": {
@@ -106,20 +125,29 @@ If the user is successfully created in ThoughtSpot, the API returns the user GUI
   "parenttype": "USER",
   "visibility": "DEFAULT",
   "tenantId": "982d6da9-9cd1-479e-b9a6-35aa05f9282a",
-  "displayName": "TS User",
+  "displayName": "userA2023",
   "header": {
-    "id": "79c4cb2a-18cd-44a7-a077-6de65d1b468e",
+    "id": "f31cc613-5f03-4df6-bc4a-309ab6160c0c",
     "indexVersion": 0,
     "generationNum": 0,
-    "name": "TS User",
+    "name": "userA2023",
+    "displayName": "userA2023",
     "author": "59481331-ee53-42be-a548-bd87be6ddd4a",
-    "created": 1624796017810,
-    "modified": 1624796017810,
+    "created": 1698063672659,
+    "modified": 1698063672659,
     "modifiedBy": "59481331-ee53-42be-a548-bd87be6ddd4a",
-    "owner": "79c4cb2a-18cd-44a7-a077-6de65d1b468e",
+    "owner": "f31cc613-5f03-4df6-bc4a-309ab6160c0c",
+    "isDeleted": false,
+    "isHidden": false,
+    "orgIds": [
+      0
+    ],
     "tags": [],
+    "type": "LOCAL_USER",
+    "aiAnswerGenerationDisabled": false,
     "isExternal": false,
-    "isDeprecated": false
+    "isDeprecated": false,
+    "isSharedViaConnection": false
   },
   "complete": true,
   "incompleteDetail": [],
@@ -146,17 +174,18 @@ Unauthorized user addition to an org
 
 To modify an existing user account, send a `PUT` request to the /tspublic/v1/user/{userid}` endpoint.
 
-This API allows the following modifications to a user profile:
+This API you to modify the following properties of a user object:
 
 * Username modifications
 * Password reset
 * Group assignment
 * User visibility for sharing objects
+* User's email address
 * User preferences, such as viewing onboarding experience, subscribing to or unsubscribing from email notifications, and so on.
 
 [NOTE]
 ====
-To add or modify the email address of a user, use the `/tspublic/v1/user/email` API endpoint.
+You can also use the `/tspublic/v1/user/email` API endpoint to add or modify the email address of a user
 ====
 
 === Resource URL
@@ -185,7 +214,7 @@ Starting from 8.9.0.cl, ThoughtSpot users can update their display name on the p
 
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -193,69 +222,111 @@ curl -X PUT \
 --header 'Content-Type: application/x-www-form-urlencoded' \
 --header 'Accept: application/json' \
 --header 'X-Requested-By: ThoughtSpot' \
--d 'userid=6deb3976-e7c9-4f6a-94cc-90d790ee828d&content={    "userContent":{       "userPreferences":{          "notifyOnShare":true,          "showWalkMe":true,          "analystOnboardingComplete":false       },       "userProperties":{          "displayNameLastUpdatedBy":"ADMIN"       },       "userActivityProto":{          "first_login":-1,          "welcome_email_sent":false       }    },    "state":"ACTIVE",    "assignedGroups":[       "b25ee394-9d13-49e3-9385-cd97f5b253b4"    ],    "inheritedGroups":[       "b25ee394-9d13-49e3-9385-cd97f5b253b4"    ],    "privileges":[           ],    "type":"LOCAL_USER",    "parenttype":"USER",    "visibility":"DEFAULT",    "tenantId":"982d6da9-9cd1-479e-b9a6-35aa05f9282a",    "displayName":"TS Test User",    "header":{       "id":"6deb3976-e7c9-4f6a-94cc-90d790ee828d",       "name":"tsTest",       "displayName":"tsTest",       "author":"59481331-ee53-42be-a548-bd87be6ddd4a",       "created":1675661280328,       "modified":1675661280328,       "modifiedBy":"59481331-ee53-42be-a548-bd87be6ddd4a",       "owner":"6deb3976-e7c9-4f6a-94cc-90d790ee828d",       "isDeleted":false,       "isHidden":false,       "orgIds":[          0       ],       "tags":[                 ],       "type":"LOCAL_USER",       "isExternal":false,       "isDeprecated":false,       "isSharedViaConnection":false    },    "complete":true,    "incompleteDetail":[           ],    "isSuperUser":false,    "isSystemPrincipal":false }&triggeredbyadmin=true'\
+-d 'userid=6deb3976-e7c9-4f6a-94cc-90d790ee828d&content= {
+   "userContent":{
+      "userPreferences":{
+         "notifyOnShare":false
+      },
+      "userProperties": {
+         "mail": "User123@thoughtspot.com",
+      },
+      "userActivityProto":{
+         "welcome_email_sent":true
+      }
+   },
+   "state":"ACTIVE",
+   "assignedGroups":[
+      "f67ea2a4-efe7-4881-9ec4-32e1cb2605f3",
+      "6085cc9f-087a-4075-9b33-11578538cec8"
+   ],
+   "inheritedGroups":[
+      "bed1da2ea-e9b0-4d3e-8156-02dd331577d5"
+   ],
+   "privileges":[
+      "A3ANALYSIS",
+      "DATADOWNLOADING",
+      "SHAREWITHALL",
+      "USERDATAUPLOADING",
+      "DATAMANAGEMENT",
+      "ADMINISTRATION",
+   ],
+   "displayName":"UserA",
+}&triggeredbyadmin=true' \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/{userid}'
 ----
 
-.Request URL
+
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/{userid}
 ----
 
 ==== JSON file example for updating user profile
 
+The following example shows the JSON map content to send in the API request:
+
 [source,JSON]
 ----
 {
-   "userContent":{
-      "userPreferences":{
-         "notifyOnShare":false,
-         "showWalkMe":true,
-         "analystOnboardingComplete":false
-      },
-      "userActivityProto":{
-         "first_login":-1,
-         "welcome_email_sent":false
-      }
-   },
-   "state":"ACTIVE",
-   "assignedGroups":[
-      "d0326b56-ef23-4c8a-8327-a30e99bcc72b",
-      "b25ee394-9d13-49e3-9385-cd97f5b253b4"
-   ],
-   "inheritedGroups":[
-      "b25ee394-9d13-49e3-9385-cd97f5b253b4"
-   ],
-   "privileges":[
-
-   ],
-   "type":"LOCAL_USER",
-   "parenttype":"USER",
-   "visibility":"DEFAULT",
-   "tenantId":"982d6da9-9cd1-479e-b9a6-35aa05f9282a",
-   "displayName":"TS User2",
-   "header":{
-      "id":"d1f4f2c8-c5bb-4f20-a81d-1f24af0b3286",
-      "indexVersion":0,
-      "generationNum":0,
-      "name":"TS User2",
-      "author":"59481331-ee53-42be-a548-bd87be6ddd4a",
-      "created":1624846987754,
-      "modified":1624846987754,
-      "modifiedBy":"59481331-ee53-42be-a548-bd87be6ddd4a",
-      "owner":"d1f4f2c8-c5bb-4f20-a81d-1f24af0b3286",
-      "tags":[
-
-      ],
-      "isExternal":false,
-      "isDeprecated":false
-   },
-   "complete":true,
-   "incompleteDetail":[
-
-   ],
-   "isSuperUser":false,
-   "isSystemPrincipal":false
+    "userContent": {
+        "userPreferences": {
+            "notifyOnShare": true,
+            "showWalkMe": true,
+            "analystOnboardingComplete": false
+        },
+        "userProperties": {
+            "mail": "User123@thoughtspot.com",
+            "displayNameLastUpdatedBy": "ADMIN"
+        },
+        "userActivityProto": {
+            "first_login": -1,
+            "welcome_email_sent": false
+        }
+    },
+    "state": "ACTIVE",
+    "assignedGroups": [
+        "b25ee394-9d13-49e3-9385-cd97f5b253b4"
+        "f67ea2a4-efe7-4881-9ec4-32e1cb2605f3",
+        "6085cc9f-087a-4075-9b33-11578538cec8"
+    ],
+    "inheritedGroups": [
+        "b25ee394-9d13-49e3-9385-cd97f5b253b4"
+    ],
+    "privileges": [],
+    "type": "LOCAL_USER",
+    "parenttype": "USER",
+    "visibility": "DEFAULT",
+    "tenantId": "982d6da9-9cd1-479e-b9a6-35aa05f9282a",
+    "displayName": "TestDisplayName",
+    "header": {
+        "id": "d99556d5-9a32-4dea-bf40-b8955dcd186a",
+        "indexVersion": 0,
+        "generationNum": 0,
+        "name": "Test",
+        "displayName": "TestDisplayName",
+        "author": "59481331-ee53-42be-a548-bd87be6ddd4a",
+        "created": 1697793220573,
+        "modified": 1697793220573,
+        "modifiedBy": "59481331-ee53-42be-a548-bd87be6ddd4a",
+        "owner": "d99556d5-9a32-4dea-bf40-b8955dcd186a",
+        "isDeleted": false,
+        "isHidden": false,
+        "orgIds": [
+            0
+        ],
+        "tags": [],
+        "type": "LOCAL_USER",
+        "aiAnswerGenerationDisabled": false,
+        "aiAnswerState": "NOT_SET",
+        "isExternal": false,
+        "isDeprecated": false,
+        "isSharedViaConnection": false,
+        "isVerified": false
+    },
+    "complete": true,
+    "incompleteDetail": [],
+    "isSuperUser": false,
+    "isSystemPrincipal": false
 }
 ----
 
@@ -302,7 +373,7 @@ PUT /tspublic/v1/user/email
 
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -314,7 +385,7 @@ curl -X PUT \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/email'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/email
 ----
@@ -361,7 +432,7 @@ POST /tspublic/v1/user/addtoorg
 
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -372,7 +443,7 @@ curl -X POST \
 'http://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/addtoorg?orgScope=ALL'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/addtoorg?orgScope=ALL
 ----
@@ -429,7 +500,7 @@ You can use either `userid` or `name` to query data for a specific user. If usin
 
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -438,7 +509,7 @@ curl -X GET \
 --header 'X-Requested-By: ThoughtSpot' \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/?userid=b995e481-d0a7-4820-b1e8-54051ede77a2'
 ----
-.Request URL
+.**Request URL**
 
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/?userid=b995e481-d0a7-4820-b1e8-54051ede77a2
@@ -545,7 +616,7 @@ POST /tspublic/v1/user/inactivate
 
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -556,7 +627,7 @@ curl -X POST \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/inactivate'
 ----
 
-.Request URL
+.**Request URL**
 
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/inactivate
@@ -615,7 +686,7 @@ POST /tspublic/v1/user/activate
 
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -628,7 +699,7 @@ curl -X POST \
 
 ----
 
-.Request URL
+.**Request URL**
 
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/activate
@@ -683,7 +754,7 @@ POST /tspublic/v1/user/session/invalidate
 
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -695,7 +766,7 @@ curl -X POST \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/session/invalidate'
 ----
 
-.Request URL
+.**Request URL**
 
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/session/invalidate
@@ -744,7 +815,7 @@ To remove the user from all Orgs and the ThoughtSpot system, set the `orgScope` 
 |===
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -754,7 +825,7 @@ curl -X DELETE \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/ee74b737-da39-4667-95ad-cc06c81ab13d'
 ----
 
-.Request URL
+.**Request URL**
 
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/ee74b737-da39-4667-95ad-cc06c81ab13d
@@ -789,7 +860,7 @@ GET /tspublic/v1/user/list
 
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -798,7 +869,7 @@ curl -X GET \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/list'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/list
 ----
@@ -965,7 +1036,7 @@ POST /tspublic/v1/user/updatepassword
 |====
 === Example request
 
-.cURL
+.**cURL**
 ----
 curl -X POST \
 --header 'Content-Type: application/x-www-form-urlencoded' \
@@ -975,7 +1046,7 @@ curl -X POST \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/updatepassword'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/updatepassword
 ----
@@ -1019,7 +1090,7 @@ POST /tspublic/v1/user/resetpassword
 
 === Example request
 
-.cURL
+.**cURL**
 
 [source,cURL]
 ----
@@ -1031,7 +1102,7 @@ curl -X POST \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/resetpassword'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/resetpassword
 ----
@@ -1114,7 +1185,7 @@ If your browser or OS locale is set to a xref:user-api.adoc#locale-setting[Thoug
 
 === Example request
 
-.cURL
+.**cURL**
 [source, cURL]
 ----
 curl -X POST \
@@ -1129,7 +1200,7 @@ curl -X POST \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/updatepreference'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/updatepreference
 ----
@@ -1222,7 +1293,7 @@ POST /tspublic/v1/user/transfer/ownership
 
 === Example request
 
-.cURL
+.**cURL**
 [source,cURL]
 ----
 curl -X POST \
@@ -1232,7 +1303,7 @@ curl -X POST \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/transfer/ownership?fromUserName=guest&toUserName=guest1'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/transfer/ownership?fromUserName=guest&toUserName=guest1
 ----
@@ -1304,7 +1375,7 @@ Specify whether to remove the deleted users and user groups. By default, this at
 
 === Example request
 
-.cURL
+.**cURL**
 [source, cURL]
 ----
 curl -X POST \
@@ -1317,7 +1388,7 @@ curl -X POST \
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/sync
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/sync
 ----
@@ -1422,7 +1493,7 @@ POST /tspublic/v1/user/{userid}/groups
 
 === Example request
 
-.cURL
+.**cURL**
 [source, cURL]
 ----
 curl -X POST \
@@ -1433,7 +1504,7 @@ curl -X POST \
 
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/a8aeda00-dc3c-4485-b8d1-fd6ac701a819/groups?groupids=%5B%2246fc2125-d424-40bd-9513-23cd5e2e92c3%22%2C%222e3f697a-e38d-4d50-b5c5-e2514e85d90e%22%5D
 ----
@@ -1478,7 +1549,7 @@ GET /tspublic/v1/user/{userid}/groups
 
 === Example request
 
-.cURL
+.**cURL**
 [source, cURL]
 ----
 curl -X GET \
@@ -1487,7 +1558,7 @@ curl -X GET \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/a8aeda00-dc3c-4485-b8d1-fd6ac701a819/groups'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/a8aeda00-dc3c-4485-b8d1-fd6ac701a819/groups
 ----
@@ -1604,7 +1675,7 @@ PUT /tspublic/v1/user/{userid}/groups
 
 === Example request
 
-.cURL
+.**cURL**
 [source, cURL]
 ----
 curl -X PUT \
@@ -1614,7 +1685,7 @@ curl -X PUT \
 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/a8aeda00-dc3c-4485-b8d1-fd6ac701a819/groups?groupids=%5B%222e3f697a-e38d-4d50-b5c5-e2514e85d90e%22%2C%222364bf7c-7eec-4839-ac4b-e0cbb27aec37%22%2C%2246fc2125-d424-40bd-9513-23cd5e2e92c3%22%5D'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/a8aeda00-dc3c-4485-b8d1-fd6ac701a819/groups?groupids=%5B%222e3f697a-e38d-4d50-b5c5-e2514e85d90e%22%2C%222364bf7c-7eec-4839-ac4b-e0cbb27aec37%22%2C%2246fc2125-d424-40bd-9513-23cd5e2e92c3%22%5D
 ----
@@ -1661,7 +1732,7 @@ DELETE /tspublic/v1/user/{userid}/groups
 
 === Example request
 
-.cURL
+.**cURL**
 [source,cURL]
 ----
 curl -X DELETE \
@@ -1669,7 +1740,7 @@ curl -X DELETE \
 --header 'X-Requested-By: ThoughtSpot' \ 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/a8aeda00-dc3c-4485-b8d1-fd6ac701a819/groups?groupids=%5B%222e3f697a-e38d-4d50-b5c5-e2514e85d90e%22%2C%222364bf7c-7eec-4839-ac4b-e0cbb27aec37%22%5D'
 ----
 
-.Request URL
+.**Request URL**
 ----
 https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/user/a8aeda00-dc3c-4485-b8d1-fd6ac701a819/groups?groupids=%5B%222e3f697a-e38d-4d50-b5c5-e2514e85d90e%22%2C%222364bf7c-7eec-4839-ac4b-e0cbb27aec37%22%5D
 ----
