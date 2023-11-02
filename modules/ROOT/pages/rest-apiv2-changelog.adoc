@@ -9,6 +9,61 @@
 This changelog lists the features and enhancements introduced in REST API v2.0. For a complete list of ThoughtSpot Everywhere features and enhancements, see xref:whats-new.adoc[What's New].
 
 
+== Version 9.7.0, Coming soon
+
+=== Version Control APIs
+
+This release introduces the following enhancements and changes to the Version Control API endpoints:
+
+`POST /api/rest/2.0/vcs/git/config/create`::
+
+* `commit_branch_name` [tag greenBackground]#NEW in 9.7.0.cl#
++
+ThoughtSpot recommends using `commit_branch_name` instead of `default_branch_name` to prevent users from comitting changes to default deploy branch.
+
+* `configuration_branch_name` [tag greenBackground]#NEW in 9.7.0.cl#
+
+
+
+
+Developers should use the  parameter instead of the default_branch_name parameter. This is to clarify how to use the branches and
+For the same reason, when orgs are used in a cluster, we prevent two orgs from using the same commit branch.
+Added a new field: configuration_branch_name which will be used by ThoughtSpot to store the GUID mapping file, as well as the last commit point (which will help synchronize delete operations when deploying). This will replace guid_mapping_branch_name
+enable_guid_mapping is now set to true by default as most scenarios will benefit from it.
+
+Key changes
+Added support for delete operation in commit and deploy
+Ensuring uniqueness of branches across orgs using same repo url in configuration
+
+
+Changes to POST /api/rest/2.0/vcs/git/config/create
+
+
+Developers should use the commit_branch_name parameter instead of the default_branch_name parameter. This is to clarify how to use the branches and avoid scenarios where one would commit in a deploy branch.
+For the same reason, when orgs are used in a cluster, we prevent two orgs from using the same commit branch.
+Added a new field: configuration_branch_name which will be used by ThoughtSpot to store the GUID mapping file, as well as the last commit point (which will help synchronize delete operations when deploying). This will replace guid_mapping_branch_name
+enable_guid_mapping is now set to true by default as most scenarios will benefit from it.
+
+
+Changes to POST /api/rest/2.0/vcs/git/config/update
+Similar to the creation endpoint, commit_branch_name will replace default_branch_name and configuration_branch_name will replace guid_mapping_branch_name
+
+
+Changes to the Commit API - POST /api/rest/2.0/vcs/git/branches/commit
+Added delete_aware parameter. This is true by default.
+When delete_aware is true, a check is now performed upon committing between the files in the Git branch and the objects in cluster/org. If any objects exist in the Git branch and not in cluster/org, they’ll be deleted from the Git branch as part of the commit.
+
+
+Changes to the Deploy API - POST /api/rest/2.0/vcs/git/commits/deploy
+The branch_name field is now mandatory to indicate which Git branch should get deployed to a ThoughtSpot cluster/org. default_branch_name will not be used here if branch_name is not provided.
+API behavior changes:
+A tracking file is maintained in the configuration branch which saves the commit id which was mentioned in the last execution of deploy API.
+In the next execution, changes in the branch post the saved commit id will be considered for deployment based on the deploy_type.
+DELTA: All the changes between the last tracked commit id and the commit id provided as part of the API call will be picked and deployed in the cluster/org. This includes tracking files that were deleted in git, which will now be deleted in the destination org/cluster upon deploy (using GUID mapping file to identify the equivalent objects).
+FULL: All the files at the commit id provided as part of the API call will be deployed. If there are any deletes to the files post last tracked commit id and commit id provided in the API call, then those will be deleted from the cluster/org.
+
+
+
 == Version 9.6.0.cl, October 2023
 
 === New API endpoints
