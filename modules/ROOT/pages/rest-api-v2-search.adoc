@@ -1,0 +1,391 @@
+= REST API v2.0 search endpoints
+:toc: true
+:toclevels: 2
+
+:page-title: Using REST API V2.0 search endpoints
+:page-pageid: rest-apiv2-search
+:page-description: Many use cases are possible with the very flexible REST API v2.0 search endpoints
+
+The REST API v2 endpoints that end in `/search` have very flexible request formats that solve a number of use cases.
+
+Some capabilities that have separate endpoints in the V1 REST API are done using the correct request on the smaller subset of `/search` endpoints in v2.0.
+
+Note that many parameters in the requests are *optional*, and leaving the parameter name out entirely has a different effect from including the parameter and specific values.
+
+Throughout this article, requests and responses will be shown as JSON, without any of the code to send the requests. The V2.0 Playground generates requests that always include the default values for any parameters that have them, but this article excludes them.
+
+Assume every request you see has the following parameters in addition to what is shown:
+
+[source,JSON]
+----
+{
+  "record_offset": 0,
+  "record_size": 10
+}
+----
+
+== Search metadata
+The `/metadata/search` endpoint in the V2 REST API replaces a large set of distinct endpoints in REST API V1.
+
+For more information about this API, xref:rest-api-v2-metadata-search.adoc[Search metadata].
+
+== Search users
+You can use `metadata/search` with the `type` set to `USER` to get a basic list of user objects, but the `users/search` endpoint provides advanced filtering options that are specific to the properties of user objects.
+
+For more information about this API, see xref:rest-api-v2-users-search.adoc[Search users].
+
+== Search groups
+You can use `metadata/search` with the `type` set to `USER_GROUP` to get a basic list of groups, but the `groups/search` endpoint provides advanced filtering options that are specific to the properties of user group objects.
+
+For more information about this API, see xref:rest-api-v2-groups-search.adoc[Search groups].
+
+== Search tags
+The `tags/search` V2 endpoint allows you to request a filtered list of the tag objects in the ThoughtSpot system.
+
+To search metadata objects by tags, use the `xref:rest-api-v2-metadata-search.adoc[metadata/search]` endpoint.
+
+=== List all tags
+The simplest request to `tags/search` is an empty body, which retrieves all tags in the system. Note that you need to send an empty object `{ }` in the body of your API request.
+
+[source,JSON]
+----
+{}
+----
+
+The response will be an array of tag header objects, with various properties of each tag:
+
+[source,JSON]
+----
+[
+  {
+    "name": "RetailJP",
+    "id": "000a240f-3029-4d2a-9d60-5fc3885f7bc7",
+    "color": "#63c9ea",
+    "deleted": false,
+    "hidden": false,
+    "external": false,
+    "deprecated": false,
+    "creation_time_in_millis": 1607307160738,
+    "modification_time_in_millis": 1607307160974,
+    "author_id": "59481331-ee53-42be-a548-bd87be6ddd4a",
+    "modifier_id": "59481331-ee53-42be-a548-bd87be6ddd4a",
+    "owner_id": "000a240f-3029-4d2a-9d60-5fc3885f7bc7"
+    },
+    ...
+]
+----
+
+`name`, `color`, and `id` are the most essential tag properties.
+
+=== Filter to specific tags
+You can specify a particular tag using the `tag_identifier` parameter in the request, which takes either the tag name or GUID:
+
+[source,JSON]
+----
+{ 
+ "tag_identifier": "Marketing Tag"
+}
+----
+
+You can also search for tags by assigned color with the `color` parameter, which takes a string of the 6-digit hex code of the color (using lowercase letters):
+
+[source,JSON]
+----
+{ 
+ "color": "#63c9ea"
+}
+----
+
+== Search Orgs
+
+Orgs are multi-tenant divisions of a ThoughtSpot cluster. If Orgs are enabled on a cluster, an Org admin can use the `orgs/search` endpoint to retrieve details about the Orgs that exist in the cluster.
+
+The API operations on Orgs require the Org ID or name. Org ID is a numeric identifier that can only be retrieved via API. The Primary Org will always have an `id` property of `0` and other Org IDs are randomly assigned.
+
+=== List all Orgs
+The simplest request to `Orgs/search` is an empty body, which retrieves all Orgs in the system. Note that you need to send an empty object `{ }` in the body of the request:
+
+[source,JSON]
+----
+{}
+----
+
+The response will be an array of Org header objects:
+
+[source,JSON]
+----
+[
+  {
+    "id": 0,
+    "name": "Primary",
+    "status": "ACTIVE",
+    "description": "Primary Org",
+    "visibility": "SHOW"
+  },
+  {
+    "id": 164728055,
+    "name": "Bill Back",
+    "status": "ACTIVE",
+    "description": "Content and testing for Bill Back.",
+    "visibility": "SHOW"
+  }
+  ...
+]
+----
+
+=== Filter to specific Orgs
+A number of parameters that can be set to filter the response of `orgs/search`:
+
+* `org_identifier` takes either the name or ID of one specific Org. +
+* `description` allows for an exact match on the `description` property of the Org. +
+* `visibility` takes either `HIDDEN` or `SHOW` as a value. +
+* `status` takes either `ACTIVE` or `IN_ACTIVE` as a value.
+
+You can also use the `user_identifiers` array, which takes a set of usernames or user GUIDs and filters the results to Orgs that the users specified in the array belong to.
+
+The following is a request with several of the filter parameters in effect:
+
+[source,JSON]
+----
+{
+  "visibility": "SHOW",
+  "status": "ACTIVE",
+  "user_identifiers": [
+    "bryant.howell"
+  ]
+}
+----
+
+== Search schedules
+The `schedules/search` V2 endpoint allows you to request a filtered list of the schedules that exist for objects in the ThoughtSpot system.
+
+=== List all schedules
+The simplest request to `schedules/search` is an empty body, which retrieves all schedules in the system. Note that you need to send an empty object `{ }` in the body of the request:
+
+[source,JSON]
+----
+{}
+----
+
+The response is an array of schedule objects, which have a number of sub-objects providing information about the schedule, the creator of the schedule, and the object on which the schedule runs:
+
+[source,JSON]
+----
+[
+ {
+  "author": {
+    "id": "f7fc5c01-5316-41b2-9e8f-8d776f5a7215",
+    "name": "casey.lauer"
+  },
+  "creation_time_in_millis": 1632923213,
+  "description": "",
+  "file_format": "PDF",
+  "frequency": {
+    "cron_expression":{
+      "day_of_month":"*",
+      "day_of_week":"1",
+      "hour":"08",
+      "minute":"00",
+      "month":"*",
+      "second":"0",
+    }
+  },
+  "id":"ef6c64e6-bb66-451b-83a5-8b0f0a5fc37f",
+  "liveboard_options": null,
+  "metadata": {
+    "name": null,
+    "id": "8d927944-7bc1-4ddc-b7a0-a1439b853f7d",
+    "type": "LIVEBOARD",
+  },
+  "name":"Customer 1 - Gross Profit < 20%",
+  "pdf_options": {
+    "complete_liveboard": true,
+    "include_cover_page": false,
+    "include_custom_logo": false,
+    "include_filter_page": false,
+    "include_page_number": false,
+    "page_footer_text": "",
+    "page_orientation": "LANDSCAPE",
+    "page_size": "A4",
+    "truncate_table": false
+  },
+  "recipient_details": null,
+  "status": "PAUSED",
+  "time_zone": "",
+  "history_runs": null
+  },
+  ...
+]
+----
+
+The value of `id` is the GUID for the specific schedule, which can be used with the other `/schedules` endpoints to perform various actions.
+
+The `metadata` key holds information about the object that is scheduled. For additional details about that object, use the `metadata/search` endpoint.
+
+The `author` key holds information about the user who created the schedule. For additional details about that user, use the `users/search` endpoint.
+
+=== Sort the response
+The `sort_options` parameter takes a link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fmetadata-search-sort-options[Metadata Search Sort Options, target=_blank] object allowing for sorting on one field of the metadata response either **ASC** or **DESC**:
+
+[source,JSON]
+----
+{
+ "sort_options" : {
+  "field_name": "NAME",
+  "order": "ASC" 
+ }
+}
+----
+
+=== Filter to specific schedules
+You can filter to specific schedules by name or ID using the `schedule_identifiers` array:
+
+[source,JSON]
+----
+{
+ "schedule_identifiers": [
+    "user.name@place.com"
+  ]
+}
+----
+
+You can search for schedules that are associated with a particular object using the `metadata` parameter, which takes an array of objects identified by either name or GUID, and a `type`.
+
+[NOTE]
+====
+The Schedule API supports only `LIVEBOARD` metadata object type.
+====
+
+[source,JSON]
+----
+{
+ "metadata": [
+   {
+      "identifier": "Great Liveboard",
+      "type": "LIVEBOARD"
+    }
+  ]
+}
+----
+
+=== Add history runs details
+The `history_runs_options` parameter takes a complex object of options that make the `history_runs` key of the response go from `null` to an array of details about each historical schedule run:
+
+[source,JSON]
+----
+{
+ "metadata": [
+   {
+      "identifier": "Great Liveboard",
+      "type": "LIVEBOARD"
+    }
+  ],
+ "history_runs_options": {
+    "include_history_runs": true,
+    "record_size": 10,
+    "record_offset": 0
+ }
+}
+----
+
+The response array has items that look like:
+[source,JSON]
+----
+"history_runs": [
+  {
+    "id": "028f4853-89f9-4049-a332-f736a0d84c55"
+    "start_time_in_millis": 1696008900,
+    "end_time_in_millis": 1696008960,
+    "status": "SUCCESS",
+    "detail": "Scheduled updates generated as expected."
+  },
+  ...
+]
+----
+
+== Search roles
+If the Role-Based Access Control (RBAC) feature is enabled on your ThoughtSpot instance, the `roles/search` endpoint allows for listing the role objects and determining the assignment of those roles, among other abilities.
+
+=== List all roles
+The simplest request to `roles/search` is an empty body, which retrieves all roles in the system. Note that you  need to send an empty object `{ }` in the body of the request:
+
+[source,JSON]
+----
+{}
+----
+
+The response is an array of roles objects, with sub-objects describing various aspects and relationships:
+
+[source,JSON]
+----
+[
+ {
+  "id": "a92a1574-7dd5-4af0-a560-3e753113bcb4",
+  "name": "Analyst",
+  "description": "Role providing privileges suitable for a Analyst",
+  "groups_assigned_count": null,
+  "orgs":[
+    {
+      "id": "0",
+      "name": "Primary"
+    }
+  ],
+  "groups": [
+    {
+      "id": "d0326b56-ef23-4c8a-8327-a30e99bcc72b",
+      "name":"Administrator"
+    }
+  ],
+  "privileges":[
+    "BYPASSRLS",
+    "A3ANALYSIS",
+    "JOBSCHEDULING",
+    "SYNCMANAGEMENT",
+    "DATADOWNLOADING",
+    "DATAMANAGEMENT",
+    "USERDATAUPLOADING"
+  ],
+  "permission": "MODIFY",
+  "author_id": "59481331-ee53-42be-a548-bd87be6ddd4a",
+  "modifier_id": "59481331-ee53-42be-a548-bd87be6ddd4a",
+  "creation_time_in_millis": 1678026709288,
+  "modification_time_in_millis": 1678075632279,
+  "deleted": false,
+  "deprecated": false,
+  "external": false,
+  "hidden": false,
+  "shared_via_connection": false
+ },
+ ...
+]
+----
+
+* The `orgs` key is an array of Org objects that the role exists on. +
+* The `privileges` key is an array of the named system privileges assigned to the role. +
+* The `groups` key is an array of group objects, including both group name and GUID as the `id` property, representing every Thoughtspot group that the role is assigned to.
+
+=== Filter the response
+A number of optional parameters are available to filter the response to only roles that match a specific set of options.
+
+* `role_identifiers`, `org_identifiers` and `group_identifiers` each take an array of either names or IDs to filter the overall response. +
+*  `privileges` takes an array of privilege names, returning only roles that provide the set of provided privileges. +
+* `deprecated`, `external` and `shared_via_connection` are all boolean options that match the similarly named property of the response.
+* `permissions` takes an array with the possible values of `READ_ONLY`, `MODIFY` and `NO_ACCESS`.
+
+You can use the various filter options together in one request:
+
+[source,JSON]
+----
+{
+  "org_identifiers": [
+    "0"
+  ],
+  "group_identifiers": [
+    "Administrator"
+  ],
+  "privileges": [
+    "AUTHORING",
+    "DATADOWNLOADING"
+  ]
+}
+----

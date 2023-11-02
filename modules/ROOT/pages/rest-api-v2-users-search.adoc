@@ -1,0 +1,283 @@
+= Search users
+:toc: true
+:toclevels: 2
+
+:page-title: Using REST API V2.0 users/search endpoint
+:page-pageid: rest-apiv2-users-search
+:page-description: Many use cases are possible with the very V2.0 users/search endpoint
+
+The `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fsearch-users[/users/search, target=_blank]` API endpoint is used to retrieve details about ThoughtSpot users, with many specific filtering capabilities for answering a number of relevant questions about users.
+
+You can search for the `USER` type using `metadata/search`, but `users/search` provides considerably more control.
+
+The overall structure of `users/search` request is link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fapi-rest-20-users-search-request[described as a combination of objects, target=_blank].
+
+Note that many parameters in the request are *optional*, and leaving the parameter name out entirely has a different effect from including the parameter and specific values.
+
+Throughout this article, requests and responses will be shown as JSON, without any of the code to send the requests. The V2.0 Playground generates requests that always include the default values for any parameters that have them, but this article excludes them. Assume every request you see has the following parameters in addition to what is shown: 
+
+[source,JSON]
+----
+{
+  "record_offset" : 0,
+  "record_size": 10
+}
+----
+
+For precise results, you can set `record_size` to `-1` and `record_offset` to `0`.
+
+== Response format
+The response from any call to `users/search` will resemble the following:
+
+[source,JSON]
+----
+[
+  {
+    "id": "0f0dd0f7-7411-4195-a4aa-0dc6b58413c9",
+    "name": "east.user@domain.com",
+    "display_name": "East User",
+    "visibility": "SHARABLE",
+    "author_id": "0f0dd0f7-7411-4195-a4aa-0dc6b58413c9",
+    "can_change_password": true,
+    "complete_detail": true,
+    "creation_time_in_millis": 1354006445722,
+    "current_org": {},
+    "deleted": false,
+    "deprecated": false,
+    "account_type": "LOCAL_USER",
+    "account_status": "ACTIVE",
+    "email": "",
+    "expiration_time_in_millis": 1696256188,
+    "external": false,
+    "favorite_metadata": [],
+    "first_login_time_in_millis": 0,
+    "group_mask": 14,
+    "hidden": false,
+    "home_liveboard": null,
+    "incomplete_details": [],
+    "is_first_login": false,
+    "modification_time_in_millis": 1354006445722,
+    "modifier_id": "59481331-ee53-42be-a548-bd87be6ddd4a",
+    "notify_on_share": true,
+    "onboarding_experience_completed": false,
+    "orgs": null,
+    "owner_id": "0f0dd0f7-7411-4195-a4aa-0dc6b58413c9",
+    "parent_type": "USER",
+    "privileges": [
+      "AUTHORING",
+      "LIVEBOARD_VERIFIER",
+      "DATADOWNLOADING",
+      "USERDATAUPLOADING",
+      "A3ANALYSIS"
+    ],
+    "show_onboarding_experience": true,
+    "super_user": true,
+    "system_user": true,
+    "tags": [],
+    "tenant_id": "982d6da9-9cd1-479e-b9a6-35aa05f9282a",
+    "user_groups": [
+      {
+        "id": "fb61e25d-5db0-4c18-8e97-9468459f5ac1",
+        "name": "Demo Retail Group"
+      }
+    ],
+    "user_inherited_groups": [],
+    "welcome_email_sent": false,
+    "org_privileges": null,
+    "preferred_locale": "en-US",
+    "extended_properties": null,
+    "extended_preferences": null
+  },
+...
+]
+----
+
+== List of users
+
+The `/users/search` API performs listing functions when you do not send specific object IDs as part of your request. Note you must send some request in the body of the POST, even if this is only `{ }`.
+
+For example, to see *all users*, you can simply send the `record_offset` and `record_size` parameters:
+
+[source,JSON]
+----
+{
+  "record_offset": 0,
+  "record_size": 100000
+}
+----
+
+== Retrieve specific objects
+There are several parameters that allow referencing a user object directly. 
+  
+The `user_identifier` takes either the **username** or **user GUID**:
+
+[source,JSON]
+----
+{
+ "user_identifier": "bill.back"
+}
+----
+
+The `display_name` property checks against the visible name that a user sees within the ThoughtSpot UI, while `email` compares against the user's e-mail property. These two properties are not guaranteed to be unique, although they often are.
+
+== Filter and sort API response
+
+=== sort_options
+
+The `sort_options` parameter requires link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fenumerations%2Ffield-name[Users Search Sort Options, target=_blank] to sort on one field of the metadata response either in the ascending (`ASC`) or descending (`DESC`) order:
+
+[source,JSON]
+----
+{
+ "sort_options" : {
+  "field_name": "DISPLAY_NAME",
+  "order": "ASC" 
+ }
+}
+----
+
+If you need multiple levels of sorting, you'll have to parse the response programmatically and apply a sorting algorithm on the properties within each response item.
+
+=== group_identifiers
+You can filter responses based on which groups the user belongs to.
+
+This replaces some of the individual group endpoints in the V1 REST API, such as the xref:group-api.adoc#get-users-group[`/tspublic/v1/group/listuser/{groupid}`] endpoint.
+
+The `group_identifiers` parameter takes an array of strings of either **group name** or **group GUID**. Note that groups have a `display_name` property which is different from **group_name** and cannot be used in the `group_identifiers` array.
+
+[source,JSON]
+----
+{
+ "group_identifiers" : [
+    "Developers"
+  ]
+}
+----
+
+=== privileges
+Responses can be filtered based on **privileges** assigned to the user. Privileges are assigned through groups or roles rather than directly to a user, but the `users/search` endpoint is able to search the set of privileges the user currently has.
+
+The array of privileges works as an OR condition, returning any user with any of the privileges listed. If you need to know who has a set of privileges, you'll have to check the `privileges` array for each user object in the response.
+
+[source,JSON]
+----
+{
+ "privileges": [
+    "DEVELOPER",
+    "DATADOWNLOADING"
+  ]
+}
+----
+
+=== visibility
+Every user has a `visibility` property which can either be `SHARABLE` or `NON_SHARABLE`. A `SHARABLE` user can have content shared directly to them by other users who belong to the same `sharable` group. In multi-tenanted situations, it is most common to have users set to `NON_SHARABLE` so that individual usernames are never revealed to any other users.
+
+You can list users with a specific visibility setting by specifying the `visibility` property in the request:
+
+[source,JSON]
+----
+{
+ "visibility": "SHARABLE"
+}
+----
+
+=== account_type and account_status
+The `account_type` property tracks which authentication method was used to create a given user. The most common options are `LOCAL_USER`, `SAML_USER`, and `OIDC_USER`.
+
+The response can be filtered to just users created from a particular method using the `account_type` parameter on the request:
+
+[source,JSON]
+----
+{
+ "account_type": "SAML_USER"
+}
+----
+
+The `account_status` parameter is also available for filtering, but the majority of users are listed as `ACTIVE` and the other available states are not relevant at this time.
+
+=== home_liveboard_identifier
+The `home_liveboard_identifier` parameter filters users who have a specific Liveboard set as their "home" Liveboard. The value can take the GUID of a Liveboard or its name, but because Liveboard names are not guaranteed to be unique, it is best to use a GUID of a specific Liveboard when using this filtering parameter:
+
+[source,JSON]
+----
+{
+ "home_liveboard_identifier": "a1fdcb4d-9cf9-466b-b866-22c53db9b1ac"
+}
+----
+
+=== org_identifiers
+On a ThoughtSpot instance with Orgs, a user can belong to multiple Orgs.
+
+The `org_identifiers` parameter takes an array of strings representing either Org name or Org ID.
+
+As with other filtering parameters that take arrays, the list of identifiers is handled as a logical OR, returning any users who belong to any of the provided identifiers. To filter to a user with a particular set of Orgs, you will need to do additional processing on the result set to confirm the full set of Orgs matches:
+
+[source,JSON]
+----
+{
+ "org_identifiers": [
+   "Dev",
+   "UAT"
+ ]
+}
+----
+
+The `orgs` key of each user item in the response contains the details of the Orgs, which can be read and compared to the set of Orgs you want to match for that user:
+
+[source,JSON]
+----
+...
+"orgs":[
+  {
+    "id": 1568202965,
+    "name": "Dev"
+  }, 
+  {
+    "id": 2004448319,
+    "name": "Secondary"
+  }
+]
+...
+----
+
+Note that the Org ID is an integer in this portion of the response.
+
+=== role_identifiers
+On ThoughtSpot instances with the Role-Based Access Control(RBAC) feature enabled, you can use the `role_identifiers` parameter to send an array of either GUID or name of the roles that a user has access to.
+
+=== Additional optional boolean filters
+The `notify_on_share`, `show_onboarding_experience`, and `onboarding_experience_completed` properties are available as boolean filters to see only users who either have or haven't used a given feature.
+
+Note that the *absence* of the parameter is how you remove the filtering. If the parameter value is present as a key, the value must be set to `true` or `false`, so that the response can be filtered to get only those users that match the condition.
+
+== Additional response details
+There are a number of parameters that add new data to the response, allowing the `metadata/search` endpoint to answer questions that require multiple API calls in the V1 REST API.
+
+=== include_favorite_metadata
+The `user` object in the response always includes a `favorite_metadata` key, but it will always be an empty array unless the  `include_favorite_metadata` parameter is added to the request set to `true`:
+
+[source,JSON]
+----
+{
+ "user_identifier": "bryant.howell",
+ "include_favorite_metadata": true
+}
+----
+
+The response will include metadata objects in the `favorite_metadata` array, with the `id`, `name`, and `type` of the objects that the user has set as favorites. This data can be used to create a listing in an embedding web app's UI that can load the content:
+
+[source,JSON]
+----
+"favorite_metadata":[
+  {
+    "id": "8838d9fc-e56d-4467-859f-1ab9364eb139"
+    "name": "Procurement / Supplier 365"
+    "type": "LIVEBOARD"
+  }
+  ...
+]
+----
+
+
+
+
