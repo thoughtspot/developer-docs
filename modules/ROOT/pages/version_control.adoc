@@ -37,7 +37,7 @@ The ThoughtSpot content deployment process with version control APIs and Git int
 2. xref:version_control.adoc#connectTS[Connect your ThoughtSpot environment to the Git repository]. +
 You can connect your ThoughtSpot development and production environments to the `dev` and production branches on your Git repository. The general practice is to use the `main` branch in the Git repository as a production branch to publish content.
 3. xref:version_control.adoc#_commit_tml_files_to_git[Push changes to the Git branch mapped to your ThoughtSpot environment]. +
-4. xref:version_control.adoc#_merge_updates_from_dev_branch_to_main_in_git[validate merge before deploying changes to the destination environment].
+4. xref:version_control.adoc#_merge_updates_from_dev_branch_to_main_in_git[Validate merge before deploying changes to the destination environment].
 5. xref:version_control.adoc[Deploy commits to your production environment] and publish your changes.
 
 The following figure illustrates a simple Git integration workflow with ThoughtSpot `Dev` and `Prod` environments.
@@ -67,7 +67,7 @@ image::./images/git-lifecycle-management.png[Git integration workflow]
 
 [NOTE]
 ====
-ThoughtSpot does not recommend committing changes to git directly and deploying these changes back in a ThoughtSpot development environment.
+ThoughtSpot does not recommend committing changes to Git directly and deploying these changes back in a ThoughtSpot development environment.
 ====
 
 == Get started
@@ -111,11 +111,11 @@ To connect your ThoughtSpot instance to a Git repository using REST API, send a 
 |`access_token`|__String__. Access token to authenticate to the Git repository.
 |`org_identifier`|__String__. ID of the Org. Define this parameter only if the Orgs feature is enabled on your ThoughtSpot cluster and separate Orgs are configured for development and production environments.
 |`branch_names`|__Array of strings__. List of Git branches to configure.
-|`commit_branch_name` |__String__. Name of the remote branch where objects committed from this Thoughtspot instance will be versioned. ThoughtSpot recommends using `commit_branch_name` instead of the `default_branch_name` property. For example, when Orgs are used in a cluster, you can prevent two Orgs from using the same commit branch.
+|`commit_branch_name` |__String__. Name of the remote branch where objects committed from this Thoughtspot instance will be versioned. ThoughtSpot recommends using `commit_branch_name` instead of the `default_branch_name` property.
 |`default_branch_name` +
 __Optional__|__String__. Name of the default Git branch to use for all operations on the cluster. ThoughtSpot recommends using `commit_branch_name` instead of `default_branch_name`. If both these parameters are defined, ThoughtSpot will consider only the branch name defined in `commit_branch_name`.
 |`enable_guid_mapping`  |__Boolean__. Enables GUID mapping and generates a GUID mapping file. Starting from 9.7.0.cl, this attribute is set to `true` by default.
-To know more about GUID mapping, see xref:version_control.adoc#_guid_mapping[GUID mapping].
+To know more about GUID mapping, see xref:version_control.adoc#_guid_mapping_and_configuration_files[GUID mapping].
 |`configuration_branch_name` a|__String__. Name of the branch that will contain all configuration files related to operations between ThoughtSpot and Git repository. ThoughtSpot recommends using `configuration_branch_name` instead of the `guid_mapping_branch_name` in the API request. If no branch name is specified, the default `ts_config_files` branch is considered. You must ensure that the configuration branch is available in the Git repository connected to ThoughtSpot.
 |`guid_mapping_branch_name` +
 __Optional__|__String__. The name of the Git branch to which you want to add the GUID mapping file. ThoughtSpot recommends using the `configuration_branch_name` property in the API request.
@@ -201,9 +201,9 @@ The version control API automatically generates a GUID mapping file when deployi
 * `mappedGuid` refers to the GUID of the object on the destination environment, for example, `staging` or `prod` cluster.
 * `counter` shows the number of times the mapped object was used in deploy operations.
 
-If GUID mapping is enabled, ThoughtSpot uses the GUID mapping file to map the object GUIDs and automatically update the object references in your TML content.
+If GUID mapping is enabled, ThoughtSpot uses the GUID mapping file to map the object GUIDs and automatically updates the object references in your TML content.
 
-The following figure illustrates the GUID mapping during deployments:
+The following figure illustrates how GUIDs are mapped during deployments:
 
 [.widthAuto]
 image::./images/guid-mapping.png[GUID mapping]
@@ -218,7 +218,7 @@ For more information about these endpoints, see the API documentation in the +++
 
 === Commit files
 
-ThoughtSpot users with data management (*Can manage data*) privilege can download TML files to their local environment, xref:modify-tml.adoc[edit TML files], and import them into ThoughtSpot via UI or REST API. With Git integration, users can also push TML files from a ThoughtSpot instance to a Git branch using the `/api/rest/2.0/vcs/git/branches/commit` API endpoint.
+ThoughtSpot users with data management (*Can manage data*) privilege can download TML files to their local environment, xref:modify-tml.adoc[edit TML files], and import them into ThoughtSpot via UI or REST API. With Git integration, users can also push commits from a ThoughtSpot instance to a Git branch via `/api/rest/2.0/vcs/git/branches/commit` API call.
 
 ==== Request parameters
 [width="100%" cols="2,8"]
@@ -430,9 +430,9 @@ curl -X POST \
 
 ==== Results
 
-If the API request is successful, the changes are applied to the objects in the `prod` environment. A tracking file is generated in the branch used for storing configuration files. This file includes the `commit_id` specified in the API request.
+If the API request is successful, the changes are applied to the objects in the `prod` environment. A tracking file is generated in the Git branch used for storing configuration files. This file includes the `commit_id` specified in the API request.
 
-The subsequent API calls to deploy commits will consider the saved `commit_id` and `delta_type` specified in the API request:
+The subsequent API calls to deploy commits will consider the saved `commit_id` and `deploy_type` specified in the API request:
 
 * If `deploy_type` is set as `DELTA`, all the changes between the last tracked `commit id` and the new `commit_id` specified in the API request will be deployed to the destination environment or Org.
-* If the `deploy_type` is set as `FULL`, all the files from the `commit_id` specified in the API request will be deployed. If any object or file is deleted in the new commit specified in the API request, it will be deleted from the destination environment or Org during deployment.
+* If the `deploy_type` is  FULL`, all the files from the `commit_id` specified in the API request will be deployed. If any object or file is deleted in the commit specified in the API request, it will be deleted from the destination environment during deployment.
