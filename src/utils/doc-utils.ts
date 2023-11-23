@@ -1,3 +1,5 @@
+import { BUILD_ENVS } from '../configs/doc-configs';
+
 const buildJSON = (element) => {
     const parentElement = element?.children;
     const subObj: any = {
@@ -19,7 +21,7 @@ const buildJSON = (element) => {
 };
 
 const getPathPrefix = () => {
-    return 'docs';
+    return process.env.NODE_ENV === BUILD_ENVS.LOCAL ? '' : 'docs';
 };
 
 export const getPath = (path) =>

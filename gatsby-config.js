@@ -3,10 +3,9 @@ const asciidoc = require('asciidoctor')();
 const config = require('./src/configs/doc-configs');
 
 const getPathPrefix = () => {
-    // if (process.env.BUILD_ENV === config.BUILD_ENVS.LOCAL) {
-    //     return null;
-    // }
-    // return null;
+    if (process.env.BUILD_ENV === config.BUILD_ENVS.LOCAL) {
+        return null;
+    }
     return 'docs';
 };
 
