@@ -49,7 +49,7 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
 
     const getParentURL = () => {
         let parentUrl = location?.origin;
-        if (isBrowser()) {
+        if (isBrowser() && !parentUrl) {
             const { ancestorOrigins } = window?.location;
             parentUrl =
                 ancestorOrigins?.length > 0
