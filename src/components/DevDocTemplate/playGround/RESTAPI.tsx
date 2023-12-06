@@ -133,12 +133,12 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
             if (event.data?.type === EXTERNAL_PLAYGROUND_EVENTS.URL_CHANGE) {
                 const locationHash = event?.data?.data || '';
                 if (locationHash && locationHash !== 'http') {
-                    const path = window?.location?.pathname;
+                    const path = window?.location?.pathname.replace(/^\//, '');
                     const queryParams = window.location.search;
                     const searchParams = new URLSearchParams(queryParams);
                     searchParams.set('apiResourceId', locationHash);
                     const parent = getParentURL().replace(/\/$/, '');
-                    const newUrl = `${parent}${path}?${searchParams?.toString()}`;
+                    const newUrl = `${parent}/${path}?${searchParams?.toString()}`;
                     if (isAppEmbedded) {
                         window.parent.postMessage(
                             {
