@@ -1,5 +1,6 @@
 module.exports = {
     SITE_URL: 'https://developers.thoughtspot.com/docs',
+    SITE_PREFIX: 'docs',
     DOC_REPO_NAME: '',
     DOC_NAV_PAGE_ID: 'nav',
     TS_HOST_PARAM: 'tshost',
@@ -37,12 +38,12 @@ module.exports = {
             label: '9.7.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
-        }
+        },
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
         ASK_DOCS: 'ask-docs',
-        GQ_PLAYGROUND:'graphql-play-ground'
+        GQ_PLAYGROUND: 'graphql-play-ground',
     },
     CLUSTER_TYPES: {
         PROD: 'PROD',

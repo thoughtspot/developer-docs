@@ -6,7 +6,7 @@ const getPathPrefix = () => {
     if (process.env.BUILD_ENV === config.BUILD_ENVS.LOCAL) {
         return null;
     }
-    return 'docs';
+    return config.SITE_PREFIX;
 };
 
 const getPath = (path) =>
@@ -87,7 +87,7 @@ module.exports = {
     pathPrefix: getPath(config.DOC_REPO_NAME),
     siteMetadata: {
         title: 'tseverywhere-docs',
-        url: 'https://developers.thoughtspot.com/docs',
+        url: config.SITE_URL,
         image: './images/favicon.svg',
     },
     plugins: [
