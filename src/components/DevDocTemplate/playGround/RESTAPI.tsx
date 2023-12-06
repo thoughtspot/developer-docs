@@ -9,7 +9,10 @@ import {
     CLUSTER_TYPES,
 } from '../../../configs/doc-configs';
 
-import { DOC_VERSION_DEV, DOC_VERSION_PROD } from '../../../constants/uiConstants';
+import {
+    DOC_VERSION_DEV,
+    DOC_VERSION_PROD,
+} from '../../../constants/uiConstants';
 import BackButton from '../../BackButton';
 
 const EXTERNAL_PLAYGROUND_EVENTS = {
@@ -131,16 +134,15 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
                 const locationHash = event?.data?.data || '';
                 if (locationHash && locationHash !== 'http') {
                     const path = window?.location?.pathname;
-                    const currentUrl = window.location.search;
-                    var searchParams = new URLSearchParams(currentUrl);
                     const queryParams = window.location.search;
-                    var searchParams = new URLSearchParams(queryParams);
+                    const searchParams = new URLSearchParams(queryParams);
                     searchParams.set('apiResourceId', locationHash);
-                    const newUrl = `${getParentURL()}${path}?${searchParams?.toString()}`;
+                    const parent = getParentURL().replace(/\/$/, '');
+                    const newUrl = `${parent}${path}?${searchParams?.toString()}`;
                     if (isAppEmbedded) {
                         window.parent.postMessage(
                             {
-                                params:props?.params,
+                                params: props?.params,
                                 subsection: locationHash,
                             },
                             '*',
@@ -194,7 +196,6 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
         }
     }, [token, isPlaygroundReady]);
 
-
     return (
         <div className="restApiWrapper">
             <BackButton title="Back" backLink={backLink} internalRedirect />
@@ -216,5 +217,5 @@ type RenderPlayGroundProps = {
     location: Location;
     backLink: string;
     isPublisSiteOpen: boolean;
-    params:Object
+    params: Object;
 };
