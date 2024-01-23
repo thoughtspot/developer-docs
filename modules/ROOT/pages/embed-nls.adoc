@@ -1,0 +1,264 @@
+= Embed Natural Language Search
+:toc: true
+:toclevels: 2
+
+:page-title: Embed Natural Language Search
+:page-pageid: embed-nls
+:page-description: You can use the SageEmbed SDK library to embed ThoughtSpot Natural Language Search experience in your application.
+
+ThoughtSpot provides the `SageEmbed` SDK package to embed Natural Language Search experience in your embedding application. ThoughtSpot Natural Language Search supports the following features:
+
+* Ability to pass search text in natural language format as query string
+* AI-generated sample Answers
+* AI-suggested popular queries
+
+== Natural Language Search components
+
+The `SageEmbed` package allows you embed the following Search components in your application:
+
+* Search bar that supports natural language queries +
++
+Unlike the token-based Search, the Search bar in the Natural Language Search interface allows you to type questions in the natural language format. Users can also select popular queries suggested by ThoughtSpot. +
+* Worksheet selector +
+Allows selecting a Worksheet as data source for search queries. The AI Answer Search must be enabled on the Worksheet for search queries to return AI-generated Answers.
+* Sample questions +
+The sample questions panel shows the AI-suggested search queries and Answers. To see AI generated answers, select an AI-enabled worksheet.
+* Answer page +
+The API generated Answer page shows chart or table and an **Edit** button to modify the search query. The Answer page also includes a feedback widget for users to send feedback.
+
+== Get started
+Get started with embedding Natural Language Search and complete the steps described in the following sections
+
+=== Import the SageEmbed package
+
+Import the `SageEmbed` SDK library to your application environment:
+
+**npm**
+[source,JavaScript]
+----
+import {
+    SageEmbed,
+    AuthType,
+    init,
+    prefetch,
+    EmbedEvent,
+    HostEvent
+}
+from '@thoughtspot/visual-embed-sdk';
+----
+
+**ES6**
+[source,JavaScript]
+----
+<script type = 'module'>
+    import {
+        SageEmbed,
+        AuthType,
+        init,
+        prefetch,
+        EmbedEvent
+    }
+from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+----
+
+=== Initialize the SDK
+
+xref:getting-started.adoc#initSdk[Initialize the SDK] and define authentication attributes.
+
+=== Create an instance of the SageEmbed class
+
+Create an instance of the SageEmbed object and customize your Search page view.
+
+[source,JavaScript]
+----
+const sageEmbed = new SageEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        width: '100%',
+        height: '100%',
+    },
+    dataSources: ['<%=datasourceGUID%>'],
+    searchOptions: {
+        searchQuery: '<search text>',
+        executeSearch: true,
+
+    },
+});
+----
+
+////
+[source,JavaScript]
+----
+const searchEmbed = new SearchBarEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        width: '100%',
+        height: '100%',
+    },
+    additionalFlags: {
+    <key>: <value>
+    },
+    answerId: "<%=savedAnswerGUID%>",
+    dataSources: ['<%=datasourceGUID%>'],
+    collapseDataSources: false,
+    disabledActions: [],
+    disabledActionReason: '<reason for disabling>',
+    enableSearchAssist: true,
+    forceTable: false,
+    hiddenActions: [],
+    hideDataSources: false,
+    hideResults: false,
+    searchOptions: {
+        searchTokenString: '<TML-query-string>',
+        executeSearch: true,
+    },
+});
+----
+
+
+
+frameParams::
+Sets the `width` and `height` dimensions to render the search object in a web browser. You can set the `width` and `height` attribute values in pixels or as a percentage.
+
+include::{path}/additional-flags.adoc[]
+
+----
+https://{ThoughtSpot-Host}/v2/?dataSourceMode=expand&useLastSelectedSources=false&isSearchEmbed=true&enableFeatureA=true#/embed/answer
+----
+
+
+answerID __Optional__::
+_String_. The Global Unique Identifiers (GUID) of the answers saved in a user profile.
+
+dataSources::
+_Array of strings_. The GUIDs of the data sources which you want to query.
+
+visibleActions __Optional__::
+_Array of strings_. Displays the specified actions on the search result page. These actions can appear as buttons, or as menu actions in  **More** image:./images/icon-more-10px.png[the more options menu] or the contextual menu. You can use this attribute to show a small subset of actions from the list of available actions. 
+
++
+[NOTE]
+====
+Use either `visibleActions` or `hiddenActions` to show or hide the actions in the embedded UI. For more information, see xref:embed-actions.adoc[Show or hide UI actions].
+====
+
++
+----
+visibleActions: [Action.DownloadAsPDF,Action.DownloadAsCSV,Action.Save,Action.ShowUnderlyingData]
+----
++
+++++
+<a href="{{previewPrefix}}/playground/search?modifyActions=true" id="preview-in-playground" target="_blank">Try it out</a>
+++++
+
+hiddenActions __Optional__::
+_Array of strings_. Hides the specified actions on the search result page. You can use this attribute to remove the actions that are not relevant to your application context. Use this attribute only if `visibleActions` are not defined. 
+
++
+For example, to hide the *Share* action, specify `Action.Share` in the `hiddenActions` attribute.
+
++
+----
+hiddenActions: [Action.Share]
+----
++
+++++
+<a href="{{previewPrefix}}/playground/search?modifyActions=true" id="preview-in-playground" target="_blank">Try it out</a>
+++++
+
+
+disabledActions __Optional__::
+_Array of strings_. Disables the specified actions. You can use this attribute to restrict user access to certain features.
++
+For example, to disable the *Show underlying data* action in the *More* menu image:./images/icon-more-10px.png[the more options menu], specify `Action.ShowUnderlyingData` in the `disabledActions` attribute.
+
++
+----
+disabledActions: [Action.ShowUnderlyingData]
+----
++
+++++
+<a href="{{previewPrefix}}/playground/search?modifyActions=true" id="preview-in-playground" target="_blank">Try it out</a>
+++++
+
+include::{path}/custom-action-note.adoc[]
+
+disabledActionReason __Optional__::
+_String_. The text to show for disabled actions. The text string specified in `disabledActionReason` shows as a tooltip when a user hovers over a disabled action in the embedded UI. For example, if you have disabled the `Download` action and you intend to enable this action for only authorized users, you can specify `disabledActionReason` as `Contact your administrator to enable this feature`. 
+
+
+hideDataSources __Optional__::
+_Boolean_. When set to true, it hides the default Data Source panel. Use this attribute if you want to create a custom data panel.
+
++
+++++
+<a href="{{previewPrefix}}/playground/search?hideDataSources=true" id="preview-in-playground" target="_blank">Try it out</a>
+++++
+
+[#search-query]
+searchOptions __Optional__::
+Allows you to specify a search token string and execute search.
+
+* `searchTokenString`
++
+__String__. The ThoughtSpot Modeling Language (TML) query string. For example, to use the `product` and `sales` keywords, you can set the search token as shown here:
+
++
+    searchTokenString: '[sales][product name]'
+
+* `executeSearch`
+__Boolean__. When set to `true`, the  focus is placed on search results. When set to `false`, the focus is placed at the end of search tokens in the search bar.
++
+
+[source,JavaScript]
+----
+searchOptions: {
+    searchTokenString: '[product][sales][date].daily',
+    executeSearch: true,
+}
+----
+
+++++
+<a href="{{previewPrefix}}/playground/search/searchOptions=true" id="preview-in-playground" target="_blank">Try it out</a>
+++++
+////
+
+=== Register, handle, and trigger events
+
+Register event listeners. 
+
+[source,JavaScript]
+----
+ sageEmbed.on(EmbedEvent.Init, showLoader)
+ sageEmbed.on(EmbedEvent.Load, hideLoader)
+----
+For more information about event types, see the following pages:
+
+* xref:HostEvent.adoc[HostEvent]
+* xref:EmbedEvent.adoc[EmbedEvent]
+
+=== Render the embedded search
+
+[source,JavaScript]
+----
+sageEmbed.render();
+----
+
+=== Test your embedding
+
+Load the embedded object in your app. If the embedding is successful, you will see the following page:
+
+[.bordered]
+image::./images/sageEmbed.png[Sage embed]
+
+Type a question or select a popular query, and verify the results.
+
+== Customize embedded view
+
+The `SageEmbed` SDK allows customizing Natural Language Search experience in the embedded view. The xref:_sageviewconfig.adoc[`SageViewConfig` interface] includes several parameters to customizing the Natural Language Search page, enable or disable Worksheet selection, show or hide popular queries and sample questions.
+
+To preview the Natural Language Search embed and customization features, use the +++<a href="{{previewPrefix}}/playground/search" target="_blank">Visual Embed Playground</a>+++.
+
+For more information Natural Language Search components, interface objects, properties, methods, and enumeration members, see the following pages:
+
+* xref:SageEmbed.adoc[SageEmbed]
+* xref:SageViewConfig.adoc[SageViewConfig]
+* xref:Action.adoc[Actions]

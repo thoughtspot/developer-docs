@@ -36,6 +36,7 @@ import {
     DEFAULT_APP_ROOT,
     HOME_PAGE_ID,
     CUSTOM_PAGE_ID,
+    BUILD_ENVS,
 } from '../../configs/doc-configs';
 import {
     LEFT_NAV_WIDTH_DESKTOP,
@@ -60,10 +61,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            if (location.pathname === '/') {
-                navigate('/docs', { replace: true });
-            }
-
             const queryParams = new URLSearchParams(window.location.search);
             const pageId = queryParams.get('pageid');
             if (pageId) {
@@ -88,7 +85,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         [TS_HOST_PARAM]: DEFAULT_HOST,
         [TS_ORIGIN_PARAM]: '',
         [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
-        [NAV_PREFIX]: '/docs',
+        [NAV_PREFIX]: process.env.BUILD_ENV === BUILD_ENVS.LOCAL ? '' : '/docs',
         [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
     });
     const [docTitle, setDocTitle] = useState(
@@ -201,7 +198,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     [TS_HOST_PARAM]: DEFAULT_HOST,
                     [TS_ORIGIN_PARAM]: '',
                     [TS_PAGE_ID_PARAM]: curPageNode.pageAttributes.pageid,
-                    [NAV_PREFIX]: '/docs',
+                    [NAV_PREFIX]:
+                        process.env.NODE_ENV === BUILD_ENVS.LOCAL
+                            ? ''
+                            : '/docs',
                     [PREVIEW_PREFIX]: `${DEFAULT_PREVIEW_HOST}/#${DEFAULT_APP_ROOT}`,
                 },
                 subsection: location.hash.split('#')[1] || '',

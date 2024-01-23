@@ -1,3 +1,5 @@
+import { BUILD_ENVS, SITE_PREFIX } from '../configs/doc-configs';
+
 const buildJSON = (element) => {
     const parentElement = element?.children;
     const subObj: any = {
@@ -19,7 +21,7 @@ const buildJSON = (element) => {
 };
 
 const getPathPrefix = () => {
-    return 'docs';
+    return process.env.NODE_ENV === BUILD_ENVS.LOCAL ? '' : SITE_PREFIX;
 };
 
 export const getPath = (path) =>
@@ -57,7 +59,7 @@ export const getBreadcrumsPath = (data: any, pageid?: string) => {
     return data.reduce((previous, current) => {
         if (
             current.href === `?pageid=${pageid}` ||
-            current.href === `/docs/${pageid}`
+            current.href === `/${SITE_PREFIX}/${pageid}`
         ) {
             // To avoid having link for the same page we are setting href to null
             return [{ name: current.name, href: null }];

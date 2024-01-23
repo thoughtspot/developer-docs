@@ -4,7 +4,7 @@ const config = require('../configs/doc-configs');
 const { getAlgoliaIndex } = require('../configs/algolia-search-config');
 
 const getPathPrefix = () => {
-    return 'docs';
+    return config.SITE_PREFIX;
 };
 
 const getPath = (path) =>
@@ -104,7 +104,7 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
         pageid,
         type: 'ASCII',
         title: node.document.title,
-        link: `/docs/${pageid}`,
+        link: `/${config.SITE_PREFIX}/${pageid}`,
     }));
 };
 

@@ -76,12 +76,12 @@ interface ConstructorNode extends TypeDocNode {
 }
 interface TypeDocType {
     type:
-    | 'reference'
-    | 'union'
-    | 'intrinsic'
-    | 'reflection'
-    | 'array'
-    | 'literal';
+        | 'reference'
+        | 'union'
+        | 'intrinsic'
+        | 'reflection'
+        | 'array'
+        | 'literal';
     id?: number;
     name?: string;
     types?: TypeDocType[];
@@ -215,7 +215,8 @@ class TypeDocInternalParser {
 
         let content = '';
         content += this.covertTypeDocText(
-            `${comment?.shortText?.trim() || ''}\n${comment?.text?.trim() || ''
+            `${comment?.shortText?.trim() || ''}\n${
+                comment?.text?.trim() || ''
             }\n\n`,
         );
 
@@ -302,8 +303,9 @@ class TypeDocInternalParser {
                 );
             }
             case 'array': {
-                return `${this.parseTypeDocType(node.elementType, link) + typeArg
-                    }[]`;
+                return `${
+                    this.parseTypeDocType(node.elementType, link) + typeArg
+                }[]`;
             }
             default: {
                 console.error(`${node.type} not handled`);
@@ -435,7 +437,7 @@ class TypeDocParser {
                 if (link)
                     return (
                         TypeDocInternalParser.convertToItalic(node.name) +
-                        typeArg || ''
+                            typeArg || ''
                     );
                 return node.name + typeArg || '';
             case 'reference': {
@@ -464,8 +466,9 @@ class TypeDocParser {
                 );
             }
             case 'array': {
-                return `${this.parseTypeDocType(node.elementType, link) + typeArg
-                    }[]`;
+                return `${
+                    this.parseTypeDocType(node.elementType, link) + typeArg
+                }[]`;
             }
             default: {
                 console.error(`${node.type} not handled`);
@@ -570,8 +573,9 @@ class TypeDocParser {
             this.childrenIdMap[parent]?.kindString ===
             TypeDocReflectionKind.Project
         ) {
-            return `[.typedoc-${node.kindString.replace(/ /g, '_')}]#xref:${node.name
-                }.adoc[${node.name}]#`;
+            return `[.typedoc-${node.kindString.replace(/ /g, '_')}]#xref:${
+                node.name
+            }.adoc[${node.name}]#`;
         }
 
         const grandParent = this.childrenIdMap[parent]?.parentId;
@@ -690,7 +694,8 @@ class TypeDocParser {
     private handleParameterNode = (node: ParameterNode) => {
         return [
             `${node.name}::: ${node.flags.isOptional ? '_Optional_\n' : ''}`,
-            `* ${node.name}: ${this.parseTypeDocType(node.type, true)}${node?.defaultValue ? ` = ${node.defaultValue}` : ''
+            `* ${node.name}: ${this.parseTypeDocType(node.type, true)}${
+                node?.defaultValue ? ` = ${node.defaultValue}` : ''
             }`,
             TypeDocInternalParser.parseComment(node.comment),
             this.handleTypeNode(node.type),
@@ -699,8 +704,9 @@ class TypeDocParser {
     };
 
     private handlePropertyNode = (node: ParameterNode) => {
-        const sig = `\`${node.name}: ${this.parseTypeDocType(node.type, true)}${node?.defaultValue ? ` = ${node.defaultValue}` : ''
-            }\``;
+        const sig = `\`${node.name}: ${this.parseTypeDocType(node.type, true)}${
+            node?.defaultValue ? ` = ${node.defaultValue}` : ''
+        }\``;
 
         return [
             `=== ${node.name}`,
@@ -726,7 +732,8 @@ class TypeDocParser {
             parmContent,
             '**Returns**',
             TypeDocInternalParser.parseTypeDocType(node.type, true),
-            this.handleTypeNode(node.type),
+            // SCAL-182339
+            // this.handleTypeNode(node.type),
             TypeDocInternalParser.parseTags(node.comment?.tags),
         ].join('\n\n');
     };
@@ -972,7 +979,7 @@ class TypedocConverter {
                 const updatedPageId = pageId.replace('_', '/');
                 const filePath =
                     pageId === 'VisualEmbedSdkNavLinks' ||
-                        pageId === 'CustomSideNav'
+                    pageId === 'CustomSideNav'
                         ? `modules/ROOT/pages/common/generated/typedoc/${updatedPageId}.adoc`
                         : `modules/ROOT/pages/generated/typedoc/${updatedPageId}.adoc`;
                 this.writeFile(filePath, content);
