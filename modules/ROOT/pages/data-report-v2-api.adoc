@@ -1,0 +1,353 @@
+= Data and Report APIs
+:toc: true
+:toclevels: 2
+
+:page-title: data-apis
+:page-pageid: fetch-data-and-report-apis
+:page-description: Data and Report APIs
+
+== Data APIs
+ThoughtSpot provides the following REST API v2 endpoints to fetch data:
+
+* xref:#_search_data_api[`POST /api/rest/2.0/searchdata`] to search data from a given data source.
+* xref:#_fetch_liveboard_api[`POST /api/rest/2.0/metadata/liveboard/data`] to get data from a Liveboard.
+* xref:#_fetch_answer_data_api[`POST /api/rest/2.0/metadata/answer/data`] to get data from a saved Answer.
+
+=== Search data API
+
+The `/api/rest/2.0/searchdata` endpoint requires you to specify data source object ID and query string for a successful API call. You can also define additional parameters such as `runtime_filter`, `runtime_sort`, and `runtime_param_override` to apply runtime overrides on the data set.
+
+==== Data source
+To search data via API call, you require at least view access to the data source object. The data source object can be a Worksheet, View, or Table.
+
+You can specify the data source object GUID in the `logical_table_identifier`. The search data endpoint doesn't support searching data from multiple Worksheets, Views, or Tables in a single API request.
+
+To find the GUID of the Worksheet, View, or Table, use one of the following methods:
+
+Get data object GUID via API::
+
+Send an API request to the `/api/rest/2.0/metadata/search` endpoint with the following parameters in the metadata array: +
+
++
+.**Example**
+[source,JSON]
+----
+ "metadata": [
+    {
+      "identifier": "my_worksheet",
+      "type": "LOGICAL_TABLE"
+    }
+  ]
+----
+
++
+If you don't know the exact name of the data source object, you can search metadata by specifying the `type` as `LOGICAL_TABLE` and examine the API response and copy the GUID of the data object.
+
+Find the GUID of the data object via UI::
+. Log in to your ThoughtSpot application instance:
+. Navigate to *Data*.
++
+----
+https://<your-thoughtspot-instance>/#/data/tables/
+----
+. On the **Data** > **Home** page, click on data object type. For example, if the data source object is a Worksheet, click **Worksheets** and open the Worksheet.
+. In the address bar of the web browser, note the GUID of the data object.  For example, in the following address string, the GUID is `9d93a6b8-ca3a-4146-a1a1-e908b71b963f`:
++
+----
+https://<your-thoughtspot-instance>/#/data/tables/9d93a6b8-ca3a-4146-a1a1-e908b71b963f
+----
+. Copy the GUID.
+
+==== Search query
+
+include::{path}/search-query-string.adoc[]
+
+.**Example**
+[source,JSON]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/searchdata' \
+  -H 'Authorization: Bearer {access-token}
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "query_string": "[sales][store]",
+  "logical_table_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+}'
+----
+
+=== Fetch Liveboard Data API
+To get data from a Liveboard object and its visualizations via `POST /api/rest/2.0/metadata/liveboard/data` endpoint, you require at least view access to the Liveboard.
+
+The API request body must include the name or GUID of the Liveboard to fetch data. To get specific visualizations from a given Liveboard, add the names or GUIDs of the visualizations in the  `visualization_identifiers` array.
+
+.**Example**
+[source,JSON]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/liveboard/data' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "d084c256-e284-4fc4-b80c-111cb606449a",
+  "data_format": "COMPACT",
+  "visualization_identifiers": [
+    "a9655c18-9855-4a73-9e7b-ff4fb6da334b",
+    "bf4c9814-82c1-4ec4-b879-57eae2134cb4",
+    "8c46d2b6-94c7-4ba7-a628-6e74e297f973",
+    "f6ef5d1f-cddb-4547-8b66-af4d5f4da5ad"
+  ]
+}'
+----
+
+[#transient-lb-content]
+==== Liveboard data with unsaved changes
+
+include::{path}/transient-lb-content.adoc[]
+
+.**Sample browser fetch request**
+
+[source,JavaScript]
+----
+< iframe src = "http://ts_host:port/" id = "ts-embed" > < /iframe>
+< script src = "/path/to/liveboard.js" > < /script>
+< script >
+    const embed = new LiveboardEmbed("#embed", {
+        frameParams: {},
+    });
+    async function liveboardData() {
+    const transientPinboardContent  = await embed.trigger(HostEvent.getExportRequestForCurrentPinboard);
+    const liveboardDataResponse = await fetch("https://ts_host:port/api/rest/2.0/metadata/liveboard/data", {
+        method: "POST",
+        body: createFormDataObjectWith({
+            "data_format": "COMPACT",
+            "transient_content": transientPinboardContent,
+        }),
+    });
+ }
+< /script>
+----
+
+=== Fetch Answer Data API
+To get data from saved Answer object via `POST /api/rest/2.0/metadata/answer/data` endpoint, you require at least view access to the saved Answer.
+
+The API request body must include the name or GUID of the saved Answer.
+
+.**Example**
+[source,JSON]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/answer/data' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "f605dbc7-db19-450b-8613-307118f74c3c",
+}'
+----
+
+== Report APIs
+
+ThoughtSpot provides the following REST API v2 endpoints to fetch data:
+
+* xref:_liveboard_report_api[`POST /api/rest/2.0/report/liveboard`] +
+Download data from a Liveboard in the PDF, PNG, CSV, or XLSX file format.
+* xref:#_answer_report_api[`POST /api/rest/2.0/report/answer`] +
+Download data from a saved Answer in the PDF, PNG, CSV, or XLSX file format.
+
+=== Liveboard Report API
+
+To download a Liveboard report via `/api/rest/2.0/report/liveboard` API, you need `DATADOWNLOADING` privilege and at least view access to the Liveboard.
+
+In the `POST` request body, specify the GUID or name of the Liveboard as `metadata_identifier`. To download reports with specific visualizations, add GUIDs or names of the visualizations in the `visualization_identifiers`.
+
+The default `file_format` is CSV. For PDF and PNG file format, you can specify additional parameters to customize the page orientation and include or exclude the cover page, logo, footer text, and page numbers.
+For PNG file format, you can include cover page and filters.
+
+.**Example**
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/liveboard' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "9bd202f5-d431-44bf-9a07-b4f7be372125",
+  "file_format": "PNG",
+  "visualization_identifiers": [
+    "9bd202f5-d431-44bf-9a07-b4f7be372125",
+    "9bd202f5-d431-44bf-9a07-b4f7be372125",
+    "9bd202f5-d431-44bf-9a07-b4f7be372125"
+  ],
+  "png_options": {
+    "include_cover_page": true,
+    "include_filter_page": true
+  }
+}'
+----
+
+[#transient-lb-content]
+==== Liveboard data with unsaved changes
+
+include::{path}/transient-lb-content.adoc[]
+
+.**Sample browser fetch request**
+
+[source,JavaScript]
+----
+< iframe src = "http://ts_host:port/" id = "ts-embed" > < /iframe>
+< script src = "/path/to/liveboard.js" > < /script>
+< script >
+    const embed = new LiveboardEmbed("#embed", {
+        frameParams: {},
+    });
+    async function liveboardData() {
+    const transientPinboardContent = await embed.trigger(HostEvent.getExportRequestForCurrentPinboard);
+    const liveboardDataResponse = await fetch("https://ts_host:port/api/rest/2.0/report/liveboard", {
+        method: "POST",
+        body: createFormDataObjectWith({
+            "transient_content": transientPinboardContent,
+        }),
+    });
+ }
+< /script>
+----
+
+=== Answer Report API
+
+To download Answer data via `/api/rest/2.0/report/answer` API, you need `DATADOWNLOADING` privilege and at least view access to the saved Answer.
+
+In the request body, specify the GUID or name of the Answer object as `metadata_identifier`.
+
+You can download thw Answer data in the `PNG`, `PDF`, `CSV`, or `XLSX` format. The default `file_format` is CSV.
+
+.**Example**
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "9bd202f5-d431-44bf-9a07-b4f7be372125",
+  "file_format": "PNG"
+}'
+----
+
+== Pagination settings for Data and Report APIs
+
+When you make REST API calls to some v2 Data endpoints to query data, the API may return many rows of data in response. By default, the following parameters are set in API requests to the v2 Data API endpoints:
+
+[source,JSON]
+----
+{
+  "data_format": "COMPACT",
+  "record_offset": 0,
+  "record_size": 10
+}
+----
+
+You can set `record_size` to `-1` and `record_offset` to `0` for precise and complete results. The APIs return a maximum of 100000 rows of data at any given time. If you must retrieve a higher number of rows in an API call, contact ThoughtSpot Customer Support to increase the row size limit. However, if the record size and number of rows are high, the API may take a while to fetch the data, and the request may time out.
+
+== Runtime overrides
+The Data API endpoints support the following runtime overrides:
+
+* Runtime filters
+* Runtime sorting of columns
+* Runtime Parameters
+
+=== Runtime filters
+To add runtime filters, in the `runtime_filter` property, add the `col1`, `op1`, and `val1` parameters JSON key-value format:
+
+[source,JSON]
+----
+"runtime_filter": {
+    "col1": "type",
+    "op1": "EQ",
+    "val1": "roasted",
+}
+----
+
+To add additional filters, increment the number at the end of each parameter for each filter: for example, col2, op2, val2, and so on.
+
+[source,JSON]
+----
+"runtime_filter": {
+    "col1": "type",
+    "op1": "EQ",
+    "val1": "roasted",
+    "col2": "tea",
+    "op2": "EQ",
+    "val2": "barley"
+}
+----
+
+Some operators such as allow more than one value in the `val` parameter:
+
+[source,JSON]
+----
+ "runtime_filter": {
+    "col1": "tea",
+    "op1": "CONTAINS",
+    "val1": [
+      "barley",
+      "mint"
+    ],
+    "col2": "type",
+    "op2": "CONTAINS",
+    "val2": [
+      "roasted",
+      "loose leaves"
+    ]
+}
+----
+
+For more information, see xref:runtime-filters.adoc#rtOperator[Supported runtime filter operators] and xref:runtime-filters.adoc#_rest_api_v2_0_endpoints[Apply runtime filters via REST APIs].
+
+=== Runtime parameters
+
+To add runtime Parameters, in the `runtime_param_override` property, add the `param1, and `paramVal1` parameters JSON key-value format. The Parameter value must be defined as per the data type. For example, `Date Param` and `Date List Param` Parameters, specify Epoch time as value.
+
+To apply Parameter overrides on Liveboards and Answers, ensure that the Parameters are configured in the  Worksheet used for generating Liveboard visualizations and Answer.
+
+[source,JSON]
+----
+ "runtime_param_override": {
+    "param1": "Double List Param",
+    "paramVal1": 0.5
+ }
+----
+
+To add additional Parameter overrides, increment the number at the end of each parameter: for example, paramVal2, and so on.
+
+[source,JSON]
+----
+ "runtime_param_override": {
+    "param1": "Double List Param",
+    "paramVal1": 0.5,
+    "param2": "Date Param",
+    "paramVal2": 1696932000
+  }
+----
+
+For more information, see xref:runtime-parameters.adoc[Runtime Parameter overrides].
+
+=== Runtime sort
+
+To sort columns on a Liveboard or Answer, define runtime sort properties in `runtime_sort` as a key-value pair in JSON format. The `runtime_sort` object allows `sortCol1` and `asc1` properties. To sort more columns, increment the number at the end of the parameter for each key: for example, `sortCol2`, `asc2`, `sortCol3`, `asc3`, and so on.
+
+
+[source,JSON]
+----
+ "runtime_sort": {
+    "sortCol1": "sales",
+    "asc1": true,
+    "sortCol2": "region",
+    "asc2": false
+  }
+----
+
+For more information, see xref:runtime-sort.adoc#_rest_api_v2_0[Runtime sorting of columns].
+
