@@ -17,6 +17,10 @@ If neither of these patterns is easily implemented, please consider the xref:aba
 
 RLS rules are defined using either the *ts_username* variable or *ts_groups* variable. The RLS rules translate into WHERE clauses in any SQL query generated from that table object, with the variables expanding into the details of the signed-in user. *ts_groups* turns into the set of *group name* properties of the ThoughtSpot groups the user belongs to.
 
+The `ts_username` special value translates to `t1.fieldName = 'users-username'` within the generated queries.
+
+The `ts_groups` special values translates to `t1.fieldName IN ('group a', 'group b', ...)` . The name property of every ThoughtSpot group that a user belongs to will be added to the list after the `IN`.
+
 Both *ts_username* and *ts_groups* are string values, so the RLS rule may require using casting functions on the columns within the database if those columns are not also string types. The xref:abac-user-properties.adoc[ABAC via tokens] method allows for specifying the data type of the attributes sent in.
 
 The username or ThoughtSpot group name property must be an exact match to the values within the database column. ThoughtSpot usernames and group names cannot be changed once they have been created, but their values can be any valid string.
@@ -28,6 +32,52 @@ A direct RLS rule directly filters on column within the table that the RLS rule 
 
 A common RLS rule type pattern for a multi-tenanted data warehouse involves each user belonging to a *ThoughtSpot group* names to match the values in a 'customer name' or 'tenant name' column on every table. Alternatively, *username* can be used if the data is stored at an individual rather than tenant level.
 
+=== Direct RLS rule example
+Imagine a table in ThoughtSpot that looks like:
+[cols="1,1,1"]
+|===
+|customer_id|product_id|custom_region_id
+
+|cust_1
+|prod_a
+|region_1
+
+
+|cust_1
+|prod_b
+|region_1
+
+|cust_2
+|prod_a
+|region_3
+
+|cust_2
+|prod_c
+|region_4
+|===
+
+A direct RLS rule would look like `customer_id = ts_groups`. 
+
+If the signed-in user belongs to a ThoughtSpot group named `cust_1`, ThoughtSpot will add a filtering clause to any SQL generated on this table like:
+
+`WHERE t1.customer_id IN ('cust_1', ...)`
+
+This will filter the table down to the following rows, after which all other aggregations and other parts of the query will be processed by the data warehouse:
+
+[cols="1,1,1"]
+|===
+|customer_id|product_id|custom_region_id
+
+|cust_1
+|prod_a
+|region_1
+
+
+|cust_1
+|prod_b
+|region_1
+
+|===
 
 == Access control list (ACL) table rules
 Rules that reference a separate Access Control List (ACL) table of 'entitlements' for that user or the groups they belong to, which is then JOINed to other tables. 
