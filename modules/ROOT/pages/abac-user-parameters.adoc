@@ -8,16 +8,51 @@
 
 Attribute Based Access Control (ABAC) is a pattern where security entitlements are sent in as lists of attributes at session creation time via the auth service.
 
-The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot V2.0 REST API Access Tokens (which are OAuth JWT tokens). The token can be used as a bearer token for Cookieless Trusted Auth or REST API access or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
+[IMPORTANT]
+====
+[#beta-warning]
+RLS using ABAC via tokens is a BETA feature. ThoughtSpot is working on improvements in upcoming releases that will change the best practice recommendations below, and will result in needed re-work of the security architecture of your deployment. We recommend reaching out to ThoughtSpot to discuss RLS best practices for your specific use case and deployment timelines.
+====
+
+Currently the ABAC via tokens method *requires using xref:trusted-authentication.adoc[trusted authentication]* and using link:https://docs.thoughtspot.com/cloud/latest/worksheet-create[worksheets, target=_blank] as data sources for Liveboards and answers, rather than individual table objects.
 
 You can to pass in Runtime Filters and Parameters for a user via their login token. Both features work like the Runtime Filters and Parameters available within the Visual Embed SDK, but values set via token cannot be overriden by any user action within the ThoughtSpot UI.
 
+
 == Token request
+The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot V2.0 REST API Access Tokens (which are OAuth JWT tokens). The token can be used as a bearer token for Cookieless Trusted Auth or REST API access or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
+
+=== Trusted authentication
 
 === Persistence
 
 == Implementing RLS with ABAC via tokens
-You can to pass in Runtime Filters and Parameters for a user via the login token. 
+In ThoughtSpot 9.11+, three features are available to set via the login token:
 
-Both features work like the Runtime Filters and Parameters available within the Visual Embed SDK, but values set via token cannot be overriden by any user action within the ThoughtSpot UI.
+1. *Runtime filters*: can filter *multiple values* of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name). 
+2. *Parameters*: binds a *single value* to any Parameter in any Worksheet by Parameter Name and Type Match
+3. *Runtime sorts*
+
+=== Using parameters to filter a worksheet
+The basic patter for using a parameter to filter a worksheet is:
+
+1. Create link:https://docs.thoughtspot.com/cloud/latest/parameters-create[parameter, target=_blank] in worksheet
+2. Make link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, target=_blank] that evaluates the parameter's default value and the expected values from the token
+3. Make link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[worksheet filter, target=_blank] based on the formula, set to *true*
+
+link:https://docs.thoughtspot.com/cloud/latest/parameters-create[Parameters, target=_blank] are defined at the worksheet level within ThoughtSpot. Parameters have a data type and a default value set by the worksheet author.
+
+To use a parameter, you'll make a link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, target=_blank] on the worksheet. 
+
+link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[Worksheet filters, target=_blank] can reference worksheet formulas once they have been created, which creates the security layer out of the result of the formula.
+
+
+
+=== Best practice pattern: runtime filters + shared key parameter
+
+
+== Indexing
+Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in Explore, use ThoughtSpot indexing. 
+
+Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the 
 
