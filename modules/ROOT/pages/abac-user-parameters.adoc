@@ -24,6 +24,13 @@ The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using
 
 The token can be used as a bearer token for Cookieless Trusted Auth or REST API access or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
 
+=== ABAC capabilities
+In ThoughtSpot 9.11+, three features are available to set via the login token:
+
+1. *Runtime filters*: can filter *multiple values* of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name). 
+2. *Parameters*: binds a *single value* to any Parameter in any Worksheet by Parameter Name and Type Match
+3. *Runtime sorts*: overrides to sort order within columns
+
 === Request format
 The ABAC request is sent using the `user_parameters` key of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]. 
 
@@ -72,11 +79,16 @@ There is a `persist` key to be added on each object that takes boolean `true` or
 ----
 
 == Implementing RLS with ABAC via tokens
-In ThoughtSpot 9.11+, three features are available to set via the login token:
+The best practice pattern for RLS using ABAC via tokens is *runtime filters + a shared secret 'check parameter'*. 
 
-1. *Runtime filters*: can filter *multiple values* of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name). 
-2. *Parameters*: binds a *single value* to any Parameter in any Worksheet by Parameter Name and Type Match
-3. *Runtime sorts*: overrides to sort order within columns
+To make sure that no data shows if a properly-built token is not used to start the user session, you need to send a 'check parameter' along with the runtime filters. If the 'check parameter' value from the token does not match the value defined in the worksheet formula (the *shared secret*), the formula + filter combination blocks any data from showing for the user.
+
+Parameters are currently single-value, so you'll need to use Runtime Filters to restrict on multiple values on a given field.
+
+However, the way to set a runtime filter to *show all values* is to not send in any runtime filter at all for that column. Without additional information, it's impossible to know if the lack of a runtime filter is intentionally or the filter was not set via the token at all.
+
+=== Building the ABAC token request
+
 
 === Using parameters to filter a worksheet
 The basic pattern for using a parameter to filter a worksheet is:
@@ -92,14 +104,6 @@ To use a parameter, you'll make a link:https://docs.thoughtspot.com/cloud/latest
 link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[Worksheet filters, target=_blank] can reference worksheet formulas once they have been created, which creates the security layer out of the result of the formula.
 
 
-
-=== Best practice pattern: runtime filters + shared key 'check parameter'
-Because parameters are currently single-value, you'll need to use Runtime Filters to restrict on multiple values on a given field.
-
-However, the way to set a runtime filters to *show all values* is to not send in any runtime filter at all for that column. Without additional information, it's impossible to know if the lack of a runtime filter is intentionally or the filter was not set via the token at all.
-
-To make sure that no data shows if a properly-built token is not used to start the user session, you also need to send a 'check parameter' along with the runtime filters.
-
 ==== Defining the 'check parameter'
 The simplest 'check parameter' pattern is a shared key string that is stored in both the xref:trusted-auth-token-request-service.adoc[token request service] and the *worksheet formula* used for the *worksheet filter*.
 
@@ -107,11 +111,25 @@ Parameters are always visible in the UI, even though a parameter set via a token
 
 Thus the 'check parameter' and its default value should be named something that looks pleasant to end users. For example, if the parameter name is "Secured", you can set the default value to "✔️" or "true" or "yes" (any Unicode value is allowed, including emojis):
 
-<<<image from Nico's workflow>>
+<<<image from Nico's workflow>>>
 
 This will display on Liveboards and answers as:
 
-<<<image from Nico's workflow>>
+<<<image from Nico's workflow>>>
+
+==== Creating the 'worksheet security formula'
+A parameter doesn't do anything on its own - you need a formula to evaluate the parameter's value.
+
+The simplest formula for a 'check parameter' with shared key looks like:
+
+`if ( check_parameter_name ) = 'shared-key-value' then true else false`
+
+For example, if the 'check parameter' is called `Secured`, and the secret key value is a long-encoded string like `rxzricmwfe87q7bh7jyg`, the worksheet formula will be (parameter name are always lower-cased in formulas):
+
+<<< image from Nico's workflow >>>
+
+==== Setting a worksheet filter on the worksheet security formula
+
 
 == Indexing
 Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in Explore, use ThoughtSpot indexing. 
