@@ -20,11 +20,14 @@ You can to pass in Runtime Filters and Parameters for a user via their login tok
 
 
 == Token request
-The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot V2.0 REST API Access Tokens (which are OAuth JWT tokens). The token can be used as a bearer token for Cookieless Trusted Auth or REST API access or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
+The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot V2.0 REST API Access Tokens (which are OAuth JWT tokens). 
+
+The token can be used as a bearer token for Cookieless Trusted Auth or REST API access or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
 
 === Request format
-The ABAC request is sent using the `user_parameters` key of the Full Access Token request. There are three potential keys within `user_parameters`, each taking an array of objects:
+The ABAC request is sent using the `user_parameters` key of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]. 
 
+There are three potential keys within `user_parameters`, each taking an array of objects:
 [code,javascript]
 ----
 ...
@@ -37,7 +40,7 @@ The ABAC request is sent using the `user_parameters` key of the Full Access Toke
 
 The format for the objects in each section follow the equivalent formats in the Visual Embed SDK for xref:runtime-filters.adoc[runtime filters], xref:runtime-parameters.adoc[runtime parameters] or xref:runtime-sort.adoc[runtime sorts]. 
 
-Additionally there is a `persist` key to be added on each object that takes boolean `true` or `false`. This determines on if the values are persisted at the user level beyond just the token itself. 
+There is a `persist` key to be added on each object that takes boolean `true` or `false`. This determines if the values are persisted at the user level beyond just the token itself, for features such as alerts and subscriptions that run outside of a user's session.
 
 *You must persist values for them to apply when using xref:trusted-authenication.adoic#_cookie_based_vs_cookieless_authentication[cookie-based trusted authentication]*.
 
@@ -68,16 +71,12 @@ Additionally there is a `persist` key to be added on each object that takes bool
   }
 ----
 
-=== Trusted authentication
-
-=== Persistence
-
 == Implementing RLS with ABAC via tokens
 In ThoughtSpot 9.11+, three features are available to set via the login token:
 
 1. *Runtime filters*: can filter *multiple values* of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name). 
 2. *Parameters*: binds a *single value* to any Parameter in any Worksheet by Parameter Name and Type Match
-3. *Runtime sorts*
+3. *Runtime sorts*: overrides to sort order within columns
 
 === Using parameters to filter a worksheet
 The basic pattern for using a parameter to filter a worksheet is:
@@ -94,11 +93,30 @@ link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[Worksh
 
 
 
-=== Best practice pattern: runtime filters + shared key parameter
+=== Best practice pattern: runtime filters + shared key 'check parameter'
+Because parameters are currently single-value, you'll need to use Runtime Filters to restrict on multiple values on a given field.
 
+However, the way to set a runtime filters to *show all values* is to not send in any runtime filter at all for that column. Without additional information, it's impossible to know if the lack of a runtime filter is intentionally or the filter was not set via the token at all.
+
+To make sure that no data shows if a properly-built token is not used to start the user session, you also need to send a 'check parameter' along with the runtime filters.
+
+==== Defining the 'check parameter'
+The simplest 'check parameter' pattern is a shared key string that is stored in both the xref:trusted-auth-token-request-service.adoc[token request service] and the *worksheet formula* used for the *worksheet filter*.
+
+Parameters are always visible in the UI, even though a parameter set via a token can never be overridden by any action in the UI or using the Visual Embed SDK.
+
+Thus the 'check parameter' and its default value should be named something that looks pleasant to end users. For example, if the parameter name is "Secured", you can set the default value to "✔️" or "true" or "yes" (any Unicode value is allowed, including emojis):
+
+<<<image from Nico's workflow>>
+
+This will display on Liveboards and answers as:
+
+<<<image from Nico's workflow>>
 
 == Indexing
 Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in Explore, use ThoughtSpot indexing. 
 
-Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the 
+Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token. 
+
+*You should turn of indexing for any field that needs to be restricted by RLS* when using ABAC via tokens for RLS.
 
