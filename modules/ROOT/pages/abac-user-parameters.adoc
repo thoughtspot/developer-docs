@@ -93,10 +93,53 @@ Two parts to the ABAC request:
 1. Runtime filters defining multi-value conditions on columns
 2. The *shared secret* to go into the 'check parameter' 
 
-==== Creating runtime filter definitions
+The runtime filters must be built by:
+
+1. Retrieving user data entitlements
+2. Translating entitlements into ThoughSpot runtime filters
+
+==== Retrieving entitlements
 The value of the ABAC pattern is that you can send different combinations of filters for different types of users.
 
-*Runtime filters match on the name property of a column*
+You can retrieve the attribute names and values from any source: the embedding application's session details, an entitlement REST API, a query to a different database, etc. 
+
+==== Translating entitlements into runtime filters
+Runtime filters *match on the name property of a column* as defined in ThoughtSpot, not the column's name in the underlying database table. The *token request service* does need to know the ThoughtSpot column names that will be used to for each of the attributes, so you'll need to coordinate between the ThoughtSpot worksheet designers and the *token request service* to make sure the column names and values are passing correctly to the *token request service*.
+
+As mentioned previously, the format for runtime filters within the token match with xref:runtime-filters.adoc[runtime filters] in the Visual Embed SDK. In general, RLS entitlements are lists of values using the `IN` operator, but you can pass in filters on numeric and time columns using the full set of operators.
+
+For example, let's assume three attributes that are needed to filter down a user on a multi-tenanted database: `Customer ID`, `Region`, and `Product Type`.
+
+The following is what the token request would look like if restricting on all three attributes:
+[code,javascript]
+----
+"runtime_filters": [
+   {
+     "column_name" : "Customer ID",
+     "operator": "EQ",
+     "values": [492810],
+     "persist" : true
+  },
+   {
+     "column_name": "Region",
+     "operator": "IN",
+     "values": ["West", "Southwest"],
+     "persist": true
+   },
+   {
+     "column_name": "Product Type",
+     "operator": "IN",
+     "values": ["Shirts", "Swimwear"],
+     "persist": true
+   }
+ ]
+----
+
+If `Customer ID` is only ever a single value for any given user, it could also be passed as a parameter to be used in a worksheet formula/filter combination. 
+
+Additionally, a user might have *all access* on any given attribute. The process for translating the entitlements request into ThoughtSPot runtime filters must *drop* the filter definition entirely to represent *all access*. 
+
+The following is a request where the user can see all `Region`: 
 
 ==== Setting the 'check parameter' to the shared secret
 The *shared secret* is just a long string value that cannot be easily guessed or determined programmatically. You can generate these values randomly - and the end user will never see it, only the worksheet editor if they look at the formula.
