@@ -51,6 +51,7 @@ There is a `persist` key to be added on each object that takes boolean `true` or
 
 *You must persist values for them to apply when using xref:trusted-authenication.adoic#_cookie_based_vs_cookieless_authentication[cookie-based trusted authentication]*.
 
+The following is a `user_parameters` section that would be part of the JSON request of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]:
 [code,javascript]
 ----
 "user_parameters": {
@@ -79,13 +80,24 @@ There is a `persist` key to be added on each object that takes boolean `true` or
 ----
 
 == Implementing RLS with ABAC via tokens
-The best practice pattern for RLS using ABAC via tokens is *runtime filters + a shared secret 'check parameter'*. 
+The current best practice pattern for RLS using ABAC via tokens is:
 
-To make sure that no data shows if a properly-built token is not used to start the user session, you need to send a 'check parameter' along with the runtime filters. If the 'check parameter' value from the token does not match the value defined in the worksheet formula (the *shared secret*), the formula + filter combination blocks any data from showing for the user.
+1. *Runtime filter*s to define all multi-value filter conditions on columns
+2. A *shared secret* passed in as a 'check parameter', used in worksheet filters to block unrestricted data access 
 
-Parameters are currently single-value, so you'll need to use Runtime Filters to restrict on multiple values on a given field.
+Parameters are currently single-value, so you'll need to use Runtime Filters to restrict on multiple values on a given field. If a column will only be restricted by a single value for any users, you can choose whether to pass that attribute value as a runtime filter or a parameter to be used in a worksheet formula/filter combination. 
 
-However, the way to set a runtime filter to *show all values* is to not send in any runtime filter at all for that column. Without additional information, it's impossible to know if the lack of a runtime filter is intentionally or the filter was not set via the token at all.
+=== Show all
+The way to set a runtime filter to *show all values* is to not send in any runtime filter at all for that column. 
+
+Without additional information, it's impossible to know if the lack of a runtime filter is intentional to indicated an *show all values* condition or if something went wrong - a malformed ABAC token or the user entered into ThoughtSpot without a token at all.
+
+=== 'check parameter' and shared key
+To make sure that no data shows if a properly-built token is not used to start the user session, you need to send a 'check parameter' along with the runtime filters. 
+
+The *shared secret* is a string value used in both the *token request service* to generate each token, and within the *worksheet formula* to evaluate the parameter.
+
+If the 'check parameter' value from the token does not match the value defined in the worksheet formula (the *shared secret*), the formula + filter combination blocks any data from showing for the user.
 
 === Building the ABAC token request
 Two parts to the ABAC request:
@@ -135,11 +147,33 @@ The following is what the token request would look like if restricting on all th
  ]
 ----
 
-If `Customer ID` is only ever a single value for any given user, it could also be passed as a parameter to be used in a worksheet formula/filter combination. 
+A user might be entitled to *all access* on any given column (you might drop some levels of a hierachy if you include more granular columns to filter on for that user). 
 
-Additionally, a user might have *all access* on any given attribute. The process for translating the entitlements request into ThoughtSPot runtime filters must *drop* the filter definition entirely to represent *all access*. 
+[IMPORTANT]
+====
+The process for translating the entitlements request into ThoughtSpot runtime filters must *drop* the filter definition entirely to represent *all access*. 
+====
 
-The following is a request where the user can see all `Region`: 
+The following is a request where a different user can see all `Region`, but still has restrictions on `Customer ID` and `Product Type`: 
+[code,javascript]
+----
+"runtime_filters": [
+   {
+     "column_name" : "Customer ID",
+     "operator": "EQ",
+     "values": [492810],
+     "persist" : true
+  },
+   {
+     "column_name": "Product Type",
+     "operator": "IN",
+     "values": ["Shirts", "Swimwear"],
+     "persist": true
+   }
+ ]
+----
+
+Because the `runtime_filters` section is entirely within the control of the *token request service*, you have full flexibility to generate any set of filters for any type of user within the token.
 
 ==== Setting the 'check parameter' to the shared secret
 The *shared secret* is just a long string value that cannot be easily guessed or determined programmatically. You can generate these values randomly - and the end user will never see it, only the worksheet editor if they look at the formula.
