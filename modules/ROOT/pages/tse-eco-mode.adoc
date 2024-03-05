@@ -1,17 +1,12 @@
-= Manage your cluster state
+= Cluster maintenance and upgrade
 :toc: true
 :toclevels: 1
 
 :page-title: Update cluster state
-:page-pageid: tse-dynamic-sense-cluster
+:page-pageid: tse-cluster
 :page-description:  If you are using a ThoughtSpot Cloud cluster in the economy mode in your embedded deployments, use the APIs to restart an inactive cluster.
 
-If you are using a ThoughtSpot Cloud cluster for embedded deployments in your development or production environment, you can enable idle sensing to save costs and allow your cluster to operate in `economy` mode. To enable this feature on your clusters, contact ThoughtSpot Support.
-
-== Idle sensing and cluster states
-If idle sensing is enabled on your cluster, your cluster will be automatically stopped if there is no user activity detected for a given time threshold. By default, the idle time threshold is set to 120 minutes.
-
-At any given time, a ThoughtSpot cluster can be in any one of the following states:
+At any given time, a ThoughtSpot application instance can be in any one of the following states:
 
 * `ACTIVE` +
 Indicates that the cluster is active and user activity is detected.
@@ -22,12 +17,76 @@ Indicates that the cluster is stopped and no user activity is detected.
 * `STARTING`/`PENDING` +
 The cluster is currently starting, or some other workflow is running on the cluster.
 
-== Identify the status of your cluster
+== Cluster status during upgrade
+With ThoughtSpot’s Minimal Downtime Ephemeral Mode upgrade option, we upgrade ThoughtSpot in the background while users can use ThoughtSpot in Ephemeral mode. This means that during the upgrade, the system will be in transient state, yet it allows users to create and view data. However, any new objects created during the upgrade will be lost.
+
+When the upgrade starts, the ThoughtSpot instance operates in the Ephemeral (Read-Only mode) and the cluster state changes to `UNDER_MAINTENANCE`.
+
+ThoughtSpot users can determine if their instance is under maintenance by sending a `GET` request to one of the following API endpoints:
+
+* REST API v1 endpoint +
+`GET /tspublic/v1/admin/banner`
+* REST API v2 endpoint +
+`GET /api/rest/2.0/system/banner`
+
+ThoughtSpot Embedded application users can also view the banner text by calling the above APIs.
+
+=== REST v1 API request
+
+.cURL
+[source,cURL]
+----
+curl -X GET \
+--header 'Accept: application/json' \
+'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/admin/banner'
+----
+
+.Request URL
+
+----
+https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/admin/banner
+----
+
+=== REST v2 API request
+
+.cURL
+[source,cURL]
+----
+curl -X GET \
+--header 'Accept: application/json' \
+'https://{ThoughtSpot-Host}/api/rest/2.0/system/banner'
+----
+
+.Request URL
+----
+https://{ThoughtSpot-Host}/api/rest/2.0/system/banner
+----
+
+=== API response
+
+If the cluster in maintenance mode, the API returns the following response:
+----
+{"banner_text":"This system is currently being upgraded and is in ephemeral mode. You can continue to use it to visualize data. Any objects you create or modify during this period will be lost when the upgrade is complete.","under_maintenance":true}
+----
+
+If the cluster is not in maintenance mode, the API returns the following response:
+----
+{"banner_text":"This system is functioning normally. No maintenance is in progress.","under_maintenance":false}
+----
+
+Administrators of the ThoughtSpot Embedded app can create their custom banner text and display it to indicate the cluster upgrade status.
+
+== Idle sensing
+If you are using a ThoughtSpot Cloud instance for embedded deployments in your development or production environment, you can enable idle sensing to save costs and allow your cluster to operate in `economy` mode.
+
+If idle sensing is enabled on your cluster, your cluster will be automatically stopped if there is no user activity detected for a given time threshold. By default, the idle time threshold is set to 120 minutes. To enable this feature on your clusters, contact ThoughtSpot Support.
+
+=== Get information about the status of a cluster
 By default, a ThoughtSpot cluster running the `economy` mode stops if there is no user activity for two hours. When a user tries to access a cluster that's in the `STOPPED` state, the API calls will return the `"cluster-state": "Stopped"` in the response header.
 
 [source,cURL]
 ----
- $ curl https://<cluster-name>.thoughtspot.cloud  --head
+ $ curl https://{cluster-name}.thoughtspot.cloud  --head
   HTTP/1.1 200 OK
   Server: awselb/2.0
   Date: Tue, 30 May 2023 15:27:01 GMT
@@ -50,21 +109,21 @@ For example, to start an inactive cluster, send a `GET` request in the following
 .Production environment
 [source,http]
 ----
-https://<cluster-name>.thoughtspot.cloud/?tse=true&start_cluster=true
+https://{ThoughtSpot-Host}/?tse=true&start_cluster=true
 ----
 
 .Staging environment
 
 [source,http]
 ----
-https://<cluster-name>.thoughtspotstaging.cloud/?tse=true&start_cluster=true
+https://{cluster-name}.thoughtspotstaging.cloud/?tse=true&start_cluster=true
 ----
 
 .Development environment
 
 [source,http]
 ----
-https://<cluster-name>.thoughtspotdev.cloud/?tse=true&start_cluster=true
+https://{cluster-name}.thoughtspotdev.cloud/?tse=true&start_cluster=true
 ----
 
 In the request header, you must also pass the `security-key`. The `security-key` is used for authenticating users and is generated when xref:trusted-authentication.adoc#trusted-auth-enable[trusted authentication is enabled] on a ThoughtSpot instance. Embedded application users can obtain the `security key` from their ThoughtSpot administrator.
@@ -73,7 +132,7 @@ The following example shows the cURL request for restarting a cluster:
 
 [source, cURL]
 ----
-$ curl -X GET 'https://<cluster-name>.thoughtspot.cloud/?tse=true&start_cluster=true' \
+$ curl -X GET 'https://{ThoughtSpot-Host}/?tse=true&start_cluster=true' \
  -H 'security-key: e8ade677-c3f1-461d-8b7f-7f0fe4e024f0' --head \
   HTTP/1.1 200 OK
   Server: awselb/2.0
