@@ -1,14 +1,13 @@
-= Get Started with embedding
+= Embed ThoughtSpot
 :toc: true
 :linkattrs:
 :sectanchors:
 
-
-:page-title: Getting Started
-:page-pageid: getting-started
+:page-title: Embed ThoughtSpot
+:page-pageid: tsembed
 :page-description: Getting Started
 
-ThoughtSpot provides Visual Embed SDK to embed Search bar, Search page, Liveboard, visualizations, or the full ThoughtSpot experience in your web application or portal. Based on your embedding requirements and integration setup, you can use one of the following methods:
+Based on your embedding requirements and integration setup, you can use one of the following methods:
 
 * Embed using Visual Embed SDK (Recommended)
 +
@@ -25,9 +24,7 @@ Before embedding ThoughtSpot in your app, check if your application domain is ad
 +
 If you encounter any errors when using the Visual Embed SDK components, verify the xref:security-settings.adoc#csp-cors-hosts[CORS and CSP settings].
 
-* **Enable Developer Portal access**
-+
-ThoughtSpot users can access Developer Portal via *Develop* tab in the UI.
+* **Get Developer access**
 +
 Only administrators and users with `Developer` privilege can access the *Develop* tab. Please have your administrator add any users who will be developing embedded solutions to a ThoughtSpot group with *Has Developer privilege*.
 
@@ -35,13 +32,11 @@ Only administrators and users with `Developer` privilege can access the *Develop
 For more information, see xref:user-roles.adoc[Developer access].
 ////
 
-== Install the Visual Embed SDK
+== Embed using SDK
 
-The Visual Embed SDK is available for installation as a Node Package Manager (NPM) package. Make sure the link:https://www.npmjs.com/get-npm[NPM is installed, window=_blank] in your environment.
+The Visual Embed SDK is available for installation as a Node Package Manager (NPM) package. The latest version of the Visual Embed SDK is available at link:https://www.npmjs.com/package/@thoughtspot/visual-embed-sdk[https://www.npmjs.com/package/@thoughtspot/visual-embed-sdk, window=_blank].
 
-The latest version of the Visual Embed SDK is available at link:https://www.npmjs.com/package/@thoughtspot/visual-embed-sdk[https://www.npmjs.com/package/@thoughtspot/visual-embed-sdk, window=_blank].
-
-To install the SDK from NPM, execute the following command:
+To get started with embedding, install the SDK:
 
 [source,console]
 ----
@@ -52,41 +47,14 @@ npm install @thoughtspot/visual-embed-sdk
 
 The SDK is written in TypeScript and is also provided both as ES Module (ESM) and Universal Module Definition (UMD) modules, allowing you to use it in a variety of environments.
 
-[source,JavaScript]
-----
-// ESM via NPM
-import * as TsEmbedSDK from '@thoughtspot/visual-embed-sdk';
-// OR
-import { LiveboardEmbed } from '@thoughtspot/visual-embed-sdk';
-
-// NPM <script>
-<script src="https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.js"></script>;
-// Make the SDK available on global namespace window.tsembed
-
-// ES6 from web
-import {
-    LiveboardEmbed,
-    AuthType,
-    init,
-} from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
-----
-
 Import one of the following modules into your app:
 
 * **LiveboardEmbed** +
-Use the **LiveboardEmbed** component to embed a single visualization or a full Liveboard with multiple visualizations
+Use the **LiveboardEmbed** component to xref:embed-a-viz.adoc[embed a single visualization] or a full Liveboard with multiple visualizations:
 
 +
 ++++
 <a href="?pageid=embed-liveboard" id="preview-in-playground" target="_blank">Embed a Liveboard</a>
-++++
-
-* **AppEmbed** +
-Use the `AppEmbed` library to embed full ThoughtSpot application in your app.
-
-+
-++++
-<a href="?pageid=full-embed" id="preview-in-playground" target="_blank">Embed full ThoughtSpot application</a>
 ++++
 
 * **SageEmbed** +
@@ -95,6 +63,14 @@ Use the `SageEmbed` package to embed Natural Language Search interface.
 +
 ++++
 <a href="?pageid=embed-nls" id="preview-in-playground" target="_blank">Embed Natural Language Search</a>
+++++
+
+* **AppEmbed** +
+Use the `AppEmbed` library to embed full ThoughtSpot application in your app.
+
++
+++++
+<a href="?pageid=full-embed" id="preview-in-playground" target="_blank">Embed full ThoughtSpot application</a>
 ++++
 
 * **SearchEmbed** +
@@ -112,8 +88,28 @@ Use the `SearchBarEmbed` component to embed only the ThoughtSpot Search bar and 
 <a href="?pageid=embed-searchbar" id="preview-in-playground" target="_blank">Embed Search bar</a>
 ++++
 
+==== Example
 
+[source,JavaScript]
+----
+// ESM via NPM
+import * as TsEmbedSDK from '@thoughtspot/visual-embed-sdk';
+// OR
+import { LiveboardEmbed } from '@thoughtspot/visual-embed-sdk';
 
+// NPM <script>
+<script src="https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.js"></script>;
+// Make the SDK available on global namespace window.tsembed
+
+// ES6 from web
+import {
+    LiveboardEmbed,
+    AuthType,
+    init,
+    EmbedEvent,
+    HostEvent
+} from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+----
 
 [#initSdk]
 == Initialize the SDK
@@ -129,7 +125,7 @@ init({
 });
 ----
 
-=== Define the object instance and properties
+=== Embed ThoughtSpot Component
 Create an object instance and define object properties. This example shows the code sample for a Liveboard object:
 
 [source,JavaScript]
@@ -148,7 +144,8 @@ const liveboardEmbed = new LiveboardEmbed(
 
 == Register events
 
-Subscribe and listen to events triggered when the embedded object interacts with your app. The following example registers `LiveboardRendered` and `SetVisibleVizs` events. The `LiveboardRendered` embed event is emitted when the embedding application renders the Liveboard and triggers the `SetVisibleVizs` event to show specific visualizations on the Liveboard.
+Register events that your app can listen to and respond with appropriate actions.
+The following example registers `LiveboardRendered` and `SetVisibleVizs` events. The `LiveboardRendered` embed event is emitted when the embedding application renders the Liveboard and triggers the `SetVisibleVizs` event to show specific visualizations on the Liveboard.
 
 [source,JavaScript]
 ----
@@ -175,8 +172,10 @@ liveboardEmbed.render();
 ----
 import {
     LiveboardEmbed,
+    AuthType,
+    init,
     EmbedEvent,
-    HostEvent,
+    HostEvent
 } from '@thoughtspot/visual-embed-sdk';
 
 const lb = new LiveboardEmbed('#container', {
@@ -206,7 +205,6 @@ lb.trigger(HostEvent.UpdateRuntimeFilters, [
 ----
 
 `#container` is a selector for the DOM node which the code assumes is already attached to DOM. The SDK will render the ThoughtSpot component inside this container element.
-
 
 == Embed in a React app
 ThoughtSpot provides React components for embedding Search, Liveboard, and the full ThoughtSpot application in a React app. The following code sample shows how to embed a Liveboard component in a React app:
