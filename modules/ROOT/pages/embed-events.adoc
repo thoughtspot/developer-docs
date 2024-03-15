@@ -8,6 +8,11 @@
 
 ThoughtSpot supports a range of events that your app can listen to and respond to with appropriate actions. The embedded ThoughtSpot components emit events when they initialize and load, and when a user executes an action inside these components. The host application can also trigger events within the embedded ThoughtSpot objects, causing an alert or other action.
 
+The SDK library includes the following event objects:
+
+* `EmbedEvent`
+* `HostEvent`
+
 [#embed-events]
 == Embed events
 Embed events are emitted by the embedded ThoughtSpot components and are part of the `EmbedEvent` object. Embed events are emitted when ThoughtSpot components initialize and load, or when users interact with these components. For example, you can register an event handler to trigger `EmbedEvent.Save` when a user clicks the *Save* action on the Answer page in the embedded UI. You can also define a *listener* for an EmbedEvent with a callback function to handle the event response via the `.on(embedEvent, eventHandlerCallbackFunction)` format.  For some of these action-triggered events, you can register event handlers to emit events when the corresponding action starts and ends.
@@ -66,48 +71,38 @@ import { LiveboardEmbed, useEmbedRef } from '@thoughtspot/visual-embed-sdk/react
 ++++
 
 [#use-cases]
-== Common use cases
-
-=== Handle load and errors for embedded components
+== Handle load and errors for embedded components
 
 A common workflow is to use an overlay `div` element to hide the embed content until you know that SSO has completed, and the content is fully loaded. If an error occurs in the process, you may prefer to display your own custom message to the end user rather than showing embedded ThoughtSpot content in an error state.
 
 Embed events fire at points within the loading process. The following events are related to the load process:
 
-. `Init`
-+
-Fires at the beginning of the loading process.
-. `NoCookieAccess`
 
-+
+. `Init` +
+Fires at the beginning of the loading process.
+
+. `NoCookieAccess` +
 Some browsers (Safari in particular) default to strict settings on cookie origins that prohibit the standard SSO process. This event fires if cookies are restricted by a user's browser.
 
-. `AuthExpire`
-+
+. `AuthExpire` +
 Fires if SSO does not complete and if the ThoughtSpot session times out at some point. Listen to the `AuthExpire` event in the load process to determine when it is safe to show the ThoughtSpot content, and listen to it after loading to hide the ThoughtSpot login screen if the session expires for some reason.
 
-. `AuthInit` 
-+
+. `AuthInit` +
 Fires when the SSO process is completed correctly. The event does not fire when an SSO process fails, instead `AuthExpire` fires in that situation. The logged-in user GUID is available in the `AuthInit` event response.
 
-. `Error` 
+. `Error` +
+Fires when an error occurs in the embedded app. For information about error types, see xref:embed-events.adoc#errorType[Error types].
 
-+
-Fires if any other error occurs in the Visual Embed SDK process. Does not fire for errors within the embedded ThoughtSpot content
-
-. `Load`
-+
+. `Load` +
 Fires as soon as the area for embedding is created, not when the content has begun or finished loading.
 
-. `Data`
-+
+. `Data` +
 Fires only on `SearchEmbed` components. Does not fire on a `LiveboardEmbed` component.
 
-. `LiveboardRendered`
-+
+. `LiveboardRendered` +
 Fires only on `LiveboardEmbed` components when the Liveboard or visualization container loads.
 
-`AuthExpire` and `AuthInit` can be used together to determine if the SSO process is completed correctly. To determine if `AuthExpire` is firing because SSO did not complete or if the ThoughtSpot session has timed out, you can set a variable to act as a flag to determine if SSO is completed. When `AuthInit` fires, set the flag to *true*. You can also associate a callback function to `AuthExpire` to look up the flag to determine which state change has caused the `AuthExpire` event to fire. In the following example, the `tsLoggedIn` flag is set to indicate the SSO login state. 
+`AuthExpire` and `AuthInit` can be used together to determine if the SSO process is completed correctly. To determine if `AuthExpire` is firing because SSO did not complete or if the ThoughtSpot session has timed out, you can set a variable to act as a flag to determine if SSO is completed. When `AuthInit` fires, set the flag to *true*. You can also associate a callback function to `AuthExpire` to look up the flag to determine which state change has caused the `AuthExpire` event to fire. In the following example, the `tsLoggedIn` flag is set to indicate the SSO login state.
 
 [source,JavaScript]
 ----
@@ -139,32 +134,89 @@ embed
     .render()
 ----
 
-=== Filters in embedded UI
-xref:runtime-filters.adoc[Runtime filters] can be set programmatically before loading the embedded ThoughtSpot content in the `options` object set in the `LiveboardEmbed` component constructor.
+[#errorType]
+==== Error types
 
-Runtime filters can be updated after load time by triggering the `HostEvent.UpdateRuntimeFilters` event. You can build the filter UI in the embedding app, which triggers the `UpdateRuntimeFilters` event when changed or with the click of an `apply` button.
+The `EmbedEvent.Error` is fired when the following types of errors occur.
 
-==== Filtering from selection
-Filtering from a selection on a chart or table can be implemented by combining the `EmbedEvent.VizPointClick` or `EmbedEvent.VizPointDoubleClick` events with the `HostEvent.UpdateRuntimeFilters` event.
+* `API` +
+API call failure error. This error event occurs when an API request is blocked.
++
+[source,JavaScript]
+----
+SearchEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "API", error: { message: '...', error: '...' } } }
+});
+----
 
-The callback function from the `VizPointClick` event will need to read the response, parse out the attributes from the response that will be sent to the Runtime Filters, and then send the attributes and their target fields in the format used by `UpdateRuntimeFilters`.
+* `FULLSCREEN` +
+Error in presenting a Liveboard or visualization in full screen mode.
 
-==== ThoughtSpot filters overview
-ThoughtSpot Liveboards have four levels of filters. 
++
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "FULLSCREEN", error: {
+    //   message: "Fullscreen API is not enabled",
+    // } }}
+})
+----
 
-Row-level security (RLS) rules::
-Tied to the logged-in user and their group memberships. Completely secure and cannot be altered by the logged-in user.
-Runtime filters::
-Set via the Visual Embed SDK or URL parameters. Runtime filters do not display as UI filter components.
-Answer filters::
-Established via the search definition, not visible as UI filter components on a Liveboard, but can be viewed in **Explore** or *Edit* modes.
-Liveboard filters::
-Visible as UI components at the top of a Liveboard, affecting all visualizations on the Liveboard.
+* `SINGLE_VALUE_FILTER` +
+Error in updating filter values. This error occurs when a single value filter is applied on a Liveboard and the user tries to update this filter with multiple values.
++
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "SINGLE_VALUE_FILTER", error: {
+    //  message: "Filter {filter_name}: Cannot pass multiple filtering elements to this single value filter.",
+    // } }}
+})
+----
 
-=== Modify SearchEmbed behavior
-The `hideResults` parameter in the options object of a `SearchEmbed` constructor blocks the *GO* button from displaying the chart or table results. When this option is *true*, you can listen to the `QueryChanged` event to perform actions based on the user's interaction within the `SearchEmbed` component.
+* `NON_EXIST_FILTER` +
+Error in applying filter due to a non-existent filter.
++
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "NON_EXIST_FILTER", error: {
+    //  message: "UpdateFilters could not update the filter on {filter_name} as it is not an existing filter in the Liveboard. Please edit the Liveboard and add {filter_name} as a filter chip in order to update it programmatically.",
+    // } }}
+})
+----
 
-==== SearchEmbed Events
+* `INVALID_DATE_VALUE` +
+Error due to invalid date value in a filter. For example, if the column name is `Commit Date` and a correct date value is not specified, the `INVALID_DATE_VALUE` error event is fired.
++
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "INVALID_DATE_VALUE", error: {
+    //  message: "UpdateFilters could not update the filter on {filter_name} as invalid date value provided.",
+    // } }}
+})
+----
+
+* `INVALID_OPERATOR` +
+Error due to the use of invalid operator during filter application. For example, if you are filtering a column called `Revenue` and set the operator as `In` instead of `EQ` and specify multiple values, the filter application may fail.
++
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "INVALID_OPERATOR", error: {
+    //  message: "UpdateFilters could not update the filter on {filter_name} as invalid operator value provided.",
+    // } }}
+})
+----
+
+==  SearchEmbed Events
 There are several events that fire only on the SearchEmbed component:
 
 * `DataSourceSelected`
@@ -200,6 +252,32 @@ liveboardEmbed.on(EmbedEvent.CustomAction, (payload) => {
           }
       })
 ----
+
+
+== Filters in embedded UI
+xref:runtime-filters.adoc[Runtime filters] can be set programmatically before loading the embedded ThoughtSpot content in the `options` object set in the `LiveboardEmbed` component constructor.
+
+Runtime filters can be updated after load time by triggering the `HostEvent.UpdateRuntimeFilters` event. You can build the filter UI in the embedding app, which triggers the `UpdateRuntimeFilters` event when changed or with the click of an `apply` button.
+
+=== Filtering from selection
+Filtering from a selection on a chart or table can be implemented by combining the `EmbedEvent.VizPointClick` or `EmbedEvent.VizPointDoubleClick` events with the `HostEvent.UpdateRuntimeFilters` event.
+
+The callback function from the `VizPointClick` event will need to read the response, parse out the attributes from the response that will be sent to the Runtime Filters, and then send the attributes and their target fields in the format used by `UpdateRuntimeFilters`.
+
+=== ThoughtSpot filters overview
+ThoughtSpot Liveboards have four levels of filters. 
+
+Row-level security (RLS) rules::
+Tied to the logged-in user and their group memberships. Completely secure and cannot be altered by the logged-in user.
+Runtime filters::
+Set via the Visual Embed SDK or URL parameters. Runtime filters do not display as UI filter components.
+Answer filters::
+Established via the search definition, not visible as UI filter components on a Liveboard, but can be viewed in **Explore** or *Edit* modes.
+Liveboard filters::
+Visible as UI components at the top of a Liveboard, affecting all visualizations on the Liveboard.
+
+=== Modify SearchEmbed behavior
+The `hideResults` parameter in the options object of a `SearchEmbed` constructor blocks the *GO* button from displaying the chart or table results. When this option is *true*, you can listen to the `QueryChanged` event to perform actions based on the user's interaction within the `SearchEmbed` component.
 
 == Related resources
 
