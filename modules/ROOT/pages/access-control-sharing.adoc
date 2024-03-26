@@ -35,37 +35,33 @@ ThoughtSpot users can share objects such as Liveboards, answers, tables, workshe
 
 Sharing provides either `read-only` or `edit` permissions on an object 
 
-When an object is shared, users can view all the data regardless of the permissions set at the parent object level. For example, a user can view a shared Liveboard without having access to its underlying worksheet or table from which the visualizations in the Liveboard are built. However, there are some features of a Liveboard which do require at least `read-only` permissions on the underlying worksheet.
+When an object is shared, users can view all the data regardless of the permissions set at the parent object level. For example, a user can view a shared Liveboard without having access to its underlying worksheet or table from which the visualizations in the Liveboard are built. However, there are some features of a Liveboard, which do require at least `read-only` permissions to the underlying worksheet.
 
 === Sharing visibility
 
 The Sharing visibility configuration allows users and groups to be set as *SHAREABLE* or *NOT SHAREABLE*.
 
-
 The *SHAREABLE* property of a group affects the visibility of users who belong to that group. If _UserA_ is marked as *SHAREABLE*, other users *in the same group* as _UserA_ will see _UserA_ in the *Share* dialog when they try to share an object.
 
 A user with *administrator* privileges can share any content to any user or group regardless of their visibility. This allows for using a *NOT SHAREABLE* group as an *access control group*.
 
+[widthAuto]
 image::./images/shareablity_can_share_to.png[Shareability and group membership controls vsibility]
 
-
-
 == Sharing via UI
-Within the ThoughtSpot UI, there is are buttons or menu items for triggering the sharing dialogs for every type of object (link:https://docs.thoughtspot.com/cloud/latest/share-liveboards#share-liveboardpage[Liveboards, target=_blank] or link:https://docs.thoughtspot.com/cloud/latest/share-worksheets[wroksheets, target=_blank] for example).
+Within the ThoughtSpot UI, there are buttons or menu items to trigger the sharing workflow for every type of object (link:https://docs.thoughtspot.com/cloud/latest/share-liveboards#share-liveboardpage[Liveboards, target=_blank] or link:https://docs.thoughtspot.com/cloud/latest/share-worksheets[worksheets, target=_blank] for example).
 
 
 == Sharing via REST API
-The V2.0 link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/metadata/share endpoint, target=_blank] is used to programmatically share content, or to remove any access.
+The REST API v2 link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/metadata/share endpoint, target=_blank] is used to programmatically share content, or to remove any access.
 
-The API request has two components, `metadata_identifiers` and `permissions`. 
+The API request has two components, `metadata_identifiers` and `permissions`:
 
-`metadata_identifiers` is the list of objects being shared.
+* `metadata_identifiers` is the list of objects being shared.
+* `permissions` defines the set of users or groups (referred to as *principals*) being shared to, and the `share_mode` being granted.
+* `share_mode` can be either `READ_ONLY`, `MODIFY` (equivalent to `Edit` in the UI), or `NO_ACCESS`.
 
-`permissions` defines the set of users or groups (referred to as *principals*) being shared to, and the `share_mode` being granted. 
-
-`share_mode` can be either `READ_ONLY`, `MODIFY` (equivalent to `Edit` in the UI), or `NO_ACCESS`.
-
-[code,json]
+[source,JSON]
 ----
 {
   "metadata_identifiers": [
@@ -83,9 +79,9 @@ The API request has two components, `metadata_identifiers` and `permissions`.
 }
 ----
 
-To remove sharing to a user or group, you set their `share_mode` to `NO_ACCESS` in the request to */security/metadata/share*, which effectively removes any existing `share_mode` granted to that user or group within ThoughtSpot:
+To remove sharing to a user or group, you set their `share_mode` to `NO_ACCESS` in the request to `/security/metadata/share`, which effectively removes any existing `share_mode` granted to that user or group within ThoughtSpot:
 
-[code,json]
+[source,JSON]
 ----
 {
   "metadata_identifiers": [
@@ -106,21 +102,21 @@ To remove sharing to a user or group, you set their `share_mode` to `NO_ACCESS` 
 Requests to the `/fetch-permissions` endpoints will never return any user or group that has been set to `NO_ACCESS`. 
 
 == Auditing access control
-Sharing details are not returned via the responses from the */metadata/search* endpoints. Instead, there are two REST API endpoints under the */security/* for retrieving access control details.
+Sharing details are not returned via the responses from the `/metadata/search` endpoints. Instead, there are two REST API endpoints under the */security/* for retrieving access control details.
 
-Using the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/metadata/fetch-permissions, target=_blank] endpoint on an object will return the *effective permissions* the total set of groups and the users within those groups who have access to the object. 
+Using the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/metadata/fetch-permissions, target=_blank] endpoint on an object will return the *effective permissions* for all groups and the users within those groups who have access to the object.
 
 Effective permissions for an object are the full set of groups and users who have access, and what that access level is.
 
 The link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/principals/fetch-permissions endpoint, target=_blank] is used to get the *effective permissions* for a specific user or group. 
 
-Effective permissions for a user are based on things shared to them individually and their group membership. Group effective permissions should be close to their *defined permissions* but hierarchical groups are a feature in ThoughtSpot that would lead to more complex scenarios (hierarchical groups are discouraged when doing embedded ThoughtSpot integrations).
+Effective permissions for a user are based on things shared to them individually and their group membership. Group effective permissions should be close to their __defined permissions__ but hierarchical groups are a feature in ThoughtSpot that would lead to more complex scenarios (hierarchical groups are discouraged when doing embedded ThoughtSpot integrations).
 
 
 == Re-assign content author
 The *author* of any object can be re-assigned using the V2.0 link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/metadata/assign, target=_blank] REST API endpoint:
 
-[code,json]
+[source,JSON]
 ----
 {
   "metadata": [
@@ -131,5 +127,5 @@ The *author* of any object can be re-assigned using the V2.0 link:https://develo
 }
 ----
 
-Often rather than re-assigning authorship, a designated *service account user* is used when importing TML objects via REST API into a different Org or ThoughtSpot instance, establishing the user used for the import process as the *author* within that environment.
+Rather than re-assigning authorship, a designated *service account user* is used often when importing TML objects via REST API into a different Org or ThoughtSpot instance, establishing the user used for the import process as the *author* within that environment.
 
