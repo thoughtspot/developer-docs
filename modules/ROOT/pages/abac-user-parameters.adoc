@@ -1,0 +1,309 @@
+= ABAC via token
+:toc: true
+:toclevels: 3
+
+:page-title: ABAC via token
+:page-pageid: abac-user-parameters
+:page-description: Attribute-based access control pattern can be achieved via user parameters sent in the login token
+
+Attribute Based Access Control (ABAC) is a pattern where security entitlements are sent in as lists of attributes at session creation time via the authentication service.
+
+[IMPORTANT]
+====
+[#beta-warning]
+RLS using ABAC via tokens is in beta. ThoughtSpot is working on improvements in upcoming releases that will change some of the best practices recommended in this article, and will result in the needed re-work of the security architecture of your deployment. We recommend reaching out to ThoughtSpot to discuss RLS best practices for your specific use case and deployment timelines.
+====
+
+Currently, the ABAC via tokens method requires using *xref:trusted-authentication.adoc[trusted authentication]* and using link:https://docs.thoughtspot.com/cloud/latest/worksheet-create[Worksheets, target=_blank] as data sources for Liveboards and Answers, rather than individual table objects.
+
+You can pass in runtime filters and Parameters for a user via their login token. Both features work like the runtime filters and Parameters available within the Visual Embed SDK, but values set via token cannot be overridden by any user action within the ThoughtSpot UI.
+
+== Token request
+The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot V2.0 REST API Access Tokens (which are OAuth JWT tokens). 
+
+The token can be used as a bearer token for Cookieless Trusted Auth or REST API access, or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
+
+=== ABAC capabilities
+In ThoughtSpot 9.10,5 and later releases, three features are available to set via the login token:
+
+* *Runtime filters* +
+Can filter *multiple values* of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name).
+* *Parameters* +
+Binds a *single value* to any Parameter in any Worksheet by Parameter Name and Type match.
+* *Runtime sorts* +
+Overrides to sort order within columns.
+
+=== Request format
+The ABAC request is sent using the `user_parameters` key of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]. 
+
+There are three potential keys within `user_parameters`, each taking an array of objects:
+[code,javascript]
+----
+...
+"user_parameters": {
+   "runtime_filters": [],
+   "parameters" : [],
+   "runtime_sorts": []
+}
+----
+
+The format for the objects in each section follows the equivalent formats in the Visual Embed SDK for xref:runtime-filters.adoc[runtime filters], xref:runtime-parameters.adoc[runtime parameters], or xref:runtime-sort.adoc[runtime sorts].
+
+There is a `persist` key to be added on each object that takes boolean `true` or `false`. This determines if the values are persisted at the user level beyond just the token itself, for features such as alerts and subscriptions that run outside a user's session.
+
+You must persist values for them to apply when using xref:trusted-authenication.adoic#_cookie_based_vs_cookieless_authentication[cookie-based trusted authentication].
+
+The following is a `user_parameters` section that would be part of the JSON request of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]:
+
+[source,JavaScript]
+----
+"user_parameters": {
+   "runtime_filters": [
+      {
+        "column_name": "Region",
+        "operator": "IN",
+        "values": ["West", "Southwest"],
+        "persist": false
+      },
+      {
+        "column_name": "Product Type",
+        "operator": "IN",
+        "values": ["Shirts", "Swimwear"],
+        "persist": true
+      }
+    ],
+    "parameters": [
+      {
+        "name": "Secured",
+        "values": ["rxzricmwfe87q7bh7jyg"],
+        "persist": true
+      }
+    ]
+  }
+----
+
+You can specify any attribute that applies only to a specific ThoughtSpot object by including an `objects` section with the following format:
+
+[source,JavaScript]
+----
+"runtime_filters": [
+   {
+     "column_name": "Region",
+     "operator": "IN",
+     "values": ["West", "Southwest"],
+     "persist": false
+     "objects": [
+         {
+           // example of the format
+           "type": "{OBJECT_TYPE}",
+           "identifier": "{id or name of the object}"
+         },
+         {
+            "type":"LIVEBOARD", 
+            "identifier": "9bd202f5-d431-44bf-9a07-b4f7be372125"
+
+         }
+      ]
+]
+----
+
+== Implementing RLS with ABAC via tokens
+The current best practice pattern for RLS using ABAC via tokens is:
+
+1. Runtime filters to define all multi-value filter conditions on columns
+2. A *shared secret* passed in as a 'check parameter', used in Worksheet filters to block unrestricted data access
+
+Parameters are currently single-value, so you'll need to use runtime filters to restrict multiple values on a given field. If a column will only be restricted by a single value for any users, you can choose whether to pass that attribute value as a runtime filter or a parameter to be used in a Worksheet formula/filter combination.
+
+=== Show all
+The way to set a runtime filter to *show all values* is to not send in any runtime filter at all for that column. 
+
+Without additional information, it's impossible to know if the lack of a runtime filter is intentional to indicate a  *show all values* condition or if something went wrong—a malformed ABAC token or the user entered into ThoughtSpot without a token at all.
+
+=== Check parameter and shared key
+To make sure that no data shows when a properly-built token is not used to start the user session, you need to send a 'check parameter' along with the runtime filters.
+
+The *shared secret* is a string value used in both the *token request service* to generate each token, and within the *Worksheet formula* to evaluate the parameter.
+
+If the 'check parameter' value from the token does not match the value defined in the Worksheet formula (the *shared secret*), the formula and filter combination blocks any data from showing for the user.
+
+=== Building the ABAC token request
+Two parts to the ABAC request:
+
+1. Runtime filters defining multi-value conditions on columns
+2. The *shared secret* to go into the 'check parameter' 
+
+The runtime filters must be built by:
+
+1. Retrieving user data entitlements
+2. Translating entitlements into ThoughSpot runtime filters
+
+==== Retrieving entitlements
+The value of the ABAC pattern is that you can send different combinations of filters for different types of users.
+
+You can retrieve the attribute names and values from any source: the embedding application's session details, an entitlement REST API, a query to a different database, etc. 
+
+==== Translating entitlements into runtime filters
+Runtime filters *match on the name property of a column* as defined in ThoughtSpot, not the column's name in the underlying database table. The *token request service* does need to know the ThoughtSpot column names that will be used for each of the attributes, so you'll need to coordinate between ThoughtSpot Worksheet designers and the *token request service* to make sure the column names and values are passing correctly to the *token request service*.
+
+As mentioned in the preceding section, the format for runtime filters within the token match with xref:runtime-filters.adoc[runtime filters] in the Visual Embed SDK. In general, RLS entitlements are lists of values using the `IN` operator, but you can pass in filters on numeric and time columns using the full set of operators.
+
+For example, let's assume three attributes that are needed to filter down a user on a multi-tenanted database: `Customer ID`, `Region`, and `Product Type`.
+
+The following is what the token request would look like if restricting on all three attributes:
+
+[source,JavaScript]
+----
+"runtime_filters": [
+   {
+     "column_name" : "Customer ID",
+     "operator": "EQ",
+     "values": [492810],
+     "persist" : true
+  },
+   {
+     "column_name": "Region",
+     "operator": "IN",
+     "values": ["West", "Southwest"],
+     "persist": true
+   },
+   {
+     "column_name": "Product Type",
+     "operator": "IN",
+     "values": ["Shirts", "Swimwear"],
+     "persist": true
+   }
+ ]
+----
+
+A user might be entitled to *all access* on any given column (you might drop some levels of a hierarchy if you include more granular columns to filter on for that user).
+
+[IMPORTANT]
+====
+The process for translating the entitlements request into ThoughtSpot runtime filters must *drop* the filter definition entirely to represent *all access*. 
+====
+
+The following is a request where a different user can see all `Region`, but still has restrictions on `Customer ID` and `Product Type`: 
+[code,javascript]
+----
+"runtime_filters": [
+   {
+     "column_name" : "Customer ID",
+     "operator": "EQ",
+     "values": [492810],
+     "persist" : true
+  },
+   {
+     "column_name": "Product Type",
+     "operator": "IN",
+     "values": ["Shirts", "Swimwear"],
+     "persist": true
+   }
+ ]
+----
+
+Because the `runtime_filters` section is entirely within the control of the *token request service*, you have full flexibility to generate any set of filters for any type of user within the token.
+
+==== Setting the 'check parameter' to the shared secret
+The *shared secret* is just a long string value that cannot be easily guessed or determined programmatically. You can generate these values randomly - and the end user will never see it, only the Worksheet editor if they look at the formula.
+
+Information about how to set up the appropriate set of Worksheet parameters, formulas and filters for the 'check parameter' to provide security is provided in the following sections.
+
+All that is required within the token request service is that the same *shared secret* defined within the Worksheet formula is being sent with the appropriate 'check parameter' name.
+
+If the parameter is named `Secured` and the *shared secret* value is `rxzricmwfe87q7bh7jyg`, then the `parameters` section of the token request will look like the following snippet:
+
+[source,JavaScript]
+----
+"parameters": [
+   {
+     "name": "Secured",
+     "values": ["rxzricmwfe87q7bh7jyg"],
+     "persist": true
+   }
+]
+----
+
+=== Using Parameters to filter a Worksheet
+The basic pattern for using a Parameter to filter a Worksheet includes these steps:
+
+. Create link:https://docs.thoughtspot.com/cloud/latest/parameters-create[Parameters, target=_blank] in Worksheet
+. Make link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, target=_blank] that evaluates the Parameter's default value and the expected values from the token
+. Make link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[Worksheet filter, target=_blank] based on the formula, set to *true*.
+
+link:https://docs.thoughtspot.com/cloud/latest/parameters-create[Parameters, target=_blank] are defined at the Worksheet level within ThoughtSpot. Parameters have a data type and a default value set by the Worksheet author.
+
+To use a Parameter, you'll make a link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, target=_blank] on the Worksheet.
+
+link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[Worksheet filters, target=_blank] can reference Worksheet formulas once they have been created, which creates the security layer out of the result of the formula.
+
+All of these Worksheet-level features are set by clicking *Edit* on the Worksheet, then expanding the menu on the left sidebar:
+
+[.widthAuto]
+image::./images/worksheet_edit_sidebar.png[Worksheet Edit Sidebar]
+
+==== Defining the check parameter
+The simplest 'check parameter' pattern is a shared key string that is stored in both the xref:trusted-auth-token-request-service.adoc[token request service] and the Worksheet formula used for the Worksheet filter.
+
+Parameters are always visible in the UI, even though a parameter set via a token can never be overridden by any action in the UI or using the Visual Embed SDK.
+
+Thus the 'check parameter' and its default value should be named something that looks pleasant to end users. For example, if the parameter name is "Secured", you can set the default value to "✔️" or "true" or "yes" (any Unicode value is allowed, including emojis):
+
+[.bordered]
+[.widthAuto]
+image::./images/check_parameter_definition.png[Check Parameter with Default Value for Display]
+
+This will display on Liveboards and Answers as shown here:
+
+[.bordered]
+[.widthAuto]
+image::./images/parameter_with_default.png[Parameter with Default Value on Answer]
+
+==== Creating the Worksheet security formula
+A Parameter doesn't do anything on its own. You need a formula to evaluate the Parameter's value.
+
+The simplest formula for a 'check parameter' with shared key looks like:
+
+`if ( check_parameter_name ) = 'shared-key-value' then true else false`
+
+For example, if the 'check parameter' is called `Secured`, and the secret key value is a long-encoded string like `rxzricmwfe87q7bh7jyg`, the Worksheet formula will be as shown in the following figure. Note that the Parameter name is always lower-cased in formulas):
+
+[.bordered]
+[.widthAuto]
+image::./images/worksheet_formula.png[Security Formula in Worksheet]
+
+==== Setting a Worksheet filter on the Worksheet security formula
+The last step is to set a *Worksheet filter* on the *formula* you just created to evaluate the 'check parameter'.
+
+Click the *create new* icon next to Filters, and choose the formula you created (at the end of the list):
+
+[.bordered]
+[.widthAuto]
+image::./images/new_worksheet_filter_step_1.png[Create New Filter on Worksheet]
+
+At the bottom of the filter dialog that appears, choose "Add values in bulk":
+[.bordered]
+[.widthAuto]
+image::./images/new_worksheet_filter_step_2.png[Choose add values in bulk]
+
+Type in the value *true* in the bulk dialog box, then press "Done":
+
+[.bordered]
+[.widthAuto]
+image::./images/new_worksheet_filter_step_3.png[Type in true in bulk values box]
+
+Once you press "Done" on the filter, you should see it listed in the Worksheet edit screen:
+
+[.bordered]
+[.widthAuto]
+image::./images/new_worksheet_filter_step_4.png[Completed Worksheet filter]
+
+Now the 'check parameter' will be evaluated all the time, blocking all data unless the appropriate value is passed in via ABAC token.
+
+== Indexing
+Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in Explore, use ThoughtSpot indexing. 
+
+Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token. 
+
+You must turn off indexing for any field that needs to be restricted by RLS* when using ABAC via tokens for RLS.
+
