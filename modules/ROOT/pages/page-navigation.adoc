@@ -12,6 +12,9 @@ All REST API requests from the browser are scoped to the signed-in user and show
 If you are using the ThoughtSpot xref:full-embed.adoc[AppEmbed component] to embed the full ThoughtSpot application, please see the documentation for xref:full-app-customize.adoc[customizing navigation within the full app embed].
 
 == Create web app URLs for embedded ThoughtSpot pages
+Modern web applications have various architectures for how URLs are translated into the actual content delivered to the user's web browser. 
+
+=== ThoughtSpot object types and object ids
 Every object in ThoughtSpot is referenced by a globally unique identifier (GUID), which appears as the `id:` or `guid:` property in API responses and TML files.
 
 Visual Embed SDK components require object IDs to load the correct content.
@@ -20,8 +23,7 @@ The object ID is part of the URLs to load objects in ThoughtSpot. For example, t
 
 `{your-domain}.thoughtspot.cloud/#/pinboard/*ddd982ea-c7bc-4c00-9b49-c53fab949b34*`
 
-Modern web applications have various architectures for how URLs are translated into the actual content delivered to the user's web browser. 
-
+=== Web app URL patterns
 Within the embedding web app, create one or more URL patterns that include variables for: 
 
 * A reference to the ThoughtSpot *object type* (does not have to match ThoughtSpot names for the object types)
@@ -50,10 +52,30 @@ xref:embed-search.adoc[SearchEmbed] component to an existing Answer:
 With defined URL patterns, you can xref:customize-links.adoc[customize links] within ThoughtSpot so that e-mails and other exported references send users to the embedding web app's pages rather than directly to the ThoughtSpot instance.
 
 == Create menus to embedded ThoughtSpot pages
+Once you have the URL patterns defined within the embedding application to load ThoughtSpot content, you can build out the navigation elements to reach the content a given user has access to.
 
-=== REST API request for content listings
-The ThoughtSpot web application UI uses the xref:metadata-api.adoc#metadata-list[metadata/list REST API endpoint] in rendering the Answers, Liveboards, and Data pages.
+Navigation typically takes the form of elements in a menu, but could also be a dropdown selector or a set of buttons.
 
+=== "Hardcoded" links within a menu system
+If your web application only embeds a limited set of ThoughtSpot objects, without granting users the ability to save their own objects, you can "hardcode" the object IDs and names of the ThoughtSpot content.
+
+Object IDs in ThoughtSpot are GUIDs and thus are unique on every org or instance, with the exception of separate instances that are intentionally replicated with the same GUIDs via TML import and export.
+
+You may still use the `xref:rest-api-v2-metadata-search.adoc[/metadata/search]` V2.0 REST API endpoint to retrieve the equivalent object IDs for content on various orgs and environments in the process of "hardcoding" the menu system. Alternatively you may keep a *mapping file* of equivalent objects during your CICD deployment process, that you use to generate the "hardcoded URLs" in the menu system.
+
+=== Dynamic requests for content listings via REST API
+Both the V1 and V2.0 REST APIs have endpoints for retrieving filtered lists of the content a user has access to. The `xref:rest-api-v2-metadata-search.adoc[/metadata/search]` V2.0 REST API endpoint is the simpler of the APIs to use from the user's web browser, while the xref:metadata-api.adoc#metadata-list[metadata/list V1 REST API endpoint] is identical to the endpoint used within ThoughtSpot to rendering the Answers, Liveboards, and Data pages.
+
+The process for generating a dynamic menu is:
+
+1. Ensure the system can request content as a user (sign-in with browser or an access token) 
+2. Request the user's available content via the REST API
+3. (Optional) Cache the results within embedding application
+4. Render the menu items within the web application, with links to ThoughtSpot pages within the web app
+
+==== Requesting content as a user
+
+==== /metadata/list V1 REST API
 The endpoint can only request one object type at a time: +
 
 * `PINBOARD_ANSWER_BOOK` for Liveboards
@@ -183,7 +205,7 @@ Last edit timestamp (to milliseconds)
 +
 Array of tag objects, each with a `name` property among other details
 
-== Replicate ThoughtSpot application listing pages
+=== Replicate ThoughtSpot application listing pages
 If you want to render something very close to the 'Answers' or 'Liveboards' pages within the ThoughtSpot UI, your rendering function will grab the `name`, `id`, `tags`, `modified` and `authorDisplayName` properties and make a table in that order (feel free to leave out any undesired elements):
 
 [source,javascript]
