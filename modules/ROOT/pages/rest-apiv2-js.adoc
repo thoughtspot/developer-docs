@@ -34,12 +34,41 @@ async function restApiCallV2(endpoint, httpVerb, apiRequestObject){
             credentials: "include",
             body: JSON.stringify(apiRequestObject)
         })
-    // is there always response JSON?
-    .then(response =>  response.json())
-    .catch(error => {
-        console.error("Unable to get the" + endpoint + "response: " + error);
-    });
-}
+        // Some type of request might not have a body
+        if (apiRequestObj !== null){
+            fetchArgs['body'] = JSON.stringify(apiRequestObj);
+        }
+        // With the async modifier on the function, you add return await to the fetch() call here
+        return await fetch(
+            apiFullEndpoint,
+            fetchArgs
+        ).then(response =>
+        {
+            console.log("Fetch response returned with status code " + response.status);
+            // Parse 4XX or 500 HTTP status code errors from the API 
+            if (!response.ok) {
+                console.log("HTTP response indicates an error from the API");
+                throw new Error("Received HTTP response " + response.status + "with the message " + response.statusText)
+                // Alternatively, check for specific error codes you might expect, like a 403
+                /*
+                if( response.status == 403){
+                    // retrySSOProcess(); // Example action to take based on status 
+                }
+                */
+            }
+            else {
+                if( response.status === 200){
+                    return response.json(); // Returns the JSON of the response 
+                }
+                else if (response.status === 204){
+                    return true;  // 204 is success without any body
+                }
+            }
+        }).catch(error =>
+        {
+            console.error("Unable to get the " + endpoint + " response: " + error);
+        });
+    }
 ----
 
 You can use the `restApiCallV2` function directly in a code block, or wrap it in another function.
