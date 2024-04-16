@@ -1,40 +1,142 @@
-= Customize navigation components
+= Build navigation to ThoughtSpot content
 :toc: true
 
-:page-title: Integrate navigation
+:page-title: Build navigation to ThoughtSpot content
 :page-pageid: in-app-navigation
-:page-description: Navigate to ThoughtSpot content from the embedding application
+:page-description: Build navigation to ThoughtSpot content from the embedding application
 
-To create navigation components such as buttons or menus to link to or load ThoughtSpot embedded components, you can use the ThoughtSpot REST APIs within the browser to retrieve filter lists of available content for the logged-in user.
+This documentation page covers two related aspects of integrating ThoughtSpot content into another application:
 
-All REST API requests from the browser are scoped to the signed-in user and show only those objects that a user can access.
+* Creating URLs that load various ThoughtSpot objects correctly within the embedding app
+* Retrieving ThoughtSpot objects available to a given web application user
 
-If you are using the ThoughtSpot xref:full-embed.adoc[AppEmbed component] to embed the full ThoughtSpot application, please see the documentation for xref:full-app-customize.adoc[customizing navigation within the full app embed].
+The embedding application can retrieve the available content for a ThoughtSpot user via REST API, then render the response as menu items or buttons that link to the URLs within the web app that load the proper ThoughtSpot embedded component with the desired object ID.
 
-== ThoughtSpot IDs and URLs
+If you are using the ThoughtSpot xref:full-embed.adoc[AppEmbed component] to embed any of the pages from the full ThoughtSpot application, please see the documentation for xref:full-app-customize.adoc[customizing navigation within the full app embed].
+
+== Create web app URLs for embedded ThoughtSpot pages
+Modern web applications have various architectures for how URLs are translated into the actual content delivered to the user's web browser.
+
+The ThoughtSpot Visual Embed SDK uses different components depending on the object type to be loaded, so the URL must include a reference to both the ThoughtSpot object type and the object ID to load it properly. 
+
+=== ThoughtSpot object types and object ids
 Every object in ThoughtSpot is referenced by a globally unique identifier (GUID), which appears as the `id:` or `guid:` property in API responses and TML files.
 
 Visual Embed SDK components require object IDs to load the correct content.
 
 The object ID is part of the URLs to load objects in ThoughtSpot. For example, the GUID of the Liveboard appears at the end of the URL:
 
-----
-https://{}.thoughtspot.cloud/#/pinboard/*ddd982ea-c7bc-4c00-9b49-c53fab949b34*
-----
+`{your-domain}.thoughtspot.cloud/#/pinboard/*ddd982ea-c7bc-4c00-9b49-c53fab949b34*`
 
-To provide the ability to return to a given embedded ThoughtSpot object in a web app, you will want to build out a dynamic URL pattern that includes the ThoughtSpot *object type* and *object ID*, to load the correct embed component with the desired object.
+When hardcoding ThoughtSpot object IDs, you can use the ThoughtSpot application URL or Visual Embed SDK playground to find the object IDs. Most developers switch to using the REST APIs to retrieve the object IDs as their integration project progresses (see below).
 
-Example web app URL patterns for various component types:
+=== Web app URL patterns
+Within the embedding web app, create one or more URL patterns that include variables for: 
 
-* xref:embed-pinboard.adoc[LiveboardEmbed] component for a Liveboard: {web-app-name}.{your-domain}.com/analytics/dashboard/*{liveboardId}*
-* xref:embed-pinboard.adoc[LiveboardEmbed] component for a Viz on a Liveboard: {web-app-name}.{your-domain}.com/analytics/dashboard/*{liveboardId}*/*{vizId}*
-* xref:embed-a-viz.adoc[SearchEmbed] component to a datasource: {web-app-name}.{your-domain}.com/analytics/data/*{datasourceId}*
-* xref:embed-search.adoc[SearchEmbed] component to an existing Answer: {web-app-name}.{your-domain}.com/analytics/report/*{answerId}*
+* A reference to the ThoughtSpot *object type* (does not have to match ThoughtSpot names for the object types)
+* The ThoughtSpot *object ID(s)*
 
-The web app could have multiple distinct pages for each component type, or might instead have a single underlying page that is able to load the appropriate component based on the URL components.
+These two details are necesssary to load the correct ThoughtSpot embed component with the desired ThoughtSpot object.
 
-== REST API request for content listings
-The ThoughtSpot web application UI uses the xref:metadata-api.adoc#metadata-list[metadata/list REST API endpoint] in rendering the Answers, Liveboards, and Data pages.
+Example URL patterns for various component types:
+
+xref:embed-pinboard.adoc[LiveboardEmbed] component for a Liveboard: 
+
+`{web-app-name}.{your-domain}.com/analytics/dashboard/*{liveboardId}*`
+
+xref:embed-pinboard.adoc[LiveboardEmbed] component for a specific Viz on a Liveboard: 
+
+`{web-app-name}.{your-domain}.com/analytics/dashboard/*{liveboardId}*/*{vizId}*`
+
+xref:embed-a-viz.adoc[SearchEmbed] component to a datasource: 
+
+`{web-app-name}.{your-domain}.com/analytics/data/*{datasourceId}*`
+
+xref:embed-search.adoc[SearchEmbed] component to an existing Answer: 
+
+`{web-app-name}.{your-domain}.com/analytics/report/*{answerId}*`
+
+With defined URL patterns, you can xref:customize-links.adoc[customize links] within ThoughtSpot so that e-mails and other exported references send users to the embedding web app's pages rather than directly to the ThoughtSpot instance.
+
+== Create menus to embedded ThoughtSpot pages
+Once you have the URL patterns defined within the embedding application to load ThoughtSpot content, you can build out the navigation elements to reach the content a given user has access to.
+
+Navigation typically takes the form of elements in a menu, but could also be a dropdown selector or a set of buttons.
+
+=== "Hardcoded" links within a menu system
+If your web application only embeds a limited set of ThoughtSpot objects, without granting users the ability to save their own objects, you can "hardcode" the object IDs and names of the ThoughtSpot content.
+
+Object IDs in ThoughtSpot are GUIDs and thus are unique on every org or instance, with the exception of separate instances that are intentionally replicated with the same GUIDs via TML import and export.
+
+You may still use the `xref:rest-api-v2-metadata-search.adoc[/metadata/search]` V2.0 REST API endpoint to retrieve the equivalent object IDs for content on various orgs and environments in the process of "hardcoding" the menu system. Alternatively you may keep a *mapping file* of equivalent objects during your CICD deployment process, that you use to generate the "hardcoded URLs" in the menu system.
+
+=== Dynamic requests for content listings via REST API
+Both the V1 and V2.0 REST APIs have endpoints for retrieving filtered lists of the content a user has access to. 
+
+The xref:rest-api-v2-metadata-search.adoc[/metadata/search V2.0 REST API endpoint] can be used be an administrator level account to retrieve content for any given user or can be called as the user by the web browser once they have signed-in via SSO.
+
+The xref:metadata-api.adoc#metadata-list[/metadata/list V1 REST API endpoint] is identical to the endpoint used within ThoughtSpot to rendering the Answers, Liveboards, and Data pages, making it a simple path to replicate and customize the existing content listing pages within ThoughtSpot.
+
+The process for generating a dynamic menu is:
+
+1. Request the user's available content via the REST API
+2. (Optional) Cache the results within embedding application
+3. Render the menu items and link by using the REST API response to build the URLs within the web app that will load ThoughtSpot content
+
+If implementing a caching system for the ThoughtSpot content listings, implementing the content requests on the back-end may be preferred for easy access to other parts of the web application.
+
+==== Requesting content for a user
+An administrator account can use the xref:rest-api-v2-metadata-search.adoc#permissions[permissions parameters of the /metadata/search V2.0 REST API endpoint] to retrieve list of content available for that user at either the `READ_ONLY` or `MODIFY` permission levels.
+
+By default, the endpoint returns for Liveboards, but the `metadata` section of the request can be set to specify `LIVEBOARD`, `ANSWER`, and `LOGICAL_TABLE` in any desired combination.
+
+If the web application has implemented other processes on the back-end using a ThoughtSpot service account with administrator privileges, this may be a simplest implemenation of retrieving the content listings rather than dealing with individual user access tokens for the requests.
+
+==== Requesting content as a user
+Rather than using an administrator level account to request content listings, you can instead have the REST API request scoped to the user themselves, and the REST API will always only return the content they have access to.
+
+All REST API requests from the browser are scoped as the signed-in user, as long as the `credentials` option of the REST API request has been set properly to `include`.
+
+With xref:trusted-authentication.adoc[cookieless trusted authentication], there is no *browser session* but instead an *access token* is retrieved for the user and used by the SDK. The same access token for authentication can be used to make REST API requests, or a second access token can be generated for use with REST API requests.
+
+The trusted authentication pattern requires implementing a backend service to generate access tokens for any user. The token request service can instead be used by the back-end of the embedding web application to get an access token to make REST API requests for a user, rather than having it happen at the front-end within the web browser. 
+
+==== Build menu items and web app links
+The response from the search REST API is an array of header objects, which includes the details needed to build out the menu items and the links within the web application to the pages that display ThoughtSpot content.
+
+The `/metadata/search` endpoint returns `metadata_name`, `metadata_id` and `metadata_type` in each response item, which is enough information to build a simple menu and a link to the appropriate URL to display the content.
+
+The V2.0 `/metadata/search` endpoint has an additional `metadata_header` key within the response, with the object containing the following properties along with many others, while the `metadata/list` V1 endpoint contains them in slightly different structure.
+
+Within the `metadata_header` section, `name` and `id` properties are identical to the `metadata_name` and `metadata_id` from the outer portion of the response. Additional properties the web application might use for display include:
+
+* `description`
++
+Text description added to content by creator
+* `authorDisplayName`
++
+Display name of the object creator or current owner
+* `authorName`
++
+Username of the object creator or current owner
+* `created`
++
+Object creation timestamp (to milliseconds)
+* `modified`
++
+Last edit timestamp (to milliseconds)
+* `tags`
++
+Array of tag objects, each with a `name` property among other details
+
+Individual visualizations on a Liveboard can be loaded using the `LiveboardEmbed` component by supplying both `liveboardId` and `vizId`.
+
+The display of a visualization from a Liveboard differs from a saved Answer object, which is loaded via the `SearchEmbed` component. The saved answer object always displays the ThoughtSpot search bar and UI actions for editing an Answer, whereas the visualizations display fewer UI elements and show the menu items in the **More** menu image:./images/icon-more-10px.png[the more options menu].
+
+Setting the `include_visualization_headers` request parameter to `true` will bring back the list of all visualization details with any Liveboard response. This request requires a separate API call for each Liveboard in the V1 REST API.
+
+=== Replicating the ThoughtSpot UI Liveboards or Answers page
+As mentioned before, the `/metadata/list` V1 REST API provides the same details as the internal REST API used to display the pages within the ThoughtSpot UI, making it easy to "replicate" those pages exactly within the embedding web app's own UI. The V2.0 REST API includes these details within the `metadata_headers` section of its response so it can be used for a similar purpose as well.
 
 The endpoint can only request one object type at a time: +
 
@@ -141,31 +243,7 @@ metadataListRestApiCall(
 );
 ----
 
-== Render navigation elements
-The response from the function in the preceding example is an array of header objects, which can be parsed to render navigation.
-
-The `name` and `id` property are used in almost all the navigation you build (`id` is the GUID necessary to load any ThoughtSpot object). Additional properties include:
-
-* `description`
-+
-Text description added to content by creator
-* `authorDisplayName`
-+
-Display name of the object creator or current owner
-* `authorName`
-+
-Username of the object creator or current owner
-* `created`
-+
-Object creation timestamp (to milliseconds)
-* `modified`
-+
-Last edit timestamp (to milliseconds)
-* `tags`
-+
-Array of tag objects, each with a `name` property among other details
-
-== Replicate ThoughtSpot application listing pages
+==== Rendering Liveboards or Answers pages similar to ThoughtSpot UI
 If you want to render something very close to the 'Answers' or 'Liveboards' pages within the ThoughtSpot UI, your rendering function will grab the `name`, `id`, `tags`, `modified` and `authorDisplayName` properties and make a table in that order (feel free to leave out any undesired elements):
 
 [source,javascript]
@@ -248,12 +326,9 @@ metadataListRestApiCall(
 
 Note that the `loadContent()` function referenced in the anchor tag created for the name column in the function above is a placeholder representing whatever is necessary to load that type of ThoughtSpot content in the web application. The actual design you choose for your application will determine the code you need to go from the navigation component to loading the ThoughtSpot content.
 
-== Retrieve individual visualizations from a Liveboard
-You can load individual visualizations on a Liveboard using the `LiveboardEmbed` component by supplying both `liveboardId` and `vizId`.
+==== Retrieve individual visualizations using the V1 REST API
 
-The display of a visualization from a Liveboard differs from a saved Answer object, which is loaded via the `SearchEmbed` component. The saved answer object always displays the ThoughtSpot search bar and UI actions for editing an Answer, whereas the visualizations display fewer UI elements and show the menu items in the **More** menu image:./images/icon-more-10px.png[the more options menu].
-
-To retrieve a list of visualizations from a Liveboard, you can use the xref:metadata-api.adoc#viz-header[get visualization headers REST API endpoint].
+To retrieve a list of visualizations from a Liveboard with the V1 REST API, you can use the xref:metadata-api.adoc#viz-header[get visualization headers REST API endpoint].
 
 [source,javascript]
 ----
