@@ -7,7 +7,7 @@ import { getBreadcrumsPath } from '../../utils/doc-utils';
 jest.mock('../../utils/doc-utils', () => ({
     getBreadcrumsPath: jest.fn().mockReturnValue([
         {
-            "name": "ThoughtSpot Everywhere",
+            "name": "ThoughtSpot Embedded",
             "href": "?pageid=embed-analytics"
         },
         {
@@ -29,7 +29,7 @@ describe('Breadcrums', () => {
             "href": "?pageid=whats-new"
         },
         {
-            "name": "ThoughtSpot Everywhere",
+            "name": "ThoughtSpot Embedded",
             "href": "?pageid=embed-analytics",
             "children": [
                 {
