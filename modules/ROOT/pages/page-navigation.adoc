@@ -38,6 +38,8 @@ Within the embedding web app, create one or more URL patterns that include varia
 
 These two details are necesssary to load the correct ThoughtSpot embed component with the desired ThoughtSpot object.
 
+With defined URL patterns, you can *xref:customize-links.adoc[customize links]* within ThoughtSpot so that e-mails and other exported references send users to the embedding web app's pages rather than directly to the ThoughtSpot instance.
+
 Example URL patterns for various component types:
 
 xref:embed-pinboard.adoc[LiveboardEmbed] component for a Liveboard: 
@@ -56,12 +58,14 @@ xref:embed-search.adoc[SearchEmbed] component to an existing Answer:
 
 `{web-app-name}.{your-domain}.com/analytics/report/*{answerId}*`
 
-With defined URL patterns, you can xref:customize-links.adoc[customize links] within ThoughtSpot so that e-mails and other exported references send users to the embedding web app's pages rather than directly to the ThoughtSpot instance.
+
 
 == Create menus to embedded ThoughtSpot pages
 Once you have the URL patterns defined within the embedding application to load ThoughtSpot content, you can build out the navigation elements to reach the content a given user has access to.
 
 Navigation typically takes the form of elements in a menu, but could also be a dropdown selector or a set of buttons.
+
+Please see the  link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/examples/menus_and_other_navigation_components/rest_api_ui_navigation_v2.html[example on GitHub, target=_blank] for a complete flow of REST API requests powering various navigation components to be rendered into an embedding application's page. 
 
 === "Hardcoded" links within a menu system
 If your web application only embeds a limited set of ThoughtSpot objects, without granting users the ability to save their own objects, you can "hardcode" the object IDs and names of the ThoughtSpot content.
@@ -74,6 +78,8 @@ You may still use the `xref:rest-api-v2-metadata-search.adoc[/metadata/search]` 
 Both the V1 and V2.0 REST APIs have endpoints for retrieving filtered lists of the content a user has access to. 
 
 The xref:rest-api-v2-metadata-search.adoc[/metadata/search V2.0 REST API endpoint] can be used be an administrator level account to retrieve content for any given user or can be called as the user by the web browser once they have signed-in via SSO.
+
+The response to */metadata/search* can be parsed and split on *tags*, *author* or other properties, or you can make multiple calls to the endpoitn with the the various filtering arguments in each request. For example, xref:rest-api-v2-metadata-search.adoc#_favorite_object_options[favorite options] can be specified to only retrieve a lit of content that has been favorited.
 
 The xref:metadata-api.adoc#metadata-list[/metadata/list V1 REST API endpoint] is identical to the endpoint used within ThoughtSpot to rendering the Answers, Liveboards, and Data pages, making it a simple path to replicate and customize the existing content listing pages within ThoughtSpot.
 
@@ -90,12 +96,39 @@ An administrator account can use the xref:rest-api-v2-metadata-search.adoc#permi
 
 By default, the endpoint returns for Liveboards, but the `metadata` section of the request can be set to specify `LIVEBOARD`, `ANSWER`, and `LOGICAL_TABLE` in any desired combination.
 
+[code,json]
+----
+const answerRequestObject = {
+    "metadata": [{"type": "ANSWER"}],
+    "permissions" : [
+    {
+      "principal": {
+        "type": "USER",
+        "identifier": "{username}"
+      },
+      "share_mode": "READ_ONLY"
+    }
+  ]
+    'record_offset': 0,  // Adjust to do pagination
+    'record_size': 100000 // Adjust to do pagination (or handle in browser with table component)
+}
+----
+
 If the web application has implemented other processes on the back-end using a ThoughtSpot service account with administrator privileges, this may be a simplest implemenation of retrieving the content listings rather than dealing with individual user access tokens for the requests.
 
 ==== Requesting content as a user
 Rather than using an administrator level account to request content listings, you can instead have the REST API request scoped to the user themselves, and the REST API will always only return the content they have access to.
 
 All REST API requests from the browser are scoped as the signed-in user, as long as the `credentials` option of the REST API request has been set properly to `include`.
+
+[code,json]
+----
+const lbRequestObject = {
+    "metadata": [{"type": "LIVEBOARD"}],
+    'record_offset': 0,  // Adjust to do pagination
+    'record_size': 100000 // Adjust to do pagination (or handle in browser with table component)
+}
+----
 
 With xref:trusted-authentication.adoc[cookieless trusted authentication], there is no *browser session* but instead an *access token* is retrieved for the user and used by the SDK. The same access token for authentication can be used to make REST API requests, or a second access token can be generated for use with REST API requests.
 
@@ -136,7 +169,7 @@ The display of a visualization from a Liveboard differs from a saved Answer obje
 Setting the `include_visualization_headers` request parameter to `true` will bring back the list of all visualization details with any Liveboard response. This request requires a separate API call for each Liveboard in the V1 REST API.
 
 === Replicating the ThoughtSpot UI Liveboards or Answers page
-As mentioned before, the `/metadata/list` V1 REST API provides the same details as the internal REST API used to display the pages within the ThoughtSpot UI, making it easy to "replicate" those pages exactly within the embedding web app's own UI. The V2.0 REST API includes these details within the `metadata_headers` section of its response so it can be used for a similar purpose as well.
+As mentioned before, the `/metadata/list` V1 REST API provides the same details as the internal REST API used to display the pages within the ThoughtSpot UI, making it easy to "replicate" those pages exactly within the embedding web app's own UI. The V2.0 REST API includes these details within the `metadata_headers` section of its response so it can be used for a similar purpose as well (see see the  link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/examples/menus_and_other_navigation_components/rest_api_ui_navigation_v2.html[example on GitHub for V2.0 equivalents, target=_blank].
 
 The endpoint can only request one object type at a time: +
 
