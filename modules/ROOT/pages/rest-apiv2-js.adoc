@@ -18,26 +18,52 @@ Every REST API v2.0 endpoint uses either an HTTP GET or POST request, with or wi
 */
 let tsHost = 'https://{yourdomain}.thoughtspot.cloud';
 async function restApiCallV2(endpoint, httpVerb, apiRequestObject){
-    const publicApiUrl = 'api/rest/2.0/';
-    console.log("hitting endpoint " + endpoint + " with verb " + httpVerb + " and request:");
-    console.log(apiRequestObject);
-    const apiFullEndpoint = tsHost + "/" + publicApiUrl + endpoint;
-    return await fetch(
-        apiFullEndpoint, 
-        {
+    const tsApiVersion = '2.0';
+    const baseUrl = `${tsHost}/api/rest/${tsApiVersion}/`;  // Forward ticks allow variables in strings
+    const apiFullEndpoint = baseUrl + endpoint;
+
+    let fetchArgs = {
             method: httpVerb.toUpperCase(),
             headers: {
                 "Accept": "application/json",
                 "X-Requested-By": "ThoughtSpot",
                 "Content-Type": "application/json"
-            },
-            credentials: "include",
-            body: JSON.stringify(apiRequestObject)
-        })
-    // is there always response JSON?
-    .then(response =>  response.json())
-    .catch(error => {
-        console.error("Unable to get the" + endpoint + "response: " + error);
+                },
+            credentials: "include"
+        }
+    // Some type of request might not have a body
+    if (apiRequestObj !== null){
+        fetchArgs['body'] = JSON.stringify(apiRequestObj);
+    }
+    // With the async modifier on the function, you add return await to the fetch() call here
+    return await fetch(
+        apiFullEndpoint,
+        fetchArgs
+    ).then(response =>
+    {
+        console.log("Fetch response returned with status code " + response.status);
+        // Parse 4XX or 500 HTTP status code errors from the API 
+        if (!response.ok) {
+            console.log("HTTP response indicates an error from the API");
+            throw new Error("Received HTTP response " + response.status + "with the message " + response.statusText)
+            // Alternatively, check for specific error codes you might expect, like a 403
+            /*
+            if( response.status == 403){
+                // retrySSOProcess(); // Example action to take based on status 
+            }
+            */
+        }
+        else {
+            if( response.status === 200){
+                return response.json(); // Returns the JSON of the response 
+            }
+            else if (response.status === 204){
+                return true;  // 204 is success without any body
+            }
+        }
+    }).catch(error =>
+    {
+        console.error("Unable to get the " + endpoint + " response: " + error);
     });
 }
 ----
@@ -56,7 +82,6 @@ let apiRequestForTML = {
     }],
     "export_associated": false,
     "export_fqn": true
-
 }
 
 // Place call to export the TML for the Liveboard, to get the details of the Viz
@@ -72,7 +97,50 @@ return restApiCallV2(tmlExportEndpoint, 'POST', apiRequestForTML).then(
 
 ----
 
-Here's a function to call a specific endpoint:
+Here are some example functions wrapping specific endpoints:
+
+[source,javascript]
+----
+/*
+* Wrapper function for calling /metadata/search with any request
+* Can be used to generate UI components like menus or drop-downs of the content a user has access to
+*/
+async function callMetadataSearchApi(searchRequestObject){
+    let endpoint = 'metadata/search';
+    let verb = 'POST';
+
+    return await restApiCallV2(endpoint, verb, searchRequestObject).then(
+        response => {
+            // Additional logging to the console
+            console.log("API response:", response);
+            console.log(response);
+            return response;
+        }
+    );
+}
+
+// Copy the request directly from the REST API Playground, substituting in any variables you need
+const apiRequestObject = {
+    "metadata": [
+        {
+            "name_pattern": "%QA%",
+            "type": "LIVEBOARD"
+        },
+        {
+            "name_pattern": "%QA%",
+            "type": "ANSWER"
+        }
+        ],
+    'record_offset': 0,
+    'record_size': 100000 
+}
+
+        
+let results = await callMetadataSearchApi(apiRequestObject);
+console.log("Final results from the callMetadataSearchApi function: ");
+console.log(results);
+}
+----
 
 [source,javascript]
 ----
