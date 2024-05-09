@@ -8,51 +8,7 @@
 
 OpenID Connect (OIDC) is an authentication protocol that adds an identity layer to the OAuth 2.0 protocol. OIDC allows clients to verify a user’s identity based on the authentication performed by an authorization server. Using the OIDC authentication framework, end users can access multiple applications, websites using their single sign-on credentials.
 
-== OIDC concepts and terms
-
-The OIDC authentication involves several entities and concepts.
-
-Relying party::
-Refers to a client application that supports OAuth 2.0 and relies on an OpenID provider to verify the identity of a user. In this article, the relying party refers to a ThoughtSpot application instance. 
-
-OpenID provider::
-The IdP that supports the OAuth2.0 and OIDC protocols. The OpenID provider is an OAuth 2.0 authorization server that authenticates and verifies a user's identity. When a relying party sends an authentication request, the OpenID provider returns the authorization code and provides user information through identity (ID) tokens.   
-
-End user::
-The application user who requests access to a resource.  
-
-Tokens::
-In OIDC authentication, ID and access tokens are used to verify a user's identity before providing access to an application resource. 
- 
-ID token;;
-The ID token, also known as a JSON web token (JWT), is a security token that allows the client to verify the identity of the user. An ID token consists of claims that provide user information. The OpenID provider issues an ID token when ThoughtSpot sends the authorization code received from the OpenID authorization endpoint. 
-
-Access token;;
-The access token is issued when a relying party sends the authorization code received from the authorization endpoint of the OpenID provider. It allows a client application to validate claims and grant access to the resources requested by a user.
-
-Refresh token;;
-A refresh token is a string that a client application can use to obtain a new access token. Refresh tokens renew user sessions with new access tokens without requiring the user to re-authenticate.
-
-Claims::
-A claim provides user information, such as the first name, last name, username, and so on. Claims consist of user and authentication attributes that define the scope of a user profile, based on which ThoughtSpot can determine the access permissions for a given user. 
-
-Scope::
-A scope is a logical group of claims. The relying party sends the `scope` attribute in the authentication request to include claims in the ID token. For example, when ThoughtSpot sends an authentication request with the `scope` attribute set as `profile`, the ID token will include the claims that constitute a user's profile.
-
-Authorization endpoint::
-The OpenID provider endpoint that authenticates a user and grants an authorization code to the relying party.
-
-Token endpoint::
-The OpenID provider endpoint that returns an ID and access token in exchange for an authorization code. ThoughtSpot sends the authorization code obtained from the authorization server to the token endpoint to obtain an ID and access token.
-
-Userinfo endpoint::
-The OpenID provider endpoint that returns claims or user information to a client application with a valid access token.
-
-Issuer URL::
-The Issuer URL allows a client application to discover details such as the OpenID endpoints, supported scopes and claims, and public-keys used in the tokens. ThoughtSpot can retrieve these details dynamically from the issuer URL using the `/.well-known/openid-configuration` suffix.
-
-Redirect URI::
-The redirection URI is a callback endpoint to which the OpenID provider must send the authentication response. 
+To get familiar with the common OIDC terminologies, see the following page link:https://docs.thoughtspot.com/cloud/latest/oidc-configure[OIDC concepts and terms, window=_blank].
 
 
 == OIDC configuration steps
@@ -66,7 +22,9 @@ The OIDC configuration procedure includes the following steps:
 * xref:configure-oidc.adoc#embedConfig[Enable OIDC authentication in the Visual Embed SDK] (For embedded ThoughtSpot instances only)
  
 
-[#clientRegistration] 
+
+////
+[#clientRegistration]
 ==== Register ThoughtSpot and set the redirect URI
 
 To register the ThoughtSpot as a client in the OpenID provider server:
@@ -179,6 +137,8 @@ Email address of the user. It maps to the `mail` attribute in the user profile o
 * `sub`
 +
 The unique ID issued for the user at the OpenID provider. Maps to `oktauserid` attribute on ThoughtSpot.
+////
+
 
 
 [#embedConfig]
@@ -211,9 +171,31 @@ The OIDC authentication workflow involves the following steps:
 . The SDK validates the ID token and authenticates the user.
 . If the authentication is successful, the web browser redirects the user to the requested page.
 
+== Org mapping on OIDC with IAMv1
+With Org mapping, the IdP will have the ability to assign users to specific Orgs when users login via OIDC authentication mechanism. IdP will have to send a list of the Org names and the user will be assigned to these Orgs.
+This will be applicable for new users ( if OIDC `autoCreateUser` is enabled ) and existing users. By default the Org mapping is disabled on the cluster. To enable it follow the steps listed below:
+
+. Create an OIDC connection on the ThoughtSpot instance.
+. Configure the OIDC claim on IdP side, as part of ID Token this claim will be sent.
+
++
+////
+[.bordered]
+image::./images/OIDC_IAMv1.png[Org mapping on OIDC IAMv1]
+////
+
+. Configure the same attribute on ThoughtSpot using the tscli command as follows:
+`tscli --adv service add-javaopt tomcat.tomcat D orion.oidcConfiguration.oidcOrgsAttributeKey <key_name>`
+
+[NOTE]
+====
+The Orgs should be enabled on the cluster for which this feature is enabled and marked as not hidden `orgsHidden != true`
+====
+
+
+
 
 == Group synchronization
-
 The group synchronization feature reads the Group claim from the ID token provided by the OpenID provider and creates groups in ThoughtSpot. To enable group synchronization on ThoughtSpot, contact ThoughtSpot Support.
 
 [NOTE]
@@ -225,3 +207,4 @@ If a group is deleted from the OpenID provider server, the corresponding group i
 
 * link:https://developer.okta.com/docs/concepts/oauth-openid/[Okta documentation]
 * link:https://openid.net/connect/faq/[OpenID Connect documentation]
+
