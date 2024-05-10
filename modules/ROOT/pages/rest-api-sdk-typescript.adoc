@@ -8,7 +8,7 @@
 
 The REST API SDK library for TypeScript is available on the link:https://www.npmjs.com/package/@thoughtspot/rest-api-sdk[NPM site, window=_blank].
 
-== SDK version
+== Supported versions
 
 Note the version recommendations for your ThoughtSpot clusters:
 
@@ -28,127 +28,122 @@ ThoughtSpot Software: 10.0.0.sw
 ThoughtSpot Software: 10.0.0.sw
 |====
 
-If your cluster is upgraded to a later version, please browse through the xref:rest-apiv2-changelog.adoc[API changelog] and note the breaking changes and deprecated features.
+For information about new features, breaking changes, and deprecated parameters, see xref:rest-apiv2-changelog.adoc[API changelog].
 
 == Get started
 
-Before you begin:
+Before you begin, check the following:
 
-* Make sure you have access to a ThoughtSpot instance and the required credentials to access ThoughtSpot objects and resources.
-* Node.js version 18 or later is installed on your machine +
-You can also use the ThoughtSpot React demo application to interact with a ThoughtSpot instance using the TypeScript SDK.
+* Node.js version 18 or later is installed.
+* Access to a ThoughtSpot instance. Make sure you have the following information:
+** User credentials
+** URL of the ThoughtSpot instance
+** Secret key (Required for trusted authentication only)
+* User privileges and object permissions to view, edit, or create ThoughtSpot objects and resources.
 
 === Setup and usage
+
+Complete the following steps:
 
 . Install the SDK in your local directory.
 +
 ----
 npm install @thoughtspot/rest-api-sdk --save
 ----
-
-////
-. Build your app locally.
-
+. Import the SDK.
 +
-----
-npm run build
-----
-
-. Open the `src/App.tsx` file and update the following constants with your ThoughtSpot server information:
-+
-* `BASE_URL` +
-The URL of your ThoughtSpot instance.
-* `USERNAME` +
-Username of your ThoughtSpot account.
-* `PASSWORD` +
-Password of your ThoughtSpot account.
-
-. Start the application:
-+
-----
-npm run start
-----
-////
-
-=== Authentication
-
-After you install the SDK, set up authentication and make an API request.
-
-The following code snippet fetches a bearer token using `username` and `password`:
-
 [source,TypeScript]
 ----
 import {
-    ThoughtSpotRestApi,
     createBearerAuthenticationConfig,
-} from "@thoughtspot/rest-api-sdk";
-
-let client: ThoughtSpotRestApi;
-
-//create a client with BearerAuth using your credentials
-const createClientBearerAuthWithCredential = (host: string) => {
-    const config = createBearerAuthenticationConfig(host, {
-        username: "YOUR_USERNAME",
-        password: "YOUR_PASSWORD",
-    });
-    const tsRestApiClient = new ThoughtSpotRestApi(config);
-    return tsRestApiClient;
-};
-
-export const getClientBearerAuthWithCredential = (host: string) => {
-    if (!client) {
-        client = createClientBearerAuthWithCredential(host);
-    }
-    return client;
-};
+    ThoughtSpotRestApi,
+} from '@thoughtspot/rest-api-sdk';
 ----
 
-If you want to obtain a token for another user or sign in a user via Trusted authentication method, use  `secret_key` instead of `password`. The secret key is generated on ThoughtSpot if Trusted authentication is enabled on your ThoughtSpot instance. For more information, see xref:trusted-auth-secret-key.adoc[Secret key management].
+. Create a client session using one of the following options:
 
+*  Get an authentication token via `getAuthToken` method.
++
 [source,TypeScript]
 ----
-import {
-    ThoughtSpotRestApi,
-    createBearerAuthenticationConfig,
-} from "@thoughtspot/rest-api-sdk";
+const config = createBearerAuthenticationConfig("CLUSTER_SERVER_URL", getAuthToken);
+const tsRestApiClient = new ThoughtSpotRestApi(config);
 
-let client: ThoughtSpotRestApi;
+const getAuthToken = async () => {
+    returns "BEARER TOKEN";
+}
+----
 
-// create a client with BearerAuth for Trusted authentication implementation
-const createClientBearerAuthWithCredential = (host: string) => {
-    const config = createBearerAuthenticationConfig(host, {
-        username: "YOUR_USERNAME",
+* To obtain a token on behalf of another user, use `secret_key` instead of `password`. The secret key is generated on ThoughtSpot if Trusted authentication is enabled on your ThoughtSpot instance. For more information, see xref:trusted-auth-secret-key.adoc[Secret key management].
++
+[source,TypeScript]
+----
+const config = createBearerAuthenticationConfig("CLUSTER_SERVER_URL", {
+    username: "USERNAME",
+    secret_key: "SECRET_KEY",
+});
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+----
++
+If the user account doesn't exist in ThoughtSpot, you can provision a user just in time and assign privileges.
++
+[source,TypeScript]
+----
+const config = createBearerAuthenticationConfig();
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+tsRestApiClient.getFullAccessToken(
+    // GetFullAccessTokenRequest
+    {
+        username: "USERNAME",
         secret_key: "SECRET_KEY",
-    });
-    const tsRestApiClient = new ThoughtSpotRestApi(config);
-    return tsRestApiClient;
-};
-
-export const getClientBearerAuthWithCredential = (host: string) => {
-    if (!client) {
-        client = createClientBearerAuthWithCredential(host);
+        email: "USER@example.com",
+        display_name: "display_name_example",
+        auto_create: true,
+        org_id: 0,
+        group_identifiers: [
+            "GROUP-A", "GROUP-B",
+        ],
     }
-    return client;
+).then((data: any) => {
+    console.log('API called successfully. Returned data: ' + data);
+}).catch((error: any) => console.error(error));
+----
+
+* Use basic authentication with `username` and `password`:
++
+[source,TypeScript]
+----
+const config = createBearerAuthenticationConfig("CLUSTER_SERVER_URL", {
+        username: "YOUR_USERNAME",
+        password: "PASSWORD",
+    });
+const tsRestApiClient = new ThoughtSpotRestApi(config);
 };
 ----
 
-=== Usage examples
+* If a session cookie is already set via either Visual Embed SDK or login method, you can send requests without authentication.
++
+[source,TypeScript]
+----
+ const config = createConfiguration({
+    baseServer: new ServerConfiguration("CLUSTER_SERVER_URL", {}),
+  });
+  const tsRestApiClient = new ThoughtSpotRestApi(config);
+----
 
-To test your implementation:
+. Send a test request.
 
-. Try creating a user as shown in the following example. You can use the REST API v2  playground to view the supported parameters, and copy parameters and values from the code panel.
-
+*  Try creating a user as shown in the following example. To view and copy the supported parameters and values, use the +++<a href="{{navprefix}}/restV2-playground">REST API v2 Playground</a>+++ or the link:https://codesandbox.io/p/sandbox/ts-sdk-demo-s3hp8z[code sandbox of REST API TypeScript SDK, window=_blank].
 +
 [source,TypeScript]
 ----
 import {
     createBearerAuthenticationConfig,
     ThoughtSpotRestApi,
-    CreateUserRequest
 } from '@thoughtspot/rest-api-sdk';
 
-const apiInstance = getClientBearerAuthWithCredential(configuration);
-apiInstance.createUser(
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+tsRestApiClient.createUser(
     // CreateUserRequest
     {
         name: "UserA",
@@ -169,19 +164,18 @@ apiInstance.createUser(
 }).catch((error: any) => console.error(error));
 ----
 
-. Try a GET call, for example, get a list of users via `searchUsers`. To get specific details, you can specify optional parameters such as `visibility`, `account_type`, `account_status`, `group_identifiers` and so on. To get the details of a user, specify the user name or GUID in the `user_identifier`.
+. Try a GET call, for example, get a list of users via `searchUsers`. To get specific details, you can specify optional parameters such as `visibility`, `account_type`, `account_status`, `group_identifiers`, and so on. To get the details of a user, specify the name or GUID of the user as `user_identifier`.
 +
 [source,TypeScript]
 ----
 import {
     createBearerAuthenticationConfig,
-    UsersApi,
-    SearchUsersRequest
+    ThoughtSpotRestApi,
 } from '@thoughtspot/rest-api-sdk';
 
-const apiInstance = getClientBearerAuthWithTokenApi(configuration);
-apiInstance.searchUsers(
-    // SearchUsersRequest (optional)
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+tsRestApiClient.searchUsers(
+    // SearchUsersRequest (optional parameters)
     {
         user_identifier: "UserA",
     }
@@ -190,13 +184,8 @@ apiInstance.searchUsers(
 }).catch((error: any) => console.error(error));
 ----
 
-[NOTE]
-====
-If you are using Visual Embed SDK and trusted authentication method, a cookie is set after a user authenticates and logs in successfully. In such cases, you can use  `getClientWithouthAuth`.
-====
-
 === Error handling
-The SDK raises errors when the HTTP response code indicates an error. You can use these error codes to to handle or log errors as shown in the following example:
+The SDK raises errors when the HTTP response code indicates an error. You can use these error codes to handle or log errors as shown in the following example:
 
 [source,JavaScript]
 ----
@@ -227,7 +216,7 @@ const test = async () => {
 ----
 
 
-== SDK documentation
+== SDK Reference
 
 For a complete list of methods to use for API requests, see the following resources:
 
@@ -248,7 +237,7 @@ For a complete list of methods to use for API requests, see the following resour
 
 .8+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/UsersApi.md[Users, window=_blank]
 
-| `changeUserPassword` | `POST /api/rest/2.0/users/change-password`
+|`changeUserPassword` | `POST /api/rest/2.0/users/change-password`
 |`createUser` |	`POST /api/rest/2.0/users/create`
 |`deleteUser` |	`POST /api/rest/2.0/users/{user_identifier}/delete`
 |`forceLogoutUsers` | `POST /api/rest/2.0/users/force-logout`
