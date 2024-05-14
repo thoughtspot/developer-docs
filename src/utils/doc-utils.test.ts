@@ -12,7 +12,7 @@ describe('test cases for doc-utils', () => {
             "href": "?pageid=whats-new"
         },
         {
-            "name": "ThoughtSpot Everywhere",
+            "name": "ThoughtSpot Embedded",
             "href": "?pageid=embed-analytics",
             "children": [
                 {
@@ -286,7 +286,7 @@ describe('test cases for doc-utils', () => {
 
     it('should get breadcrumb path', () => {
         const breadcrumbPath = getBreadcrumsPath(breadCrumbData, pageId);
-        expect(breadcrumbPath).toStrictEqual([{ "href": "?pageid=embed-analytics", "name": "ThoughtSpot Everywhere" }, { "href": null, "name": "ThoughtSpot Developer portal" }]);
+        expect(breadcrumbPath).toStrictEqual([{ "href": "?pageid=embed-analytics", "name": "ThoughtSpot Embedded" }, { "href": null, "name": "ThoughtSpot Developer portal" }]);
     })
 
     it('should pass through html correctly', () => {

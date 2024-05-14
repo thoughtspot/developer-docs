@@ -86,7 +86,7 @@ console.log(getPath(config.DOC_REPO_NAME));
 module.exports = {
     pathPrefix: getPath(config.DOC_REPO_NAME),
     siteMetadata: {
-        title: 'tseverywhere-docs',
+        title: 'tsembedded-docs',
         url: config.SITE_URL,
         image: './images/favicon.svg',
     },
@@ -168,7 +168,7 @@ module.exports = {
         {
             resolve: 'gatsby-plugin-manifest',
             options: {
-                name: 'ThoughtSpot Everywhere Documentation',
+                name: 'ThoughtSpot Embedded Documentation',
                 short_name: 'Documentation',
                 icon: `${__dirname}/src/assets/icons/favicon.png`,
             },
