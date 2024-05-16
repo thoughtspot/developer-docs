@@ -1,0 +1,349 @@
+= TypeScript SDK
+:toc: true
+:toclevels: 3
+
+:page-title: REST API SDK
+:page-pageid: rest-api-sdk-typescript
+:page-description: ThoughtSpot provides REST API SDK with TypeScript client libraries.
+
+The REST API SDK library for TypeScript is available on the link:https://www.npmjs.com/package/@thoughtspot/rest-api-sdk[NPM site, window=_blank].
+
+== Supported versions
+
+Note the version recommendations for your ThoughtSpot clusters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|====
+|SDK version|Minimum required version on ThoughtSpot cluster
+|v2.0.2 a| ThoughtSpot Cloud: 9.6.0.cl +
+ThoughtSpot Software: 9.8.0.sw
+|v2.1.0| ThoughtSpot Cloud: 9.7.0.cl +
+ThoughtSpot Software: 9.8.0.sw
+|v2.2.0| ThoughtSpot Cloud: 9.8.0.cl +
+ThoughtSpot Software: 9.8.0.sw
+|v2.4.0| ThoughtSpot Cloud: 9.10.0.cl +
+ThoughtSpot Software: 10.0.0.sw
+|v2.4.1| ThoughtSpot Cloud: 9.10.5.cl +
+ThoughtSpot Software: 10.0.0.sw
+|====
+
+For information about new features, breaking changes, and deprecated parameters, see xref:rest-apiv2-changelog.adoc[API changelog].
+
+== Get started
+
+Before you begin, check the following:
+
+* Node.js version 18 or later is installed.
+* Access to a ThoughtSpot instance. Make sure you have the following information:
+** User credentials
+** URL of the ThoughtSpot instance
+** Secret key (Required for trusted authentication only)
+* User privileges and object permissions to view, edit, or create ThoughtSpot objects and resources.
+
+=== Setup and usage
+
+Complete the following steps:
+
+. Install the SDK in your local directory.
++
+----
+npm install @thoughtspot/rest-api-sdk --save
+----
+. Import the SDK.
++
+[source,TypeScript]
+----
+import {
+    createBearerAuthenticationConfig,
+    ThoughtSpotRestApi,
+} from '@thoughtspot/rest-api-sdk';
+----
+
+. Create a client session using one of the following options:
+
+*  Get an authentication token via `getAuthToken` method.
++
+[source,TypeScript]
+----
+const config = createBearerAuthenticationConfig("CLUSTER_SERVER_URL", getAuthToken);
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+
+const getAuthToken = async () => {
+    returns "BEARER TOKEN";
+}
+----
+
+* To obtain a token on behalf of another user, use `secret_key` instead of `password`. The secret key is generated on ThoughtSpot if Trusted authentication is enabled on your ThoughtSpot instance. For more information, see xref:trusted-auth-secret-key.adoc[Secret key management].
++
+[source,TypeScript]
+----
+const config = createBearerAuthenticationConfig("CLUSTER_SERVER_URL", {
+    username: "USERNAME",
+    secret_key: "SECRET_KEY",
+});
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+----
++
+If the user account doesn't exist in ThoughtSpot, you can provision a user just in time and assign privileges.
++
+[source,TypeScript]
+----
+const config = createBearerAuthenticationConfig();
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+tsRestApiClient.getFullAccessToken(
+    // GetFullAccessTokenRequest
+    {
+        username: "USERNAME",
+        secret_key: "SECRET_KEY",
+        email: "USER@example.com",
+        display_name: "display_name_example",
+        auto_create: true,
+        org_id: 0,
+        group_identifiers: [
+            "GROUP-A", "GROUP-B",
+        ],
+    }
+).then((data: any) => {
+    console.log('API called successfully. Returned data: ' + data);
+}).catch((error: any) => console.error(error));
+----
+
+* Use basic authentication with `username` and `password`:
++
+[source,TypeScript]
+----
+const config = createBearerAuthenticationConfig("CLUSTER_SERVER_URL", {
+        username: "YOUR_USERNAME",
+        password: "PASSWORD",
+    });
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+};
+----
+
+* If a session cookie is already set via either Visual Embed SDK or login method, you can send requests without authentication.
++
+[source,TypeScript]
+----
+ const config = createConfiguration({
+    baseServer: new ServerConfiguration("CLUSTER_SERVER_URL", {}),
+  });
+  const tsRestApiClient = new ThoughtSpotRestApi(config);
+----
+
+. Send a test request.
+
+*  Try creating a user as shown in the following example. To view and copy the supported parameters and values, use the +++<a href="{{navprefix}}/restV2-playground">REST API v2 Playground</a>+++.
++
+[source,TypeScript]
+----
+import {
+    createBearerAuthenticationConfig,
+    ThoughtSpotRestApi,
+} from '@thoughtspot/rest-api-sdk';
+
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+tsRestApiClient.createUser(
+    // CreateUserRequest
+    {
+        name: "UserA",
+        display_name: "User A",
+        password: "123Guest!",
+        email: "UserA@example.com",
+        account_type: "LOCAL_USER",
+        account_status: "ACTIVE",
+        visibility: "SHARABLE",
+        notify_on_share: true,
+        show_onboarding_experience: true,
+        onboarding_experience_completed: false,
+        preferred_locale: "en-CA",
+        trigger_welcome_email: true,
+    }
+).then((data: any) => {
+    console.log('API called successfully. Returned data: ' + data);
+}).catch((error: any) => console.error(error));
+----
+
+* Try a GET call, for example, get a list of users via `searchUsers`. To get specific details, you can specify optional parameters such as `visibility`, `account_type`, `account_status`, `group_identifiers`, and so on. To get the details of a user, specify the name or GUID of the user as `user_identifier`.
++
+[source,TypeScript]
+----
+import {
+    createBearerAuthenticationConfig,
+    ThoughtSpotRestApi,
+} from '@thoughtspot/rest-api-sdk';
+
+const tsRestApiClient = new ThoughtSpotRestApi(config);
+tsRestApiClient.searchUsers(
+    // SearchUsersRequest (optional parameters)
+    {
+        user_identifier: "UserA",
+    }
+).then((data: any) => {
+    console.log('API called successfully. Returned data: ' + data);
+}).catch((error: any) => console.error(error));
+----
+
+=== Error handling
+The SDK raises errors when the HTTP response code indicates an error. You can use these error codes to handle or log errors as shown in the following example:
+
+[source,JavaScript]
+----
+const test = async () => {
+    const client = getClientWithoutAuth(HOST);
+    try {
+        const data = await client.searchUsers({});
+        const names = data.reduce((names, user) => {
+            return names + " " + user.name;
+        }, "");
+        console.log(names);
+    } catch (e) {
+        switch (e.code) {
+            case 401: {
+                alert("Unauthorized error");
+                break;
+            }
+            case 400: {
+                alert("Incorrect input");
+                break;
+            }
+            default: {
+                alert("Server error " + e.code);
+            }
+        }
+    }
+};
+----
+
+
+== SDK Reference
+
+For a complete list of methods to use for API requests, see the following resources:
+
+[width="100%" cols="4,4,6"]
+[options='header']
+|====
+|Category| Methods| HTTP Endpoints
+
+.7+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/AuthenticationApi.md[Authentication, window=_blank]
+
+|`getCurrentUserInfo` |	`GET /api/rest/2.0/auth/session/user`
+|`getCurrentUserToken` | `GET /api/rest/2.0/auth/session/token`
+|`getFullAccessToken` |	`POST /api/rest/2.0/auth/token/full`
+|`getObjectAccessToken` | `POST /api/rest/2.0/auth/token/object`
+|`login` | `POST /api/rest/2.0/auth/session/login`
+|`logout` | `POST /api/rest/2.0/auth/session/logout`
+|`revokeToken` | `POST /api/rest/2.0/auth/token/revoke`
+
+.8+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/UsersApi.md[Users, window=_blank]
+
+|`changeUserPassword` | `POST /api/rest/2.0/users/change-password`
+|`createUser` |	`POST /api/rest/2.0/users/create`
+|`deleteUser` |	`POST /api/rest/2.0/users/{user_identifier}/delete`
+|`forceLogoutUsers` | `POST /api/rest/2.0/users/force-logout`
+| `importUsers` | `POST /api/rest/2.0/users/import`
+|`resetUserPassword`| `POST /api/rest/2.0/users/reset-password`
+| `searchUsers` | `POST /api/rest/2.0/users/search`
+| `updateUser` | `POST /api/rest/2.0/users/{user_identifier}/update`
+
+.4+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/SystemApi.md[System, window=_blank]
+| `getSystemConfig` | `GET /api/rest/2.0/system/config`
+| `getSystemInformation` | `GET /api/rest/2.0/system`
+| `getSystemOverrideInfo` |	`GET /api/rest/2.0/system/config-overrides`
+| `updateSystemConfig` | `POST /api/rest/2.0/system/config-update`
+
+.4+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/OrgsApi.md[Orgs, window=_blank]
+| `createOrg` |	`POST /api/rest/2.0/orgs/create`
+| `deleteOrg` | `POST /api/rest/2.0/orgs/{org_identifier}/delete`
+| `searchOrgs` | `POST /api/rest/2.0/orgs/search`
+| `updateOrg` |	`POST /api/rest/2.0/orgs/{org_identifier}/update`
+
+.6+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/TagsApi.md[Tags, window=_blank]
+
+| `assignTag` |	`POST /api/rest/2.0/tags/assign`
+| `createTag` |	`POST /api/rest/2.0/tags/create`
+| `deleteTag` |	`POST /api/rest/2.0/tags/{tag_identifier}/delete`
+| `searchTags` | `POST /api/rest/2.0/tags/search`
+| `unassignTag` | `POST /api/rest/2.0/tags/unassign`
+| `updateTag` |	`POST /api/rest/2.0/tags/{tag_identifier}/update`
+
+.5+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/GroupsApi.md[Groups, window=_blank]
+
+| `createUserGroup` | `POST /api/rest/2.0/groups/create`
+| `deleteUserGroup` | `POST /api/rest/2.0/groups/{group_identifier}/delete`
+| `importUserGroups` | `POST /api/rest/2.0/groups/import`
+| `searchUserGroups` | `POST /api/rest/2.0/groups/search`
+| `updateUserGroup` | `POST /api/rest/2.0/groups/{group_identifier}/update`
+
+.6+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/MetadataApi.md[Metadata, window=_blank]
+| `deleteMetadata` | `POST /api/rest/2.0/metadata/delete`
+| `exportMetadataTML` |	`POST /api/rest/2.0/metadata/tml/export`
+| `fetchAnswerSqlQuery` | `POST /api/rest/2.0/metadata/answer/sql`
+| `fetchLiveboardSqlQuery` | `POST /api/rest/2.0/metadata/liveboard/sql`
+| `importMetadataTML` |	`POST /api/rest/2.0/metadata/tml/import`
+| `searchMetadata` |	`POST /api/rest/2.0/metadata/search`
+
+.2+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/ReportsApi.md[Reports, window=_blank]
+| `exportAnswerReport` | `POST /api/rest/2.0/report/answer`
+| `exportLiveboardReport` |	`POST /api/rest/2.0/report/liveboard`
+
+.4+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/SecurityApi.md[Security, window=_blank]
+
+| `assignChangeAuthor` | `POST /api/rest/2.0/security/metadata/assign`
+| `fetchPermissionsOfPrincipals` | `POST /api/rest/2.0/security/principals/fetch-permissions`
+| `fetchPermissionsOnMetadata` | `POST /api/rest/2.0/security/metadata/fetch-permissions`
+| `shareMetadata` |	`POST /api/rest/2.0/security/metadata/share`
+
+.3+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/DataApi.md[Data, window=_blank]
+| `fetchAnswerData` | `POST /api/rest/2.0/metadata/answer/data`
+| `fetchLiveboardData` | `POST /api/rest/2.0/metadata/liveboard/data`
+| `searchData` | `POST /api/rest/2.0/searchdata`
+
+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/LogApi.md[Log, window=_blank]
+|`fetchLogs` | `POST /api/rest/2.0/logs/fetch`
+.9+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/VersionControlApi.md[Version control, window=_blank]
+
+| `commitBranch` | `POST /api/rest/2.0/vcs/git/branches/commit`
+| `createConfig` | `POST /api/rest/2.0/vcs/git/config/create`
+| `deleteConfig` | `POST /api/rest/2.0/vcs/git/config/delete`
+| `deployCommit` | `POST /api/rest/2.0/vcs/git/commits/deploy`
+| `revertCommit` | `POST /api/rest/2.0/vcs/git/commits/{commit_id}/revert`
+| `searchCommits` |	`POST /api/rest/2.0/vcs/git/commits/search`
+| `searchConfig` | `POST /api/rest/2.0/vcs/git/config/search`
+| `updateConfig` | `POST /api/rest/2.0/vcs/git/config/update`
+| `validateMerge` |	`POST /api/rest/2.0/vcs/git/branches/validate`
+
+.4+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/ConnectionsApi.md[Connections, window=_blank]
+
+| `createConnection` | `POST /api/rest/2.0/connection/create`
+| `deleteConnection` | `POST /api/rest/2.0/connection/delete`
+| `searchConnection` | `POST /api/rest/2.0/connection/search`
+| `updateConnection` | `POST /api/rest/2.0/connection/update`
+
+.4+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/CustomActionApi.md[Custom actions, window=_blank]
+
+| `createCustomAction` | `POST /api/rest/2.0/customization/custom-actions`
+| `deleteCustomAction` | `POST /api/rest/2.0/customization/custom-actions/{custom_action_identifier}/delete`
+| `searchCustomActions` | `POST /api/rest/2.0/customization/custom-actions/search`
+| `updateCustomAction` | `POST /api/rest/2.0/customization/custom-actions/{custom_action_identifier}/update`
+
+.4+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/SchedulesApi.md[Schedules, window=_blank]
+| `createSchedule` | `POST /api/rest/2.0/schedules/create`
+| `deleteSchedule` | `POST /api/rest/2.0/schedules/{schedule_identifier}/delete`
+| `searchSchedules` | `POST /api/rest/2.0/schedules/search`
+| `updateSchedule` | `POST /api/rest/2.0/schedules/{schedule_identifier}/update`
+
+.4+| link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/RolesApi.md[Roles, window=_blank]
+
+| `createRole` | `POST /api/rest/2.0/roles/create`
+| `deleteRole` | `POST /api/rest/2.0/roles/{role_identifier}/delete`
+| `searchRoles` | `POST /api/rest/2.0/roles/search`
+| `updateRole` | `POST /api/rest/2.0/roles/{role_identifier}/update`
+
+.5+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/typescript/DBTApi.md[DBT, window=_blank]
+| `dbtConnection` |	`POST /api/rest/2.0/dbt/dbt-connection`
+| `dbtSearch` |	`POST /api/rest/2.0/dbt/search`
+| `generateSyncTml` | `POST /api/rest/2.0/dbt/generate-sync-tml`
+| `generateTml` | `POST /api/rest/2.0/dbt/generate-tml`
+| `updateDbtConnection` | `POST /api/rest/2.0/dbt/{dbt_connection_identifier}`
+|====
