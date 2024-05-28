@@ -1,6 +1,6 @@
 = SAML SSO authentication
 :toc: true
-:toclevels: 1
+:toclevels: 3
 
 :page-title: SAML SSO Authentication
 :page-pageid: saml-sso
@@ -10,8 +10,11 @@ ThoughtSpot supports the Single Sign-On (SSO) authentication method with the Sec
 
 == About SAML authentication
 
-SAML is an XML standard that allows secure exchange of user authentication and authorization data between trusted partners. It enables the following entities to exchange identity, authentication, and authorization information:
+SAML is an XML standard that allows secure exchange of user authentication and authorization data between trusted partners. It enables the following entities to exchange identity, authentication, and authorization information,
+For detailed information on SAML identities, see the following page link:https://docs.thoughtspot.com/cloud/9.10.0.cl/authentication-integration#_saml_entities["SAML entities" option, window=_blank].
 
+
+////
 === SAML entities
 
 The SAML SSO authentication involves several entities.
@@ -27,11 +30,16 @@ The provider of a business function or application service; for example, Thought
 * *Federated user*
 +
 A user whose identity information is managed by the IdP. The federated users have SSO credentials and authenticate to the IdP to access various application services.
+////
 
-=== SAML assertion and attributes
 
-Both SP-initiated and IdP-initiated authentication workflows rely on assertions that are exchanged between the SAML endpoints through a web browser.
+//=== SAML assertion and attributes
 
+Both SP-initiated and IdP-initiated authentication workflows rely on assertions that are exchanged between the SAML endpoints through a web browser. For detailed information on these, see the following page
+link:https://docs.thoughtspot.com/cloud/9.10.0.cl/authentication-integration#saml-assertion["SAML assertion and attributes" option, window=_blank].
+
+
+////
 Some of the most commonly used elements are:
 
 * *SAML assertion*
@@ -54,6 +62,8 @@ A unique service name to identify the client application from which the SSO logi
 * *SAML attributes*
 +
 The attributes associated with the user; for example, username and email address.
+////
+
 
 === SSO workflows
 
@@ -108,7 +118,8 @@ Make a note of all of the redirects within the SAML workflow. Each server must b
 
 To configure SAML SSO authentication on the ThoughtSpot embedded instance, complete the following steps:
 
-* xref:configure-saml.adoc#admin-portal[Enable SAML authentication on ThoughtSpot]
+* xref:configure-saml.adoc#admin-portal[Enable SAML authentication on ThoughtSpot with IAMv1]
+* xref:configure-saml.adoc#IAMv2[Enable SAML authentication on ThoughtSpot with IAMv2] (Requires assistance from ThoughtSpot Support)
 * xref:configure-saml.adoc#idp-config[Configure the IdP server for SAML authentication]
 * xref:configure-saml.adoc#auth-config-sdk[Enable SSO authentication in Visual Embed SDK]
 * xref:configure-saml.adoc#saml-redirect[Add SAML redirect domain to the allowed list in ThoughtSpot]
@@ -116,9 +127,43 @@ To configure SAML SSO authentication on the ThoughtSpot embedded instance, compl
 Before you begin, make sure you have the admin user privileges to configure SAML support on ThoughtSpot.
 
 [#admin-portal]
-=== Enable SAML authentication on ThoughtSpot
-You need admin privileges to enable SAML SSO authentication.
+=== Enable SAML authentication on ThoughtSpot with IAMv1
+[NOTE]
+====
+You need admin privileges to enable SAML authentication on ThoughtSpot.
+====
+The following attributes need to be configured on your ThoughtSpot instance:
 
+ThoughtSpot Service Address::
+A fully qualified and resolvable domain name for the ThoughtSpot service.
+This must be in the format <cluster-name>.thoughtspot.cloud.
+
+Port::
+Enter 443 in this box.
+This is the port of the server where your ThoughtSpot instance is running.
+
+Unique Service Name::
+The unique key used by your Identity Provider to identify the client.
+For example, urn:thoughtspot:callosum:saml, or https://ssoappname.microsoft.com/ab12c3de4.
+
+Skew Time in Seconds::
+The allowed skew time, after which the authentication response is rejected and sent back from the IDP. 86400 is a popular choice.
+The default is 3600.
+
+
+Protocol::
+The connection protocol for ThoughtSpot.
+Use https.
+
+IDP Metadata XML File::
+The absolute path to your Identity Provider’s metadata file. This file is provided by your IDP. For example, idp-meta.xml.
+
+
+For detailed information on enabling SAML
+authentication on your ThoughtSpot instance with IAMv1, see this page link:https://docs.thoughtspot.com/cloud/9.10.0.cl/authentication-integration[Enable SAML authentication]
+
+
+////
 . Configure the ThoughtSpot application instance on your IdP server.
 . Log in to your ThoughtSpot application instance.
 . From the top navigation bar, click the **Admin** tab.
@@ -155,6 +200,70 @@ For additional authorization settings beyond user creation and group assignment,
 
 +
 . Click *Save*.
+////
+
+[#IAMv2]
+=== Enable SAML authentication on ThoughtSpot with IAMv2
+[NOTE]
+====
+You need admin privileges to enable SAML authentication with IAMv2 on ThoughtSpot.
+====
+
+With link:https://docs.thoughtspot.com/cloud/latest/okta-iam["IAMv2", window=_blank], ThoughtSpot powers its internal authentication with Okta.
+IAMv2 involves several external improvements to authentication, including security enhancements.
+
+To link:https://docs.thoughtspot.com/cloud/9.10.0.cl/saml-okta#_enable_saml_authentication[enable SAML authentication using IAMv2, window_=blank], the *SAML2 IDP* tile needs to be selected from the IdP options in the *Admin* panel.
+The following IdP details are to be provided:
+
+Connection name::
+Provide a name for the configuration of the connection to your identity provider, helping to distinguish and manage multiple connections.
+This appears as the connection name on the Admin Console.
+
+IDP provider certificate::
+Your IdP public key certificate to verify SAML messages and assertion signature (usually provided by the team responsible for the IdP in your organisation).
+
+IDP issuer ID::
+IDP issuer URI.
+
+IDP single sign on URL::
+Your IDP endpoint. Receives the authentication request from ThoughtSpot.
+
+Advanced configuration:: _Optional_
+Request binding;;
+Binding used for mapping the SAML protocol message. The default is HTTP-POST.
+
+Request signature algorithm;;
+Signature algorithm used to sign the authentication request to your IDP. The default is SHA-256.
+
+Response signature algorithm;;
+The minimum signature algorithm used to validate the SAML assertion from the IDP. The default is SHA-256.
+
+Max clock skew time in seconds;;
+The allowed skew time, after which the authentication response is rejected and sent back from the IDP. The default is 86400.
+
+The IdP details will have to be mapped with these ThoughtSpot attributes:
+
+Username::
+ThoughtSpot username corresponding to the username from the IdP.
+
+Email::
+ThoughtSpot email associated with the email of the user in the IdP.
+
+Display name:: _Optional._
+The display name for the user.
+
+roles:: _Optional._
+Roles associated with the user. This mapping is crucial for assigning the correct roles and permissions to users based on their authentication through SAML.
+
+
+For detailed information on enabling SAML authentication on ThoughtSpot using IAMv2, and attributes, see this page
+link:https://docs.thoughtspot.com/cloud/9.10.0.cl/saml-okta#_enable_saml_authentication["Enable SAML authentication" option, window=_blank].
+
+
+You can map your SAML groups,or groups and Orgs from your IdP to your ThoughtSpot. This means that you do not have to manually recreate your groups and Orgs in ThoughtSpot if they are already present in your IdP.
+Refer to link:https://docs.thoughtspot.com/cloud/9.10.0.cl/saml-group-mapping["Configure SAML group mapping" option, window=_blank].
+
+
 
 [#idp-config]
 === Configure the IdP server for SAML authentication
@@ -211,3 +320,5 @@ Do NOT include the protocol in the SAML redirect domain name string to avoid con
 ====
 +
 . Click *Save changes*.
+
+
