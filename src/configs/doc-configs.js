@@ -35,7 +35,7 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '9.12.0.cl',
+            label: '9.12.5.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
         },
