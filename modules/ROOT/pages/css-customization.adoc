@@ -14,13 +14,17 @@ The `init()` function of ThoughtSpot's Visual Embed SDK has a `customizations` p
 
 The ThoughtSpot custom CSS framework defines a large number of xref:css-variables-reference.adoc[CSS variables] for assigning styles to common properties throughout the ThoughtSpot UI, while also allowing use of any valid CSS selector combination.
 
+CSS variables and selector overrides are defined using the `style` property of the `customizations` property.
+
+You can use a CSS file to make your declarations of variables and rules with the `customCSSUrl` property or declare them inline within the Visual Embed SDK code using the `customCSS` property, which can contain a `variables` section and a `rules_UNSTABLE` section for selectors:
+
 [source,JavaScript]
 ----
 customizations: {
     style: {
       // location of a saved stylesheet with ThoughtSpot variable declarations and rules using CSS selectors
       customCSSUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/css-variables.css", 
-      // direct overrides declared web application code
+      // direct overrides declared within the Visual Embed SDK code
       customCSS: {
         // ThoughtSpot variables declared inline
         variables: {
@@ -41,9 +45,81 @@ customizations: {
   },
 ----
 
-
-
 == Before you begin
+
+. Make sure your deployments are upgraded to support Visual Embed SDK version 1.17.0 or later.
+. To load fonts, images, favicons, and stylesheets from an external source, your instance must be configured with the appropriate CSP settings to allow the linked content to load from its source domain. You must explicitly xref:security-settings.adoc#_add_trusted_domains_for_font_css_and_image_import[set the source URLs as trusted domains] on the *Security Settings* page in the *Develop* tab.
+
+The `https://cdn.jsdelivr.net/` domain is allowed on every ThoughtSpot instance by default without additional configuration, for use of content available through the the jsdelivr CDN, including most GitHub content.
+
+== Font declarations
+If you have hosted custom web fonts you can declare them within the CSS customization's framework without adding them to your ThoughtSpot instance.
+
+CSS uses the `@font-face` property to declare a new font for use within other CSS rules. 
+
+You can include any number of `@font-face` declarations within a CSS file along with variables and direct selector rules. You can only declare *one* CSS file to include via the ThoughtSpot CSS customization framework, so if you have `@font-face` declarations from another source (for example a Google Fonts CSS file for a font like link:https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,600;0,700;1,400;1,700&display=swap[Poppins]), you'll need to copy the declarations into your ThoughtSpot CSS file:
+
+
+[source, CSS]
+----
+:root {
+  /* Application-wide background, app-wide text color, app-wide font, app-wide text transform */
+  --ts-var-root-background: #FFFFFF;
+  --ts-var-root-color: #1D232F;
+  --ts-var-root-font-family: Poppins,Helvetica,Arial,sans-serif;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLEj6Z1xlFd2JQEk.woff2) format('woff2');
+}
+...
+----
+
+ThoughtSpot does use fonts at various weights, so you may want to include a 400, 600 and 700 weight version of a web-font, if there are different files to include.
+
+You can also declare multiple `@font-face` rules inline, but you must take care with the syntax for each to be considered. Add a distinct CSS comment in front of each item so that they do not overwrite each other:
+
+[source,Javascript]
+----
+let fontFamilyName = 'Poppins';
+...
+ "customCSS" : { 
+    variables : { 
+    "--ts-var-root-font-family": fontFamilyName,
+  } ,
+  rules_UNSTABLE: {
+      '/* ff-400 */ @font-face': {
+          'font-family': fontFamilyName,
+          'font-style': 'normal',
+          'font-weight': '400',
+          'font-display': 'swap',
+          'src': "url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2')"
+      }
+      '/* ff-600 */ @font-face': {
+        'font-family': fontFamilyName,
+        'font-style': 'normal',
+        'font-weight': '600',
+        'font-display': 'swap',
+        'src': "url(https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLEj6Z1xlFd2JQEk.woff2) format('woff2')"
+      }
+    }
+  }
+----
+
+
+== Testing in the Visual Embed Playground
 
 * Identify the UI elements you want to customize.
 * For best results, you can combine the customization settings in the UI and custom CSS. However,
@@ -182,7 +258,7 @@ init({
 
 == Customize elements using rules
 
-The `rules` option in the `customCSS` object allows you to apply style overrides to UI components and elements that cannot be customized using the variables provided by ThoughtSpot, inline in your code without having to include a separate stylesheet file.
+The `rules_UNSTABLE` option in the `customCSS` object allows you to apply style overrides to UI components and elements that cannot be customized using the variables provided by ThoughtSpot, inline in your code without having to include a separate stylesheet file.
 
 [WARNING]
 ====
