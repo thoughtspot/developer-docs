@@ -17,7 +17,7 @@ ThoughtSpot also supports customizing icons and text strings on the embedded Tho
 * xref:customize-icons.adoc[Customize icons]
 * xref:customize-text-strings.adoc[Customize text strings]
 
-== Overview of using CSS customizations
+== Overview
 The `init()` function of ThoughtSpot's Visual Embed SDK has a `customizations` property for declaring overrides to the default ThoughtSpot look and feel.
 
 CSS variables and rule overrides are defined using the `style` property of the `customizations` property.
@@ -57,6 +57,7 @@ customizations: {
 
 . Make sure your deployments are upgraded to support Visual Embed SDK version 1.17.0 or later.
 . To load fonts, images, favicons, and stylesheets from an external source, your instance must be configured with the appropriate CSP settings to allow the linked content to load from its source domain. You must explicitly xref:security-settings.adoc#_add_trusted_domains_for_font_css_and_image_import[set the source URLs as trusted domains] on the *Security Settings* page in the *Develop* tab.
+. Review the xref:customize-css-styles.adoc[CSS variables reference] page to find the existing defined properties to customize
 
 The `cdn.jsdelivr.net` domain is allowed on every ThoughtSpot instance by default without additional configuration, for use of content available through the the jsdelivr CDN, including most GitHub content. The `fonts.gstatic.com` domain is also included within the `font-src` settings automatically.
 
@@ -126,6 +127,98 @@ let fontFamilyName = 'Poppins';
   }
 ----
 
+If using web fonts from Google Fonts,  include the `@font-face` declarations for`* latin *` for `font-weight: 400`  if you are doing simple testing within the Visual Embed SDK. 
+
+Copy the full set of declarations from Google's CSS file into the file you declare with `customCSSUrl` to give full coverage in all font-weights and unicode-ranges.
+
+== CSS rules using selectors
+If there is not a defined ThoughtSpot variable available for an aspect of style customization, you can use a CSS rule with valid CSS selector to assign a style *override*.
+
+Make sure to include `!important` after any style property declared with a selector. Variables are in use within ThoughtSpot's own CSS declarations, but any rule you write will follow the standard CSS rules for priority, so `!important` is often necessary for your rule to override the other styles.
+
+A CSS file included using the `customCSSUrl` property can contain variables, font-face declarations, and rules using selectors:
+
+[source, CSS]
+----
+:root {
+  --ts-var-root-background: #FFFFFF;
+  --ts-var-root-font-family: Poppins,Helvetica,Arial,sans-serif;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2');
+}
+
+.dx-widget {
+    font-weight: 600!important;
+]
+...
+----
+
+To declare a rule inline in the Visual Embed SDK, use the `rules_UNSTABLE` option in the `customCSS` object.
+
+A rule is defined in a JSON notation for styles, rather than direct CSS.
+
+[source,javascript]
+----
+rules_UNSTABLE: {
+      '{selector1}' : {
+        "{css-property-name}" : "{value}",
+        "{css-property-name2}" : "{value}"
+    },
+    '{selector2}'...
+}
+----
+
+[WARNING]
+====
+While the `rules_UNSTABLE` option allows granular customization of individual elements, note that the rule-based style overrides can break when your ThoughtSpot instance is upgraded to a new release version.
+====
+
+When defining rules for style overrides:
+
+* Use the correct style class and values in your rule statements. +
+To find the class name of an element: +
+. Right-click on the element and select *Inspect*.
+. Note the style class for the selected element in the *Elements* tab on the *Developer Tools* console.
+
+
+The `selector` to get the appropriate element may only require a simple standard `id` or `class` identifier like `.classname` or `#idName`, or it may need to be a complex CSS selector involving bracket syntax and other complex operators. The following are examples of selector syntax to try in the rules section to isolate a particular element:
+
+- `'.bk-filter-option'`
+- `'[id="bk-filter-option"]'`
+- `'[class="sage-search-bar-module__undoRedoResetWrapper"]'`
+- `'[class="className"] [aria-colid="6"]'`
+- `'[data-tour-id="chart-switcher-id"]'`
+
+The following example shows how to change the background color of the *All Tags* and *All Authors* dropdowns on the *Home* page of the ThoughtSpot application.
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: "https://<hostname>:<port>",
+    customizations: {
+        style: {
+            customCSS: {
+                rules_UNSTABLE: {
+                    '[data-testid="select-dropdown-header"]':{
+                    "background-color":"#ABC7F9"
+                }
+            }
+         },
+      },
+   },
+});
+----
+
+The following figure shows the style override applied using the preceding code example:
+[.widthAuto]
+[.bordered]
+image::./images/selection-dropdown-after.png[selection dropdown style override]
 
 == Testing in the Visual Embed Playground
 
@@ -166,72 +259,6 @@ customizations: {
 ++++
 <a href="{{previewPrefix}}/playground/fullApp" id="preview-in-playground" target="_blank">Try it out</a>
 ++++
-
-== Customize elements using rules
-
-The `rules_UNSTABLE` option in the `customCSS` object allows you to apply style overrides to UI components and elements that cannot be customized using the variables provided by ThoughtSpot, inline in your code without having to include a separate stylesheet file.
-
-[WARNING]
-====
-While the `rules` option allows granular customization of individual elements, note that the rule-based style overrides can break when your ThoughtSpot instance is upgraded to a new release version.
-====
-
-When defining rules for style overrides:
-
-* Use the correct style class and values in your rule statements. +
-To find the class name of an element: +
-. Right-click on the element and select *Inspect*.
-. Note the style class for the selected element in the *Elements* tab on the *Developer Tools* console.
-* Add the `_UNSTABLE` suffix to the `rules` property.
-
-A rule is defined in a JSON notation for styles, rather than direct CSS.
-
-[source,javascript]
-----
-rules_UNSTABLE: {
-      '{selector1}' : {
-        "{css-property-name}" : "{value}",
-        "{css-property-name2}" : "{value}"
-    },
-    '{selector2}'...
-}
-----
-
-The `selector` to get the appropriate element may only require a simple standard `id` or `class` identifier like `.classname` or `#idName`, or it may need to be a complex CSS selector involving bracket syntax and other complex operators. The following are examples of selector syntax to try in the rules section to isolate a particular element:
-
-- `'.bk-filter-option'`
-- `'[id="bk-filter-option"]'`
-- `'[class="sage-search-bar-module__undoRedoResetWrapper"]'`
-- `'[class="className"] [aria-colid="6"]'`
-- `'[data-tour-id="chart-switcher-id"]'`
-
-The following example shows how to change the background color of the *All Tags* and *All Authors* dropdowns on the *Home* page of the ThoughtSpot application.
-
-[source,JavaScript]
-----
-init({
-    thoughtSpotHost: "https://<hostname>:<port>",
-    customizations: {
-        style: {
-            customCSS: {
-                rules_UNSTABLE: {
-                    '[data-testid="select-dropdown-header"]':{
-                    "background-color":"#ABC7F9"
-                }
-            }
-         },
-      },
-   },
-});
-----
-
-The following figure shows the style override applied using the preceding code example:
-[.widthAuto]
-[.bordered]
-image::./images/selection-dropdown-after.png[selection dropdown style override]
-
-
-
 
 == Additional resources
 
