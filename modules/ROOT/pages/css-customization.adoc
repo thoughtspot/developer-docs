@@ -1,10 +1,268 @@
-= CSS variables and overrides
+= CSS customization framework
 :toc: true
-:toclevels: 3
+:toclevels: 2
 
-:page-title: Customize styles and layout
+:page-title: CSS customization framework
 :page-pageid: custom-css
 :page-description: Customize UX elements and layout of embedded ThoughtSpot interface using custom CSS
+
+The CSS customization framework allows overriding the default styles, color schemes, design elements, and typography of ThoughtSpot elements to match the look and feel of your host application.  
+
+There are a large number of defined variables for assigning styles to common properties throughout the ThoughtSpot UI. See the full reference here:
+
+* xref:customize-css-styles.adoc[CSS variables reference]
+
+ThoughtSpot also supports customizing icons and text strings on the embedded ThoughtSpot interface. For more information, see the following pages:
+
+* xref:customize-icons.adoc[Customize icons]
+* xref:customize-text-strings.adoc[Customize text strings]
+
+== Overview
+The `init()` function of ThoughtSpot's Visual Embed SDK has a `customizations` property for declaring overrides to the default ThoughtSpot look and feel.
+
+CSS variables and rule overrides are defined using the `style` property of the `customizations` property.
+
+The `customCSSUrl` property allows for loading a single CSS file with variables and CSS rules.
+
+The `customCSS` property, which can contain a `variables` section and a `rules_UNSTABLE` section for selectors, allows for overrides directly within the Visual Embed SDK code, which load *after* the file from the `customCSSUrl` property:
+
+[source,JavaScript]
+----
+customizations: {
+    style: {
+      // location of a saved stylesheet with ThoughtSpot variable declarations and rules using CSS selectors
+      customCSSUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/css-variables.css", 
+      // direct overrides declared within the Visual Embed SDK code
+      customCSS: {
+        // ThoughtSpot variables declared inline
+        variables: {
+          "--ts-var-button--secondary-background": "#F0EBFF",
+          "--ts-var-button--secondary--hover-background": "#E3D9FC",
+          "--ts-var-root-background": "#F7F5FF",
+        },
+        // CSS selectors declared inline, with syntax for declaring multiple CSS properties
+        rules_UNSTABLE: {
+          '{selector1}' : {
+            "{css-property-name}" : "{value}!important",
+            "{css-property-name2}" : "{value}!important"
+          },
+          '{selector2}'...
+        }
+      },
+    },
+  },
+----
+
+== Before you begin
+
+* Make sure your deployment supports Visual Embed SDK version 1.17.0 or later.
+* Identify the UI elements you want to customize.
+* For best results, you can combine the customization settings in the UI and custom CSS. However,
+note that CSS overrides take precedence over the style customization settings configured in the UI. For more information, see xref:style-customization.adoc#_scope_of_customization[Scope of customization].
+* To load fonts, images, favicons, and stylesheets from an external source, your instance must be configured with the appropriate CSP settings to allow the linked content to load from its source domain. You must explicitly xref:security-settings.adoc#_add_trusted_domains_for_font_css_and_image_import[set the source URLs as trusted domains] on the *Security Settings* page in the *Develop* tab.
+* Review the xref:customize-css-styles.adoc[CSS variables reference] page to find the existing defined properties to customize
+
+The `cdn.jsdelivr.net` domain is allowed on every ThoughtSpot instance by default without additional configuration, for use of content available through the `jsdelivr` CDN, including most GitHub content. The `fonts.gstatic.com` domain is also included within the `font-src` settings automatically.
+
+== Font declarations
+If you have hosted custom web fonts, you can declare them within the CSS customization's framework without adding them to your ThoughtSpot instance.
+
+CSS uses the `@font-face` property to declare a new font for use within other CSS rules. 
+
+You can include any number of `@font-face` declarations within a CSS file along with variables and direct selector rules. You can only declare *one* CSS file to include via the ThoughtSpot CSS customization framework. If you have `@font-face` declarations from another source (for example, a Google Fonts CSS file for a font like link:https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,600;0,700;1,400;1,700&display=swap[Poppins]), you'll need to copy the declarations into your ThoughtSpot CSS file:
+
+[source, CSS]
+----
+:root {
+  /* Application-wide background, app-wide text color, app-wide font, app-wide text transform */
+  --ts-var-root-background: #FFFFFF;
+  --ts-var-root-color: #1D232F;
+  --ts-var-root-font-family: Poppins,Helvetica,Arial,sans-serif;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLEj6Z1xlFd2JQEk.woff2) format('woff2');
+}
+...
+----
+
+ThoughtSpot does use fonts at various weights, so you may want to include a 400, 600 and 700 weight version of a web-font, if there are different files to include.
+
+You can also declare multiple `@font-face` rules inline, but you must take care with the syntax for each to be considered. Add a distinct CSS comment in front of each item so that they do not overwrite each other:
+
+[source,Javascript]
+----
+let fontFamilyName = 'Poppins';
+...
+ "customCSS" : { 
+    variables : { 
+    "--ts-var-root-font-family": fontFamilyName,
+  } ,
+  rules_UNSTABLE: {
+      '/* ff-400 */ @font-face': {
+          'font-family': fontFamilyName,
+          'font-style': 'normal',
+          'font-weight': '400',
+          'font-display': 'swap',
+          'src': "url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2')"
+      }
+      '/* ff-600 */ @font-face': {
+        'font-family': fontFamilyName,
+        'font-style': 'normal',
+        'font-weight': '600',
+        'font-display': 'swap',
+        'src': "url(https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLEj6Z1xlFd2JQEk.woff2) format('woff2')"
+      }
+    }
+  }
+----
+
+If using web fonts from Google Fonts,  include the `@font-face` declarations for`* latin *` for `font-weight: 400`  if you are doing simple testing within the Visual Embed SDK. 
+
+Copy the full set of declarations from Google's CSS file into the file you declare with `customCSSUrl` to give full coverage in all font-weights and unicode-ranges.
+
+== CSS rules using selectors
+If there is not a defined ThoughtSpot variable available for an aspect of style customization, you can use a CSS rule with valid CSS selector to assign a style *override*.
+
+Make sure to include `!important` after any style property declared with a selector. Variables are in use within ThoughtSpot's own CSS declarations, but any rule you write will follow the standard CSS rules for priority, so `!important` is often necessary for your rule to override the other styles.
+
+A CSS file included using the `customCSSUrl` property can contain variables, font-face declarations, and rules using selectors:
+
+[source, CSS]
+----
+:root {
+  --ts-var-root-background: #FFFFFF;
+  --ts-var-root-font-family: Poppins,Helvetica,Arial,sans-serif;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2');
+}
+
+.dx-widget {
+    font-weight: 600!important;
+]
+...
+----
+
+To declare a rule inline in the Visual Embed SDK, use the `rules_UNSTABLE` option in the `customCSS` object.
+
+A rule is defined in a JSON notation for styles, rather than direct CSS.
+
+[source,javascript]
+----
+rules_UNSTABLE: {
+      '{selector1}' : {
+        "{css-property-name}" : "{value}",
+        "{css-property-name2}" : "{value}"
+    },
+    '{selector2}'...
+}
+----
+
+[WARNING]
+====
+While the `rules_UNSTABLE` option allows granular customization of individual elements, note that the rule-based style overrides can break when your ThoughtSpot instance is upgraded to a new release version.
+====
+
+When defining rules for style overrides:
+
+* Use the correct style class and values in your rule statements. +
+To find the class name of an element: +
+. Right-click on the element and select *Inspect*.
+. Note the style class for the selected element in the *Elements* tab on the *Developer Tools* console.
+
+The `selector` to get the appropriate element may only require a simple standard `id` or `class` identifier like `.classname` or `#idName`, or it may need to be a complex CSS selector involving bracket syntax and other complex operators. The following are examples of selector syntax to try in the rules section to isolate a particular element:
+
+- `'.bk-filter-option'`
+- `'[id="bk-filter-option"]'`
+- `'[class="sage-search-bar-module__undoRedoResetWrapper"]'`
+- `'[class="className"] [aria-colid="6"]'`
+- `'[data-tour-id="chart-switcher-id"]'`
+
+The following example shows how to change the background color of the *All Tags* and *All Authors* dropdowns on the *Home* page of the ThoughtSpot application.
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: "https://<hostname>:<port>",
+    customizations: {
+        style: {
+            customCSS: {
+                rules_UNSTABLE: {
+                    '[data-testid="select-dropdown-header"]':{
+                    "background-color":"#ABC7F9"
+                }
+            }
+         },
+      },
+   },
+});
+----
+
+The following figure shows the style override applied using the preceding code example:
+[.widthAuto]
+[.bordered]
+image::./images/selection-dropdown-after.png[selection dropdown style override]
+
+== Testing in the Visual Embed Playground
+
+The *Visual Embed* Playground now includes the *Apply Styles* checkbox, using which you can try out the variables and rules. +
+To preview the CSS settings:
+
+. Go to *Develop* page in the ThoughtSpot UI
+. Click *Visual Embed* > *Playground*.
+. Select the embed element. For example, *Full App*.
+. Select *Apply custom styles*.
++
+The following code text appears in the `init` function and is highlighted in the code panel:
++
+[source,JavaScript]
+----
+customizations: {
+    style: {
+      customCSSUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/css-variables.css", // location of your stylesheet
+      // To apply overrides for your stylesheet in this init, provide variable values
+      customCSS: {
+        variables: {
+          "--ts-var-button--secondary-background": "#F0EBFF",
+          "--ts-var-button--secondary--hover-background": "#E3D9FC",
+          "--ts-var-root-background": "#F7F5FF",
+        },
+      },
+    },
+  },
+----
+. Change the style specifications for any variable. For a complete list of variables, see xref:css-customization.adoc#supported-variables[Supported variables].
+. Click **Run**.
+
+++++
+<a href="{{previewPrefix}}/playground/fullApp" id="preview-in-playground" target="_blank">Try it out</a>
+++++
+
+== Additional resources
+
+* link:https://github.com/thoughtspot/custom-css-demo/blob/main/css-variables.css[Custom CSS demo GitHub Repo, window=_blank]
+
+////
++
+Note that the URL shown in the above code snippet hosts a sample icon sprite to override the chart icon. To view the SVG details, click *Inspect*.
 
 ThoughtSpot provides advanced style customization capabilities with the custom CSS framework. The custom CSS feature allows you to override the default styles, color schemes, design elements, and typography of ThoughtSpot elements to match the look and feel of your host application.
 
@@ -51,14 +309,5 @@ customizations: {
 == Customization steps
 You can customize UX elements in the embedded view using the following methods:
 
-* xref:customize-css-styles.adoc[CSS variables] (Recommended)
+*  (Recommended)
 * xref:customize-using-rules.adoc[CSS Rules]
-
-ThoughtSpot also supports customizing icons and text strings on the embedded ThoughtSpot interface. For more information, see the following pages:
-
-* xref:customize-icons.adoc[Customize icons]
-* xref:customize-text-strings.adoc[Customize text strings]
-
-== Additional resources
-
-* link:https://github.com/thoughtspot/custom-css-demo/blob/main/css-variables.css[Custom CSS demo GitHub Repo, window=_blank]
