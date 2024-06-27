@@ -83,8 +83,10 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
     let sectionId;
     let sectionTitle;
     if (type === 'section') {
-        sectionId = ele.querySelector('h2').id;
-        sectionTitle = ele.querySelector('h2').innerHTML;
+        sectionId = ele.querySelector('h2')?.id || ele.querySelector('h3')?.id;
+        sectionTitle =
+            ele.querySelector('h2')?.innerHTML ||
+            ele.querySelector('h3')?.innerHTML;
     } else {
         sectionId = type;
         sectionTitle = node.document.title;
@@ -97,7 +99,7 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
     const chunks = splitStringIntoChunks(body, numberOfChunks);
 
     return chunks.map((chunk, i) => ({
-        objectID: `${node.id + sectionId}_chunk_${i}`,
+        objectID: `${sectionId}_chunk_${i}`,
         sectionId,
         sectionTitle,
         body: chunk,
@@ -131,7 +133,7 @@ const queries = [
                               )
                             : null;
                         const sections = Array.prototype.map.call(
-                            newDiv.querySelectorAll('.sect1'),
+                            newDiv.querySelectorAll('.sect1, .sect2'),
                             (sect) =>
                                 pageToAlgoliaRecordForASCII(
                                     sect,

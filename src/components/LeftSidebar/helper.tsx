@@ -150,7 +150,7 @@ export const collapseAndExpandLeftNav = (
                 divElement.classList.toggle('displayNone');
             }
 
-            if (spanElement) {
+            if (spanElement && (spanElement.children[0] as HTMLImageElement)) {
                 (spanElement
                     .children[0] as HTMLImageElement).innerHTML = divElement.classList.contains(
                     'displayNone',
