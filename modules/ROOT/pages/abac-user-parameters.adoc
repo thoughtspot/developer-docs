@@ -29,12 +29,12 @@ The  `runtime_filters` require passing the *exact* ThoughtSpot worksheet column 
 For the same reasons, end users of an embedded app cannot have *edit* accesss to any worksheet using ABAC RLS via tokens.
 ====
 
-== Token request
+= Token request
 The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot V2.0 REST API Access Tokens (which are OAuth JWT tokens). 
 
 The token can be used as a bearer token for Cookieless Trusted Auth or REST API access, or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
 
-=== ABAC capabilities
+== ABAC capabilities
 In ThoughtSpot 9.10,5 and later releases, three features are available to set via the login token:
 
 * *Runtime filters* +
@@ -44,7 +44,7 @@ Binds a *single value* to any Parameter in any Worksheet by Parameter Name and T
 * *Runtime sorts* +
 Overrides to sort order within columns.
 
-=== Request format
+== Request format
 The ABAC request is sent using the `user_parameters` key of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]. 
 
 There are three potential keys within `user_parameters`, each taking an array of objects:
@@ -91,7 +91,10 @@ The following is a `user_parameters` section that would be part of the JSON requ
   }
 ----
 
-You can specify any attribute that applies only to a specific ThoughtSpot object by including an `objects` section with the following format:
+=== Apply to specific objects
+By default, any specified filter or parameter will bind to *any content* with an exact match for the column or parameter name.
+
+You can choose for the filter or parameter to apply only to specific ThoughtSpot objectby including an `objects` section with the following format:
 
 [source,JavaScript]
 ----
@@ -116,14 +119,29 @@ You can specify any attribute that applies only to a specific ThoughtSpot object
 ]
 ----
 
-=== Persisting to user
+= Persisting user_parameters to a user
 Filters and parameters must be *persisted* for them to apply when using xref:trusted-authenication.adoic#_cookie_based_vs_cookieless_authentication[cookie-based trusted authentication] or scheduled reports.
 
 The successful *request* for a token is what updates the stored `user_parameters` property of the user, rather than the first use of token.
 
-Because of the above, you c
+Because of the above, you can treat the REST API *token request* with any values where `persist` is set to `true` as a "update user_parameters" command.
 
-==== Remove persisted values
+Persisting values opens up use cases for ABAC outside of the cookieless Trusted Authentication pattern.
+
+== Large sets of values
+There are limitations to the size of HTTP headers, which limits the amount of filter and parameters values that can be sent via a bearer token.
+
+The best solution if you have very large sets of values is to make two requests
+
+1. First request: include the `user_parameters` section defining all of filters and parameters, all with `persist: true`
+2. Second request: exclude `user_parameters` to create a pure authentication token to send to the user's browser
+
+The *request* with all of the persisted values will be set for the user, and when they use the second token to load the content, all of the persisted values will be applied.
+
+== SAML and OIDC
+The same pattern above for persisting large sets of values can also be used if users authenticate via SAML, OIDC or go directly into ThoughtSpot via username and password. 
+
+== Remove persisted values
 The syntax to fully remove persisted elements in a user's `user_parameters` property is to pass an *empty array* for the category.
 
 A request with an empty array affects persisted values despite there being no `persist` key within the request.
@@ -139,22 +157,7 @@ The following would clear *all* persisted values of any type:
 ----
 
 
-
-=== Large sets of values
-There are limitations to the size of HTTP headers, which limits the amount of filter and parameters values that can be sent via a bearer token.
-
-The best solution if you have very large sets of values is to make two requests
-
-1. First request: include the `user_parameters` section defining all of filters and parameters, all with `persist: true`
-2. Second request: exclude `user_parameters` to create a pure authentication token to send to the user's browser
-
-The *request* with all of the persisted values will be set for the user, and when they use the second token to load the content, all of the persisted values will be applied.
-
-=== SAML and OIDC
-The same pattern above for persisting large sets of values can also be used if users authenticate via SAML, OIDC or go directly into ThoughtSpot via username and password. 
-
-
-== Implementing RLS with ABAC via tokens
+= Implementing RLS with ABAC via tokens
 The current best practice pattern for RLS using ABAC via tokens is:
 
 1. Runtime filters to define all multi-value filter conditions on columns
