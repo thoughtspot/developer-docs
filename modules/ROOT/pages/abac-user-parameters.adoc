@@ -158,14 +158,21 @@ The following would clear *all* persisted values of any type:
 
 
 = Implementing RLS with ABAC via tokens
-The current best practice pattern for RLS using ABAC via tokens is:
+The ABAC via tokens pattern allows for setting arbitrary filters and overriding the values of existing worksheet parameters. These two capabilities can be combined in a number of ways to create secure and unbreakable RLS.
 
-1. Runtime filters to define all multi-value filter conditions on columns
-2. A *shared secret* passed in as a 'check parameter', used in Worksheet filters to block unrestricted data access
+Parameters are currently single-value, so you'll need to use runtime filters to restrict multiple values on a given field. 
 
-Parameters are currently single-value, so you'll need to use runtime filters to restrict multiple values on a given field. If a column will only be restricted by a single value for any users, you can choose whether to pass that attribute value as a runtime filter or a parameter to be used in a Worksheet formula/filter combination.
+The current standard best practice pattern for RLS using ABAC via tokens is:
 
-=== Show all
+1. Use runtime filters to define all *multi-value* filter conditions on columns
+2. Pass a *shared secret* to the worksheet as a 'check parameter'. This parameter will be used in a formula/filter combination at the Worksheet level to block unrestricted data access when no filters are set via the token
+3. Edit the Worksheet TML to add `is_hidden: true` to any parameter that will be set via token (9.12.5 and later)
+
+If a column will only be restricted by a single value for any users, you can choose whether to pass that attribute value as a runtime filter or a parameter to be used in a Worksheet formula/filter combination. 
+
+The ability to set the parameter to `is_hidden: true` gives flexibility to use as many parameters as desired for any type of formula to be used as a worksheet filter.
+
+== Show all
 The way to set a runtime filter to *show all values* is to not send in any runtime filter at all for that column. 
 
 Without additional information, it's impossible to know if the lack of a runtime filter is intentional to indicate a  *show all values* condition or if something went wrong—a malformed ABAC token or the user entered into ThoughtSpot without a token at all.
@@ -177,7 +184,7 @@ The *shared secret* is a string value used in both the *token request service* t
 
 If the 'check parameter' value from the token does not match the value defined in the Worksheet formula (the *shared secret*), the formula and filter combination blocks any data from showing for the user.
 
-=== Building the ABAC token request
+== Building the ABAC token request
 Two parts to the ABAC request:
 
 1. Runtime filters defining multi-value conditions on columns
@@ -188,12 +195,12 @@ The runtime filters must be built by:
 1. Retrieving user data entitlements
 2. Translating entitlements into ThoughSpot runtime filters
 
-==== Retrieving entitlements
+=== Retrieving entitlements
 The value of the ABAC pattern is that you can send different combinations of filters for different types of users.
 
 You can retrieve the attribute names and values from any source: the embedding application's session details, an entitlement REST API, a query to a different database, etc. 
 
-==== Translating entitlements into runtime filters
+=== Translating entitlements into runtime filters
 Runtime filters *match on the name property of a column* as defined in ThoughtSpot, not the column's name in the underlying database table. The *token request service* does need to know the ThoughtSpot column names that will be used for each of the attributes, so you'll need to coordinate between ThoughtSpot Worksheet designers and the *token request service* to make sure the column names and values are passing correctly to the *token request service*.
 
 As mentioned in the preceding section, the format for runtime filters within the token match with xref:runtime-filters.adoc[runtime filters] in the Visual Embed SDK. In general, RLS entitlements are lists of values using the `IN` operator, but you can pass in filters on numeric and time columns using the full set of operators.
@@ -256,7 +263,7 @@ The following is a request where a different user can see all `Region`, but stil
 
 Because the `runtime_filters` section is entirely within the control of the *token request service*, you have full flexibility to generate any set of filters for any type of user within the token.
 
-==== Setting the 'check parameter' to the shared secret
+=== Setting the 'check parameter' to the shared secret
 The *shared secret* is just a long string value that cannot be easily guessed or determined programmatically. You can generate these values randomly - and the end user will never see it, only the Worksheet editor if they look at the formula.
 
 Information about how to set up the appropriate set of Worksheet parameters, formulas and filters for the 'check parameter' to provide security is provided in the following sections.
@@ -276,7 +283,7 @@ If the parameter is named `Secured` and the *shared secret* value is `rxzricmwfe
 ]
 ----
 
-=== Using Parameters to filter a Worksheet
+== Using Parameters to filter a Worksheet
 The basic pattern for using a Parameter to filter a Worksheet includes these steps:
 
 . Create link:https://docs.thoughtspot.com/cloud/latest/parameters-create[Parameters, target=_blank] in Worksheet
@@ -311,7 +318,7 @@ This will display on Liveboards and Answers as shown here:
 [.widthAuto]
 image::./images/parameter_with_default.png[Parameter with Default Value on Answer]
 
-==== Creating the Worksheet security formula
+=== Creating the Worksheet security formula
 A Parameter doesn't do anything on its own. You need a formula to evaluate the Parameter's value.
 
 The simplest formula for a 'check parameter' with shared key looks like:
@@ -324,7 +331,7 @@ For example, if the 'check parameter' is called `Secured`, and the secret key va
 [.widthAuto]
 image::./images/worksheet_formula.png[Security Formula in Worksheet]
 
-==== Setting a Worksheet filter on the Worksheet security formula
+=== Setting a Worksheet filter on the Worksheet security formula
 The last step is to set a *Worksheet filter* on the *formula* you just created to evaluate the 'check parameter'.
 
 Click the *create new* icon next to Filters, and choose the formula you created (at the end of the list):
@@ -352,7 +359,7 @@ image::./images/new_worksheet_filter_step_4.png[Completed Worksheet filter]
 
 Now the 'check parameter' will be evaluated all the time, blocking all data unless the appropriate value is passed in via ABAC token.
 
-== Indexing
+= Indexing
 Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in Explore, use ThoughtSpot indexing. 
 
 Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token. 
