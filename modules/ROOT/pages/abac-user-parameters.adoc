@@ -8,10 +8,12 @@
 
 Attribute-Based Access Control (ABAC) is a pattern where security entitlements are sent in as lists of attributes at session creation time via the authentication service.
 
+The request for a token with ABAC details can *persist* the set of filters and parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
+
 [IMPORTANT]
 ====
 [#beta-warning]
-RLS using ABAC via tokens is in beta. ThoughtSpot is working on improvements in the upcoming releases that will change some of the best practices recommended in this article, and will result in the needed re-work of the security architecture of your deployment. We recommend reaching out to ThoughtSpot to discuss RLS best practices for your specific use case and deployment timelines.
+RLS using ABAC via tokens is in beta. ThoughtSpot is working on improvements in the upcoming releases that will change some of the best practices recommended in this article, and will result in the needed re-work of the security architecture of your deployment. We recommend reaching out to ThoughtSpot to discuss RLS best practices for your specific use case and deployment timelines, and to get all early access features enabled on your ThoughtSpot instances.
 ====
 
 Currently, the ABAC via tokens method requires using *xref:trusted-authentication.adoc[trusted authentication]* and using link:https://docs.thoughtspot.com/cloud/latest/worksheet-create[Worksheets, target=_blank] as data sources for Liveboards and Answers, rather than individual table objects.
@@ -58,8 +60,6 @@ There are three potential keys within `user_parameters`, each taking an array of
 The format for the objects in each section follows the equivalent formats in the Visual Embed SDK for xref:runtime-filters.adoc[runtime filters], xref:runtime-parameters.adoc[runtime parameters], or xref:runtime-sort.adoc[runtime sorts].
 
 There is a `persist` key to be added on each object that takes boolean `true` or `false`. This determines if the values are persisted at the user level beyond just the token itself, for features such as alerts and subscriptions that run outside a user's session.
-
-You must persist values for them to apply when using xref:trusted-authenication.adoic#_cookie_based_vs_cookieless_authentication[cookie-based trusted authentication].
 
 The following is a `user_parameters` section that would be part of the JSON request of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]:
 
@@ -114,6 +114,29 @@ You can specify any attribute that applies only to a specific ThoughtSpot object
       ]
 ]
 ----
+
+=== Persisting to user
+Filters and parameters must be *persisted* for them to apply when using xref:trusted-authenication.adoic#_cookie_based_vs_cookieless_authentication[cookie-based trusted authentication] or scheduled reports.
+
+The successful *request* for a token is what updates the stored `user_parameters` property of the user, rather than the first use of token.
+
+Because of the above, you c
+
+==== Removing persisted values
+
+=== Large sets of values
+There are limitations to the size of HTTP headers, which limits the amount of filter and parameters values that can be sent via a bearer token.
+
+The best solution if you have very large sets of values is to make two requests
+
+1. First request: include the `user_parameters` section defining all of filters and parameters, all with `persist: true`
+2. Second request: exclude `user_parameters` to create a pure authentication token to send to the user's browser
+
+The *request* with all of the persisted values will be set for the user, and when they use the second token to load the content, all of the persisted values will be applied.
+
+=== SAML and OIDC
+The same pattern above for persisting large sets of values can also be used if users authenticate via SAML, OIDC or go directly into ThoughtSpot via username and password. 
+
 
 == Implementing RLS with ABAC via tokens
 The current best practice pattern for RLS using ABAC via tokens is:
