@@ -218,7 +218,7 @@ class TypeDocInternalParser {
         const text = comment?.text?.trim() || '';
 
         content += this.covertTypeDocText(
-            `${shortText.replace(/\n/g, ' +\n')} + \n${text.replace(/\n/g, ' +\n')} +\n\n`,
+            `${shortText.replace(/\n\n/g, ' +\n\n')} + \n${text.replace(/\n\n/g, ' +\n\n')} +\n\n`,
         );
         return content;
     }
