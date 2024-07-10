@@ -214,12 +214,12 @@ class TypeDocInternalParser {
         if (!comment) return '';
 
         let content = '';
-        content += this.covertTypeDocText(
-            `${comment?.shortText?.trim() || ''}\n${
-                comment?.text?.trim() || ''
-            }\n\n`,
-        );
+        const shortText = comment?.shortText?.trim() || '';
+        const text = comment?.text?.trim() || '';
 
+        content += this.covertTypeDocText(
+            `${shortText.replace(/\n\n/g, ' +\n\n')} + \n${text.replace(/\n\n/g, ' +\n\n')} +\n\n`,
+        );
         return content;
     }
 
@@ -277,7 +277,7 @@ class TypeDocInternalParser {
 
         switch (node.type) {
             case 'literal':
-                if (link) return this.convertToItalic(node.name);
+                if (link) return this.convertToItalic(node.value);
                 return `"${node.value}"`;
             case 'intrinsic':
                 if (link)
@@ -431,7 +431,7 @@ class TypeDocParser {
         switch (node.type) {
             case 'literal':
                 if (link)
-                    return TypeDocInternalParser.convertToItalic(node.name);
+                    return TypeDocInternalParser.convertToItalic(node.value);
                 return `"${node.value}"`;
             case 'intrinsic':
                 if (link)
