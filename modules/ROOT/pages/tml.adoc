@@ -1,0 +1,144 @@
+= TML
+:toc: true
+:toclevels: 1
+
+:page-title: TML
+:page-pageid: tml
+:page-description: The TML API endpoints allow you to export and import TML files
+ThoughtSpot developed its own scriptable approach for exporting, enhancing, and migrating Worksheets, views, tables, Liveboards, Monitor alerts, and Answers.
+Use link:https://cloud-docs.thoughtspot.com/admin/ts-cloud/tml.html[TML, window=_blank] (ThoughtSpot Modeling Language) to modify a ThoughtSpot object in a flat-file format. Users can model data and build out sophisticated dashboards in the test environment, before deploying to all users.
+
+== Structure of a TML file
+To work with TML files for Worksheets, views, SQL views, tables, Answers, Liveboards, and Monitor alerts in ThoughtSpot, you can download these objects to a flat file in `.TML` format, modify it, and subsequently upload this file either to the same cluster or to a different cluster.
+
+See the following pages for the detailed syntax of each type of TML file:
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-answers[TML for Answers]
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-connections[TML for Connections]
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-joins[TML for Joins]
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-liveboards[TML for Liveboards]
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-alerts[TML for Monitor Alerts]
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-sql-views[TML for SQL Views]
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-tables[TML for Tables]
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-views[TML for Views]
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-worksheets[TML for Worksheets]
+
+* link:https://docs.thoughtspot.com/cloud/latest/tml-models[TML for Models]
+
+
+== TML API
+
+The TML API endpoints allow you to programmatically export, validate, and import scriptable TML files. You can use these API endpoints to automate the change management and deployment processes between your development and production environments. With TML API, you can easily migrate your ThoughtSpot content from one environment to another by automating the entire change management process and thereby reducing the risk of human error.
+
+[NOTE]
+====
+Ensure that your TML import files have the object name as `liveboard`. Replace any `pinboard` occurrences with `liveboard` before import, or ThoughtSpot exports TML files with `liveboard` as the object name instead of `pinboard`.
+====
+
+== Import a TML
+To import a modified TML object, your account must have the `DATAMANAGEMENT` (Can manage data) or `ADMINISTRATION` (Can administer ThoughtSpot) privilege.
+
+You can import single or multiple objects using the `tml/import` API. If you are importing TML files one at a time, include the fqn property to distinguish objects that have the same name. For example, if you have multiple connections or tables with the same name, the connection or table you reference in your TML does not have a unique name and thus can lead to invalid object references. Adding fqn helps ThoughtSpot differentiate a table from another with the same name.
+
+By default, the fqn parameter is not present in the TML file. However, you can export TML with FQNs and use it during the import.
+
+To import TML representation of the metadata objects into ThoughtSpot, use the following API endpoints:
+
+[div tableContainer]
+--
+[width="100%" cols="2,1"]
+[options='header']
+|=====
+|API endpoint| API version
+|`xref:tml-api.adoc#import[**POST** /tspublic/v1/metadata/tml/import]` +
+|REST API v1
+|`link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fimport-metadata-tml[**POST** /api/rest/2.0/metadata/tml/import]` +
+ |REST API v2
+|=====
+--
+
+//While the v1 API accepts a string containing a JSON array of TML objects to upload, in YAML or JSON format, the v2 accepts it only in the JSON format.
+
+There are multiple kinds of imports possible. They are:
+
+* `PARTIAL` imports all objects that validate successfully, and ignores objects that do not validate successfully.
+* `ALL_OR_NONE` imports the objects that validate successfully.
+* `VALIDATE_ONLY` validates the objects but does not import them.
+
+
+
+[NOTE]
+====
+If you import only a Worksheet object, it may take some time for the Worksheet to become available in the ThoughtSpot system. You may need to wait for a few seconds to create answers and Liveboards.
+
+However, if you import a Worksheet along with Liveboards, answers, and other dependent objects in a single API call, the imported objects will be immediately available for use.
+====
+
+Visit link:https://docs.thoughtspot.com/cloud/latest/scriptability[Import a TML object] for more information.
+
+== Export a TML
+To export the TML data, your account must have the `DATAMANAGEMENT` (Can manage data) or `ADMINISTRATION` (Can administer ThoughtSpot) privilege.
+
+It must be noted that the default format to export the objects is YAML is v1, and JSON in v2 APIs. To export the TML representation of the metadata objects from ThoughtSpot in JSON or YAML format, use the following endpoints:
+
+[div tableContainer]
+--
+[width="100%" cols="2,1"]
+[options='header']
+|=====
+|API endpoint| API version
+|`xref:tml-api.adoc#export[**POST** /tspublic/v1/metadata/tml/export]` +
+|REST API v1
+|`link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml[**POST** /api/rest/2.0/metadata/tml/export]` +
+|REST API v2
+|=====
+--
+
+There are several export options available with these APIs:
+
+*Exporting associated objects and connections*::
+
+* `export_associated` - Specifies if you would like to export the associated objects. To export the objects associated with the objects specified in export_ids, set the value to true. When set to true, the API exports any underlying worksheets, tables, or views for a given object. By default, the API does not export these underlying objects.
+* `export_dependent` - Specifies if the Tables of the referenced Connection object must be included in the export.
+* `export_connection_as_dependent` - Specifies if a connection object must be included as a dependent object when exporting a Table, Worksheet, Answer, or Liveboard TML.
+
+*Exporting functions*::
+
+When `export_fqn=true`, the API exports the FQNs of the referenced objects in the TML data. For example, if you export a Liveboard and its associated objects, the API returns the Liveboard TML data with the FQNs of the referenced Worksheet.
+Note that the FQN of a referenced object is the same as the GUID of that object.
++
+ThoughtSpot recommends adding the fqn property before importing the TML objects into the system because only the name of a referenced object insufficient to identify the referenced object during TML import. For example, if your ThoughtSpot instance has two worksheets with the same name, the TML import for a Liveboard that uses one of these worksheets would fail unless the Liveboard TML includes the FQN of the referenced Worksheet.
+The `export_fqn` attribute is useful when ThoughtSpot has multiple objects with the same name and you want to eliminate ambiguity during TML import. The `export_fqn=true` property adds the FQNs of the referenced objects in the TML export API response and saves the manual effort of adding FQNs for TML import.
+
+*Exporting schema*::
+
+Specifies the schema version to use during TML export. By default, the API request uses v1 schema for Worksheets. If you are using Models, set `export_schema_version` to v2. link:https://docs.thoughtspot.com/cloud/latest/models[Models] are supported as new datasets from 9.10.0.cl onwards.
+
+Visit link:https://docs.thoughtspot.com/cloud/latest/scriptability#export-object[Export a TML object] for more information.
+
+== TML modification
+TML is slightly different for every object type, but all follow a general pattern allowing programmatic editing.
+ThoughtSpot offers a lot of flexibility within its set of xref:intro-thoughtspot-objects.adoc[data objects], and there is no particular hierarchy to TML files, but rather just some rules. Visit this page for detailed information on xref:modify-tml.adoc[TML modification].
+
+== Limitations of working with TML files
+There are certain limitations to the changes you can apply by editing a ThoughtSpot object through TML. Visit link:https://docs.thoughtspot.com/cloud/latest/tml#_limitations_of_working_with_tml_files[Limitations of working with TML files] for detailed information.
+
+== Integration and deployment of TML objects
+
+When embedding or deploying a third-party application in their environments, most organizations use defined practices at various stages of their SDLC process. Users typically use a version control system and CI-CD pipeline to push their xref:development-and-deployment.adoc[TML files from development to testing and production environments].
+ThoughtSpot instances act as a constantly running service, so deployment only involves publishing ThoughtSpot content, in the form of ThoughtSpot Modeling Language (TML) files to a given ThoughtSpot instance. The three traditional steps to building an SDLC process with ThoughtSpot are:
+
+* Exporting TML objects into a source control system (Git, etc.)
+* Altering copies of the TML files for the next stage/environment
+*  Importing the TML files into the new environment
+
+But this changed with the link:https://developers.thoughtspot.com/docs/git-integration[Git integration] feature. ThoughtSpot now allows you to connect your deployment instance to a Git repository, push TML files to CI/CD pipelines, and deploy commits from your Git repository to your production environment.
+However, ThoughtSpot’s Git integration does not support moving objects within the same Org or application instance. For example, it does not support moving objects in an environment where xref:multitenancy-without-orgs[multi-tenancy is implemented using groups].
