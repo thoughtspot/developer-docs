@@ -1,0 +1,166 @@
+= Git configuration
+:toc: true
+:toclevels: 2
+
+:page-title: Git configuration
+:page-pageid: git-configration
+:page-description: Configuring the Git integration for a ThoughtSpot instance
+
+Git integration requires configuration within both ThoughtSpot, accomplished via the V2.0 REST APIs, and your Git provider (GitHub currently).
+  
+== Configure Git
+
+Before you begin, check if your Git integration setup meets the following prerequisites:
+
+* To commit objects from Thoughtspot to a Git repository, you require at least view permission for all objects that will be committed as part of the operation.
+* To deploy or revert objects from a Git repository to ThoughtSpot, you require edit access to all objects that will be updated as part of the deployment. If the deployment contains Worksheets, Views, or Tables, users require **Can manage data** (`DATAMANAGEMENT`) privilege for deploy, commit, and  revert operations.
+
+* You have a GitHub or GitHub Enterprise account and access to a repository. Ensure that your account has one of the following types of access tokens:
+** link:https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic[Personal access token (Classic), window=_blank] +
+Make sure the access token has the `repo` scope that grants full access to public and private repositories, commit and deployment status, repository invitations, and security events. +
+** link:https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#fine-grained-personal-access-tokens[Fine-grained personal access token, window=_blank] +
+Make sure the token allows `Read access to metadata` and `Read and Write access to code and commit statuses`.
+* The branch used as a configuration branch does not have any branch protection rule.
+* The branches in the Git repository are set up as described in xref:version_control.adoc#_recommended_configuration[Recommended configuration].
+
+
+== Enable Orgs and Git integration
+
+To configure Git branches and workflows, both Orgs and the Git integration feature must be enabled on your ThoughtSpot `Dev` and `Prod` environments. 
+  
+  To enable these features on your instance, contact ThoughtSpot Support.
+
+////
+Run the following `tscli` command on their instances.
+
+[source,SSH]
+----
+tscli git-integration enable
+----
+////
+
+[#connectTS]
+== Connect your ThoughtSpot environment to the Git repository
+
+To connect your ThoughtSpot instance to a Git repository using REST API, send a `POST` request with the following parameters to the `/api/rest/2.0/vcs/git/config/create` REST API v2.0 endpoint.
+
+==== Request parameters
+[width="100%" cols="2,6"]
+[options='header']
+|===
+|Parameter|Description
+|`repository_url`|__String__. The HTTPS URL of the Git repository; for example, `https://github.com/user/repo.git`.
+|`username`
+|__String__. Username to authenticate to the Git repository.
+|`access_token`|__String__. Access token to authenticate to the Git repository.
+|`org_identifier`|__String__. ID of the Org. Define this parameter only if the Orgs feature is enabled on your ThoughtSpot cluster and separate Orgs are configured for development and production environments.
+|`branch_names`|__Array of strings__. List of Git branches to configure.
+|`commit_branch_name` |__String__. Name of the remote branch where objects committed from this Thoughtspot instance will be versioned. Replaces `default_branch_name`, which is deprecated in 9.10.5.cl.
+|`default_branch_name` +
+__Optional__|__String__. Deprecated in 9.10.5.cl. In earlier versions, this parameter was used to configure the name of the default Git branch to use for all operations on the cluster.
+|`enable_guid_mapping`  |__Boolean__. Enables GUID mapping and generates a GUID mapping file. Starting from 9.7.0.cl, this attribute is set to `true` by default.
+To know more about GUID mapping, see xref:version_control.adoc#_guid_mapping_and_configuration_files[GUID mapping].
+|`configuration_branch_name` a|__String__. Name of the branch where the configuration files related to operations between Thoughtspot and version control repository should be maintained. Replaces `guid_mapping_branch_name`, which is deprecated in 9.10.5.cl.
+
+[NOTE]
+====
+If no branch name is specified, by default, the `ts_config_files` branch is considered. Ensure this branch exists before configuration.
+====
+|`guid_mapping_branch_name` +
+__Optional__|__String__. Deprecated in 9.10.5.cl.  In earlier versions, this parameter was used to configure the name of the branch for the GUID mapping file.
+||
+|===
+
+=== Request example
+
+The following example shows the API request format for connecting ThoughtSpot to a GitHub repository.
+
+[source, cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host-Dev}/api/rest/2.0/vcs/git/config/create' \
+  -H 'Authorization: Bearer {Bearer_token}  \
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "repository_url": "https://github.com/user/repo.git",
+  "username": "ts-git-user",
+  "access_token": "{ACCESS_TOKEN}",
+  "org_identifier": "dev"
+  "branch_names": [
+    "dev",
+    "main"
+  ],
+  "commit_branch_name": "dev",
+  "configuration_branch_name": "_ts_config"
+}'
+----
+
+If the API request is successful, the ThoughtSpot instance will be connected to the Git repository. Make sure you connect all your environments (`Dev`, `Staging`, and `Prod`) to the GitHub repository.
+
+The following example shows the API request parameters to connect a ThoughtSpot `Prod` instance to the Git repo. Note that  GUID mapping is enabled in the API request.
+
+[source, cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host-Prod}/api/rest/2.0/vcs/git/config/create' \
+  -H 'Authorization: Bearer {Bearer_token}  \
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "repository_url": "https://github.com/user/repo.git",
+  "username": "ts-git-user",
+  "access_token": "{ACCESS_TOKEN}",
+  "enable_guid_mapping": true,
+  "org_identifier": "prod"
+  "branch_names": [
+    "prod"
+  ],
+  "enable_guid_mapping": true,
+  "commit_branch_name": "prod",
+  "configuration_branch_name": "_ts_config"
+}'
+----
+
+=== GUID mapping and configuration files
+
+ThoughtSpot maintains a set of configuration files to facilitate the CI/CD process for developers. Typically, it includes:
+
+* One mapping file per production environment +
+This file documents the GUID mapping for ThoughtSpot development objects from the source cluster, and their equivalent objects in the production environment to which commits are deployed.
+* One deploy file per production environment +
+This file tracks the last `commit_id` of the last successful deploy operation.
+
+==== GUID mapping
+
+The version control API automatically generates a GUID mapping file when deploying commits and saves this file in a Git branch. The mapping file records the GUIDs for each TML object as shown in this example:
+
+[source,JSON]
+----
+[
+   {
+      "originalGuid":"7485d3b6-4b4e-41a2-86be-e031d1322cc9",
+      "mappedGuid":"3eeec11e-fbf7-40dc-a549-2f465f640778",
+      "counter":0
+   }
+]
+----
+
+* `originalGuid` refers to the GUID of the object on the source environment, for example, a `Dev` cluster.
+* `mappedGuid` refers to the GUID of the object on the destination environment, for example, `staging` or `prod` cluster.
+* `counter` shows the number of times the mapped object was used in deploy operations.
+
+If GUID mapping is enabled, ThoughtSpot uses the GUID mapping file to map the object GUIDs and automatically updates the object references in your TML content.
+
+The following figure illustrates how GUIDs are mapped during deployments:
+
+[.widthAuto]
+image::./images/guid-mapping.png[GUID mapping]
+
+=== Related APIs
+
+* To update the repository details or access token, send a `POST` request with Git configuration parameters to the `/api/rest/2.0/vcs/git/config/update` API endpoint.
+* To get repository configuration information, send a `POST` request to `/api/rest/2.0/vcs/git/config/search` API endpoint.
+* To delete the repository configuration, send a `POST` request to the `/api/rest/2.0/vcs/git/config/delete` endpoint.
+
+For more information about these endpoints, see the API documentation in the +++<a href="{{previewPrefix}}/api/rest/playgroundV2" target="_blank">REST API v2.0 Playground</a>+++.
