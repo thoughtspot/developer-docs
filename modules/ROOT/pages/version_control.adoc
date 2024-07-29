@@ -25,9 +25,9 @@ ThoughtSpot currently supports GitHub / GitHub Enterprise for CI/CD.
 ====
 
 == Git integration overview
-Git integration is best thought of as linking a *Git branch* to a *ThoughtSpot Org*. 
+Git integration is best thought of as linking a *Git branch* to a *ThoughtSpot Org*, using the xref:git-configuration.adoc.adoc[configure Git integration REST API].
 
-Together a paired Git branch and ThoughtSpot Org are an *environment*.
+A paired Git branch and ThoughtSpot Org are called an *environment*.
 
 Environments do not have to be on the same ThoughtSpot instance - you may have an environment on a "dev instance" that deploys to any number of "environments" on any number of "prod instances".
 
@@ -46,21 +46,26 @@ ThoughtSpot’s Git integration does not support moving objects within the same 
 == Moving TML changes between environments
 Each environment is a linked pair of a ThoughtSpot Org and a Git branch that can only export(commit) or import(deploy commits).
 
+=== Moving changes from one branch to another
 Moving commits from one Git branch to another is not handled by ThoughtSpot. 
 
 You must issue the appropriate git commands either via `git`, your software development tools or within your Git provider's UI. This allows your team to use Git integration with your existing git flows.
 
-The deploy commits REST API has a *GUID Mapping* feature which will substitute in the appropriate values for the objects on the ThoughtSpot Org.
-
-All TML in all Git branches maintain the same GUIDs and other properties as the *dev branch*, while the deploy commits REST API does all necessary substitutions in the TML files prior to the final TML import action.
-
-=== Quick Git guide
+==== Quick Git guide
 If you are not familiar with Git, the typical process to move changes from one branch to another is called a *link:https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request[pull request]*. 
 
 It is called a pull "request" because the branch with the changes is requesting they be "pulled into" the other branch, which that branch's maintainer must approve, making choices if there are any changes that do not automatically merge.
 
 There are many other Git commands that you are welcome to use within your own preferred processes, but create pull request then
 link: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request[merge the pull request] is the basic set of actions recommended by ThoughtSpot.
+
+=== Deploy commits back into an environment
+Once the merges have been completed from a pull requests, the TML files in branch for the destination environment will now reflect all of the changes that were committed originally to the branch of the "dev" environment.
+
+=== GUID mapping
+The deploy commits REST API has a *GUID Mapping* feature which will substitute in the appropriate values for the objects on the ThoughtSpot Org.
+
+All TML in all Git branches maintain the same GUIDs and other properties as the *dev branch*, while the deploy commits REST API does all necessary substitutions in the TML files prior to the final TML import action.
 
 == How it works
 
@@ -102,226 +107,3 @@ image::./images/git-lifecycle-management.png[Git integration workflow]
 ThoughtSpot does not recommend committing changes to Git directly and deploying these changes back in a ThoughtSpot development environment.
 ====
 
-
-
-=== Commit files
-
-ThoughtSpot users with data management (*Can manage data*) privilege can download TML files to their local environment, xref:modify-tml.adoc[edit TML files], and import them into ThoughtSpot via UI or REST API. With Git integration, users can also push commits from a ThoughtSpot instance to a Git branch via `/api/rest/2.0/vcs/git/branches/commit` API call.
-
-==== Request parameters
-[width="100%" cols="2,8"]
-[options='header']
-|===
-|Parameter|Description
-|`metadata`|__Array of Strings__. Specify the `type` and GUID of the metadata object.
-|`delete_aware` a|__Boolean__. When `delete_aware` is true, upon committing files, a check is run between the files in the Git branch and the objects in the ThoughtSpot environment. If an object exists in the Git branch, but not in the ThoughtSpot instance or Org, the object will be deleted from the Git branch. The `delete_aware` parameter is enabled by default.
-[NOTE]
-====
-The `delete_aware` property requires you to associate one ThoughtSpot environment or Org to one commit branch in Git. Associating multiple ThoughtSpot environments to the same Git commit branch will result in files getting unintentionally deleted across your environments during a commit operation.
-====
-
-|`branch_name` +
-__Optional__|__String__. Name of the branch in the Git repository to which you want to push the commit. If you do not specify the branch name, the commit will be pushed to the `commit_branch_name` defined for the xref:version_control.adoc#connectTS[Git connection configuration].
-|`comment`|__String__. Add a comment to the commit.
-||
-|===
-
-==== Request example
-
-The following example shows the API request with Liveboard and Worksheet objects to commit to Git.
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/vcs/git/branches/commit' \
-  -H 'Authorization: Bearer {Bearer_token}\
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "metadata": [
-    {
-      "identifier": "e9d54c69-d2c1-446d-9529-544759427075",
-      "type": "LIVEBOARD"
-    },
-    {
-      "identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-      "type": "LOGICAL_TABLE"
-    }
-  ],
-  "delete_aware": true,
-  "comment": "Add objects",
-  "branch_name": "prod"
-}'
-----
-
-==== Results
-
-During this operation, a check is performed to compare the objects in the Git branch with the objects in the ThoughtSpot environment.
-
-* If an object exists in the Git branch, but not in the ThoughtSpot instance or Org, the object will be deleted from the Git branch.
-* If the object does not exist in the Git branch, it will be added to the Git branch specified in the API request or `commit_branch_name` configured for the Git connection.
-* If the object exists on both the Git branch and ThoughtSpot cluster or Org and there are no changes detected in the commit, the API returns a warning message with a list of objects that were not updated as part of the commit.
-
-The following figure illustrates the commit operation with the `delete_aware` property enabled:
-
-[.widthAuto]
-image::./images/delete-aware-commit.png[Commit changes]
-
-==== Search commits
-
-ThoughtSpot provides a REST API endpoint to search commits for a given TML object. A `POST` call to the `/api/rest/2.0/vcs/git/commits/search` endpoint with `metadata` identifier and `type` in the request body fetches a list of commits.
-
-==== Revert a commit
-To undo the changes committed to a repository, revert to a previous commit and restore an earlier version of an object using the `/v2/vcs/commits/{commit_id}/revert` API endpoint.
-
-===== Request parameters
-[width="100%" cols="2,4"]
-[options='header']
-|=====
-|Parameter|Description
-|`commit_id`|__String__. ID of the commit to which you want to revert.
-|`metadata` +
-__Optional__|__Array of Strings__. Specify the `type` and GUID of the metadata object. If a metadata object is not specified, the API request reverts all objects that were modified as part of the specified `commit_id`.
-|`branch_name` +
-__Optional__|__String__. Name of the branch to which the revert operation must be applied. If you do not specify the branch name, the API will revert the commit to the default branch configured on that ThoughtSpot instance.
-|`revert_policy` a|__String__. Action to apply when reverting a commit. The allowed values are: +
-
-* `ALL_OR_NONE`  (Default) +
-Reverts all objects. If the revert operation fails for one of the objects provided in the commit, the API returns an error and does not revert any object.
-
-* `PARTIAL` +
-Reverts partial objects. This option reverts the subset of ThoughtSpot objects that validate successfully even if the other objects in the commit fail to import.
-||
-|=====
-
-==== Request example
-
-The following example shows the API request for reverting a commit.
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/vcs/git/commits/afc0fea831558e30d7064ab019f49243b1f09552/revert' \
-  -H 'Authorization: Bearer {Bearer_token}\\
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "metadata": [
-    {
-      "identifier": "e9d54c69-d2c1-446d-9529-544759427075",
-      "type": "LIVEBOARD"
-    }
-  ],
-  "commit_id": "afc0fea831558e30d7064ab019f49243b1f09552",
-  "branch_name": "dev"
-}'
-----
-
-==== Results
-
-If the API request is successful, the Git branch is reverted to the specified commit ID.
-
-=== Validate merge
-
-To merge updates, create a pull request to push changes from your `dev` branch to `main`. ThoughtSpot doesn't provide REST APIs to merge content from one branch to another. Before accepting the merge request in the Git repository, you can validate the merge on your ThoughtSpot instance using REST API.
-
-To validate the content of your `dev` branch against your `prod` environment, send a `POST` request from your `prod` instance to the `/api/rest/2.0/vcs/git/branches/validate` API endpoint.
-
-==== Request parameters
-[width="100%" cols="2,4"]
-[options='header']
-|=====
-|Parameter|Description
-|`source_branch_name`|__String__. Name of the source branch from which changes need to be picked for validation.
-|`target_branch_name`|__String__. Name of the target branch into which the TML changes will be merged.
-||
-|=====
-
-==== Request example
-
-The following example shows the API request with Liveboard and Worksheet objects to commit to Git.
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/vcs/git/branches/validate' \
-  -H 'Authorization: Bearer {Bearer_token}\
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "source_branch_name": "dev",
-  "target_branch_name": "main"
-}'
-----
-
-==== Results
-
-After validating the merge, check for conflicts. Resolve issues if any with a new commit and merge your changes to the `main` branch.
-
-=== Deploy commits
-
-To deploy commits to the `Staging` or `Prod` instance, send a `POST` request to the `/api/rest/2.0/vcs/git/commits/deploy` API endpoint. The API will deploy the head of the branch unless a `commit_id` is specified in the API request.
-
-Building a release version for a `Prod` environment on the same instance requires swapping in the correct GUIDs. If you have enabled xref:_guid_mapping[GUID mapping] in the Git configuration on your deployment instance, the version control APIs will automatically generate a GUID mapping file and update object references when deploying your commits to the destination environment.
-
-[NOTE]
-====
-Parallel deployment to multiple organizations within a single cluster is not supported. Developers must run deployments to each organization sequentially.
-====
-
-////
-Make sure the *guid mapping file* is referenced when creating the final TML files for production rollout.
-////
-
-==== Request parameters
-[width="100%" cols="2,4"]
-[options='header']
-|=====
-|Parameter|Description
-|`commit_id` +
-__Optional__|__String__. ID of the commit to deploy on the cluster. By default, the command will deploy the head of the branch. To deploy a specific version, specify the `commit_id`.
-|`branch_name` |__String__. Name of the branch from which the commit must be picked for deployment. If you do not specify the branch name, the commit from the default branch is deployed.
-|`deploy_type` a| __String__. Specify one of the following options: +
-
-* `DELTA` (default) +
-Deploys only the changes that were applied at the specified `commit_id`. For example, if three TML files were updated in the `commit_id` specified in the API request, only those changes will be deployed.
-* `FULL` +
-Deploys all the files in the Git branch, including the files from the `commit_id` specified in the request and all other files that were already committed.
-
-|`deploy_policy` a|__String__. Action to apply when deploying a commit. The allowed values are: +
-
-* `ALL_OR_NONE` (Default) +
-Deploys all changes or none. This option cancels the deployment of all ThoughtSpot objects if at least one of them fails to import.
-* `PARTIAL` +
-Deploys partial objects. This option imports the subset of ThoughtSpot objects that validate successfully even if other objects in the same deploy operations fail to import.
-* `VALIDATE_ONLY` +
-Runs validation to detect if your destination environment can import the changes without conflicts. Use this when the TML content is modified between source and destination environments and if you do not want the TML content in your destination branch to be modified after a pull request from your dev branch.
-||
-|=====
-
-
-==== Request example
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/vcs/git/commits/deploy' \
-  -H 'Authorization: Bearer {Bearer_token}'\
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "deploy_type": "DELTA",
-  "deploy_policy": "ALL_OR_NONE",
-  "commit_id": "afc0fea831558e30d7064ab019f49243b1f09552",
-  "branch_name": "main"
-}'
-----
-
-==== Results
-
-If the API request is successful, the changes are applied to the objects in the `prod` environment. A tracking file is generated in the Git branch used for storing configuration files. This file includes the `commit_id` specified in the API request.
-
-The subsequent API calls to deploy commits will consider the saved `commit_id` and `deploy_type` specified in the API request:
-
-* If `deploy_type` is set as `DELTA`, all the changes between the last tracked `commit id` and the new `commit_id` specified in the API request will be deployed to the destination environment or Org.
-* If the `deploy_type` is  FULL`, all the files from the `commit_id` specified in the API request will be deployed. If any object or file is deleted in the commit specified in the API request, it will be deleted from the destination environment during deployment.
