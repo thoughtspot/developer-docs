@@ -71,98 +71,7 @@ The following figure illustrates the commit operation with the `delete_aware` pr
 [.widthAuto]
 image::./images/delete-aware-commit.png[Commit changes]
 
-=== Search commits
-
-ThoughtSpot provides a REST API endpoint to search commits for a given TML object. A `POST` call to the `/api/rest/2.0/vcs/git/commits/search` endpoint with `metadata` identifier and `type` in the request body fetches a list of commits.
-
-=== Revert a commit
-To undo the changes committed to a repository, revert to a previous commit and restore an earlier version of an object using the `/v2/vcs/commits/{commit_id}/revert` API endpoint.
-
-===== Request parameters
-[width="100%" cols="2,4"]
-[options='header']
-|=====
-|Parameter|Description
-|`commit_id`|__String__. ID of the commit to which you want to revert.
-|`metadata` +
-__Optional__|__Array of Strings__. Specify the `type` and GUID of the metadata object. If a metadata object is not specified, the API request reverts all objects that were modified as part of the specified `commit_id`.
-|`branch_name` +
-__Optional__|__String__. Name of the branch to which the revert operation must be applied. If you do not specify the branch name, the API will revert the commit to the default branch configured on that ThoughtSpot instance.
-|`revert_policy` a|__String__. Action to apply when reverting a commit. The allowed values are: +
-
-* `ALL_OR_NONE`  (Default) +
-Reverts all objects. If the revert operation fails for one of the objects provided in the commit, the API returns an error and does not revert any object.
-
-* `PARTIAL` +
-Reverts partial objects. This option reverts the subset of ThoughtSpot objects that validate successfully even if the other objects in the commit fail to import.
-||
-|=====
-
-==== Request example
-
-The following example shows the API request for reverting a commit.
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/vcs/git/commits/afc0fea831558e30d7064ab019f49243b1f09552/revert' \
-  -H 'Authorization: Bearer {Bearer_token}\\
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "metadata": [
-    {
-      "identifier": "e9d54c69-d2c1-446d-9529-544759427075",
-      "type": "LIVEBOARD"
-    }
-  ],
-  "commit_id": "afc0fea831558e30d7064ab019f49243b1f09552",
-  "branch_name": "dev"
-}'
-----
-
-==== Results
-
-If the API request is successful, the Git branch is reverted to the specified commit ID.
-
-=== Validate merge
-
-To merge updates, create a pull request to push changes from your `dev` branch to `main`. ThoughtSpot doesn't provide REST APIs to merge content from one branch to another. Before accepting the merge request in the Git repository, you can validate the merge on your ThoughtSpot instance using REST API.
-
-To validate the content of your `dev` branch against your `prod` environment, send a `POST` request from your `prod` instance to the `/api/rest/2.0/vcs/git/branches/validate` API endpoint.
-
-==== Request parameters
-[width="100%" cols="2,4"]
-[options='header']
-|=====
-|Parameter|Description
-|`source_branch_name`|__String__. Name of the source branch from which changes need to be picked for validation.
-|`target_branch_name`|__String__. Name of the target branch into which the TML changes will be merged.
-||
-|=====
-
-==== Request example
-
-The following example shows the API request with Liveboard and Worksheet objects to commit to Git.
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/vcs/git/branches/validate' \
-  -H 'Authorization: Bearer {Bearer_token}\
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "source_branch_name": "dev",
-  "target_branch_name": "main"
-}'
-----
-
-==== Results
-
-After validating the merge, check for conflicts. Resolve issues if any with a new commit and merge your changes to the `main` branch.
-
-=== Deploy commits
+== Deploy commits
 
 To deploy commits to the `Staging` or `Prod` instance, send a `POST` request to the `/api/rest/2.0/vcs/git/commits/deploy` API endpoint. The API will deploy the head of the branch unless a `commit_id` is specified in the API request.
 
@@ -177,7 +86,7 @@ Parallel deployment to multiple organizations within a single cluster is not sup
 Make sure the *guid mapping file* is referenced when creating the final TML files for production rollout.
 ////
 
-==== Request parameters
+=== Request parameters
 [width="100%" cols="2,4"]
 [options='header']
 |=====
@@ -204,7 +113,7 @@ Runs validation to detect if your destination environment can import the changes
 |=====
 
 
-==== Request example
+=== Request example
 
 [source,cURL]
 ----
@@ -221,7 +130,7 @@ curl -X POST \
 }'
 ----
 
-==== Results
+=== Results
 
 If the API request is successful, the changes are applied to the objects in the `prod` environment. A tracking file is generated in the Git branch used for storing configuration files. This file includes the `commit_id` specified in the API request.
 
@@ -229,3 +138,99 @@ The subsequent API calls to deploy commits will consider the saved `commit_id` a
 
 * If `deploy_type` is set as `DELTA`, all the changes between the last tracked `commit id` and the new `commit_id` specified in the API request will be deployed to the destination environment or Org.
 * If the `deploy_type` is  FULL`, all the files from the `commit_id` specified in the API request will be deployed. If any object or file is deleted in the commit specified in the API request, it will be deleted from the destination environment during deployment.
+
+== Validate merge
+
+To merge updates, create a pull request to push changes from your `dev` branch to `main`. ThoughtSpot doesn't provide REST APIs to merge content from one branch to another. Before accepting the merge request in the Git repository, you can validate the merge on your ThoughtSpot instance using REST API.
+
+To validate the content of your `dev` branch against your `prod` environment, send a `POST` request from your `prod` instance to the `/api/rest/2.0/vcs/git/branches/validate` API endpoint.
+
+=== Request parameters
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`source_branch_name`|__String__. Name of the source branch from which changes need to be picked for validation.
+|`target_branch_name`|__String__. Name of the target branch into which the TML changes will be merged.
+||
+|=====
+
+=== Request example
+
+The following example shows the API request with Liveboard and Worksheet objects to commit to Git.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/vcs/git/branches/validate' \
+  -H 'Authorization: Bearer {Bearer_token}\
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "source_branch_name": "dev",
+  "target_branch_name": "main"
+}'
+----
+
+=== Results
+
+After validating the merge, check for conflicts. Resolve issues if any with a new commit and merge your changes to the `main` branch.
+
+
+== Search commits
+
+ThoughtSpot provides a REST API endpoint to search commits for a given TML object. A `POST` call to the `/api/rest/2.0/vcs/git/commits/search` endpoint with `metadata` identifier and `type` in the request body fetches a list of commits.
+
+
+
+== Revert a commit
+To undo the changes committed to a repository, revert to a previous commit and restore an earlier version of an object using the `/v2/vcs/commits/{commit_id}/revert` API endpoint.
+
+==== Request parameters
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`commit_id`|__String__. ID of the commit to which you want to revert.
+|`metadata` +
+__Optional__|__Array of Strings__. Specify the `type` and GUID of the metadata object. If a metadata object is not specified, the API request reverts all objects that were modified as part of the specified `commit_id`.
+|`branch_name` +
+__Optional__|__String__. Name of the branch to which the revert operation must be applied. If you do not specify the branch name, the API will revert the commit to the default branch configured on that ThoughtSpot instance.
+|`revert_policy` a|__String__. Action to apply when reverting a commit. The allowed values are: +
+
+* `ALL_OR_NONE`  (Default) +
+Reverts all objects. If the revert operation fails for one of the objects provided in the commit, the API returns an error and does not revert any object.
+
+* `PARTIAL` +
+Reverts partial objects. This option reverts the subset of ThoughtSpot objects that validate successfully even if the other objects in the commit fail to import.
+||
+|=====
+
+=== Request example
+
+The following example shows the API request for reverting a commit.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/vcs/git/commits/afc0fea831558e30d7064ab019f49243b1f09552/revert' \
+  -H 'Authorization: Bearer {Bearer_token}\\
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata": [
+    {
+      "identifier": "e9d54c69-d2c1-446d-9529-544759427075",
+      "type": "LIVEBOARD"
+    }
+  ],
+  "commit_id": "afc0fea831558e30d7064ab019f49243b1f09552",
+  "branch_name": "dev"
+}'
+----
+
+=== Results
+
+If the API request is successful, the Git branch is reverted to the specified commit ID.
+
+
