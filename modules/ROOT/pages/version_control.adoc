@@ -1,27 +1,30 @@
 = Git integration and version control
 :toc: true
-:toclevels: 3
+:toclevels: 2
 
 :page-title: Version control and Git integration
 :page-pageid: git-integration
 :page-description: The version control APIs and Git integration capability let you connect your ThoughtSpot instance to a Git repository, push changes, and deploy commits to your ThoughtSpot environment.
 
+////
 When embedding or deploying a third-party application in their environments, most organizations use defined practices at various stages of their SDLC process. Developers typically use a version control system and CI-CD pipeline to push their code from development to testing and production environments. Similarly, when deploying ThoughtSpot, you may want to publish your ThoughtSpot content from a development environment to a staging or production cluster.
 
 ThoughtSpot objects such as Worksheets, Liveboards, and Answers are stored as link:https://cloud-docs.thoughtspot.com/admin/ts-cloud/tml.html[ThoughtSpot Modeling Language (TML), window=_blank] content. Users can download these TML files, edit these files locally, and import the updated content into ThoughtSpot. TML files are also useful when migrating content from one ThoughtSpot instance to another.
+//// 
 
-With The Git integration feature, ThoughtSpot provides the ability to connect your deployment instance to a Git repository, push TML files to CI/CD pipelines, and deploy commits from your Git repository to your production environment.
+With the Git integration feature, ThoughtSpot provides the ability to connect ThoughtSpot Orgs to a Git repository, push link:https://cloud-docs.thoughtspot.com/admin/ts-cloud/tml.html[TML files, window=_blank] on demand to Git branches, and deploy commits from branches back into ThoughtSpot.
 
-The following two features are handled in ThoughtSpot via Git integration:
+Git integration in ThoughtSpot provides:
 
-* ThoughtSpot integration with Git and CI/CD workflows +
-Ability to connect your ThoughtSpot instance to a Git repository and deploy commits via REST API.
-* Ability to version control ThoughtSpot content +
-Ability to build or modify your content locally on a development instance and push commits to a remote Git branch via APIs and version your updates.
+* Version control
+// Ability to build or modify your content locally on a development instance and push commits to a remote Git branch via APIs and version your updates.
+* Development and deployment workflows
+// Ability to connect your ThoughtSpot instance to a Git repository and deploy commits via REST API.
+
 
 [NOTE]
 ====
-ThoughtSpot currently supports GitHub / GitHub Enterprise for CI/CD.
+ThoughtSpot currently supports integrating with GitHub / GitHub Enterprise
 ====
 
 == Git integration overview
@@ -31,7 +34,7 @@ A paired Git branch and ThoughtSpot Org are called an *environment*.
 
 Environments do not have to be on the same ThoughtSpot instance - you may have an environment on a "dev instance" that deploys to any number of "environments" on any number of "prod instances".
 
-ThoughtSpot has REST APIs for exporting TML from ThoughtSpot Org into a linked Git branch (commiting into Git) and for improting TML from a linked Git branch into the ThoughtSpot Org (deploying commits into ThoughtSpot).
+ThoughtSpot has REST APIs for exporting TML from ThoughtSpot Org into a linked Git branch (*commiting into Git*) and for importing TML from a linked Git branch into the ThoughtSpot Org (*deploying commits into ThoughtSpot*).
 
 The following figure illustrates a simple Git integration workflow with ThoughtSpot `Dev` and `Prod` environments.
 
@@ -46,12 +49,19 @@ ThoughtSpot’s Git integration does not support moving objects within the same 
 == Moving TML changes between environments
 Each environment is a linked pair of a ThoughtSpot Org and a Git branch that can only export(commit) or import(deploy commits).
 
-The overall pattern is:
+The standard workflow is:
 
+[.widthAuto]
+image::./images/git-lifecycle-management.png[Git integration workflow, float=right]
 1. All development work is done in the "dev environment"
 2. Use /vcs/git/branches/commit (or Version Control in the UI) to commit changes to "dev environment branch"
 3. Move changes from "dev branch" to any other environment's branch using Git
 4. Use /vsc/git/commits/deploy to deploy TML back into the desired environment's ThoughtSpot Org
+
+[NOTE]
+====
+ThoughtSpot does not recommend committing changes to Git directly and deploying these changes back in a ThoughtSpot development environment.
+====
 
 === Moving changes from one branch to another
 Moving commits from one Git branch to another is not handled by ThoughtSpot. 
@@ -69,31 +79,33 @@ link: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/
 === Deploy commits back into an environment
 Once the merges have been completed from a pull requests, the TML files in branch for the destination environment will now reflect all of the changes that were committed originally to the branch of the "dev" environment.
 
-=== GUID mapping
+==== GUID mapping
 The deploy commits REST API has a *GUID Mapping* feature which will substitute in the appropriate values for the objects on the ThoughtSpot Org.
 
 All TML in all Git branches maintain the same GUIDs and other properties as the *dev branch*, while the deploy commits REST API does all necessary substitutions in the TML files prior to the final TML import action.
 
 === Validate merge beore deploying
 
-== Recommended configuration and best practices
-The general practice is to use the `main` branch in the Git repository as a production branch to publish content.
+=== Sharing imported content with users and groups
 
-* Use one repository per ThoughtSpot version control project. Your ThoughtSpot development, staging, and production environments should all be using the same Git repository. This will make it easier to move objects from `dev` to `prod` (via merging branches).
-* Use one commit branch per environment. This is where the ThoughtSpot code will get committed. Do not commit content from different ThoughtSpot environments into the same branch. Each environment uses different unique identifiers (GUIDs) to identify files. Using the same branch to store files from multiple ThoughtSpot environments will result in corrupt branches, errors, and merge conflicts when deploying content to a ThoughtSpot production environment.
+== Recommended configuration and best practices
+The general practice is to use the `main` branch in the Git repository as the *release branch*, linked to the "prod" Org accessible by end customers.
+
+=== One repository per ThoughtSpot project
+Use one repository per ThoughtSpot version control project. Your ThoughtSpot development, staging, and production environments should all be using the same Git repository. This will make it easier to move objects from `dev` to `prod` (via merging branches).
+
+=== One branch per Org
+Use one commit branch per environment. This is where the ThoughtSpot code will get committed. Do not commit content from different ThoughtSpot environments into the same branch. Each environment uses different unique identifiers (GUIDs) to identify files. Using the same branch to store files from multiple ThoughtSpot environments will result in corrupt branches, errors, and merge conflicts when deploying content to a ThoughtSpot production environment.
 +
 As a best practice, use the xref:version_control.adoc#_commit_files[commit API] to submit TML changes to Git. This ensures that deleted and renamed files are properly synchronized.
-* Use a dedicated branch for version history. As described earlier, a given object's unique identifier will be different between its development and production versions. If you wish to implement version history in a production environment, use a dedicated branch for version history. Do not use a branch that is already used to manage or deploy development objects.
-* Use a dedicated branch for all Git configuration files. Dedicate some branches such as `dev` and `main` for ThoughtSpot content and store all Git configuration files created by ThoughtSpot in a separate branch. This will make it much easier to compare ThoughtSpot content across branches.
-* Validate the changes before merging or deploying, to ensure the TML content in target environments can import changes without conflicts.
+
+=== Dedicated branch for version history
+Use a dedicated branch for version history. As described earlier, a given object's unique identifier will be different between its development and production versions. If you wish to implement version history in a production environment, use a dedicated branch for version history. Do not use a branch that is already used to manage or deploy development objects.
+
+=== Dedicated branch for configuration files
+Use a dedicated branch for all Git configuration files. Dedicate some branches such as `dev` and `main` for ThoughtSpot content and store all Git configuration files created by ThoughtSpot in a separate branch. This will make it much easier to compare ThoughtSpot content across branches.
+
+=== Validate changes before deploying
+Validate the changes before merging or deploying, to ensure the TML content in target environments can import changes without conflicts.
 +
-The following figure illustrates the lifecycle management with git and best practices for commit and deploy workflows:
-
-[.widthAuto]
-image::./images/git-lifecycle-management.png[Git integration workflow]
-
-[NOTE]
-====
-ThoughtSpot does not recommend committing changes to Git directly and deploying these changes back in a ThoughtSpot development environment.
-====
 
