@@ -10,7 +10,11 @@ The Git deploy commits API handles the problem of recording the GUID of objects 
 
 == GUID mapping
 
-The version control API automatically generates a GUID mapping file when deploying commits and saves this file in a Git branch. The mapping file records the GUIDs for each TML object as shown in this example:
+The xref:git-rest-api-guide.adoc#deploy-commits[deploy commits API endpoint] automatically generates a GUID mapping file when deploying commits and saves this file in a Git branch. 
+
+Each Org that is configured will have a mapping JSON file generated with the name pattern `org-{orgId}.json`.
+
+Within the mapping JSON file will be an array of mapping objects recording the GUIDs for each TML object, which are automatically generated and maintained during each *deploy commits* call:
 
 [source,JSON]
 ----
@@ -34,54 +38,51 @@ The version control API automatically generates a GUID mapping file when deployi
 ]
 ----
 
-* `originalGuid` refers to the GUID of the object on the source environment, for example, a `Dev` cluster.
-* `mappedGuid` refers to the GUID of the object on the destination environment, for example, `staging` or `prod` cluster.
+* `originalGuid` refers to the GUID of the object on the source environment, typically the `dev` environment
+* `mappedGuid` refers to the GUID of the object on the destination environment, for example, `release` or `prod`
 * `counter` shows the number of times the mapped object was used in deploy operations.
-
-If GUID mapping is enabled, ThoughtSpot uses the GUID mapping file to map the object GUIDs and automatically updates the object references in your TML content.
 
 The following figure illustrates how GUIDs are mapped during deployments:
 
 [.widthAuto]
 image::./images/guid-mapping.png[GUID mapping]
 
-Each Org that is configured will have a mapping JSON file generated with the name pattern `org-{orgId}.json`.
-
-Within the mapping JSON file will be an array of mapping objects, which are automatically generated:
 
 == How mapping works
 The mapping file is updated when a new object is first created in the Destination Org and receives it's automatically generated GUID from the ThoughtSpot instance.
 
 The `additionalMapping` section records any viz_ids used to specify individual visualizations on a Liveboard, and thus is blank for all other object types.
 
-Mapping itself is performed with an EXACT FIND/REPLACE operation.
+Mapping itself is performed with an *exact string find/replace* operation.
 
 === Using mapping for Table TML properties
-There are several properties within Table TML files related to a table's fully qualified name within the RDBMS, that often need to be changed between Orgs. You can use the FIND/REPLACE nature of the GUID Mapping file to swap these properties from the Publisher Org to the Destination Org as well. 
+There are several properties within Table TML files related to a table's fully qualified name within the RDBMS, that often need to be changed between Orgs. 
+
+You can use the *exact string find/replace* nature of the GUID Mapping file to define changes in the Table TMLs between environments.
 
 Simply add to the mapping file as follows, whichever properties you need (including the TML property key along with the value):
 
 [source,JSON]
 ----
 [
-	{
-	  "originalGuid" : "db: DEVDBNAME",
-	  "mappedGuid" : "db: PRODDBNAME",
-	  "counter" : 0,
-	  "additionalMapping" : { }
-	},
-	{
-	  "originalGuid" : "schema: DEV_SCHEMA",
-	  "mappedGuid" : "schema: CUSTOMER_A_SCHEMA",
-	  "counter" : 0,
-	  "additionalMapping" : { }
-	}
+{
+  "originalGuid" : "db: DEVDBNAME",
+  "mappedGuid" : "db: PRODDBNAME",
+  "counter" : 0,
+  "additionalMapping" : { }
+},
+{
+  "originalGuid" : "schema: DEV_SCHEMA",
+  "mappedGuid" : "schema: CUSTOMER_A_SCHEMA",
+  "counter" : 0,
+  "additionalMapping" : { }
+}
 ]
 ----
 
-Note that the results will be an exact match on the provided string with full FIND/REPLACE across the full set of TML published to that Org via Git.
+Note that the results will be an exact match on the provided string with exact string find/replace across the full set of TML published to that Org via Git.
 
-If you need to limit the FIND/REPLACE to a specific TML file, you can instead put the rule within the additionalMapping section of the file you want it applied to:
+If you need to limit the find/replace to a specific TML file, you can instead put the rule within the additionalMapping section of the file you want it applied to:
 
 [source,JSON]
 ----
@@ -96,4 +97,6 @@ If you need to limit the FIND/REPLACE to a specific TML file, you can instead pu
 }
 ----
 
-This requires more effort but will work if there is a situation where a single broad FIND/REPLACE against all files would result in incorrect results. Given there are often many Table TML files being republished, perhaps across different connections, the additional specificity may be necessary.
+This requires more effort but will work if there is a situation where a single find/replace against all files would result in incorrect results. 
+
+Given there are often many Table TML files being republished, perhaps across different connections, the additional specificity may be necessary.
