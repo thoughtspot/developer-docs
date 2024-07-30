@@ -1,0 +1,49 @@
+= Single-tenant data models
+:toc: true
+:toclevels: 1
+
+:page-title: Single-tenant data models
+:page-pageid: single-tenant-data-models
+:page-description: Single-tenant data models are deployed in a prod Org per end customer model
+
+
+If there is a separate database connection for each customer organization, then the database pattern is single-tenant, and you will need to create objects for each tenant. ThoughtSpot represents all data and content objects using the link:https://cloud-docs.thoughtspot.com//admin/ts-cloud/tml.html[ThoughtSpot Modeling Language, window=_blank], with xref:tml-api.adoc[REST APIs] for automating the creation or  deployment of each tenant’s data and content objects via TML.
+
+== Single-tenant data models
+The "single-tenant data model" is designed on the following principles:
+
+* Each customer organization has its own database to connect to, with only that customer organization’s data present when making the database connection. Every database is similar in structure (table names and column names / data types).
+* Multiple customer organizations in ThoughtSpot
+* Content (answers and Liveboards) are provided by the app developer in the form of templates
+* Users within the customer organizations can create their own content, and can share it with other users within their own organizations only
+
+If you have the choice between designing your cloud data warehouse along single-tenant or multi-tenant model, it will be simpler to implement in ThoughtSpot using the multi-tenant model.
+
+=== Content provided by app developer
+Single-tenant databases require separate connections in ThoughtSpot for each database in most cases. There will then be separate objects on the ThoughtSpot Server for each connection. Because all of the objects other than the connection will be very similar, the deployment pattern can be handled through templating: there will be a set of template objects which are deployed for each tenant.
+
+We can describe the template as the parent content, with child objects that descend from the template.
+
+The template content itself will be built by the app developer, but will not be accessible to the customer organizations. Instead, there will be a deployment process that copies the template content and makes the necessary changes, and then publishes to the appropriate group for each customer.
+
+=== Content provided by app developer to each tenant group
+Each tenant should have a group used to give access to the content provided by the app developer—a tenant application group. Only the application developer would publish content to this group, and it should be set to *NOT SHAREABLE*.
+
+=== Content belonging to individual tenants
+To allow users to create their own content and share only within their organization, you will create at least one group for each tenant, separate from the application tenant group. This group can be set to *SHAREABLE*, or you may want additional groups below the main tenant group, representing different sets of users who belong to that tenant, and then make those child groups the ones that are *SHAREABLE*.
+
+=== Summary of access groups for single-tenant databases model
+The following table lists the access groups needed for this model. There will also be privilege groups, data access groups, and development and test content groups. You can name the groups anything you'd like, with a naming scheme that makes sense to you. The "group type" names here are just indications of the purpose of those groups.
+
+Reminder: when a group is set to *NOT SHAREABLE*, administrators can still share content to that group. *NOT SHAREABLE* groups are used for the content provided by the app developer to end users.
+[width="100%" cols="3,4,2,2"]
+[options='header']
+|===
+|Group type|Content shared to group|Users in group|Sharability
+|prod template group|Template tables, worksheets, answers, Liveboards|app developer|SHAREABLE
+|standard data groups (1 per tenant)|tables (connected to tenant connection)|app developer|NOT SHAREABLE
+|standard content groups (1 per tenant)|worksheets, answers, Liveboards|tenant users per group|NOT SHAREABLE
+|tenant content groups (1 per tenant)|answers, Liveboards|tenant users per group|SHAREABLE
+|===
+
+image::./images/single-tenant-database-model.png[Single-tenant database model]
