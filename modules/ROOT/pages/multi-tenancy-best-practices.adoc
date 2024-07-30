@@ -6,6 +6,15 @@
 :page-pageid: multitenancy-within-an-org
 :page-description: Multi-tenant databases can be filtered for different customers within one Org
 
+ThoughtSpot uses xref:orgs.adoc[Orgs] to create isolated tenants on a ThoughtSpot instance.
+
+The final stage of development and deployment for an embedded application results in at least one "prod enviroment" available to *end users*.
+
+If a single database with a single set of tables has the data for *all end customers*, it is a *multi-tenanted database*, and a *single "prod" environment can be used, utilizing all of the features within ThoughtSpot to separate users from different *end customers* and filter all data appropriately for each user.
+
+If your data model is single-tenanted, please review the xref:single-tenant-data-models.adoc[deployment pattern for single-tenanted data models].
+
+
 ////
 There are many situations where ThoughtSpot must be configured for multi-tenancy. With ThoughtSpot Embedded almost every deployment involves an application developer providing content to many distinct organizations. A ThoughtSpot Enterprise deployment may require separation between departments within the larger company. In both cases, the techniques in this article for creating separation of users and content will apply.
 
@@ -18,8 +27,9 @@ Just like in physical housing, tenancy within software system takes many differe
 == Multi-tenancy in ThoughtSpot is achieved using groups
 ////
 
-ThoughtSpot recommends using xref:orgs.adoc[Orgs for multi-tenancy]. If you don't intend to enable Orgs on your instance, use the following options to segregate and isolate your tenants' data:
 
+
+////
 * Multi-tenancy at the ThoughtSpot user level
 +
 Each instance of ThoughtSpot has users, who belong to various groups. ThoughtSpot link:https://cloud-docs.thoughtspot.com/admin/users-groups/add-group.html[groups, window=_blank] are the best mechanism for all access control and security within ThoughtSpot. Groups serve the purpose of folders, roles, and row-level security assignment in ThoughtSpot. When configured correctly, users from one organization never see content, groups, or other users from different organizations.
@@ -36,6 +46,7 @@ ThoughtSpot connects to cloud data warehouses (CDW) to retrieve data. CDWs can b
 
 +
 There are two aspects of groups which interact to create the “wall” between customer organizations: “shared content” and the “sharing visibility” property of groups and users.
+////
 
 == Multi-tenancy at the user level
 Each group and user has a "sharing visibility" property, which can be set to *SHAREABLE* or *NOT SHAREABLE*.
@@ -151,44 +162,7 @@ Reminder: when a group is set to *NOT SHAREABLE*, administrators can still share
 |===
 
 image::./images/multi-tenant-database-model.png[Multi-tenant database model]
-=== Single-tenant databases model
-The "single-tenant databases model" is designed on the following principles:
 
-* Each customer organization has its own database to connect to, with only that customer organization’s data present when making the database connection. Every database is similar in structure (table names and column names / data types).
-* Multiple customer organizations in ThoughtSpot
-* Content (answers and Liveboards) are provided by the app developer in the form of templates
-* Users within the customer organizations can create their own content, and can share it with other users within their own organizations only
-
-If you have the choice between designing your cloud data warehouse along single-tenant or multi-tenant model, it will be simpler to implement in ThoughtSpot using the multi-tenant model.
-
-==== Content provided by app developer
-Single-tenant databases require separate connections in ThoughtSpot for each database in most cases. There will then be separate objects on the ThoughtSpot Server for each connection. Because all of the objects other than the connection will be very similar, the deployment pattern can be handled through templating: there will be a set of template objects which are deployed for each tenant.
-
-We can describe the template as the parent content, with child objects that descend from the template.
-
-The template content itself will be built by the app developer, but will not be accessible to the customer organizations. Instead, there will be a deployment process that copies the template content and makes the necessary changes, and then publishes to the appropriate group for each customer.
-
-==== Content provided by app developer to each tenant group
-Each tenant should have a group used to give access to the content provided by the app developer—a tenant application group. Only the application developer would publish content to this group, and it should be set to *NOT SHAREABLE*.
-
-==== Content belonging to individual tenants
-To allow users to create their own content and share only within their organization, you will create at least one group for each tenant, separate from the application tenant group. This group can be set to *SHAREABLE*, or you may want additional groups below the main tenant group, representing different sets of users who belong to that tenant, and then make those child groups the ones that are *SHAREABLE*.
-
-==== Summary of access groups for single-tenant databases model
-The following table lists the access groups needed for this model. There will also be privilege groups, data access groups, and development and test content groups. You can name the groups anything you'd like, with a naming scheme that makes sense to you. The "group type" names here are just indications of the purpose of those groups.
-
-Reminder: when a group is set to *NOT SHAREABLE*, administrators can still share content to that group. *NOT SHAREABLE* groups are used for the content provided by the app developer to end users.
-[width="100%" cols="3,4,2,2"]
-[options='header']
-|===
-|Group type|Content shared to group|Users in group|Sharability
-|prod template group|Template tables, worksheets, answers, Liveboards|app developer|SHAREABLE
-|standard data groups (1 per tenant)|tables (connected to tenant connection)|app developer|NOT SHAREABLE
-|standard content groups (1 per tenant)|worksheets, answers, Liveboards|tenant users per group|NOT SHAREABLE
-|tenant content groups (1 per tenant)|answers, Liveboards|tenant users per group|SHAREABLE
-|===
-
-image::./images/single-tenant-database-model.png[Single-tenant database model]
 == Development and test content groups
 Most software development processes involve creating content in a restricted “development” environment, and then once the changes are finished, placing it in a “test” environment. Within a single ThoughtSpot instance, development and test content can be considered as another tenant's, with access restricted to only app developer users.
 
