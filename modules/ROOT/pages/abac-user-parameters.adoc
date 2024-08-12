@@ -20,11 +20,11 @@ Currently, the ABAC via tokens method requires using *link:https://docs.thoughts
 
 In ThoughtSpot 10.1 and later releases, the following can be set for a user via the login token, along with the existing capability to assign ThoughtSpot groups:
 
-* *Runtime filters* +
+* *xref:runtime-filters.adoc[Runtime filters]* +
 Can filter *multiple values* of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name).
-* *Parameters* +
+* *xref:runtime-parameters.adoc[Parameters]* +
 Binds a *single value* to any Parameter in any Worksheet by Parameter Name and Type match. Parameters can be used in *worksheet formulas*, then used as *worksheet filters*.
-* *Runtime sorts* +
+* *xref:runtime-sort.adoc[Runtime sorts]* +
 Overrides to sort order within columns.
 
 The request for a token with ABAC details can *xref:abac-user-parameters.adoc#persistForUser[persist]* the set of filters and parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
@@ -121,13 +121,11 @@ You can choose for the filter or parameter to apply only to specific ThoughtSpot
 = Persisting user_parameters to a user
 Filters and parameters must be *persisted* for them to apply when using xref:trusted-authenication.adoic#_cookie_based_vs_cookieless_authentication[cookie-based trusted authentication] or scheduled reports.
 
-The successful *request* for a token is what updates the stored `user_parameters` property of the user, rather than the first use of token.
+The successful *request* for a token *updates* the stored `user_parameters` property of the user, rather than the first use of token.
 
-Because of the above, you can treat the REST API *token request* with any values where `persist` is set to `true` as a "update user_parameters" command.
+You can treat the REST API *token request* with any values where `persist` is set to `true` as a "update user_parameters" API endpoint, even if you don't use the token in the response.
 
 Persisting values opens up use cases for ABAC outside of the cookieless Trusted Authentication pattern: even if users authenticate via SAML, OIDC or go directly into ThoughtSpot via username and password, an administrator can make a token request with `persist: true` to set their stored `user_parameters`.
-
-
 
 == Remove persisted values
 The syntax to fully remove persisted elements in a user's `user_parameters` property is to pass an *empty array* for the category.
@@ -162,17 +160,18 @@ The way to set a runtime filter to *show all values* is to not send in any runti
 Without additional information, it's impossible to know if the lack of a runtime filter is intentional to indicate a  *show all values* condition or if something went wrong—a malformed ABAC token or the user entered into ThoughtSpot without a token at all.
 
 === Check parameter and shared key
-To make sure that no data shows when a properly-built token is not used to start the user session, you need to send a 'check parameter' along with the runtime filters.
+To make sure that no data shows when a properly-built token is not used to start the user session, you need to send a *"check parameter"* when using runtime filters.
 
 The *shared secret* is a string value used in both the *token request service* to generate each token, and within the *Worksheet formula* to evaluate the parameter.
 
-If the 'check parameter' value from the token does not match the value defined in the Worksheet formula (the *shared secret*), the formula and filter combination blocks any data from showing for the user.
+If the "check parameter" value from the token does not match the value defined in the Worksheet formula (the *shared secret*), the formula and filter combination will blocks any data from showing for the user.
 
 == Building the ABAC token request
-Two parts to the ABAC request:
+The xref:trusted-auth-token-request-service.adoc[token request service] must have the following to build a token request for ABAC:
 
-1. Runtime filters defining multi-value conditions on columns
-2. The *shared secret* to go into the 'check parameter' 
+1. The *shared secret* to go into the "check parameter" 
+2. Runtime filters for defining multi-value conditions on columns
+3. Any additional parameters
 
 The runtime filters must be built by:
 
@@ -185,7 +184,17 @@ The value of the ABAC pattern is that you can send different combinations of fil
 You can retrieve the attribute names and values from any source: the embedding application's session details, an entitlement REST API, a query to a different database, etc. 
 
 === Translating entitlements into runtime filters
-Runtime filters *match on the name property of a column* as defined in ThoughtSpot, not the column's name in the underlying database table. The *token request service* does need to know the ThoughtSpot column names that will be used for each of the attributes, so you'll need to coordinate between ThoughtSpot Worksheet designers and the *token request service* to make sure the column names and values are passing correctly to the *token request service*.
+Runtime filters *match on the name property of a column* as defined in ThoughtSpot, not the column's name in the underlying database table. 
+
+The xref:trusted-auth-token-request-service.adoc[token request service] *MUST* know the ThoughtSpot column names that will be used for each of the attributes, so you'll need to coordinate between ThoughtSpot Worksheet designers and the xref:trusted-auth-token-request-service.adoc[token request service] to make sure the matching column names and values ar being sent.
+
+[IMPORTANT]
+====
+[#dev-deploy-warning]
+End users of an embedded app cannot have *edit* accesss to any worksheet using ABAC RLS via tokens.
+
+You must follow xref:development-and-deployment.adoc[proper development and deployment practices] for all end customer facing prod environments as well as the prod token request service. 
+====
 
 As mentioned in the preceding section, the format for runtime filters within the token match with xref:runtime-filters.adoc[runtime filters] in the Visual Embed SDK. In general, RLS entitlements are lists of values using the `IN` operator, but you can pass in filters on numeric and time columns using the full set of operators.
 
