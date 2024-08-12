@@ -1,26 +1,36 @@
 = TML modification
 :toc: true
-:toclevels: 2
+:toclevels: 3
 
 :page-title: Modify TML files
 :page-pageid: modify-tml
 :page-description: Details of how to change TML files to achieve various transformations and goals
 
 
-link:https://cloud-docs.thoughtspot.com/admin/ts-cloud/tml.html[TML, window=_blank] is slightly different for every object type, but all follow a general pattern that allows for programmatic editing.
+link:https://cloud-docs.thoughtspot.com/admin/ts-cloud/tml.html[ThoughtSpot Modeling Language (TML), window=_blank] is slightly different for every object type, but all follow a general pattern that allows for programmatic editing.
+
+This section describes how various objects and their connections to each other are represented in TML.
+
+The xref:version_control.adoc[Git integration features] within ThoughtSpot automatically handle the relevant aspects of a typical development and deployment process.
+
+Modifying TML programmatically is useful for more complex levels of transformations than the standard development and deployment practices handled by the Git integration capabilities, such as the following:
+
+- Re-mapping of table objects between different data warehouse types
+- Deploying dynamically generated data models from the data warehouse
+- Translations or other variations from templates
 
 You can use the link:https://github.com/thoughtspot/thoughtspot_tml[thoughtspot_tml Python library, window=_blank] to access and transform any of the properties discussed within this document, most of which are covered in the README and the link:https://github.com/thoughtspot/thoughtspot_tml/blob/v2_main/examples/common_attribute_changes.py[common_attribute_changes.py example script, window=_blank].
 
 == Best practices
 Because of the flexibility of the various data object types, there is no particular hierarchy to TML files, but rather just the following rules:
 
- - Data objects can only be joined to other objects from a single connection
- - Any single search (an *answer* or a *visualization* on a *Liveboard*) can only connect to data objects from a single connection
-The *connection* is thus the natural packaging level for importing TML files, except for Liveboards which may contain visualizations connected to different *connections*. 
+* Data objects can only be joined to other objects from a single connection
+* Any single search (an Answer or a visualization on a Liveboard) can only connect to data objects from a single connection
+The *Connection* is thus the natural packaging level for importing TML files, except for Liveboards which may contain visualizations connected to different *Connections*.
 
-This is to say, for a given *connection* you can always upload all TML files connected to that connection safely *except Liveboards*.
+This is to say, for a given *Connection* you can always upload all TML files connected to that connection safely except Liveboards.
 
-One best practice recommendation is to only connect *answers* and *Liveboards* to *worksheets*. Although they can connect directly to *tables* and *views*, it is far simpler to adjust a single reference to one *worksheet* within the *answer* and *Liveboard* TML than many individual *tables*. The only exception is if you use a single *table* or *view* for the underlying search answer.
+One best practice recommendation is to only connect *Answers* and *Liveboards* to *worksheets*. Although they can connect directly to *Tables* and *Views*, it is far simpler to adjust a single reference to one *worksheet* within the *answer* and *Liveboard* TML than many individual *tables*. The only exception is if you use a single *table* or *view* for the underlying search answer.
 
 image::./images/object_model_hierarchy.png[ThoughtSpot object model hierarchy and relationships]
 
@@ -29,7 +39,7 @@ Always export TML files with `export_fqns=true` (for versions lower than 9.0.0.c
  
 The `fqn:` property provides the GUID of associated objects, which can be swapped out when moving packages of TML files between environments. The following is an example of the `connection:` property within a Table TML:
  
-[source,yaml]
+[source,YAML]
 ----
 connection:
  name: Demo Connection
@@ -45,7 +55,7 @@ One of the most important examples is that the `name:` property of a column in a
 
 A Table object might have a column with a display name property (`name:`) that has been modified to be different than the `db_table:` property (the actual name of the column in the database itself):
 
-[source,yaml]
+[source,YAML]
 ----
 table:
   name: FACT_RETAPP_SALES
@@ -67,7 +77,7 @@ table:
 
 The connected worksheet TML referencing the same column would be as shown in the following example. Note that it is the formatted `name` property from the Table TML, not `db_table_name`.
 
-[source,yaml]
+[source,YAML]
 ----
 ...
   worksheet_columns:
@@ -82,7 +92,7 @@ The pattern for `column_id` is a combination of the `id` from the `table_paths` 
 
 This is the section in Worksheet where the first part of the identifier is defined as the `id` property (`table` property references the `tables:` section above in the TML file):
 
-[source,yaml]
+[source,YAML]
 ----
 table_paths:
   - id: DIM_RETAPP_PRODUCTS_1
@@ -100,7 +110,7 @@ table_paths:
 == Connections
 Connections contain the details and credentials necessary to connect to a database. A TML representation of a Connection includes all the details of connection object.
 
-[source,yaml]
+[source,YAML]
 ----
 guid: 46030ea3-ecba-4cbf-a02c-c2ef5d5f29f1
 connection:
@@ -139,7 +149,7 @@ link:https://cloud-docs.thoughtspot.com/admin/ts-cloud/tml.html#syntax-tables[Ta
 
 When importing a table through the ThoughtSpot UI, a table's display name will default to the table's name in the data warehouse, but you can change the display name to whatever you'd like. You can specify the display name within the TML document when creating a table via TML import by changing the `name` property, while leaving the `db_table` property as it was originally imported.
 
-[source,yaml]
+[source,YAML]
 ----
 guid: <table_guid>
 table:
@@ -156,16 +166,16 @@ table:
 === Change table properties
 You can replace the `connection: name:` or `fqn:` property to 'repoint' the *table* to a different data environment.
 
-The `db`, `schema`, and `db_table` properties may also be changed easily along with `connecton`, assuming the schema/structure (field names and data types) are identical to the original object. 
+The `db`, `schema`, and `db_table` properties may also be changed easily along with `connection`, assuming the schema/structure (field names and data types) are identical to the original object.
 
 === Change or add columns
 You can adjust the properties of existing columns or even add new column objects with TML.
 
-When updating an existing object, do not change both `name` and `db_column_name` at the same time. The TML parser will consider this a delete of the original column and an add of a new column.
+When updating an existing object, do not change both `name` and `db_column_name` at the same time. The TML parser will consider this as a deletion of the original column and an addition of a new column.
 
 If you are modifying a package of TML for deployment to a new environment, changes to `name` property have downstream effects in connected Worksheet files.
 
-[source,yaml]
+[source,YAML]
 ----
   columns:
   - name: Sales Id
@@ -198,9 +208,8 @@ If you want to change the values for an existing *worksheet* object, the `tables
 
 The `tables` section is a list of table objects that exist on the ThoughtSpot Server. The `name` property is all that is included in an exported TML file, and this matches the `name` property of the table object. If there is more than one table object on the server with identical name properties, you must use the `fqn` property to specify the GUID of the particular table you want. However, the string value of `name` is used in the `joins` section, so the correct process for adding an `fqn` property is as follows:
 
-
 So you go from
-[source,yaml]
+[source,YAML]
 ----
   tables:
   - name: <table_name_1>
@@ -208,9 +217,8 @@ So you go from
 
 to
 
-[source,yaml]
+[source,YAML]
 ----
-
   tables:
   - id : <table_name_1>
     fqn : <GUID_of_table_name>
@@ -219,7 +227,7 @@ The `name` property, which is now transformed into the `id` property, is used in
 
 Under `table_paths`, the `table` property also uses the values we moved to `id`. The list of join names under `join_path` will need to match the text value of the `name` element of an item in the `joins`. This should be valid as exported and not require any changes, but if you do change the `name` value of a join, you will need to update the value in the `join_path` list in `table_paths`.
 
-[source,yaml]
+[source,YAML]
 ----
   joins:
   - name: <join_name_1>
@@ -238,13 +246,148 @@ Under `table_paths`, the `table` property also uses the values we moved to `id`.
       - <join_name_n>
 ----
 
+== Models
+
+Like Worksheets, Models combine several Tables to create a data model optimized for Search. With Models, you can build a data model easily by dragging and dropping tables and columns and creating joins, and switch between Table and Column views.
+
+TML for Models has a specific syntax and includes several parameters. It includes parameters that are explicitly defined. For example, if you do not have any filters on your Model, the `filters` parameter does not appear. You can add that variable to the TML file to specify filters for your Model. The `fqn` parameter is optional but is recommended to reduce ambiguity when there is more than one table object on the server with identical name properties. If you do not add the `fqn` property and the Connection or Table you reference does not have a unique name, the file import fails.
+
+[source,YAML]
+----
+  model_tables::
+  - name: <table_name_1>
+    id : <optional_table_id>
+    fqn : <optional_GUID_of_table_name>
+----
+
+If you edit the joins in a Model TML file, the modifications will apply only to that specific Model. The joins at the table level will not be updated. To modify table-level joins, you must edit the source table’s TML file.
+
+The following example shows the TML syntax for Models:
+
+[source,YAML]
+----
+guid: <model_guid>
+model:
+  name: <model_name>
+  description:
+    This is a multi-line description of the model
+    Description line 2
+  model_tables:
+  - name: <table_name_1>
+    id : <optional_table_id>
+    fqn : <optional_GUID_of_table_name>
+    joins:
+    - with: Alias
+      on: <join_expression_string>
+      type: [RIGHT_OUTER | LEFT_OUTER | INNER | OUTER]
+      cardinality: [MANY_TO_ONE | ONE_TO_ONE | ONE_TO_MANY]
+  - name: <table_name_2>
+    alias: Alias
+  - name: <table_name_3>
+    joins:
+    - with: <table_name_1>
+      referencing_join: <join_expression_string>
+  formulas:
+  - name: <formula_name_1>
+    expr: <formula_definition_1>
+    id: <optional_unique_identifier>
+  - name: <formula_name_2>
+    expr: <formula_definition_2>
+  filters:
+  - column: <filtered_column_name_1>
+    oper: <filter_operator>
+    values: <filtered_values>
+    - value 1
+    - value 2
+    - value n
+  - column: <filtered_column_name_2>
+  columns:
+  - name: <column_name_1>
+    description: <optional_column_description>
+    column_id: <table_path>::<column_id_1>
+    properties:
+      column_type: [ MEASURE | ATTRIBUTE ]
+      aggregation: [ SUM | COUNT | AVERAGE | MAX | MIN |
+                     COUNT_DISTINCT | NONE | STD_DEVIATION | VARIANCE]
+      index_type: [ DONT_INDEX | DEFAULT | PREFIX_ONLY |
+                    PREFIX_AND_SUBSTRING | PREFIX_AND_WORD_SUBSTRING ]
+      index_priority: <index_priority>
+      synonyms :
+      - value 1
+      - value 2
+      - value n
+      is_attribution_dimension : [true | false]
+      is_additive : [ true | false ]
+      calendar : [ default | calendar_name ]
+      format_pattern : <format_pattern_string>
+      currency_type :
+        is_browser : true
+          OR
+        column : <column_name>
+          OR
+        iso_code : <valid_ISO_code>
+      is_hidden: [ true | false ]
+      geo_config:
+        latitude : true
+          OR
+        longitude : true
+          OR
+        country : true
+          OR
+        region_name:
+        - country : <name_supported_country>
+        - region_name : <region_name_in_UI>
+          OR
+        custom_file_guid: <custom_map_guid>
+        geometryType: <custom_map_geometry_type>
+      spotiq_preference: <spotiq_preference_string>
+    name: <column_name_2>
+    description: <column_description>
+    column_id: <table_path>::<column_id_2>
+    ...
+  properties:
+    is_bypass_rls: [ true | false ]
+    join_progressive: [ true | false ]
+  lesson_plans:
+  - lesson_id: <lesson_id_number_1>
+    lesson_plan_string <lesson_plan_string_1>
+  - lesson_id: <lesson_id_number_2>
+    lesson_plan_string <lesson_plan_string_2>
+  parameters:
+  - id: <parameter_1_id>
+    name: <parameter_1_name>
+    data_type: <parameter_1_data_type>
+    default_value: <parameter_1_default_value>
+    description: “parameter description”
+    range_config:
+      range_min: <parameter_1_range_minimum>
+      range_max: <parameter_1_range_maximum>
+      include_min: [true | false]
+      include_max: [true | false]
+  - id: <parameter_2_id>
+    name: <parameter_2_name>
+    data_type: <parameter_2_data_type>
+    default_value: <parameter_1_default_value>
+    list_config:
+      list_choice:
+      - value: <list_value_1>
+        display_name: <value_1_display_name>
+      - value: <list_value_2>
+        display_name: <value_2_display_name>
+      - value: <list_value_n>
+        display_name: <value_n_display_name>
+        linked_parameters: <table_name>::<parameter_name_in_ThoughtSpot>
+----
+
+For more information, see link:https://docs.thoughtspot.com/cloud/latest/tml-models[TML for Models, window=_blank].
+
 == Answers
 
 The link:https://cloud-docs.thoughtspot.com/admin/ts-cloud/tml.html#syntax-answers[answer TML syntax, window=_blank] defines all aspects of a saved search and how it is visualized. The `tables` property is used to point to ThoughtSpot *table*, *view*, or *worksheet* objects, whichever the answer is connected to. 
 
 As mentioned above, it is simpler to connect an answer to a single *worksheet*, so that you only have to update one reference in the `tables` section.
 
-[source,yaml]
+[source,YAML]
 ----
 guid: <answer_guid>
 answer:
@@ -263,16 +406,16 @@ answer:
 
 link:https://cloud-docs.thoughtspot.com/admin/ts-cloud/tml.html#syntax-pinboards[Liveboards, window=_blank] include many different visualizations and define a layout of the visualizations elements.
 
-It is *best practice* to only use *one worksheet* for all visualizations on a Liveboard, however each visualization on a *Liveboard* can connect to different data objects.
+It is *best practice* to only use *one worksheet* for all visualizations on a Liveboard. However, each visualization on a *Liveboard* can connect to different data objects.
 
 === Visualizations on a Liveboard
 The individual elements on a *Liveboard* are referred to as visualizations and are defined in the `visualizations` section. 
 
-A visualization on a Liveboard *is not linked* in any way to any answer object outside that Liveboard.
+A visualization on a Liveboard *is not linked* to any answer object outside that Liveboard.
 
 When you pin an answer to a Liveboard, the full definition of the answer is copied into the Liveboard definition at that time. However, the capabilities and definitions for answers stored separately or on a Liveboard are identical.
 
-Within the TML, the `visualizations` section uses the exact same syntax as a separate *answer* stored on its own, with the `guid` property of an individual answer replaced by an `id` property. The value for the `id` property is typically the word `Viz` and a number, `Viz 1`, `Viz 10`.
+Within the TML, the `visualizations` section uses the same syntax as a separate *answer* stored on its own, with the `guid` property of an individual answer replaced by an `id` property. The value for the `id` property is typically the word `Viz` and a number, `Viz 1`, `Viz 10`.
 
 [NOTE]
 ====
@@ -280,7 +423,7 @@ If your instance is running 8.9.0.cl, do not create visualizations on a single *
 ====
 
 === Modifying Liveboard TML
-[source,yaml]
+[source,YAML]
 ----
 liveboard:
   name: <Liveboard_name>
@@ -295,7 +438,7 @@ liveboard:
 
 The `layout` section is an ordered list with a `size` property for each visualization tile. If a visualization is added programmatically, it needs a matching entry in the layout section to determine how it appears within the Liveboard. Adjustments to the order within the Liveboard can be made by reordering the layout list. The `visualization_id` property must match to an existing `id` value in the `visualizations` list.
 
-[source,yaml]
+[source,YAML]
 ----
   layout:
     tiles:
@@ -311,7 +454,7 @@ link:https://cloud-docs.thoughtspot.com/complex-search/about-query-on-query.html
 
 The link:https://cloud-docs.thoughtspot.com/admin/ts-cloud/tml.html#syntax-views[TML syntax for views, window=_blank] is similar to that of worksheets, in that it defines links to table objects on the ThoughtSpot server and join overrides using the `joins` and `table_paths` sections. What truly distinguishes a view is the `search_query` element, which contains a string using the xref:search-data-api.adoc[ThoughtSpot search syntax].
 
-[source,yaml]
+[source,YAML]
 ----
 guid: <view_guid>
 view:
@@ -350,7 +493,7 @@ A link:https://docs.thoughtspot.com/cloud/latest/tml#syntax-sql-views[SQL View, 
 
 The `connection` property can be changed similar to a *table* object's TML either using the `fqn` property, while the `sql_query` property can be changed to a different valid text string.
 
-[source,yaml]
+[source,YAML]
 ----
 guid: <sql_view_guid>
 sql_view:
