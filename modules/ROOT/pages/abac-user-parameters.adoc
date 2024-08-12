@@ -27,8 +27,6 @@ Binds a *single value* to any Parameter in any Worksheet by Parameter Name and T
 * *xref:runtime-sort.adoc[Runtime sorts]* +
 Overrides to sort order within columns.
 
-The request for a token with ABAC details can *xref:abac-user-parameters.adoc#persistForUser[persist]* the set of filters and parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
-
 [IMPORTANT]
 ====
 [#column-name-warning]
@@ -36,6 +34,8 @@ The  `runtime_filters` require passing the *exact* ThoughtSpot worksheet column 
 
 For the same reasons, end users of an embedded app cannot have *edit* accesss to any worksheet using ABAC RLS via tokens.
 ====
+
+The request for a token with ABAC details can *xref:abac-user-parameters.adoc#persistForUser[persist]* the set of filters and parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
 
 = Token request
 The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 REST API Access Tokens, target=_blank] (which are OAuth JWT tokens). 
@@ -118,12 +118,36 @@ You can choose for the filter or parameter to apply only to specific ThoughtSpot
 ----
 
 [#persistForUser]
-= Persisting user_parameters to a user
+= Token-based override vs. persisting values
+When `persist: false` is chosen for an ABAC attribute, it only acts as an *override*, with the values tied only to the specific token.
+
+You can treat the REST API *token request* with any values where `persist: true` as a "update user_parameters" API endpoint, even if you don't use the token in the response.
+
 Filters and parameters must be *persisted* for them to apply when using xref:trusted-authenication.adoic#_cookie_based_vs_cookieless_authentication[cookie-based trusted authentication] or scheduled reports.
 
-The successful *request* for a token *updates* the stored `user_parameters` property of the user, rather than the first use of token.
+[cols="1,1,2"]
+|===
+|persist|authentication type|behavior
 
-You can treat the REST API *token request* with any values where `persist` is set to `true` as a "update user_parameters" API endpoint, even if you don't use the token in the response.
+|false
+|Cookieless Trusted Auth
+|Token values override user's values, without updating user_parameters
+
+|true
+|Cookieless Trusted Auth
+|Token values override, but user_parameters is also updated by token request
+
+|true
+|Cookie-based Trusted Auth
+|Token request updates user_parameters, token is used by SDK to start a session
+
+|true
+|Discard token after request
+|Token request updates user_parameters
+
+|===
+
+Remember, the successful *request* for a token *updates* the stored `user_parameters` property of the user, rather than the first use of token.
 
 Persisting values opens up use cases for ABAC outside of the cookieless Trusted Authentication pattern: even if users authenticate via SAML, OIDC or go directly into ThoughtSpot via username and password, an administrator can make a token request with `persist: true` to set their stored `user_parameters`.
 
