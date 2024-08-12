@@ -8,18 +8,26 @@
 
 Attribute-Based Access Control (ABAC) is a pattern where security entitlements are sent in as lists of attributes at session creation time via the authentication service.
 
-You can pass in runtime filters and Parameters for a user via the Full Access Token REST API. Both features work like the runtime filters and Parameters available within the Visual Embed SDK, but values set via token cannot be overridden by any user action within the ThoughtSpot UI.
-
-Currently, the ABAC via tokens method requires using link:https://docs.thoughtspot.com/cloud/latest/worksheet-create[Worksheets, target=_blank] as data sources for Liveboards and Answers, rather than individual table objects.
-
-The request for a token with ABAC details can *persist* the set of filters and parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
-
 [IMPORTANT]
 ====
 [#beta-warning]
 RLS using ABAC via tokens is in beta. ThoughtSpot is working on improvements in the upcoming releases that will change some of the best practices recommended in this article, and will result in the needed re-work of the security architecture of your deployment. We recommend reaching out to ThoughtSpot to discuss RLS best practices for your specific use case and deployment timelines, and to get all early access features enabled on your ThoughtSpot instances.
 ====
 
+Currently, the ABAC via tokens method requires using *link:https://docs.thoughtspot.com/cloud/latest/worksheet-create[Worksheets, target=_blank]* as data sources for Liveboards and Answers, rather than individual table objects.
+
+= Overview
+
+In ThoughtSpot 10.1 and later releases, the following can be set for a user via the login token, along with the existing capability to assign ThoughtSpot groups:
+
+* *Runtime filters* +
+Can filter *multiple values* of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name).
+* *Parameters* +
+Binds a *single value* to any Parameter in any Worksheet by Parameter Name and Type match. Parameters can be used in *worksheet formulas*, then used as *worksheet filters*.
+* *Runtime sorts* +
+Overrides to sort order within columns.
+
+The request for a token with ABAC details can *xref:abac-user-parameters.adoc#persistForUser[persist]* the set of filters and parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
 
 [IMPORTANT]
 ====
@@ -33,16 +41,6 @@ For the same reasons, end users of an embedded app cannot have *edit* accesss to
 The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 REST API Access Tokens, target=_blank] (which are OAuth JWT tokens). 
 
 The token can be used as a bearer token for Cookieless Trusted Auth or REST API access, or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
-
-== ABAC capabilities
-In ThoughtSpot 9.10.5 and later releases, the following can be set for a user via the login token, along with the existing capability to assign ThoughtSpot groups:
-
-* *Runtime filters* +
-Can filter *multiple values* of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name).
-* *Parameters* +
-Binds a *single value* to any Parameter in any Worksheet by Parameter Name and Type match.
-* *Runtime sorts* +
-Overrides to sort order within columns.
 
 == Request format
 The ABAC request is sent using the `user_parameters` key of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]. 
@@ -60,7 +58,7 @@ There are three potential keys within `user_parameters`, each taking an array of
 
 The format for the objects in each section follows the equivalent formats in the Visual Embed SDK for xref:runtime-filters.adoc[runtime filters], xref:runtime-parameters.adoc[runtime parameters], or xref:runtime-sort.adoc[runtime sorts].
 
-There is a `persist` key to be added on each object that takes boolean `true` or `false`. This determines if the values are persisted at the user level beyond just the token itself, for features such as alerts and subscriptions that run outside a user's session.
+There is a `xref:abac-user-parameters.adoc#persistForUser[persist]` key to be added on each object that takes boolean `true` or `false`. This determines if the values are persisted at the user level beyond just the token itself, for features such as alerts and subscriptions that run outside a user's session.
 
 The following is a `user_parameters` section that would be part of the JSON request of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]:
 
@@ -119,6 +117,7 @@ You can choose for the filter or parameter to apply only to specific ThoughtSpot
 ]
 ----
 
+[#persistForUser]
 = Persisting user_parameters to a user
 Filters and parameters must be *persisted* for them to apply when using xref:trusted-authenication.adoic#_cookie_based_vs_cookieless_authentication[cookie-based trusted authentication] or scheduled reports.
 
@@ -126,20 +125,9 @@ The successful *request* for a token is what updates the stored `user_parameters
 
 Because of the above, you can treat the REST API *token request* with any values where `persist` is set to `true` as a "update user_parameters" command.
 
-Persisting values opens up use cases for ABAC outside of the cookieless Trusted Authentication pattern.
+Persisting values opens up use cases for ABAC outside of the cookieless Trusted Authentication pattern: even if users authenticate via SAML, OIDC or go directly into ThoughtSpot via username and password, an administrator can make a token request with `persist: true` to set their stored `user_parameters`.
 
-== Large sets of values
-There are limitations to the size of HTTP headers, which limits the amount of filter and parameters values that can be sent via a bearer token.
 
-The best solution if you have very large sets of values is to make two requests
-
-1. First request: include the `user_parameters` section defining all of filters and parameters, all with `persist: true`
-2. Second request: exclude `user_parameters` to create a pure authentication token to send to the user's browser
-
-The *request* with all of the persisted values will be set for the user, and when they use the second token to load the content, all of the persisted values will be applied.
-
-== SAML and OIDC
-The same pattern above for persisting large sets of values can also be used if users authenticate via SAML, OIDC or go directly into ThoughtSpot via username and password. 
 
 == Remove persisted values
 The syntax to fully remove persisted elements in a user's `user_parameters` property is to pass an *empty array* for the category.
@@ -156,19 +144,15 @@ The following would clear *all* persisted values of any type:
 }
 ----
 
-
 = Implementing RLS with ABAC via tokens
 The ABAC via tokens pattern allows for setting arbitrary filters and overriding the values of existing worksheet parameters. These two capabilities can be combined in a number of ways to create secure and unbreakable RLS.
 
-Parameters are currently single-value, so you'll need to use runtime filters to restrict multiple values on a given field. 
-
 The current standard best practice pattern for RLS using ABAC via tokens is:
 
-1. Use runtime filters to define all *multi-value* filter conditions on columns
-2. Pass a *shared secret* to the worksheet as a 'check parameter'. This parameter will be used in a formula/filter combination at the Worksheet level to block unrestricted data access when no filters are set via the token
-3. Edit the Worksheet TML to add `is_hidden: true` to any parameter that will be set via token (9.12.5 and later)
-
-If a column will only be restricted by a single value for any users, you can choose whether to pass that attribute value as a runtime filter or a parameter to be used in a Worksheet formula/filter combination. 
+1. Use parameters for any single-value items, with formulas and filters at the worksheet layer to create the desired filtering clauses on every query
+2. Use runtime filters to define any *multi-value* filter conditions on columns (parameters are single-valued)
+3. If using runtime filters, pass a *shared secret* to the worksheet as a 'check parameter'. This parameter will be used in a formula/filter combination at the Worksheet level to block unrestricted data access when no filters are set via the token
+4. Edit the Worksheet TML, then add `is_hidden: true` to any parameter that will be set via token
 
 The ability to set the parameter to `is_hidden: true` gives flexibility to use as many parameters as desired for any type of formula to be used as a worksheet filter.
 
