@@ -196,6 +196,14 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
         }
     }, [token, isPlaygroundReady]);
 
+    React.useEffect(() => {
+        if (playgroundUrl) {
+            // Changes in playgroundUrl triggers a reload of the iframe,
+            // reset the playground ready state.
+            setIsPlaygroundReady(false);
+        }
+    }, [playgroundUrl])
+
     return (
         <div className="restApiWrapper">
             <BackButton title="Back" backLink={backLink} internalRedirect />
