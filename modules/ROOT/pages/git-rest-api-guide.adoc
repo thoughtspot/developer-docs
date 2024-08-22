@@ -6,7 +6,7 @@
 :page-pageid: git-api
 :page-description: Guide to Git Integration REST APIs
 
-The `/vcs/git/` endpoints of the v2.0 REST API provide all the functionality necessary to xref:git-configuration.adoc[configure], perform version control, and deploy changes to different ThoughtSpot environments.
+The `/vcs/git/` endpoints of the v2.0 REST API provide all the functionality necessary to xref:git-configuration.adoc[configure], perform version control, and deploy changes to different ThoughtSpot environments, other than xref:guid-mapping.adoc#connection_variations[configuring connections].
 
 The xref:version_control.adoc#moving-tml-changes-between-environments[basic process] involves the following steps:
 
@@ -15,6 +15,8 @@ The xref:version_control.adoc#moving-tml-changes-between-environments[basic proc
 3. xref:git-rest-api-guide.adoc#deploy-commits[Deploy commits] into the *destination branch* (eventually "main" or "prod")
 
 The following sections describe how to use the version control REST APIs after completing xref:git-configuration.adoc[Git configuration] for a ThoughtSpot instance.
+
+There is a complete implementation of all Git REST APIs available in the link:https://thoughtspot.github.io/cs_tools/tools/git/[CS Tools package, target=_blank] as well as link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/[example workflow scripts available in Python, target=_blank].
 
 == Commit files
 The `/api/rest/2.0/vcs/git/branches/commit` API call exports the TML files for the requested ThoughtSpot objects directly to a Git branch and commits the changes.
@@ -92,13 +94,15 @@ You must specify the *branch_name* of the commits to deploy from. In the xref:de
 
 In a xref:single-tenant-data-models.adoc[single-tenanted deployment pattern], you might instead deploy to each end-customer Org from the "release" / "pre-prod" branch rather than deploy from the branch of the Org's environment. If you have any additional processes to run on the TML files prior to final deployment, it is preferable to merge changes to the environment branch and then deploy commits from the environment branch.
 
-The API will deploy the link:https://training.github.com/downloads/github-git-cheat-sheet/[head of the specified Git branch, target=_blank] unless a `commit_id` is specified in the API request.
+The API will deploy the link:https://training.github.com/downloads/github-git-cheat-sheet/[head of the specified Git branch, target=_blank] unless a `commit_id` is specified in the API request. If your team uses link:https://git-scm.com/book/en/v2/Git-Basics-Tagging[tags, target=_blank] or link:https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases[releases, target=_blank], supply the `commit_id` from Git associated with the release or tag. 
 
 Because each Org in ThoughtSpot has distinct objects with their own GUIDs, the import process for objects originating from a different environment requires swapping in the correct GUIDs. 
 
 If you have enabled xref:guid-mapping.adoc[GUID mapping] in the Git configuration on your deployment instance, the version control APIs automatically generate a GUID mapping file and update object references when deploying your commits to the destination environment.
 
 See the xref:guid-mapping.adoc[GUID mapping] documentation to understand how it works and the  additional capabilities for handling other substitutions that may be necessary during deploying commits to the destination environment.
+
+The link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/git_deploy_commits_to_prod_single_tenants.py[example script in Python, target=_blank] shows the pattern of deploying to "prod org per customer" from a single `pre_prod/release` branch, to avoid the need for pull requests into each branch linked to an end customer Org.
 
 [NOTE]
 ====
@@ -115,7 +119,7 @@ Make sure the *guid mapping file* is referenced when creating the final TML file
 |=====
 |Parameter|Description
 |`commit_id` +
-__Optional__|__String__. ID of the commit to deploy on the cluster. By default, the command will deploy the head of the branch. To deploy a specific version, specify the `commit_id`.
+__Optional__|__String__. ID of the commit to deploy on the cluster. By default, the command will deploy the head of the branch. To deploy a specific version, specify the `commit_id`. If your team uses link:https://git-scm.com/book/en/v2/Git-Basics-Tagging[tags, target=_blank] or link:https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases[releases, target=_blank], supply the `commit_id` from Git associated with the release or tag. 
 |`branch_name` |__String__. Name of the branch from which the commit must be picked for deployment.
 |`deploy_type` a| __String__. Specify one of the following options: +
 
