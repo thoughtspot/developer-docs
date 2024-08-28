@@ -1,0 +1,180 @@
+= Configure Git integration
+:toc: true
+:toclevels: 2
+
+:page-title: Configure Git integration
+:page-pageid: git-configuration
+:page-description: Configuring the Git integration for a ThoughtSpot instance
+
+Git integration requires configuration within both ThoughtSpot, accomplished via the V2.0 REST APIs, and your Git provider (GitHub currently).
+  
+== Configure Git repository
+
+Before you begin, make sure you have a GitHub or GitHub Enterprise account and access to a repository. 
+
+Ensure that your account has one of the following types of access tokens:
+
+* link:https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic[Personal access token (Classic), window=_blank] +
+Make sure the access token has the `repo` scope that grants full access to public and private repositories, commit and deployment status, repository invitations, and security events. +
+* link:https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#fine-grained-personal-access-tokens[Fine-grained personal access token, window=_blank]. + 
+Make sure the token allows at least the following permissions: +
+
+*** `Metadata`: read
+*** `Commit statuses`: read and write 
+*** `Contents`: read and write
+
+=== Create branches for ThoughtSpot
+
+1. Create a *branch* for use as the ThoughtSpot *configuration branch*, with no branch protection rules
+2. Create one branch in the Git repository for each environment, following the patterns described in xref:version_control.adoc#_recommended_configuration_and_best_practices[Recommended configuration].
+
+== Enable Orgs and Git integration
+
+To configure Git branches and workflows, both Orgs and the Git integration feature must be enabled for your ThoughtSpot instances.
+
+To enable these features on an instance, contact ThoughtSpot Support.
+
+////
+Run the following `tscli` command on their instances.
+
+[source,SSH]
+----
+tscli git-integration enable
+----
+////
+
+== Confirm permissions within ThoughtSpot Orgs
+* To commit objects from Thoughtspot to a Git repository, your ThoughtSpot user account requires at least view permission for all objects that will be committed as part of the operation.
+* To deploy or revert objects from a Git repository to ThoughtSpot, you require edit access to all objects that will be updated as part of the deployment. If the deployment contains Worksheets, Views, or Tables, users require **Can manage data** (`DATAMANAGEMENT`) privilege for deploy, commit, and  revert operations.
+
+[#guid-map-and-config-files]
+== GUID mapping and configuration files
+
+ThoughtSpot maintains a set of configuration files to facilitate the CI/CD process for developers. Typically, it includes:
+
+* One xref:guid-mapping.adoc[GUID mapping file] per environment +
+This file documents the GUID mapping for ThoughtSpot development objects from the source cluster, and their equivalent objects in the production environment to which commits are deployed.
+* One deploy file per environment +
+This file tracks the last `commit_id` of the last successful deploy operation.
+
+These files should be configured to save to their own "configuration branch" in Git and do not need to be merged into any other branches.
+
+You can xref:git-configuration.adoc#initialize-mapping[automate the initialization] of these files using the REST API.
+
+[#connectTS]
+== Connect your ThoughtSpot environment to the Git repository
+Each Org within a ThoughtSpot instance can be configured with its own Git configuration.
+
+To connect your ThoughtSpot instance to a Git repository using REST API, send a `POST` request with the following parameters to the `/api/rest/2.0/vcs/git/config/create` REST API v2.0 endpoint. 
+
+Updates can be sent via `xref:git-configuration.adoc#update-git-config[/vcs/git/config/update]`, whereas using the `/create` endpoint again will serve to completely overwrite the existing configuration.
+
+=== Configuration options
+The simplest deployment pattern enables *one Git branch* using the `branch_names` parameter, with the same branch as the `commit_branch_name`. The `configuration_branch_name` should be the same for all Orgs related to the same project. This will centralize all the xref:git-configuration.adoc#guid-map-and-config-files[commit and GUID mapping files] for all environments into one branch.
+
+For more advanced Git development patterns, list multiple `branch_names` in the configuration, which will allow you to specify any of the configured branches when using the xref:git-rest-api-guide.adoc#commit-files[commit files] endpoint.
+
+=== Request parameters
+[width="100%" cols="2,6"]
+[options='header']
+|===
+|Parameter|Description
+|`repository_url`|__String__. The HTTPS URL of the Git repository; for example, `https://github.com/user/repo.git`.
+|`username`
+|__String__. Username to authenticate to the Git repository.
+|`access_token`|__String__. Access token to authenticate to the Git repository.
+|`org_identifier`|__String__. ID of the Org. Define this parameter only if the Orgs feature is enabled on your ThoughtSpot cluster and separate Orgs are configured for development and production environments.
+|`branch_names`|__Array of strings__. List of Git branches to configure.
+|`commit_branch_name` |__String__. Name of the remote branch where objects committed from this Thoughtspot instance will be versioned. Replaces `default_branch_name`, which is deprecated in 9.10.5.cl.
+|`default_branch_name` +
+__Optional__|__String__. Deprecated in 9.10.5.cl. In earlier versions, this parameter was used to configure the name of the default Git branch to use for all operations on the cluster.
+|`enable_guid_mapping`  |__Boolean__. Enables GUID mapping and generates a GUID mapping file. Starting from 9.7.0.cl, this attribute is set to `true` by default.
+To know more about GUID mapping, see xref:version_control.adoc#_guid_mapping_and_configuration_files[GUID mapping].
+|`configuration_branch_name` a|__String__. Name of the branch where the configuration files related to operations between Thoughtspot and the version control repository should be maintained. Replaces `guid_mapping_branch_name`, which is deprecated in 9.10.5.cl.
+
+[NOTE]
+====
+If no branch name is specified, by default, the `ts_config_files` branch is considered. Ensure this branch exists before configuration.
+====
+|`guid_mapping_branch_name` +
+__Optional__|__String__. Deprecated in 9.10.5.cl.  In earlier versions, this parameter was used to configure the name of the branch for the GUID mapping file.
+||
+|===
+
+=== Request example
+
+The following example shows the API request format for connecting ThoughtSpot to a GitHub repository.
+
+[source, cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host-Dev}/api/rest/2.0/vcs/git/config/create' \
+  -H 'Authorization: Bearer {Bearer_token}  \
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "repository_url": "https://github.com/user/repo.git",
+  "username": "ts-git-user",
+  "access_token": "{ACCESS_TOKEN}",
+  "org_identifier": "dev"
+  "branch_names": [
+    "dev",
+    "main"
+  ],
+  "commit_branch_name": "dev",
+  "configuration_branch_name": "_ts_config"
+}'
+----
+
+If the API request is successful, the ThoughtSpot instance will be connected to the Git repository. 
+
+Go into each Org an issue the `config/create` call to link the appropriate branch to establish all environments.
+
+The following example shows the API request parameters to connect a ThoughtSpot `Prod` Org to the Git repo. Note that GUID mapping is enabled in the API request. 
+
+The `Bearer_token` value must be requested for the desired Org, specified through the `org_id` value of the xref:authentication.adoc#get-a-token-for-full-access[full access token] REST API request.
+
+[source, cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host-Prod}/api/rest/2.0/vcs/git/config/create' \
+  -H 'Authorization: Bearer {Bearer_token}  \
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "repository_url": "https://github.com/user/repo.git",
+  "username": "ts-git-user",
+  "access_token": "{ACCESS_TOKEN}",
+  "enable_guid_mapping": true,
+  "org_identifier": "prod"
+  "branch_names": [
+    "prod"
+  ],
+  "enable_guid_mapping": true,
+  "commit_branch_name": "prod",
+  "configuration_branch_name": "_ts_config"
+}'
+----
+
+[#initialize-mapping]
+=== Initialize .mapping and .config files
+Version control and xref:guid-mapping.adoc[GUID mapping] utilize files stored in the `configuration_branch`. 
+
+You can initialize these files by immediately using the  xref:git-rest-api-guide.adoc#deploy-commits[deploy commits REST API] after configuring the Org for Git.
+
+See the link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/create_orgs_with_linked_git_branch.py[create_orgs_with_linked_git_branch.py script] for an example of deploying a full Orgs or branches setup for structured development and deployment.
+
+After the Orgs are set up, you can link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/create_connection_on_orgs.py[create connections across the orgs] and xref:guid-mapping.adoc#using-mapping-for-table-tml-properties[add any necessary entries to the GUID mapping files].
+
+
+[#update-git-config]
+== Update Git configuration
+To update the repository details or access token, send a `POST` request with Git configuration parameters to the `/api/rest/2.0/vcs/git/config/update` API endpoint.
+
+== Search Git configuration
+To get repository configuration information, send a `POST` request to `/api/rest/2.0/vcs/git/config/search` API endpoint.
+
+== Delete Git configuration
+
+To delete the repository configuration, send a `POST` request to the `/api/rest/2.0/vcs/git/config/delete` endpoint.
+

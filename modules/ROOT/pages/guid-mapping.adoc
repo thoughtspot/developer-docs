@@ -1,0 +1,108 @@
+= GUID mapping
+:toc: true
+:toclevels: 2
+
+:page-title: GUID mapping
+:page-pageid: guid-mapping
+:page-description: Deploying TML involves GUID mapping, handled automatically by the deploy API
+
+The xref:git-rest-api-guide.adoc#deploy-commits[deploy API endpoint] automatically generates a GUID mapping file that records the GUID of the objects deployed from a Source Org (dev) to a Destination Org, and saves this file in the `config` Git branch.
+
+Each Org configured for Git integration will have a mapping JSON file generated with the name pattern `org-{orgId}.json` in the Git branch selected to host configuration files during the Git setup.
+
+The mapping JSON file includes an array of mapping objects recording the GUIDs for each TML object, which are automatically generated and maintained during each *deploy* API call:
+
+== GUID mapping files
+
+[source,JSON]
+----
+[
+{
+  "originalGuid" : "a5fc94bc-1d0f-4fa9-b7b6-7ce4dc6bd526",
+  "mappedGuid" : "67804442-2568-4184-bbe4-2ee058e31431",
+  "counter" : 0,
+  "additionalMapping" : { }
+}, 
+{
+  "originalGuid" : "cb04e13a-7969-42d5-9469-c3beb5182af6",
+  "mappedGuid" : "91864ed5-63c2-4c9d-8d20-ba9a1e77a888",
+  "counter" : 1,
+  "additionalMapping" : {
+    "bc46684e-d8f4-4a82-a38b-b6233329c1cd" : "c79fd844-5a1b-4645-87e7-2fb70f0f3421",
+    "e0c0fb87-a9fe-43e1-93c6-f6a058711986" : "5872f7eb-24fc-4f4e-8f96-95afd24dc707",
+    "941271b6-86fa-4777-a189-46a0e85d3917" : "09b90dc1-6f95-47b4-857e-b83ec98dda00",
+  }
+}
+]
+----
+
+* `originalGuid` refers to the GUID of the object on the source environment, typically the `dev` environment
+* `mappedGuid` refers to the GUID of the object on the destination environment, for example, `release` or `prod`
+* `counter` shows the number of times the mapped object was used in deploy operations.
+
+The following figure illustrates how GUIDs are mapped during deployments:
+
+[.widthAuto]
+image::./images/guid-mapping.png[GUID mapping]
+
+
+== How mapping works
+The mapping file is updated when a new object is first created in the destination Org and receives its automatically generated GUID from the ThoughtSpot instance.
+
+The `additionalMapping` section records any `viz_ids` used to specify individual visualizations on a Liveboard, and thus is blank for all other object types.
+
+Mapping itself is performed with an *exact string find/replace* operation.
+
+=== Using mapping for Table TML properties
+There are several properties within Table TML files related to a table's fully qualified name (FQN) within the RDBMS, that often need to be changed between Orgs.
+
+You can use the *exact string find/replace* nature of the GUID Mapping file to define changes in the Table TMLs between environments.
+
+Add the properties to the mapping file, including the TML property key along with the value, as shown here:
+
+[source,JSON]
+----
+[
+{
+  "originalGuid" : "db: DEVDBNAME",
+  "mappedGuid" : "db: PRODDBNAME",
+  "counter" : 0,
+  "additionalMapping" : { }
+},
+{
+  "originalGuid" : "schema: DEV_SCHEMA",
+  "mappedGuid" : "schema: CUSTOMER_A_SCHEMA",
+  "counter" : 0,
+  "additionalMapping" : { }
+}
+]
+----
+
+Note that the results will be an exact match on the provided string with exact string find/replace across the full set of TML deployed to that Org via Git.
+
+If you need to limit the find/replace to a specific TML file, you can instead put the rule within the `additionalMapping` section of the file:
+
+[source,JSON]
+----
+{
+  "originalGuid" : "cb04e13a-7969-42d5-9469-c3beb5182af6",
+  "mappedGuid" : "91864ed5-63c2-4c9d-8d20-ba9a1e77a888",
+  "counter" : 1,
+  "additionalMapping" : {
+    "db: DEVDBNAME" : "db: PRODDBNAME",
+    "schema: DEV_SCHEMA" : "schema: CUSTOMER_A_SCHEMA"
+  }
+}
+----
+
+This requires more effort but will work if there is a situation where a single find/replace against all files would result in incorrect results. 
+
+Given there are often many Table TML files being redeployed, perhaps across different connections, the additional specificity may be necessary.
+
+[#connection_variations]
+=== Connection variations in each Org
+link:https://docs.thoughtspot.com/cloud/latest/connections[Connections] contain the majority of details that vary between data environments, other than the `db` and `schema` properties within the table objects.
+
+Connections can be defined programmatically via link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fconnections%2Fcreate-connection[REST API, target=_blank] or using link:https://docs.thoughtspot.com/cloud/latest/tml-connections[TML for connections, target=_blank], as well as in the ThoughtSpot UI.
+
+Creating a connection involves secure credentials, which will never be exported in the Connection TML. For this reason, it is preferable to set via UI or REST API at this time. An example of creating connections via REST API across multiple orgs link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/create_connection_on_orgs.py[is available here, target=_blank].  
