@@ -42,8 +42,13 @@ The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using
 
 The token can be used as a bearer token for Cookieless Trusted Auth or REST API access, or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
 
+[NOTE]
+====
+ThoughtSpot compresses the size of JWT token by default to ensure that larger payloads, for instance, more complex filtering conditions can be passed via JWT. ThoughtSpot recommends leaving that compression on to ensure all JWT tokens can get properly interpreted by the application regardless of their size, and to obfuscate the values passed in the JWT payload. However, if you want to decode the JWT token and decode the values of the token (at the expense of compression), contact ThoughtSpot Support.
+====
+
 === Request format
-The ABAC request is sent using the `user_parameters` key of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]. 
+The ABAC request is sent using the `user_parameters` key of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank].
 
 There are three potential keys within `user_parameters`, each taking an array of objects:
 [code,javascript]
@@ -89,6 +94,7 @@ The following is a `user_parameters` section that would be part of the JSON requ
   }
 ----
 
+
 === Apply to specific objects
 By default, any specified filter or parameter will bind to *any content* with an exact match for the column or parameter name.
 
@@ -109,7 +115,7 @@ You can choose the filter or parameter to apply only to specific ThoughtSpot obj
            "identifier": "{id or name of the object}"
          },
          {
-            "type":"LIVEBOARD", 
+            "type":"LIVEBOARD",
             "identifier": "9bd202f5-d431-44bf-9a07-b4f7be372125"
 
          }
@@ -179,7 +185,7 @@ The current standard best practice pattern for RLS using ABAC via tokens is:
 The ability to set the parameter to `is_hidden: true` allows the flexibility to use as many parameters as desired for any type of formula to be used as a worksheet filter.
 
 === Show all
-The way to set a runtime filter to *show all values* is to not send in any runtime filter at all for that column. 
+The way to set a runtime filter to *show all values* is to not send in any runtime filter at all for that column.
 
 Without additional information, it's impossible to know if the lack of a runtime filter is intentional to indicate a  *show all values* condition or if something went wrong—a malformed ABAC token or the user entered into ThoughtSpot without a token at all.
 
@@ -205,9 +211,10 @@ The runtime filters must be built by:
 ==== Retrieve entitlements
 The value of the ABAC pattern is that you can send different combinations of filters for different types of users.
 
-You can retrieve the attribute names and values from any source: the embedding application's session details, an entitlement REST API, a query to a different database, etc. 
+You can retrieve the attribute names and values from any source: the embedding application's session details, an entitlement REST API, a query to a different database, etc.
 
 ==== Translate entitlements into runtime filters
+
 Runtime filters *match on the name property of a column* as defined in ThoughtSpot, not the column's name in the underlying database table. 
 
 The xref:trusted-auth-token-request-service.adoc[token request service] *MUST* know the ThoughtSpot column names that will be used for each of the attributes, so you'll need to coordinate between ThoughtSpot Worksheet designers and the xref:trusted-auth-token-request-service.adoc[token request service] to make sure the matching column names and values are being sent.
@@ -256,10 +263,10 @@ A user might be entitled to *all access* on any given column (you might drop som
 
 [IMPORTANT]
 ====
-The process for translating the entitlements request into ThoughtSpot runtime filters must *drop* the filter definition entirely to represent *all access*. 
+The process for translating the entitlements request into ThoughtSpot runtime filters must *drop* the filter definition entirely to represent *all access*.
 ====
 
-The following is a request where a different user can see all `Region`, but still has restrictions on `Customer ID` and `Product Type`: 
+The following is a request where a different user can see all `Region`, but still has restrictions on `Customer ID` and `Product Type`:
 [code,javascript]
 ----
 "runtime_filters": [
@@ -407,9 +414,9 @@ image::./images/new_worksheet_filter_step_4.png[Completed Worksheet filter]
 Now the 'check parameter' will be evaluated all the time, blocking all data unless the appropriate value is passed in via ABAC token.
 
 == Indexing
-Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in Explore, use ThoughtSpot indexing. 
+Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in Explore, use ThoughtSpot indexing.
 
-Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token. 
+Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token.
 
 You must turn off indexing for any field that needs to be restricted by RLS when using ABAC via tokens for RLS.
 
