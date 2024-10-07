@@ -5,61 +5,44 @@
 :page-pageid: custom-action-callback
 :page-description: Set up a callback function to the host application and trigger a response payload from the embedded ThoughtSpot component.
 
-Callback custom actions allow you to get data payloads from an embedded ThoughtSpot object and initiate a callback to the host application. For example, if you have embedded a ThoughtSpot Liveboard in your application, you can add a callback action to the Liveboard menu to get a JSON response payload from the Liveboard visualization and initiate a callback to your app.
+== Overview
+Callback custom actions act fire off an link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent#_customaction[EmbedEvent] when the menu item or button linked to the action is clicked by a user.
 
+[NOTE]
+====
+Callback custom actions only appear in the menu system when ThoughtSpot is embedded using the Visual Embed SDK. Please go the Develop tab and use the Visual Embed SDK Developer Playground to see callback custom actions within ThoughtSpot, or use your embedded application. 
+====
 
-[div boxDiv boxFullWidth]
---
-+++<h5>Feature highlights</h5>+++
+The embedded app will define a listener for all `EmbedEvent.CustomAction` events, with a number of `if()` statements evaluating the `id` property of the response to determine which callback action has been selected by the user.
 
-* Callback custom actions are supported on embedded ThoughtSpot instances only and require a ThoughtSpot Embedded Edition license.
-* Users with developer or admin privileges can create a callback custom action in the Developer portal.
-* Developers can set a callback action as a global or local action.
-* To access callback actions, users must have the **New Answer Experience** enabled on their application instance.
-* Users with edit permissions to a Worksheet or visualization can add a local callback action to a visualization or Answer of their choice.
-* Developers must register the callback in the Visual Embed SDK and define data classes and functions to parse and process the JSON data payload retrieved from the callback event.
---
+[source,Javascript]
+----
+searchEmbed.on(EmbedEvent.CustomAction, payload => {
+    const data = payload.data;
+    if (data.id === 'show-data') {
+        console.log('Custom Action event:', data.embedAnswerData);
+    }
+})
+----
 
-== Get started
+The xref:callback-response-payload.adoc[response payload] contains metadata about the callback action, the content where the custom action was triggered from, as well as the data from the table or visualization.
+
+Developers must register the callback in the Visual Embed SDK and define data classes and functions to parse and process the JSON data payload retrieved from the callback event.
+
+== Implement a callback custom action
 
 To set up a callback custom action workflow, complete the following steps:
 
-* xref:custom-actions-callback.adoc#add-callback[Create a callback custom action]
-* xref:custom-actions-callback.adoc#register-callback[Register the custom action]
+* xref:customize-actions-menu.adoc#add-callback[Create a callback custom action]
+* xref:custom-actions-callback.adoc#register-callback[Define the event handler using Visual Embed SDK]
 * xref:custom-actions-callback.adoc#handle-data[Define classes and functions to parse JSON and handle data]
 * xref:custom-actions-callback.adoc#callback-initiate[Initiate a callback and verify your implementation]
 
-[#add-callback]
-== Create a callback custom action
-
-Before you begin, make sure you have the developer privileges to add a custom action in the Developer portal.
-
-. Go to *Develop* > *Customizations* > *Custom actions*.
-. Click *Create action*.
-. Add a label for the custom action. For example, __Send Data__.
-. Select the *Callback* option.
-. Note the callback action ID.
-
-+
-The callback ID is used as a unique reference in the Visual Embed SDK to handle the callback event. You can also use this ID to disable, show, or hide the callback action in the embedded app.
-
-+
-By default, custom actions are added to all Liveboard visualizations and saved Answers and set as Global. If you want to add this action only to specific visualizations, clear the *On by default on all visualizations* checkbox.
-
-. To restrict action availability to specific user groups, click *Show advanced availability settings*, and select the groups.    
-
-. Click *Create action*.
-+
-The custom action is added to the *Actions* dashboard in the Developer portal.
-
-. To view and verify the custom action you just created, navigate to a visualization page.
-
-include::{path}/global-local-action.adoc[]
 
 [#register-callback]
-== Register the callback using Visual Embed SDK
+== Define event listener using Visual Embed SDK
 
-After a callback custom action is added in ThoughtSpot, add an event handler to listen to the callback event and trigger a data payload as a response when a user clicks the callback action in the UI.
+In your Visual Embed SDK code, add an `.on()` listener for the `EmbedEvent.CustomAction` event, with blocks parsing the `id` property of the response to define different behaviors for different callback customer actions.
 
 In this example, the data payload from the custom action response is logged in the console.
 
@@ -131,7 +114,11 @@ include::{path}/callback-payload.adoc[]
 [#handle-data]
 == Parse JSON response payload
 
-The callback actions can return JSON payloads that are complex and need to be parsed before using it for application needs. The format of the JSON response payload can vary based on the type of the embedded object and the placement of the custom action in the menu. For example, the format of the data payload triggered by an action on a Liveboard visualization is different from the data retrieved for an Answer. When defining functions in your code to parse and handle data, make sure you use the correct classes.
+The callback actions can return JSON payloads that are complex and need to be parsed before using it for application needs. 
+
+The format of the JSON response payload can vary based on the type of the embedded object and the placement of the custom action in the menu.
+
+For example, the format of the data payload triggered by an action on a Liveboard visualization is different from the data retrieved for an Answer. When defining functions in your code to parse and handle data, make sure you use the correct classes.
 
 === Define functions and classes to handle Liveboard data
 
@@ -228,7 +215,11 @@ class LiveboardActionData {
 }
 ----
 
-The above example uses additional classes and functions to parse and get data in the tabular format, the number of columns, rows, and column names. These classes are defined in the code sample in `dataclasses.js` on link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/apis/dataclasses.js[ThoughtSpot Embedded Resources GitHub repository, window="_blank"]. You can also find sample classes and functions to parse JSON payload from context menu actions in `dataclasses.js`.
+The above example uses additional classes and functions to parse and get data in the tabular format, the number of columns, rows, and column names. 
+
+These classes are defined in the code sample in `dataclasses.js` on link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/apis/dataclasses.js[ThoughtSpot Embedded Resources GitHub repository, window="_blank"]. 
+
+You can also find sample classes and functions to parse JSON payload from context menu actions in `dataclasses.js`.
 
 
 === Define functions and classes to handle Answer data
@@ -338,9 +329,8 @@ export {
 }
 ----
 
-
 [#callback-initiate]
-== Initiate a callback and test your implementation
+== Trigger a callback custom action and test your implementation
 
 To initiate a callback action:
 
