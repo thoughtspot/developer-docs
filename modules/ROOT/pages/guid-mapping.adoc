@@ -118,4 +118,22 @@ Connections can be defined programmatically via link:https://developers.thoughts
 Creating a connection involves secure credentials, which will never be exported in the Connection TML. For this reason, it is preferable to set via UI or REST API at this time. An example of creating connections via REST API across multiple orgs link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/create_connection_on_orgs.py[is available here, target=_blank].  
 
 == Switching "dev" Orgs
-When Orgs is first enabled on an instance, 
+When Orgs is first enabled on an instance, all existing content will continue to exist in what is now termed the *Primary* Org, which will have `org_id` of `0`. 
+
+While the best practice recommendation is to have a separate *dev Org* and *prod Org* from the *Primary Org*, you may want to continue with using the *Primary Org* as *prod* for the time being, while copying content over to the *dev Org* to being doing controlled SDLC processes.
+
+You can accomplish this in phases using the Git APIs:
+
+1. Create a *temporary Git branch* and xref:git-configuration.adoc#update-git-config[update the configuration] the *Primary/prod Org* with this branch to make it available to the Commit API
+2. Use the xref:git-rest-api-guide.adoc#commit-files[Commit API] to export all desired objects from the *Primary/prod Org* into the temporary Git branch (not the xref:git-configuration.adoc#configuration-options[commit branch]
+3. Use the xref:git-rest-api-guide.adoc#deploy-commits[Deploy API] into the new *dev Org* from the temporary branch to bring all of the content into the *dev Org*. This will create the *GUID Mapping File* for the *dev Org*
+4. Take the JSON structure of the GUID Mapping file from the *dev Org*, copy it, and *swap the keys and values*, then save the result in the GUID Mapping file of the *prod Org*
+
+=== Swapping the keys and values in GUID Mapping file
+The structure of the GUID Mapping file is entirely simple key-value mappings in JSON, and thus can be easily swapped around programmatically.
+
+An example of this process in Python is available as link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/git_guid_mapping_file_functions.py[git_guid_mapping_file_functions.py, target=_blank].
+
+Simply take the swapped JSON and save it in `org-0.json` file within the `{instanceId}.mapping` directory of the `config_branch` in GitHub.
+
+Now you can being to use pull requests to move content from the `dev branch` to the `prod branch`, and when you do the Deploy API, the GUIDs will be swapped properly from their new origin in `dev Org` to the values in prod.
