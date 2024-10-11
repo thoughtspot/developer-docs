@@ -6,13 +6,23 @@
 :page-pageid: guid-mapping
 :page-description: Deploying TML involves GUID mapping, handled automatically by the deploy API
 
-The xref:git-rest-api-guide.adoc#deploy-commits[deploy API endpoint] automatically generates a GUID mapping file that records the GUID of the objects deployed from a Source Org (dev) to a Destination Org, and saves this file in the `config` Git branch.
+The xref:git-rest-api-guide.adoc#deploy-commits[deploy API endpoint] automatically generates and maintains a GUID mapping file in the xref:git-configuration[`config` Git branch] that records the GUID of the objects deployed from a Source Org (dev) to a Destination Org.
 
-Each Org configured for Git integration will have a mapping JSON file generated with the name pattern `org-{orgId}.json` in the Git branch selected to host configuration files during the Git setup.
+[NOTE]
+====
+ThoughtSpot never alters any GUIDs in the files stored in Git, regardless of branch. The find/replace of the mapping process occurs as the TML files in Git are imported by the *Deploy* REST API.
+====
 
-The mapping JSON file includes an array of mapping objects recording the GUIDs for each TML object, which are automatically generated and maintained during each *deploy* API call:
+You can use the Git APIs across distinct ThoughtSpot instances, as long as they are configured to the same Git repository. 
+
+The GUID mapping files will be maintained as described below, but the GUIDs may be identical if both instances do not have Orgs enabled, because ThoughtSpot will use a provided GUID in a TML file during object creation if that GUID does not exist already *on that instance*. 
 
 == GUID mapping files
+Each Org configured for Git integration will have a mapping JSON file generated with the name pattern `org-{orgId}.json` in the Git branch selected to host configuration files during the Git setup.
+
+The mapping files for each ThoughtSpot *instance* will live in a directory in the `config` branch with name pattern `{instanceId}.mapping`. The `instanceId` is the `id` property returned from the REST API link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsystem%2Fget-system-information[`/system`] call.
+
+Each mapping JSON file is an array of mapping objects recording the GUIDs for each TML object, which are automatically generated and maintained during each *deploy* API call:
 
 [source,JSON]
 ----
@@ -106,3 +116,6 @@ link:https://docs.thoughtspot.com/cloud/latest/connections[Connections] contain 
 Connections can be defined programmatically via link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fconnections%2Fcreate-connection[REST API, target=_blank] or using link:https://docs.thoughtspot.com/cloud/latest/tml-connections[TML for connections, target=_blank], as well as in the ThoughtSpot UI.
 
 Creating a connection involves secure credentials, which will never be exported in the Connection TML. For this reason, it is preferable to set via UI or REST API at this time. An example of creating connections via REST API across multiple orgs link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/create_connection_on_orgs.py[is available here, target=_blank].  
+
+== Switching "dev" Orgs
+When Orgs is first enabled on an instance, 
