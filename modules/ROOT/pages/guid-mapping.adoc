@@ -49,19 +49,17 @@ Each mapping JSON file is an array of mapping objects recording the GUIDs for ea
 * `originalGuid` refers to the GUID of the object on the source environment, typically the `dev` environment
 * `mappedGuid` refers to the GUID of the object on the destination environment, for example, `release` or `prod`
 * `counter` shows the number of times the mapped object was used in deploy operations.
+* `additionalMapping` is an object with direct key-value mappings of `viz_ids` on a Liveboard, and is otherwise an empty object `{}`
 
 The following figure illustrates how GUIDs are mapped during deployments:
 
 [.widthAuto]
 image::./images/guid-mapping.png[GUID mapping]
 
-
 == How mapping works
 The mapping file is updated when a new object is first created in the destination Org and receives its automatically generated GUID from the ThoughtSpot instance.
 
-The `additionalMapping` section records any `viz_ids` used to specify individual visualizations on a Liveboard, and thus is blank for all other object types.
-
-Mapping itself is performed with an *exact string find/replace* operation.
+Mapping itself is performed with an *exact string find/replace* operation, on the TML objects *directly prior to import*, without modifying the files in Git.
 
 === Using mapping for Table TML properties
 There are several properties within Table TML files related to a table's fully qualified name (FQN) within the RDBMS, that often need to be changed between Orgs.
@@ -125,15 +123,19 @@ While the best practice recommendation is to have a separate *dev Org* and *prod
 You can accomplish this in phases using the Git APIs:
 
 1. Create a *temporary Git branch* and xref:git-configuration.adoc#update-git-config[update the configuration] the *Primary/prod Org* with this branch to make it available to the Commit API
-2. Use the xref:git-rest-api-guide.adoc#commit-files[Commit API] to export all desired objects from the *Primary/prod Org* into the temporary Git branch (not the xref:git-configuration.adoc#configuration-options[commit branch]
+2. Use the xref:git-rest-api-guide.adoc#commit-files[Commit API] to export all desired objects from the *Primary/prod Org* into the temporary Git branch (not the xref:git-configuration.adoc#configuration-options[commit branch] that you will use for deployment *to* the prod Org)
 3. Use the xref:git-rest-api-guide.adoc#deploy-commits[Deploy API] into the new *dev Org* from the temporary branch to bring all of the content into the *dev Org*. This will create the *GUID Mapping File* for the *dev Org*
 4. Take the JSON structure of the GUID Mapping file from the *dev Org*, copy it, and *swap the keys and values*, then save the result in the GUID Mapping file of the *prod Org*
 
 === Swapping the keys and values in GUID Mapping file
 The structure of the GUID Mapping file is entirely simple key-value mappings in JSON, and thus can be easily swapped around programmatically.
 
+It is okay to modify the files in the `config_branch` manually, to make additions or corrections, as long as you keep everything in the proper format matching what ThoughtSpot generates.
+
 An example of this process in Python is available as link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/git_guid_mapping_file_functions.py[git_guid_mapping_file_functions.py, target=_blank].
 
 Simply take the swapped JSON and save it in `org-0.json` file within the `{instanceId}.mapping` directory of the `config_branch` in GitHub.
 
 Now you can being to use pull requests to move content from the `dev branch` to the `prod branch`, and when you do the Deploy API, the GUIDs will be swapped properly from their new origin in `dev Org` to the values in prod.
+
+
