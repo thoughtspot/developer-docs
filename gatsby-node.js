@@ -65,7 +65,7 @@ exports.createPages = async function ({ actions, graphql }) {
             });
            // Directory experiment
 
-           const dirSplit = dir.split('/');
+           const dirSplit = directory.split('/');
            const lastDir = dirSplit[dirSplit.length - 2];
            actions.createPage({
                     path: `/tutorials/$(lastDir}/${pageId}`,
