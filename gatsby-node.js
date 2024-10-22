@@ -63,6 +63,7 @@ exports.createPages = async function ({ actions, graphql }) {
                 ),
                 context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
             });
+            /*
            // Directory experiment
 
            const dirSplit = directory.split('/');
@@ -74,6 +75,7 @@ exports.createPages = async function ({ actions, graphql }) {
                     ),
                     context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
                 });
+                */
             
         }
 
