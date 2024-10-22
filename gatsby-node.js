@@ -27,6 +27,7 @@ exports.createPages = async function ({ actions, graphql }) {
                             ... on File {
                                 name
                                 sourceInstanceName
+                                dir
                             }
                         }
                         
@@ -44,7 +45,7 @@ exports.createPages = async function ({ actions, graphql }) {
 
     data.allAsciidoc.edges.forEach((edge) => {
         const { pageid: pageId } = edge.node.pageAttributes;
-        const { sourceInstanceName: sourceName } = edge.node.parent;
+        const { sourceInstanceName: sourceName, dir : directory } = edge.node.parent;
 
         actions.createPage({
             path: `/${pageId}`,
@@ -55,13 +56,22 @@ exports.createPages = async function ({ actions, graphql }) {
         });
 
         if (sourceName === 'tutorials'){
-            actions.createPage({
-            path: `/tutorials/${pageId}`,
-            component: require.resolve(
-                './src/components/DevDocTemplate/index.tsx',
-            ),
-            context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
-        });
+                actions.createPage({
+                path: `/tutorials/${pageId}`,
+                component: require.resolve(
+                    './src/components/DevDocTemplate/index.tsx',
+                ),
+                context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+            });
+           // Directory experiment
+           actions.createPage({
+                    path: `/$(dir}/${pageId}`,
+                    component: require.resolve(
+                        './src/components/DevDocTemplate/index.tsx',
+                    ),
+                    context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+                });
+            
         }
 
         if (pageId === 'introduction') {
