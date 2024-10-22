@@ -26,9 +26,10 @@ exports.createPages = async function ({ actions, graphql }) {
                         parent {
                             ... on File {
                                 name
+                                sourceInstanceName
                             }
                         }
-                        sourceInstanceName
+                        
                     }
                 }
             }
