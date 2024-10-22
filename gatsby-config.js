@@ -117,6 +117,22 @@ module.exports = {
         {
             resolve: 'gatsby-source-filesystem',
             options: {
+                name: 'pages',
+                path: `${__dirname}/modules/ROOT/tutorials/tutorial-a`,
+            },
+            __key: 'pages',
+        },
+        {
+            resolve: 'gatsby-source-filesystem',
+            options: {
+                name: 'pages',
+                path: `${__dirname}/modules/tutorials`,
+            },
+            __key: 'pages',
+        },
+        {
+            resolve: 'gatsby-source-filesystem',
+            options: {
                 name: 'common',
                 path: `${__dirname}/modules/ROOT/pages/common/`,
             },
