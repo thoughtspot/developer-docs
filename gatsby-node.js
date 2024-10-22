@@ -43,7 +43,7 @@ exports.createPages = async function ({ actions, graphql }) {
     data.allAsciidoc.edges.forEach((edge) => {
         const { pageid: pageId } = edge.node.pageAttributes;
 
-        if (pageId.includes('tutorial')) {
+        if (pageId.indexOf('tutorial') == -1) {
             actions.createPage({
                 path: `tutorials/${pageId}`,
                 component: require.resolve(
