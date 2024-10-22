@@ -65,7 +65,7 @@ exports.createPages = async function ({ actions, graphql }) {
             });
            // Directory experiment
            actions.createPage({
-                    path: `/$(dir}/${pageId}`,
+                    path: `$(dir}/${pageId}`,
                     component: require.resolve(
                         './src/components/DevDocTemplate/index.tsx',
                     ),
