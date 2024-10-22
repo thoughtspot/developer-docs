@@ -44,6 +44,7 @@ exports.createPages = async function ({ actions, graphql }) {
 
     data.allAsciidoc.edges.forEach((edge) => {
         const { pageid: pageId } = edge.node.pageAttributes;
+        const { sourceInstanceName: sourceName } = edge.node.parent;
 
         actions.createPage({
             path: `/${pageId}`,
@@ -52,6 +53,16 @@ exports.createPages = async function ({ actions, graphql }) {
             ),
             context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
         });
+
+        if (sourceName === 'tutorials'){
+            actions.createPage({
+            path: `/tutorials/${pageId}`,
+            component: require.resolve(
+                './src/components/DevDocTemplate/index.tsx',
+            ),
+            context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+        });
+        }
 
         if (pageId === 'introduction') {
             actions.createPage({
