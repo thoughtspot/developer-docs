@@ -28,6 +28,7 @@ exports.createPages = async function ({ actions, graphql }) {
                                 name
                             }
                         }
+                        sourceInstanceName
                     }
                 }
             }
