@@ -64,8 +64,11 @@ exports.createPages = async function ({ actions, graphql }) {
                 context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
             });
            // Directory experiment
+
+           const dirSplit = dir.split('/');
+           const lastDir = dirSplit[dirSplit.length - 2];
            actions.createPage({
-                    path: `$(dir}/${pageId}`,
+                    path: `$(lastDir}/${pageId}`,
                     component: require.resolve(
                         './src/components/DevDocTemplate/index.tsx',
                     ),
