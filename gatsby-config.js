@@ -117,7 +117,7 @@ module.exports = {
         {
             resolve: 'gatsby-source-filesystem',
             options: {
-                name: 'tutorials',
+                name: 'pages',
                 path: `${__dirname}/modules/tutorials/pages`,
             },
             __key: 'pages',
