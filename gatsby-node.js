@@ -28,6 +28,7 @@ exports.createPages = async function ({ actions, graphql }) {
                                 name
                                 sourceInstanceName
                                 dir
+                                relativePath
                             }
                         }
                         
@@ -45,7 +46,7 @@ exports.createPages = async function ({ actions, graphql }) {
 
     data.allAsciidoc.edges.forEach((edge) => {
         const { pageid: pageId } = edge.node.pageAttributes;
-        const { sourceInstanceName: sourceName, dir : directory } = edge.node.parent;
+        const { sourceInstanceName: sourceName, dir : directory, relativePath : relPath } = edge.node.parent;
 
         actions.createPage({
             path: `/${pageId}`,
@@ -70,7 +71,7 @@ exports.createPages = async function ({ actions, graphql }) {
            const lastDir = dirSplit[dirSplit.length - 2];
            */
            actions.createPage({
-                    path: `/$(directory}/${pageId}`,
+                    path: `/tutorials/$(relPath}`,
                     component: require.resolve(
                         './src/components/DevDocTemplate/index.tsx',
                     ),
