@@ -71,7 +71,7 @@ exports.createPages = async function ({ actions, graphql }) {
            const lastDir = dirSplit[dirSplit.length - 2];
            */
            actions.createPage({
-                    path: `/tutorials/$(relPath}`,
+                    path: `/tutorials/${relPath}`,
                     component: require.resolve(
                         './src/components/DevDocTemplate/index.tsx',
                     ),
