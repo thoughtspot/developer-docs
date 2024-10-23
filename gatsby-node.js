@@ -42,11 +42,18 @@ exports.createPages = async function ({ actions, graphql }) {
         const { sourceInstanceName: sourceName, relativePath : relPath } = e.node.parent;
         if (sourceName === 'tutorials'){
            const relPathSplit = relPath.split('/');
+           const pageIdSplit = e.node.pageAttributes.pageid.split('_');
+           if( pageIdSplit.length == 2) {
+                const finalPageId = pageIdSplit[1];
+           }
+           else {
+                const finalPageId = e.node.pageAttributes.pageid;
+           } 
 
            if(relPathSplit.length > 1) {
-                const finalPageId = `tutorials/${relPathSplit[0]}/` + e.node.pageAttributes.pageid;
+                const mapPageId = `tutorials/${relPathSplit[0]}/` + finalPageId;
                 namePageIdMap[e.node.parent.name] =
-                   finalPageId || NOT_FOUND_PAGE_ID;
+                   mapPageId || NOT_FOUND_PAGE_ID;
            }
         }
 
@@ -72,11 +79,18 @@ exports.createPages = async function ({ actions, graphql }) {
             
            // One-level of subdirectory part of stub
            const relPathSplit = relPath.split('/');
-           const finalPageId = `/tutorials/${relPathSplit[0]}/${pageId}`;
+           const pageIdSplit = pageId.split('_');
+           if( pageIdSplit.length == 2) {
+                const finalPageId = pageIdSplit[1];
+           }
+           else {
+                const finalPageId = pageId;
+           }
+           const finalPath = `/tutorials/${relPathSplit[0]}/${finalPageId}`;
 
            if(relPathSplit.length > 1) {
                actions.createPage({
-                        path: finalPageId,
+                        path: finalPath,
                         component: require.resolve(
                             './src/components/DevDocTemplate/index.tsx',
                         ),
