@@ -63,19 +63,20 @@ exports.createPages = async function ({ actions, graphql }) {
                 ),
                 context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
             });
-            /*
+            
            // Directory experiment
-
+            /*
            const dirSplit = directory.split('/');
            const lastDir = dirSplit[dirSplit.length - 2];
+           */
            actions.createPage({
-                    path: `/tutorials/$(lastDir}/${pageId}`,
+                    path: `/$(directory}/${pageId}`,
                     component: require.resolve(
                         './src/components/DevDocTemplate/index.tsx',
                     ),
                     context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
                 });
-                */
+            
             
         }
 
