@@ -72,14 +72,15 @@ exports.createPages = async function ({ actions, graphql }) {
             
            // One-level of subdirectory part of stub
            const relPathSplit = relPath.split('/');
+           const finalPageId = `/tutorials/${relPathSplit[0]}/${pageId}`;
 
            if(relPathSplit.length > 1) {
                actions.createPage({
-                        path: `/tutorials/${relPathSplit[0]}/${pageId}`,
+                        path: finalPageId,
                         component: require.resolve(
                             './src/components/DevDocTemplate/index.tsx',
                         ),
-                        context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+                        context: { finalPageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
                     });
            }
         }
