@@ -44,7 +44,7 @@ exports.createPages = async function ({ actions, graphql }) {
            const relPathSplit = relPath.split('/');
 
            if(relPathSplit.length > 1) {
-                const finalPageId = `/tutorials/${relPathSplit[0]}/` + e.node.pageAttributes.pageid;
+                const finalPageId = `tutorials/${relPathSplit[0]}/` + e.node.pageAttributes.pageid;
                 namePageIdMap[e.node.parent.name] =
                    finalPageId || NOT_FOUND_PAGE_ID;
            }
