@@ -43,13 +43,15 @@ exports.createPages = async function ({ actions, graphql }) {
         if (sourceName === 'tutorials'){
            const relPathSplit = relPath.split('/');
            const pageIdSplit = e.node.pageAttributes.pageid.split('_');
+           const finalPageId = e.node.pageAttributes.pageid;
+           /* 
            if( pageIdSplit.length == 2) {
                 const finalPageId = pageIdSplit[1];
            }
            else {
                 const finalPageId = e.node.pageAttributes.pageid;
            } 
-
+           */
            if(relPathSplit.length > 1) {
                 const mapPageId = `tutorials/${relPathSplit[0]}/` + finalPageId;
                 namePageIdMap[e.node.parent.name] =
