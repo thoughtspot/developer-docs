@@ -27,7 +27,6 @@ exports.createPages = async function ({ actions, graphql }) {
                             ... on File {
                                 name
                                 sourceInstanceName
-                                dir
                                 relativePath
                             }
                         }
@@ -46,29 +45,21 @@ exports.createPages = async function ({ actions, graphql }) {
 
     data.allAsciidoc.edges.forEach((edge) => {
         const { pageid: pageId } = edge.node.pageAttributes;
-        const { sourceInstanceName: sourceName, dir : directory, relativePath : relPath } = edge.node.parent;
-
-        actions.createPage({
-            path: `/${pageId}`,
-            component: require.resolve(
-                './src/components/DevDocTemplate/index.tsx',
-            ),
-            context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
-        });
+        const { sourceInstanceName: sourceName, relativePath : relPath } = edge.node.parent;
 
         if (sourceName === 'tutorials'){
+            /*
                 actions.createPage({
                 path: `/tutorials/${pageId}`,
                 component: require.resolve(
                     './src/components/DevDocTemplate/index.tsx',
                 ),
                 context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
-            });
+            });*/
             
-           // Sub-directory experiment
-        
+           // One-level of subdirectory part of stub
            const relPathSplit = relPath.split('/');
-           //const lastDir = dirSplit[dirSplit.length - 2];
+
            if(relPathSplit.length > 1) {
                actions.createPage({
                         path: `/tutorials/${relPathSplit[0]}/${pageId}`,
@@ -78,8 +69,16 @@ exports.createPages = async function ({ actions, graphql }) {
                         context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
                     });
            }
-            
-            
+        }
+
+        else {
+            actions.createPage({
+                path: `/${pageId}`,
+                component: require.resolve(
+                    './src/components/DevDocTemplate/index.tsx',
+                ),
+                context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+            });
         }
 
         if (pageId === 'introduction') {
