@@ -35,9 +35,9 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '10.1.0.cl',
+            label: '10.1.0.sw',
             link: ' ',
-            subLabel: 'Cloud (Latest)',
+            subLabel: 'Software (Latest)',
         },
     ],
     CUSTOM_PAGE_ID: {
