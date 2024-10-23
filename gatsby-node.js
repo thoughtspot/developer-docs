@@ -39,8 +39,21 @@ exports.createPages = async function ({ actions, graphql }) {
 
     const namePageIdMap = {};
     data.allAsciidoc.edges.forEach((e) => {
-        namePageIdMap[e.node.parent.name] =
-            e.node.pageAttributes.pageid || NOT_FOUND_PAGE_ID;
+        const { sourceInstanceName: sourceName, relativePath : relPath } = edge.node.parent;
+        if (sourceName === 'tutorials'){
+           const relPathSplit = relPath.split('/');
+
+           if(relPathSplit.length > 1) {
+                const finalPageId = `/tutorials/${relPathSplit[0]}/${pageId}`;
+                namePageIdMap[e.node.parent.name] =
+                   finalPageId || NOT_FOUND_PAGE_ID;
+           }
+        }
+
+        else {
+            namePageIdMap[e.node.parent.name] =
+                e.node.pageAttributes.pageid || NOT_FOUND_PAGE_ID;
+        }
     });
 
     data.allAsciidoc.edges.forEach((edge) => {
