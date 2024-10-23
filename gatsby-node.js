@@ -80,7 +80,7 @@ exports.createPages = async function ({ actions, graphql }) {
                         component: require.resolve(
                             './src/components/DevDocTemplate/index.tsx',
                         ),
-                        context: { finalPageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+                        context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
                     });
            }
         }
