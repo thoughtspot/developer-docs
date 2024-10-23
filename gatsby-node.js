@@ -39,7 +39,7 @@ exports.createPages = async function ({ actions, graphql }) {
 
     const namePageIdMap = {};
     data.allAsciidoc.edges.forEach((e) => {
-        const { sourceInstanceName: sourceName, relativePath : relPath } = edge.node.parent;
+        const { sourceInstanceName: sourceName, relativePath : relPath } = e.node.parent;
         if (sourceName === 'tutorials'){
            const relPathSplit = relPath.split('/');
 
