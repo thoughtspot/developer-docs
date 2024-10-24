@@ -48,7 +48,9 @@ export const addExpandCollapseImages = (
                 const allLinks = el.children[1].querySelectorAll('a');
                 for (let i = 0; i < allLinks.length; i++) {
                     const splitArr = allLinks[i].href.split('=');
-                    if (splitArr.length > 1 && splitArr[1] === pageId) {
+                    const classList = allLinks[i].classList;
+                    const isActiveClass = classList.contains('active');
+                    if (isActiveClass) {
                         spanElementChild.innerHTML = ArrowDownHTML;
                         el.children[1].classList.remove('displayNone');
                         break;
