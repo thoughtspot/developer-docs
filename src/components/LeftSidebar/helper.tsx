@@ -89,12 +89,21 @@ const isLinkMatching = (
     pageid: string,
 ) => {
     if (!href || !curLocation) return false;
-
-    return (
-        href.includes(`pageid=${pageid}`) ||
-        href.includes(`/${encodeURI(pageid)}#`) ||
-        href.endsWith(`/${encodeURI(pageid)}`)
-    );
+    const pageIdSplit = pageid.split('_');
+    if (pageIdSplit.length > 1){
+         return (
+            href.includes(`pageid=${pageid}`) ||
+            href.includes(`/${encodeURI(pageIdSplit[0)}/${encodeURI(pageIdSplit[1)}#`) ||
+            href.endsWith(`/${encodeURI(pageIdSplit[0)}/${encodeURI(pageIdSplit[1)}`)
+        );
+    }
+    else {
+        return (
+            href.includes(`pageid=${pageid}`) ||
+            href.includes(`/${encodeURI(pageid)}#`) ||
+            href.endsWith(`/${encodeURI(pageid)}`)
+        );
+    }
 };
 
 const isCurrentNavOpen = (liEle: HTMLLIElement, activePageid: string) => {
