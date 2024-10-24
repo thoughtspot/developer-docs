@@ -82,12 +82,11 @@ exports.createPages = async function ({ actions, graphql }) {
            // One-level of subdirectory part of stub
            const relPathSplit = relPath.split('/');
            const pageIdSplit = pageId.split('_');
-           if( pageIdSplit.length == 2) {
-                const finalPageId = pageIdSplit[1];
+           let finalPageId = pageId;
+           if( pageIdSplit.length === 2) {
+                finalPageId = pageIdSplit[1];
            }
-           else {
-                const finalPageId = pageId;
-           }
+
            const finalPath = `/tutorials/${relPathSplit[0]}/${finalPageId}`;
 
            if(relPathSplit.length > 1) {
