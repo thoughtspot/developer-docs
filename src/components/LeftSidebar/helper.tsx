@@ -48,7 +48,9 @@ export const addExpandCollapseImages = (
                 const allLinks = el.children[1].querySelectorAll('a');
                 for (let i = 0; i < allLinks.length; i++) {
                     const splitArr = allLinks[i].href.split('=');
-                    if (splitArr.length > 1 && splitArr[1] === pageId) {
+                    const classList = allLinks[i].classList;
+                    const isActiveClass = classList.contains('active');
+                    if (isActiveClass) {
                         spanElementChild.innerHTML = ArrowDownHTML;
                         el.children[1].classList.remove('displayNone');
                         break;
@@ -87,12 +89,22 @@ const isLinkMatching = (
     pageid: string,
 ) => {
     if (!href || !curLocation) return false;
-
-    return (
-        href.includes(`pageid=${pageid}`) ||
-        href.includes(`/${encodeURI(pageid)}#`) ||
-        href.endsWith(`/${encodeURI(pageid)}`)
-    );
+    
+    const pageIdSplit = pageid.split('_');
+    if (pageIdSplit.length > 1){
+         return (
+            href.includes(`pageid=${pageid}`) ||
+            href.includes(`/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}#`) ||
+            href.endsWith(`/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}`)
+        );
+    }
+    //else {
+        return (
+            href.includes(`pageid=${pageid}`) ||
+            href.includes(`/${encodeURI(pageid)}#`) ||
+            href.endsWith(`/${encodeURI(pageid)}`)
+        );
+    //}
 };
 
 const isCurrentNavOpen = (liEle: HTMLLIElement, activePageid: string) => {
