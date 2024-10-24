@@ -40,18 +40,15 @@ exports.createPages = async function ({ actions, graphql }) {
     const namePageIdMap = {};
     data.allAsciidoc.edges.forEach((e) => {
         const { sourceInstanceName: sourceName, relativePath : relPath } = e.node.parent;
+        const pageId = e.node.pageAttributes.pageid;
         if (sourceName === 'tutorials'){
            const relPathSplit = relPath.split('/');
-           //const pageIdSplit = e.node.pageAttributes.pageid.split('_');
-           const finalPageId = e.node.pageAttributes.pageid;
-           /* 
-           if( pageIdSplit.length == 2) {
-                const finalPageId = pageIdSplit[1];
+           const pageIdSplit = pageId.split('_');
+           let finalPageId = pageId;
+           if( pageIdSplit.length > 1) {
+                finalPageId = pageIdSplit[1];
            }
-           else {
-                const finalPageId = e.node.pageAttributes.pageid;
-           } 
-           */
+
            if(relPathSplit.length > 1) {
                 const mapPageId = `tutorials/${relPathSplit[0]}/` + finalPageId;
                 namePageIdMap[e.node.parent.name] =
