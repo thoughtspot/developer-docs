@@ -42,7 +42,7 @@ exports.createPages = async function ({ actions, graphql }) {
         const { sourceInstanceName: sourceName, relativePath : relPath } = e.node.parent;
         if (sourceName === 'tutorials'){
            const relPathSplit = relPath.split('/');
-           const pageIdSplit = e.node.pageAttributes.pageid.split('_');
+           //const pageIdSplit = e.node.pageAttributes.pageid.split('_');
            const finalPageId = e.node.pageAttributes.pageid;
            /* 
            if( pageIdSplit.length == 2) {
