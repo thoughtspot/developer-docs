@@ -91,13 +91,13 @@ const isLinkMatching = (
     if (!href || !curLocation) return false;
     
     const pageIdSplit = pageid.split('_');
-    /*if (pageIdSplit.length > 1){
+    if (pageIdSplit.length > 1){
          return (
             href.includes(`pageid=${pageid}`) ||
-            href.includes(`/${encodeURI(pageIdSplit[0)}/${encodeURI(pageIdSplit[1)}#`) ||
-            href.endsWith(`/${encodeURI(pageIdSplit[0)}/${encodeURI(pageIdSplit[1)}`)
+            href.includes(`/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}#`) ||
+            href.endsWith(`/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}`)
         );
-    }*/
+    }
     //else {
         return (
             href.includes(`pageid=${pageid}`) ||
