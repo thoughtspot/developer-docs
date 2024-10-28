@@ -48,12 +48,12 @@ exports.createPages = async function ({ actions, graphql }) {
            if( pageIdSplit.length > 1) {
                 finalPageId = pageIdSplit[1];
            }
-
+           const mapPageId = `tutorials/` + finalPageId;
            if(relPathSplit.length > 1) {
-                const mapPageId = `tutorials/${relPathSplit[0]}/` + finalPageId;
-                namePageIdMap[e.node.parent.name] =
-                   mapPageId || NOT_FOUND_PAGE_ID;
+                mapPageId = `tutorials/${relPathSplit[0]}/` + finalPageId;
            }
+           namePageIdMap[e.node.parent.name] =
+                   mapPageId || NOT_FOUND_PAGE_ID;
         }
 
         else {
@@ -76,17 +76,18 @@ exports.createPages = async function ({ actions, graphql }) {
                 finalPageId = pageIdSplit[1];
            }
 
-           const finalPath = `/tutorials/${relPathSplit[0]}/${finalPageId}`;
-
+           const finalPath = `/tutorials/${finalPageId}`;
            if(relPathSplit.length > 1) {
-               actions.createPage({
-                        path: finalPath,
-                        component: require.resolve(
-                            './src/components/DevDocTemplate/index.tsx',
-                        ),
-                        context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
-                    });
+               finalPath = `/tutorials/${relPathSplit[0]}/${finalPageId}`;
            }
+           
+           actions.createPage({
+                    path: finalPath,
+                    component: require.resolve(
+                        './src/components/DevDocTemplate/index.tsx',
+                    ),
+                    context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+                });
         }
 
         else {
