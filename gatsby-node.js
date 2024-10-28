@@ -48,7 +48,7 @@ exports.createPages = async function ({ actions, graphql }) {
            if( pageIdSplit.length > 1) {
                 finalPageId = pageIdSplit[1];
            }
-           const mapPageId = `tutorials/` + finalPageId;
+           let mapPageId = `tutorials/` + finalPageId;
            if(relPathSplit.length > 1) {
                 mapPageId = `tutorials/${relPathSplit[0]}/` + finalPageId;
            }
@@ -76,7 +76,7 @@ exports.createPages = async function ({ actions, graphql }) {
                 finalPageId = pageIdSplit[1];
            }
 
-           const finalPath = `/tutorials/${finalPageId}`;
+           let finalPath = `/tutorials/${finalPageId}`;
            if(relPathSplit.length > 1) {
                finalPath = `/tutorials/${relPathSplit[0]}/${finalPageId}`;
            }
