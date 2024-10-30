@@ -10,7 +10,7 @@ The xref:git-rest-api-guide.adoc#deploy-commits[deploy API endpoint] automatical
 
 [NOTE]
 ====
-ThoughtSpot never alters any GUIDs in the files stored in Git, regardless of branch. The find/replace of the mapping process occurs as the TML files in Git are imported by the *Deploy* REST API.
+ThoughtSpot never alters any GUIDs in the files stored in Git, regardless of branch. The find/replace of the mapping process occurs as the TML files in Git are imported by the `/deploy` REST API.
 ====
 
 You can use the Git APIs across distinct ThoughtSpot instances, as long as they are configured to the same Git repository. 
@@ -20,9 +20,9 @@ The GUID mapping files will be maintained as described in this article. If both 
 == GUID mapping files
 Each Org configured for Git integration will have a mapping JSON file generated with the name pattern `org-{orgId}.json` in the Git branch selected to host configuration files during the Git setup.
 
-The mapping files for each ThoughtSpot *instance* will live in a directory in the `config` branch with name pattern `{instanceId}.mapping`. The `instanceId` is the `id` property returned from the REST API link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsystem%2Fget-system-information[`/system`] call.
+The mapping files for each ThoughtSpot instance will live in a directory in the `config` branch with name pattern `{instanceId}.mapping`. The `instanceId` is the `id` property returned from the REST API link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsystem%2Fget-system-information[`/system`] call.
 
-Each mapping JSON file is an array of mapping objects recording the GUIDs for each TML object, which are automatically generated and maintained during each *deploy* API call:
+Each mapping JSON file is an array of mapping objects recording the GUIDs for each TML object, which are automatically generated and maintained during each `/deploy` API call:
 
 [source,JSON]
 ----
@@ -49,7 +49,7 @@ Each mapping JSON file is an array of mapping objects recording the GUIDs for ea
 * `originalGuid` refers to the GUID of the object on the source environment, typically the `dev` environment
 * `mappedGuid` refers to the GUID of the object on the destination environment, for example, `release` or `prod`
 * `counter` shows the number of times the mapped object was used in deploy operations.
-* `additionalMapping` is an object with direct key-value mappings of `viz_ids` on a Liveboard, and is otherwise an empty object `{}`
+* `additionalMapping` is an object with direct key-value mappings of `viz_ids` on a Liveboard and is otherwise an empty object `{}`
 
 The following figure illustrates how GUIDs are mapped during deployments:
 
@@ -57,12 +57,10 @@ The following figure illustrates how GUIDs are mapped during deployments:
 image::./images/guid-mapping.png[GUID mapping]
 
 == How mapping works
-The mapping file is updated when a new object is first created in the destination Org and receives its automatically generated GUID from the ThoughtSpot instance.
-
-Mapping itself is performed with an *exact string Find/Replace* operation, on the TML objects directly before the import, without modifying the files in Git repository.
+The mapping file is updated when a new object is first created in the destination Org and receives its automatically generated GUID from the ThoughtSpot instance. Mapping is performed with an *exact string Find/Replace* operation, on the TML objects directly before the import, without modifying the files in the Git repository.
 
 === Using mapping for Table TML properties
-There are several properties within Table TML files related to a table's fully qualified name (FQN) within the RDBMS, that often need to be changed between Orgs.
+There are several properties within Table TML files related to a Table's fully qualified name (FQN) within the RDBMS, that often need to be changed between Orgs.
 
 You can use the *exact string Find/Replace* nature of the GUID Mapping file to define changes in the Table TMLs between environments.
 
@@ -103,15 +101,15 @@ If you need to limit the *Find/Replace* action to a specific TML file, you can i
 }
 ----
 
-This requires more effort but works when a single Find/Replace against all files could result in incorrect results. Given there are often many Table TML files being redeployed, perhaps across different connections, additional specificity may be necessary.
+This requires more effort but works when a single *Find/Replace* against all files could result in incorrect results. Given there are often many Table TML files being redeployed, perhaps across different connections, additional specificity may be necessary.
 
 [#connection_variations]
 === Connection variations in each Org
-link:https://docs.thoughtspot.com/cloud/latest/connections[Connections] contain most details that vary between data environments, other than the `db` and `schema` properties within the table objects.
+The link:https://docs.thoughtspot.com/cloud/latest/connections[Connection, window=_blank] objects contain most details that vary between data environments, other than the `db` and `schema` properties within the table objects.
 
-Connections can be defined programmatically via link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fconnections%2Fcreate-connection[REST API, target=_blank] or using link:https://docs.thoughtspot.com/cloud/latest/tml-connections[TML for connections, target=_blank] in the ThoughtSpot UI or via APIs.
+Connections can be defined programmatically via link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fconnections%2Fcreate-connection[REST API] or using link:https://docs.thoughtspot.com/cloud/latest/tml-connections[TML for connections, window=_blank] in the ThoughtSpot UI or via APIs.
 
-Creating a connection involves secure credentials, which are not exported in the Connection TML. For this reason, it is preferable to set via UI or REST API. An example of creating connections via REST API across multiple Orgs is available at the link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/create_connection_on_orgs.py[thoughtspot_rest_api_v1_python GitHub repository, target=_blank].
+Creating a connection involves secure credentials, which are not exported in the Connection TML. For this reason, it is preferable to set it via UI or REST API. An example of creating connections via REST API across multiple Orgs is available at the link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/create_connection_on_orgs.py[thoughtspot_rest_api_v1_python GitHub repository, target=_blank].
 
 == Switching "dev" Orgs
 When the Orgs feature is enabled on an instance for the first time, all existing content will be available in the *Primary* Org, with `org_id` as `0`.
@@ -120,20 +118,20 @@ While the best practice is to create a separate `dev Org` and `prod Org` from th
 
 You can accomplish this in phases using the Git APIs:
 
-1. Create a temporary Git branch and xref:git-configuration.adoc#update-git-config[update the configuration] the *Primary/prod Org* with this branch to make it available to the Commit API
-2. Use the xref:git-rest-api-guide.adoc#commit-files[Commit API] to export all desired objects from the `Primary/prod Org` into the temporary Git branch (not the xref:git-configuration.adoc#configuration-options[commit branch] that you will use for deployment to the `prod` Org)
-3. Use the xref:git-rest-api-guide.adoc#deploy-commits[Deploy API] into the new `dev Org` from the temporary branch to bring all the content into the `dev Org`. This will create the *GUID Mapping File* for the `dev Org`.
-4. Take the JSON structure of the GUID Mapping file from the *dev Org*, copy it, and *swap the keys and values*, then save the result in the GUID Mapping file of the *prod Org*
+1. Create a temporary Git branch and xref:git-configuration.adoc#update-git-config[update the configuration] to add *Primary*/`prod` Org to make it available to the `commit` operations.
+2. Use the xref:git-rest-api-guide.adoc#commit-files[Commit API] to export all desired objects from the *Primary*/`prod` Org into the temporary Git branch (not the xref:git-configuration.adoc#configuration-options[commit branch] that you will use for deployment to the `prod` Org)
+3. Use the xref:git-rest-api-guide.adoc#deploy-commits[Deploy API] into the new `dev` Org from the temporary branch to bring all the content into the `dev` Org. This will create the GUID mapping file for the `dev` Org.
+4. Take the JSON structure of the GUID mapping file from the `dev` Org, copy it, swap the keys and values, and then save the result in the GUID Mapping file of the `prod`.
 
-=== Swapping keys and values in the GUID Mapping file
+=== Swap keys and values in the GUID Mapping file
 The structure of the GUID Mapping file is entirely simple key-value mappings in JSON, and thus can be easily swapped around programmatically.
 
-You can modify the files in the `config_branch` manually for additions or corrections, but you must make sure the data is in the proper format and matches what ThoughtSpot generates.
+You can modify the files in the `config_branch` manually for additions or corrections, but you must make sure the data is in the correct format and matches what ThoughtSpot generates.
 
 An example of this process in Python is available as link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/blob/main/examples_v2/git_guid_mapping_file_functions.py[git_guid_mapping_file_functions.py, target=_blank].
 
-Simply take the swapped JSON and save it in `org-0.json` file within the `{instanceId}.mapping` directory of the `config_branch` in GitHub (or whichever `org-{orgId}.json` file matches to your prod Org). 
+Take the swapped JSON and save it in `org-0.json` file within the `{instanceId}.mapping` directory of the `config_branch` in GitHub, or whichever `org-{orgId}.json` file matches to your `prod` Org.
 
-Now you can being to use pull requests to move content from the `dev branch` to the `prod branch`, and when you do the Deploy API, the GUIDs will be swapped properly from their new origin in `dev Org` to the values in prod.
+You can use pull requests to move content from `dev` to the `prod` branch, and when you push changes via `/deploy` API, the GUIDs will be swapped properly from their new origin in `dev` Org to the values in `prod`.
 
 
