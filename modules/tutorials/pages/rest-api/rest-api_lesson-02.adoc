@@ -122,18 +122,21 @@ In the REST API V2.0 Playground, go to `Authentication`->`Get Full Access Token`
 
 Enter in the details 
 
-Copy the JSON body from the right side of the Playground, Python Dict uses the same syntax, but you ) 
+Copy the JSON body from the right side of the Playground, Python Dict uses the same syntax, but you must update the booleans to be *uppercase*.
+
+Replace any of the hard-coded values with the *global variables* you declared so that you can change your requests in an easy way at the top of your script and make sure the values change in all the necessary places:
 
 [,python]
 ----
 ...
 endpoint = 'auth/token/full'
 url = base_url + endpoint
+
 json_post_data = {
   "username": "yourusername",
   "password": "y0urP@ssword",
   "validity_time_in_sec": 3600,
-  "org_id": 1613534286,
+  "org_id": org_id,
   "auto_create": False  # make sure to uppercase in Python
 }
 ----
@@ -157,9 +160,144 @@ token = resp_json["token"]
 ----
 
 === Update the Session object headers
+Almost all of the REST API endpoints other than the token requests require authentication, either within the cookies or via an `Authentication: Bearer {token}` header.
+
+We neeed to update the `Session` object with this new header while keeping the original ones.
+
+Use the `token` variable from above to form the exact header to update the original `api_headers` Dict, then use the `.headers.update()` method of the `Session` object: 
+
+[,python]
+----
+...
+token = resp_json["token"]
+
+# Update api_headers from before with header for Bearer token
+api_headers['Authorization'] = 'Bearer {}'.format(token)
+
+requests_session.headers.update(api_headers)
+----
 
 == 04 - Handle errors from the REST API
+The code we have written so far is correct from a logical perspective, but only works properly if everything goes as expected.
 
+Unfortunately, making a REST API request to a web server can result in any number of errors, even if the communication back and forth completes successfully.
+
+Good coding involves testing for and handling error situations.
+
+=== Using try and except in Python
+Python code raises `link:https://docs.python.org/3/tutorial/errors.html[Exceptions, target=_blank]` when an error is encountered. 
+
+If an `Exception` is raised and is not *handled*, the script exits and displays the message provided with the Exception and other details of what failed.
+
+A `try...except block` encloses a set of lines that may result in a known `Exception` in the `try` portion, and then the `except` line defines which `Exception` type to listen for and how to proceed if the `Exception` is thrown.
+
+Every HTTP request can potentially result in an error, and we don't want to continue within the script as planned if the expected action on the ThoughtSpot server did not complete correctly.
+
+The most generic `try...except` block will capture *any* `Exception`:
+[,python]
+----
+try: 
+    resp = requests_session.post(url=url, json=json_post_data)
+    resp_json = resp.json()  # Returns JSON body of resp to Python Dict
+    print(resp_json)
+    token = resp_json["token"]
+
+except Exception as e: 
+	# do whatever is necessary in exception case
+
+# Code after the try block will now run even after Exception
+----
+
+=== Checking for requests HTTPError exceptions
+The `requests` library does not raise an `Exception` when an HTTP request completes "properly", that is to say a well-formed HTTP response is received from a request.
+
+However as saw in the previous lesson, HTTP responses include a *Status Code* that indicates if the requested action was a *Success* or an *Error*.
+
+To cause `Exceptions` if the response does not include a *Success* status code, call the `Response.raise_for_status()` method for each call, which will throw the specifc `requests.exceptions.HTTPError` `Exception` when a 400 series or 500 status code is returned:
+
+[,python]
+----
+try: 
+    resp = requests_session.post(url=url, json=json_post_data)
+    resp.raise_for_status()
+    print(resp)
+    token = resp["token"]
+except requests.exceptions.HTTPError as e:
+    print(e)
+    print(e.request)
+    print(e.request.url)
+    print(e.request.headers)
+    print(e.request.body)
+    print(e.response.content)
+----
+
+== 05 - Complete REST API request example
+With the addition of `try...except` blocks looking for `HTTPError` when we make the HTTP request, we now have a complete basic pattern for using the ThoughtSpot V2.0 REST API:
+
+[,python]
+----
+import requests
+import json
+
+thoughtspot_url = 'https://{}.thoughtspot.cloud'
+org_id = 0
+api_version = '2.0'
+
+endpoint = 'auth/token/full'
+url = base_url + endpoint
+
+json_post_data = {
+  "username": "yourusername",
+  "password": "y0urP@ssword",
+  "validity_time_in_sec": 3600,
+  "org_id": org_id,
+  "auto_create": False  # make sure to uppercase in Python
+}
+
+try:
+    # requests returns back Response object 
+    resp = requests_session.post(url=url, json=json_post_data)
+
+    # This method causes Python Exception to throw if status not 2XX
+    resp.raise_for_status()
+
+    # Retrieve the JSON body of response and convert into Dict
+    # Ifcall (DEL) returns 204 not 200, with no body, may error
+    resp_json = resp.json()
+
+    # You can just print(resp_json) to see the Python Dict
+    print(json.dumps(resp_json, indent=2))
+
+    # 'token' property of the response is the Bearer Token to use
+    token = resp_json["token"]
+
+except requests.exceptions.HTTPError as e:
+    print(e)
+    print(e.request)
+    print(e.request.url)
+    print(e.request.headers)
+    print(e.request.body)
+    print(e.response.content)
+
+# Update api_headers from before with header for Bearer token
+api_headers['Authorization'] = 'Bearer {}'.format(token)
+
+requests_session.headers.update(api_headers)
+
+# Issue any other command using the same requests_session object
+
+user_search_url = base_url + "users/search"
+
+# Every request must be wrapped in try...except
+try:
+    search_resp = requests_session.get(url=user_search_url)
+    search_resp.raise_for_status()
+...
+----
+
+You may have noticed many steps that are repeated each time for any given request. 
+
+In the next lesson, we'll cover using a *library* that wraps most of these repeated steps, so that you can focus simply on the logic of your API workflows.
 
 '''
 
