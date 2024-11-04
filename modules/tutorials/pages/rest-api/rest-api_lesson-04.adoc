@@ -17,13 +17,9 @@ Instead you specify code to run after a task, like a request to another server, 
 JS is also a functional language - functions (blocks of code) can be passed to and returned from other functions, and this is a very common design pattern - often called callbacks
 
 === Configuring ThoughtSpot CORS
-ThoughtSpot instances are locked down by default, rejecting API requests from web servers that have not been added to the CORS whitelist.
+ThoughtSpot instances are locked down by default, rejecting API requests from web servers that have not been added to the xref:security-settings.adoc#cors-hosts[CORS allowlist].
 
-== 02 - Using fetch() to issue REST API request
-
-The `fetch()` function in JavaScript uses the browser itself as a store of cookies and other details when you use the `credentials: "include"` parameter.
-
-`fetch` is an asynchronous call that returns a `Promise`:
+=== Setting global variables
 
 [,javascript]
 ----
@@ -32,12 +28,42 @@ const publicApiUrl = 'api/rest/2.0/';
 
 
 const endpoint = "/{}/{}"
+----
+
+=== Copy requests directly from Playground
+The request and response format for the V2.0 REST API is JSON, the native object format of JavaScript. 
+
+You can copy any request from the REST API V2.0 Playground directly into your code:
+
+image:images/tutorials/rest-api/json-request-format.png[JSON request format in Playground, width=521, height=445]
+
+[,javascript]
+----
 // Copy in directly from the V2.0 REST API Playground
 const apiRequestObject = {
-
+  "record_offset": 0,
+  "record_size": 10,
+  "include_favorite_metadata": false,
+  "privileges": [
+    "DATADOWNLOADING"
+  ]
 }
 
+// Can later use the following to send as part of a request body:
+// JSON.stringify(apiRequestObject);
+----
+
+== 02 - Using fetch() to issue REST API request
+
+The `fetch()` function in JavaScript uses the browser itself as a store of cookies and other details when you use the `credentials: "include"` parameter.
+
+`fetch` is an asynchronous call that returns a `Promise`, which has `.then()` and `.error()` methods for calling the next code to run once the REST API response is returned:
+
+[,javascript]
+----
+...
 const apiFullEndpoint = tsHost + "/" + publicApiUrl + endpoint;
+
 await fetch(
   apiFullEndpoint, // URL
     {
@@ -49,11 +75,11 @@ await fetch(
          },
        credentials: "include",
        body: JSON.stringify(apiRequestObject)
-        })
-    .then(response =>  response.json())
-    .catch(error => {
+    }
+) .then(response =>  response.json())
+  .catch(error => {
         console.error("Unable to get the" + endpoint + "response: " + error);
-    });
+  });
 ----
 
 
