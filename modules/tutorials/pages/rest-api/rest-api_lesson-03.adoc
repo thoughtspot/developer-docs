@@ -9,6 +9,13 @@ The files for this tutorial are `api_training_python_2_begin.py` and `api_traini
 
 You must have installed the `thoughtspot_rest_api_v1` library per the prerequisites at the beginning into the Python environment you are using.
 
+[NOTE]
+====
+You'll need to use an *administrator* level ThoughtSpot account to complete the following tutorial. 
+
+It will create a Tag and a Group that need to be deleted at the end of the tutorial.
+====
+
 == 01 - Introducing the thoughtspot_rest_api_v1 library
 The *link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python[thoughtspot_rest_api_v1 library]* was originally created because the V1 ThoughtSpot REST API was not very uniform, so a library with an implementation of each individual endpoint was created as a "reference" on how to format and send each request correctly.
 
@@ -21,7 +28,7 @@ The library encapsulates logic around making the REST API requests properly, so 
 Endpoints are defined properly, along with HTTP request details and response handling. 
 
 === Importing and using the thoughtspot_rest_api_v1 library
-Rather than helper functions like in JavaScript, the thoughtspot_rest_api_v1 library provides two `*classes* that represent the entire set of the two REST API versions: `TSRestApiV1` & `TSRestApiV2`
+Rather than helper functions like in JavaScript, the thoughtspot_rest_api_v1 library provides two *classes* that represent the entire set of the two REST API versions: `TSRestApiV1` & `TSRestApiV2`
 
 *Classes* define how to build *Objects*, which combine together data (called properties) and functions (called methods).
 
@@ -78,9 +85,13 @@ You'll notice that we've already accomplished everything we did in the previous 
 
 == 03 - Using other endpoints
 
-All of the methods of the TSRestApiV2 class are named after their equivalent REST endpoints, with an underscore character `_` replacing the forward-slashes `/` from the URLs.
+All of the methods of the `TSRestApiV2` class are named after their equivalent REST endpoints, with an underscore character `_` replacing the forward-slashes `/` from the URLs.
 
 ex. `/users/search` endpoint is accessed via `TSRestApiV2.users_search()` method
+
+If everything is installed and configured properly in your IDE, you should get auto-complete on the available endpoints as you type:
+
+image:images/tutorials/rest-api/autocomplete-in-ide.png[Autocomplete in IDE, width=475, height=229]
 
 For endpoints that have only a few strictly defined arguments, the method will define Python arguments to match the endpoint’s arguments:
 
@@ -88,26 +99,85 @@ For endpoints that have only a few strictly defined arguments, the method will d
 
 
 Endpoints with lots of request options simply take a `request=` argument, which expects a Python Dict matching the JSON request you see in the REST API Playground:
+
+image:images/tutorials/rest-api/json-request-format.png[JSON request format in Playground, width=521, height=445]
+
 [,python]
 ----
-# Get all Tables
+# Get all Users with a particular privilege
 search_request = {
-    'metadata': [{'type': 'LOGICAL_TABLE'}],
-    'record_offset': 0,
-    'record_size': 100000  # default is 10
+  "record_offset": 0,
+  "record_size": 10,
+  "include_favorite_metadata": False,  # make sure to upper-case booleans
+  "privileges": [
+    "DATADOWNLOADING"
+  ]
 }
 try:
-    tables = ts.metadata_search(request=search_request)
+    users = ts.users_search(request=search_request)
 except requests.exceptions.HTTPError as e:
     print(e)
     print(e.response.content)
     exit()
-for t in table:
+for u in users:
     # get details of each table and do further actions
-    table_guid = t['id']
+    user_guid = u['id']
 ----
+
 == 04 - Complex workflows
+The real reason to use the library is to allow quickly combining together the results of multiple requests into complex and flexible workflows.
+
+We'll walk through the process of determing the steps for a sample task, then code out the necessary steps.
+
+Our example task: *Find all Liveboards and Answers with a name that includes '(Sample)', add a tag called 'Tutorial Test' to those items, then give read-only access to a 'Tutorial Test' group*
+
+=== Define steps
+It’s always easiest to program by establishing the exact requirements, what those requirements amount to in logical steps, then start writing the code to match. 
+
+Let’s split into discrete steps:
+
+1. Find all Liveboards and Answers with a name that includes '(Sample)'
+2. Add a tag called 'Tutorial Test' to all of the items
+3. Give read-only access to a 'Tutorial Test' group
+
+Create comments in your code file to help structure your thinking:
+[,python]
+----
+# 1. Find all Liveboards and Answers with a name that includes '(Sample)'
+
+# 2. Add a tag to each item called 'Tutorial Test'
+
+# 3. Give read-only access to a 'Tutorial Test' group
+----
+
+Even this basic step opens up new questions as to what our exact requirements are:
+
+[,python]
+----
+# 1. Find all Liveboards and Answers with a name that includes '(Sample)'
+
+# Get all of the items with name '(Sample)'
+#  Is this a case-sensitive or insensitive operation? Are we finding anywhere in the name or just at start or end?
+
+# 2. Add a tag to each item called 'Tutorial Test'
+
+# Get the ID of the tag called 'Tutorial Test'
+#   What if there is no tag called 'Tutorial Test'?
+
+# Assign Tag to each item
+
+# 3. Give read-only access to a 'Tutorial Test' group
+
+# Get the ID of the group called 'Tutorial Test'
+#  Is 'Tutorial Test' the name or the display_name property? 
+#  What if there is no group called 'Tutorial Test'?
+----
+
+
+
+=== Find and test endpoints in the REST API V2.0 Playground
+
 
 '''
 
-xref:rest-api_lesson-04.adoc[Next: Lesson 04 >]
+xref:rest-api_lesson-02.adoc[< Back: 02 - Simple Python Implementation of V2.0 REST API]| xref:rest-api_lesson-04.adoc[Next: 04 - Browser JavaScript REST API implementation >]

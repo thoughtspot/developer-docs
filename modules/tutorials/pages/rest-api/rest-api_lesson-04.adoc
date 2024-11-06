@@ -1,18 +1,159 @@
-= Lesson 04: Basic JavaScript Implementation
+= 04 - Browser JavaScript REST API implementation
 :page-pageid: rest-api_lesson-04
-:description: Basic JavaScript Implementation
+:description: Browser JavaScript REST API implementation
 :toc: true
-:toclevels: 2
+:toclevels: 1
 
 == Getting started
-We'll use the files from the link:https://github.com/thoughtspot/tse-api-tutorial[tse-api-tutorial GitHub repository, target=_blank] that you downloaded at the beginning of the tutorial.
+The files for Lesson 04 are `api_training_javascript_1.html` and `api_training_javascript_2.html`
 
-Open up your IDE (Visual Studio Code will be used in all images and instructions).
 
-The files for Lesson 02 are `api_training_python_1_begin.py` and `api_training_python_1_end.py`
 
-== Importing requests library 
+== 01 - Basics of browser-side JavaScript
+Many actions in JavaScript are asynchronous that is to say, code does not execute in the order it is written.
+
+Instead you specify code to run after a task, like a request to another server, has completed.
+
+JS is also a functional language - functions (blocks of code) can be passed to and returned from other functions, and this is a very common design pattern - often called callbacks
+
+=== Configuring ThoughtSpot CORS
+ThoughtSpot instances are locked down by default, rejecting API requests from web servers that have not been added to the xref:security-settings.adoc#cors-hosts[CORS allowlist].
+
+=== Setting global variables
+
+[,javascript]
+----
+let tsHost = 'https://{yourdomain}.thoughtspot.cloud';
+const publicApiUrl = 'api/rest/2.0/';
+
+
+const endpoint = "/{}/{}"
+----
+
+=== Copy requests directly from Playground
+The request and response format for the V2.0 REST API is JSON, the native object format of JavaScript. 
+
+You can copy any request from the REST API V2.0 Playground directly into your code:
+
+image:images/tutorials/rest-api/json-request-format.png[JSON request format in Playground, width=521, height=445]
+
+[,javascript]
+----
+// Copy in directly from the V2.0 REST API Playground
+const apiRequestObject = {
+  "record_offset": 0,
+  "record_size": 10,
+  "include_favorite_metadata": false,
+  "privileges": [
+    "DATADOWNLOADING"
+  ]
+}
+
+// Can later use the following to send as part of a request body:
+// JSON.stringify(apiRequestObject);
+----
+
+== 02 - Using fetch() to issue REST API request
+
+The `fetch()` function in JavaScript uses the browser itself as a store of cookies and other details when you use the `credentials: "include"` parameter.
+
+`fetch` is an asynchronous call that returns a `Promise`, which has `.then()` and `.error()` methods for calling the next code to run once the REST API response is returned:
+
+[,javascript]
+----
+...
+const apiFullEndpoint = tsHost + "/" + publicApiUrl + endpoint;
+
+await fetch(
+  apiFullEndpoint, // URL
+    {
+      method: ‘POST’,
+      headers: {
+          "Accept": "application/json",
+          "X-Requested-By": "ThoughtSpot",
+          "Content-Type": "application/json"
+         },
+       credentials: "include",
+       body: JSON.stringify(apiRequestObject)
+    }
+) .then(response =>  response.json())
+  .catch(error => {
+        console.error("Unable to get the" + endpoint + "response: " + error);
+  });
+----
+
+
+== 03 - Final function
+
+By making this a function, we can make the code generic, where it can work for any call by changing the arguments
+
+[,javascript]
+----
+async function restApiCallV2(endpoint, httpVerb, apiRequestObj){
+  const tsApiVersion = '2.0';
+  const baseUrl = `${tsHost}/api/rest/${tsApiVersion}/`;  // Forward ticks allow variables in strings
+  const apiFullEndpoint = baseUrl + endpoint;
+  console.log("Executing fetch");
+  /* 
+  * Fetch is asynchronous and returns a Promise, which always has a .then() and .catch() method so you can chain
+  * additional code to happen after the REST API call returns back.
+  * Alternatively, you can use the 'async' and 'await' patterns
+  * https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Asynchronous/Promises
+  */
+
+  let fetchArgs = {
+          method: httpVerb.toUpperCase(),
+          headers: {
+              "Accept": "application/json",
+              "X-Requested-By": "ThoughtSpot",
+              "Content-Type": "application/json"
+              },
+          credentials: "include"
+      }
+  // Some type of request might not have a body
+  if (apiRequestObj !== null){
+      fetchArgs['body'] = JSON.stringify(apiRequestObj);
+  }
+  
+  // With the async modifier on the function, you add return await to the fetch() call here
+  return await fetch(
+      apiFullEndpoint,
+      fetchArgs
+  ).then(response =>
+  {
+      console.log("Fetch response returned with status code " + response.status);
+      // Parse 4XX or 500 HTTP status code errors from the API 
+      if (!response.ok) {
+          console.log("HTTP response indicates an error from the API");
+          throw new Error("Received HTTP response " + response.status + "with the message " + response.statusText)
+
+          //
+          // Alternatively, check for specific error codes you might expect, like a 403
+          /*
+          if( response.status == 403){
+              // retrySSOProcess(); // Example action to take based on status 
+          }
+          else{
+              throw new Error("Received HTTP response " + response.status + "with the message " + response.statusText)
+          }
+          */
+      }
+      else {
+          if( response.status === 200){
+              return response.json(); // Returns the JSON of the response 
+          }
+          else if (response.status === 204){
+              return true;  // 204 is success without any body
+          }
+
+      }
+  }).catch(error =>
+  {
+      console.error("Unable to get the " + endpoint + " response: " + error);
+  });
+}
+----
 
 '''
 
-xref:rest-api_lesson-03.adoc[< Previous: Lesson 03]
+xref:rest-api_lesson-03.adoc[< Back: 03 - Complex Workflows in Python ]
