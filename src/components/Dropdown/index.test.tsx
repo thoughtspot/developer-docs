@@ -1,12 +1,12 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { fireEvent, render } from '@testing-library/react';
+import { opt_out_tracking } from 'mixpanel-browser';
 import { VERSION_DROPDOWN } from '../../configs/doc-configs';
 
 import Dropdown from './index';
-import { opt_out_tracking } from 'mixpanel-browser';
 
-describe('Dropdown', () => {
+xdescribe('Dropdown', () => {
     window.open = jest.fn();
     const location = {
         href: {

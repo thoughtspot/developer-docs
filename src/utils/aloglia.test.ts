@@ -66,25 +66,25 @@ const asciiNode = {
 const asciiAlgoliaObj = {
     body:
         'ThoughtSpot API components or resources are represented by the URI endpoints.',
-    objectID: 'fa556896-4e38-5e7a-ab35-a45ee93d58ee_resource_endpoints_chunk_0',
+    objectID: '_resource_endpoints_chunk_0',
     pageid: 'rest-apis',
     sectionId: '_resource_endpoints',
     sectionTitle: 'Resource endpoints',
     title: 'About REST APIs',
     type: 'ASCII',
-    link: '/rest-apis',
+    link: '/docs/rest-apis',
 };
 
 const asciiPremableAlgoliaObj = {
     body:
         'ThoughtSpot REST APIs let you programmatically create ThoughtSpot objects.',
-    objectID: 'fa556896-4e38-5e7a-ab35-a45ee93d58eepreamble_chunk_0',
+    objectID: 'preamble_chunk_0',
     pageid: 'rest-apis',
     sectionId: 'preamble',
     sectionTitle: 'About REST APIs',
     title: 'About REST APIs',
     type: 'ASCII',
-    link: '/rest-apis',
+    link: '/docs/rest-apis',
 };
 
 const algoliaTransformerData: any = {
