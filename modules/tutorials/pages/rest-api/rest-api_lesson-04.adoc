@@ -8,18 +8,54 @@
 The files for Lesson 04 are `api_training_javascript_1.html` and `api_training_javascript_2.html`
 
 
-
 == 01 - Basics of browser-side JavaScript
-Many actions in JavaScript are asynchronous that is to say, code does not execute in the order it is written.
+Many actions in JavaScript are asynchronous - that is to say, code does not execute in the order it is written.
 
 Instead you specify code to run after a task, like a request to another server, has completed.
 
-JS is also a functional language - functions (blocks of code) can be passed to and returned from other functions, and this is a very common design pattern - often called callbacks
+JS is also a functional language - functions (blocks of code) can be passed to and returned from other functions, and this is a very common design pattern often referred to as *callbacks*
+
+[,javascript]
+----
+// Need to know what types a and b 
+function callbackFunction(a, b){
+   return a + b;
+}
+
+function doOtherFunction(a, b, otherFunc){
+ // We assume the other function will be passing a and b of some type here
+    return otherFunc(a,b);
+}
+
+// Send only the name of the first function as an argument of the second function 
+let result = doOtherFunction(2, 2, callbackFunction);
+----
+
+Modern JavaScript uses the link:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise[Promise] concept to help with structuring asynchronous code.
+
+Promises provide `.then()` and `.catch()` methods, where each `.then()` takes a `handleFulfilled` and an optional `handleRejected` callback function as an argument:
+
+[,javascript]
+----
+myPromise
+  .then(handleFulfilledA, handleRejectedA)
+  .catch((err) => {
+      console.error(err);
+    });
+----
+
 
 === Configuring ThoughtSpot CORS
 ThoughtSpot instances are locked down by default, rejecting API requests from web servers that have not been added to the xref:security-settings.adoc#cors-hosts[CORS allowlist].
 
-=== Setting global variables
+CORS is applied by web browsers, which is why we did not look at these settings in any previous lessons where Python called the REST API directly.
+
+=== Setting global scope variables
+JavaScript has variables defined with `let` or `var` and constants defined with `const`. We will use *variable* to refer to either throughout.
+
+Variables that are declared outside of *functions*, directly within `<script>` tags, have *global scope*. 
+
+Global scoped variables can be referenced in all other functions, as long as there is no variable with the same name declared within the function (*local scoped*).
 
 [,javascript]
 ----
@@ -29,6 +65,26 @@ const publicApiUrl = 'api/rest/2.0/';
 
 const endpoint = "/{}/{}"
 ----
+
+=== Scope within module blocks
+The ThoughtSpot Visual Embed SDK must be imported as a *module*, and the scoping rules for *modules* are slightly different than other `<script>` blocks.
+
+[,javascript]
+----
+<script type = 'module'>
+    import {
+        LiveboardEmbed,
+        AuthType,
+        init,
+        prefetch,
+        tokenizedFetch
+    }
+from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+----
+
+The simple form is that *things declared within a module block are not available in other blocks*, while things that are declared *in other blocks* are available even *within the module block*.
+
+If you are using the Visual Embed SDK, it is simplest to keep all ThoughtSpot related code within the block where you import the Visual Embed SDK module.
 
 === Copy requests directly from Playground
 The request and response format for the V2.0 REST API is JSON, the native object format of JavaScript. 
@@ -53,7 +109,7 @@ const apiRequestObject = {
 // JSON.stringify(apiRequestObject);
 ----
 
-== 02 - Using fetch() to issue REST API request
+== 02 - Using fetch() and tokenizedFetch() to issue REST API requests
 
 The `fetch()` function in JavaScript uses the browser itself as a store of cookies and other details when you use the `credentials: "include"` parameter.
 
@@ -82,6 +138,47 @@ await fetch(
   });
 ----
 
+The standard JavaScript `fetch()` works if you are using any of the cookie-based authentication methods.
+
+If you are using xref:trusted-authentication.adoc#cookie[Cookieless Trusted Authentication], you'll need to import the `tokenizedFetch()` function from the ThoughtSpot Visual Embed SDK.
+
+`tokenizedFetch()` is able to access the current *Bearer Token* used by the SDK when making requests, while using the exact syntax as the standard `fetch()` function:
+
+[,javascript]
+----
+<script type = 'module'>
+    import {
+        LiveboardEmbed,
+        AuthType,
+        init,
+        prefetch,
+        tokenizedFetch
+    }
+from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+const apiFullEndpoint = tsHost + "/" + publicApiUrl + endpoint;
+
+await tokenizedFetch(
+  apiFullEndpoint, // URL
+    {
+      method: ‘POST’,
+      headers: {
+          "Accept": "application/json",
+          "X-Requested-By": "ThoughtSpot",
+          "Content-Type": "application/json"
+         },
+       credentials: "include",
+       body: JSON.stringify(apiRequestObject)
+    }
+) .then(response =>  response.json())
+  .catch(error => {
+        console.error("Unable to get the" + endpoint + "response: " + error);
+  });
+
+</script>
+----
+
+As noted before, you need these function to be within the *module block* where the Visual Embed SDK is imported, and you must import the *tokenizedFetch* function explicitly to make it available.
 
 == 03 - Final function
 
