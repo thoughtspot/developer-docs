@@ -180,7 +180,7 @@ await tokenizedFetch(
 
 As noted before, you need these function to be within the *module block* where the Visual Embed SDK is imported, and you must import the *tokenizedFetch* function explicitly to make it available.
 
-== 03 - Final function
+== 03 - Generic function for all calls
 
 By making this a function, we can make the code generic, where it can work for any call by changing the arguments
 
@@ -213,7 +213,7 @@ async function restApiCallV2(endpoint, httpVerb, apiRequestObj){
   }
   
   // With the async modifier on the function, you add return await to the fetch() call here
-  return await fetch(
+  return await tokenizedFetch(
       apiFullEndpoint,
       fetchArgs
   ).then(response =>
@@ -250,6 +250,64 @@ async function restApiCallV2(endpoint, httpVerb, apiRequestObj){
   });
 }
 ----
+
+Once you have the first wrapper function handling the baseline functionality, you can write functions that wrap calling individual endpoints:
+
+[,javascript]
+----
+/*
+* Wrapper function for calling /metadata/search with any request
+*/
+async function callMetadataSearchApi(searchRequestObject){
+    let endpoint = 'metadata/search';
+    let verb = 'POST';
+
+    return await restApiCallV2(endpoint, verb, searchRequestObject).then(
+        response => {
+            // Additional logging to the console
+            console.log("API response:", response);
+            console.log(response);
+            return response;
+        }
+    );
+}
+----
+
+To use such a function you define your request object, copied from the REST API V2.0 Playground directly. This code can be called anywhere - here we show another function that could be attached to an event listener or called by other code at any point in time after SSO has completed:
+
+[,javascript]
+----
+// Here we actually CALL the functions to make the request
+function makeSearchRequest(){
+   // Copy the request directly from the REST API Playground, substituting in any variables you need
+   const apiRequestObject = {
+       "metadata": [
+           {
+               "name_pattern": "(Sample)",
+               "type": "LIVEBOARD"
+           },
+           {
+               "name_pattern": "(Sample)",
+               "type": "ANSWER"
+           }
+           ],
+       'record_offset': 0,
+       'record_size': 100000 
+   }
+
+   
+   let results = callMetadataSearchApi(apiRequestObject);
+   console.log("Final results from the callMetadataSearchApi function: ");
+   console.log(results);
+}
+----
+
+== 04 - Conclusion
+Due to the JSON based nature of the V2.0 REST API, implementing within browser-side JavaScript is more about knowing the intricacies of browser-security models and JavaScript scoping rules than any particular difficulty with the message formats.
+
+There is a link:https://github.com/thoughtspot/rest-api-sdk/tree/release/sdks/typescript[TypeScript SDK] that can be used when working in Node.js or other environments where TypeScript is available. 
+
+It is up to you to determine if the extra rigor and structure of the Typescript REST API SDK is helpful in the projects you build, or if a simple light implementation of a few of the REST API calls within a simple set of functions will suffice.
 
 '''
 
