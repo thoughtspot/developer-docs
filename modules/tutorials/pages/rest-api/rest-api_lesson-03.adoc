@@ -1,0 +1,378 @@
+= Complex REST API workflows
+:page-pageid: rest-api_lesson-03
+:description: Complex REST API Workflows
+:toc: true
+:toclevels: 1
+
+== Get started
+The files for this tutorial are `api_training_python_2_begin.py` and `api_training_python_2_end.py`
+
+You must have installed the `thoughtspot_rest_api_v1` library per the prerequisites at the beginning into the Python environment you are using.
+
+[NOTE]
+====
+You'll need to use an *administrator* level ThoughtSpot account to complete the following tutorial. 
+
+It will create a Tag and a Group that need to be deleted at the end of the tutorial.
+====
+
+== 01: Use ThoughtSpot REST API v1s library
+The link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python[thoughtspot_rest_api_v1 library^] was originally created because the V1 ThoughtSpot REST API was not very uniform, so a library with an implementation of each individual endpoint was created as a "reference" on how to format and send each request correctly.
+
+The V2.0 REST API is simple enough to implement in any language. We've just completed the initial steps in Python in the previous lesson.
+
+The V2.0 portion of the library implements the repeated standard steps everyone would have to do for themselves each time, and issues can be reported to and fixed in the library once for everyone.
+
+The library encapsulates logic around making the REST API requests properly, so that you don’t have to rewrite code that everyone will need to do the same way. 
+
+Endpoints are defined properly, along with HTTP request details and response handling. 
+
+=== Import thoughtspot_rest_api_v1 library
+Rather than helper functions like in JavaScript, the *thoughtspot_rest_api_v1* library provides two *classes* that represent the entire set of the two REST API versions: `TSRestApiV1` & `TSRestApiV2`
+
+*Classes* define how to build *Objects*, which combine together data (called properties) and functions (called methods).
+
+There are *methods* for each endpoint, typically named identically with the forward-slash replaced by an underscore: the `/metadata/search` endpoint becomes the `.metadata_search()` method.
+
+You'll start by importing all of the classes from the library and then creating a `TSRestApiV2` object, that will be used for all subsequent calls:
+
+[source,python]
+----
+from thoughtspot_rest_api_v1 import *
+
+username = 'username'  
+password = 'password'  
+server = 'https://{instance}.thoughtspot.cloud'         
+
+ts: TSRestApiV2 = TSRestApiV2(server_url=server)
+----
+
+== 02: Authentication
+The TSRestApiV2 object doesn’t automatically log in, you must explicitly request an authentication token and set the `TSRestApiV2.bearer_token` property:
+
+[,python]
+----
+from thoughtspot_rest_api_v1 import *
+
+username = 'username'  
+password = 'password'
+org_id = 0
+server = 'https://{instance}.thoughtspot.cloud'    
+
+ts: TSRestApiV2 = TSRestApiV2(server_url=server)
+try:
+    auth_token_response = ts.auth_token_full(username=username, password=password, org_id=org_id, validity_time_in_sec=36000)
+    
+    # Endpoints with JSON responses return the Python Dict form of the JSON response automatically 
+    ts.bearer_token = auth_token_response['token']
+
+except requests.exceptions.HTTPError as e:
+    print(e)
+    print(e.response.content)
+    exit()
+----
+
+You can also issue a `/session/login` request with token or username/password and the object will maintain authentication using its internal `requests.Session` object:
+
+[source,python]
+----
+ts.auth_session_login(bearer_token=auth_token_response['token'], remember_me=True)
+# or
+ts.auth_session_login(username=username, password=password, remember_me=True)
+----
+
+You'll notice that we've already accomplished everything we did in the previous lesson with much less code. 
+
+== 03: Use other endpoints
+
+All of the methods of the `TSRestApiV2` class are named after their equivalent REST endpoints, with an underscore character `_` replacing the forward-slashes `/` from the URLs.
+
+For example, `/users/search` endpoint is accessed via `TSRestApiV2.users_search()` method.
+
+If everything is installed and configured properly in your IDE, you should get auto-complete on the available endpoints as you type:
+
+image:images/tutorials/rest-api/autocomplete-in-ide.png[Autocomplete in IDE, width=475, height=229]
+
+For endpoints that have only a few strictly defined arguments, the method will define Python arguments to match the endpoint’s arguments:
+
+`users_delete(user_identifier:str)`
+
+Endpoints with lots of request options simply take a `request=` argument, which expects a Python Dict matching the JSON request you see in the REST API Playground:
+
+image:images/tutorials/rest-api/json-request-format.png[JSON request format in Playground, width=521, height=445]
+
+[,python]
+----
+# Get all Users with a particular privilege
+search_request = {
+  "record_offset": 0,
+  "record_size": 10,
+  "include_favorite_metadata": False,  # make sure to upper-case booleans
+  "privileges": [
+    "DATADOWNLOADING"
+  ]
+}
+try:
+    users = ts.users_search(request=search_request)
+except requests.exceptions.HTTPError as e:
+    print(e)
+    print(e.response.content)
+    exit()
+for u in users:
+    # get details of each table and do further actions
+    user_guid = u['id']
+----
+
+== 04: Complex workflows
+The real reason to use the library is to allow quickly combining together the results of multiple requests into complex and flexible workflows.
+
+We'll walk through the process of determining the steps for a sample task, then code out the necessary steps.
+
+Our example task is:
+*Find all Liveboards and Answers with a name that includes '(Sample)' and tag them with the tag called 'Tutorial Test'*
+
+=== Define steps
+It’s always easiest to program by establishing the exact requirements, what those requirements amount to in logical steps, then start writing the code to match. 
+
+Let’s split into discrete steps:
+
+1. Find all Liveboards and Answers with a name that includes '(Sample)'
+2. Add a tag called 'Tutorial Test' to all of the items
+
+Create comments in your code file to help structure your thinking:
+[,python]
+----
+# 1. Find all Liveboards and Answers with a name that includes '(Sample)'
+
+# 2. Add a tag to each item called 'Tutorial Test'
+----
+
+Even this basic step opens up new questions as to what our exact requirements are:
+
+[,python]
+----
+# 1. Find all Liveboards and Answers with a name that includes '(Sample)'
+
+# Get all of the items with name including '(Sample)'
+#  Is this a case-sensitive or insensitive operation? Are we finding anywhere in the name or just at start or end?
+
+# 2. Add a tag to each item called 'Tutorial Test'
+
+# Get the ID of the tag called 'Tutorial Test'
+#   What if there is no tag called 'Tutorial Test'?
+
+# Assign Tag to each item
+----
+
+=== Find and test endpoints in the REST API V2.0 Playground
+As we've seen in the previous lessons, the REST API V2.0 Playground is the documentation for the requests and their responses, as well as an interactive system that allows you to run the commands.
+
+[NOTE]
+====
+Don't press `TRY IT OUT` on anything but `/search` endpoints - the Playground is fully live.
+====
+
+The first of our tasks is:
+
+[,python]
+----
+# 1. Find all Liveboards and Answers with a name that includes '(Sample)'
+
+# Get all of the items with name including '(Sample)'
+#  Is this a case-sensitive or insensitive operation? Are we finding anywhere in the name or just at start or end?
+----
+
+Information about the objects in the system lives under the `Metadata` heading within the Playground. Endpoints labeled `Search` are `GET` methods that query information without causing any changes.
+
+`/metadata/search` has many different xref:rest-api-v2-metadata-search.adoc[request parameters] available to help filter and select all of the necessary information.
+
+The `metadata` key takes an array of `Metadata List Items`, which can have a `name_pattern` argument along with `type`. Note that it says "match the *case-insensitive name* of the metadata object" - if this matters, you'll need additional code to inspect the result set from the API.
+
+The second task is:
+
+[,python]
+----
+# 2. Add a tag to each item called 'Tutorial Test'
+
+# Get the ID of the tag called 'Tutorial Test'
+#   What if there is no tag called 'Tutorial Test'?
+----
+
+`Tags` have their own section in the Playground - `/tags/search` will help us find a tag by a particular name.
+
+Look at the description of `tag_identifier` parameter of the request: "Name or Id of the tag". Almost every `_identifier` argument within the API works this way - it can take an object's *GUID* or the *name* property.
+
+Our comments remind us to consider the situation where the `Tutorial Test` tag does not exist.
+
+The `/tags/create` endpoint is available, with the only required option being the `name` property.
+
+Lastly, we want to assign the tag to the items from the `/metadata/search` request, minus any additional filtering we do.
+
+Looking at the `Assign Tag` endpoint:
+
+image:images/tutorials/rest-api/tag-assign-request.png[Assign tag, width=446, height=471]
+
+There are two sections, `metadata` which is an *Array* of *Objects each with an `identifier` key and then a `tag_identifiers` Array of strings.
+
+=== Write code
+
+Now that we've found our endpoints and looked at the requests and responses, we can write code to combine all endpoints together into a workflow.
+
+We'll start with our first step:
+
+[source,python]
+----
+# 1. Find all Liveboards and Answers with a name that includes '(Sample)'
+
+# Get all of the items with name including '(Sample)'
+#  Is this a case-sensitive or insensitive operation? Are we finding anywhere in the name or just at start or end?
+
+# Create request to /metadata/search to find the Liveboards and Answers matching the name pattern
+# Use the Playground to build your request, then copy/paste in the script
+search_request = {
+    "metadata": [
+    {
+      "name_pattern": "(Sample)",
+      "type": "ANSWER"
+    },
+    {
+      "name_pattern": "Sample)",
+      "type": "LIVEBOARD"
+    }
+  ],
+    'record_offset': 0,
+    'record_size': 10000
+}
+
+try:
+    # Send request to /metadata/search endpoint
+    metadata_resp = ts.metadata_search(request=search_request)
+except requests.exceptions.HTTPError as e:
+    print("Error from the API: ")
+    print(e)
+    print(e.response.content)
+    exit()
+----
+
+Remember the note about *case-sensitivity*? We can use Python's string methods to apply stricter logic than the API provides:
+
+[,python]
+----
+# Create List to hold the final set of Answers + Liveboards we want to tag and share
+final_list_of_objs =[]
+
+# Iterate through the results from the API response to double-check that the name value matches exactly
+for item in metadata_resp:
+    m_name = item["metadata_name"]
+    m_id = item["metadata_id"]
+    # Python string find is Case-Sensitive 
+    if m_name.find("(Sample)") != -1:
+        final_list_of_objs.append(item)  # We'll add the whole object to the new List
+
+# optional print to command line to see what happened
+print(json.dumps(final_list_of_objs, indent=2))
+----
+
+Next, we'll find the tag to apply using the `/tags/search` endpoint.
+
+You'll notice that the autocomplete for the `TSRestApiV2.tags_search()` method shows defined arguments rather than a generic `request` argument. 
+
+When an endpoint has very few possibilities, the library often has the full set of arguments available directly.
+image:images/tutorials/rest-api/tags-search-autocomplete.png[Assign tag, width=504, height=158]
+
+[source,python]
+----
+# 2. Add a tag to each item called 'Tutorial Test'
+
+# Get the ID of the tag called 'Tutorial Test'
+#   What if there is no tag called 'Tutorial Test'?
+
+#
+# Find the Tag Identifer so we can assign
+# Create new Tag if it doesn't exist
+#
+try:
+    tags = ts.tags_search(tag_identifier="Tutorial Test")
+except requests.exceptions.HTTPError as e:
+    print("Error from the API: ")
+    print(e)
+    print(e.response.content)
+    exit()
+----
+
+Next let's add the logic to create the tag if none is found with that name. Note that `tags_create()` also has defined arguments rather than taking a `request`:
+
+[,python]
+----
+if len(tags) == 0:
+    try:
+        new_tag = ts.tags_create(name="Tutorial Test")
+        tag_id = new_tag['id']
+    except requests.exceptions.HTTPError as e:
+        print("Error from the API: ")
+        print(e)
+        print(e.response.content)
+        exit()
+else:
+    tag_id = tags[0]['id']
+----
+
+Finally, we'll take the tag ID and the objects whose names matched and apply the tag.
+
+We go back to the Playground to copy the request, and remember that the `metadata` section is not a simple Array, but an Array of Objects: 
+
+[,python]
+----
+assign_req = {
+  "metadata": [
+    {
+      "identifier": "identifier4"
+    }
+  ],
+  "tag_identifiers": [
+    "tag_identifiers8",
+    "tag_identifiers9",
+    "tag_identifiers0"
+  ]
+}
+----
+
+We'll need to create the data structure that the `metadata` parameter needs by iterating through the objects we stored in `final_list_of_objs`, then assigning that result to the `metadata` parameter's value:
+
+[,python]
+----
+# Assign the tag to the items
+
+try:
+   # When we copied from the Playground, we realize the format of the `metadata` section is an Array of Objects,
+   # which needs to be a List of Dicts in Python syntax [ {"identifier": metadata_id}, ...]
+   
+   tag_metadata_section = []
+   # Iterate through each object and make the Dict in create format
+   for obj in final_list_of_objs:
+        tag_metadata_section.append({"identifier" : obj['metadata_id']})
+
+   assign_req = {
+        "metadata": tag_metadata_section,
+        "tag_identifiers": [tag_id]
+   }
+
+   assign_resp = ts.tags_assign(requst=assign_req)
+except requests.exceptions.HTTPError as e:
+    print("Error from the API: ")
+    print(e)
+    print(e.response.content)
+    exit()
+----
+
+
+== 05 - Conclusion
+After completing these lessons, you should be very capable at using the REST API V2.0 Playground and the *link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python[thoughtspot_rest_api_v1 library^]* to retrieve and process the results of the `/search` endpoints and then issue other commands using the IDs of objects.
+
+By moving hard-coded values into variables, you can develop reusable scripts to accomplish tasks that otherwise would require a lot of manual effort.
+
+There are many link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python/tree/main/examples_v2[existing examples^] of workflows that can be pieced together to accomplish any number of administration and integration tasks.
+
+'''
+
+xref:rest-api_lesson-02.adoc[< Back: 02 - Simple Python Implementation of V2.0 REST API]| xref:rest-api_lesson-04.adoc[Next: 04 - Browser JavaScript REST API implementation >]
