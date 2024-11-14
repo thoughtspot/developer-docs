@@ -72,7 +72,7 @@ class CustomDocConverter {
                 }
                 anchorMarkup = `href="${anchorMarkup}"`;
                 if (attributes.window) {
-                    anchorMarkup += ` target="${attributes.window}"`;
+                    anchorMarkup += ` window="${attributes.window}"`;
                 }
                 return `<a ${anchorMarkup}>${node.getText()}</a>`;
             }
