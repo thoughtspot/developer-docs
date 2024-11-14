@@ -1,0 +1,318 @@
+= Simple Python implementation of V2.0 REST API
+:toc: true
+:toclevels: 3
+
+:page-pageid: rest-api_lesson-02
+:description: A lesson on a simple implementation of the V2.0 using Python
+
+
+== Get started
+We'll use the files from the link:https://github.com/thoughtspot/tse-api-tutorial[tse-api-tutorial GitHub repository, window=_blank] that you downloaded at the beginning of the tutorial.
+
+. Open your IDE +
+Visual Studio Code will be used in all images and instructions.
+The files for this lesson are `api_training_python_1_begin.py` and `api_training_python_1_end.py`
+. Open up your command line or terminal environment as well.
+
+[NOTE]
+====
+There are many ways to install and configure Python on a system. This tutorial shows "plain" versions of all commands as if you are using the main system-wide install of Python for the tutorial.
+
+Please adjust all Python commands according to your own environment.
+====
+
+== 01 - Imports and variables
+At the top of `api_training_python_1_begin.py`, there is a set of *imports* and *variables* that configure the overall script.
+
+=== Import  Requests library
+To issue HTTP commands in a given programming language, you must use a library that sends and receives HTTP.
+
+For this lesson, we'll use link:https://requests.readthedocs.io/en/latest/[Requests, window=_blank], the most commonly used high-level HTTP library for Python.
+
+The file starts with *import* commands for the `json` standard Python package and the `requests` package, which must be installed.
+
+[,python]
+----
+import requests
+import json
+----
+
+==== Install requests package
+If you followed the prerequisites and installed the link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python[thoughtspot_rest_api_v1 package, window=_blank] using your command line or terminal:
+
+[code,bash]
+----
+pip install thoughtspot_rest_api_v1
+----
+
+The `requests` package should have automatically been installed along with the other requirements.
+
+You can double-check the installation or force a version upgrade using the following command:
+
+[code,bash]
+----
+pip install requests --upgrade
+----
+
+=== Set global variables
+It is very convenient to declare global variables at the beginning of a script so that they can be reused throughout.
+
+The URL of the ThoughtSpot instance is always necessary to send a REST API command, and if the instance has Orgs enabled, you need to send the `org_id` when you request a login token. We'll set those as global variables along with the `api_version` (which hasn't changed ever at this point).
+
+[,python]
+----
+import requests
+import json
+
+thoughtspot_url = 'https://{}.thoughtspot.cloud'
+org_id = 1613534286
+api_version = '2.0'
+
+----
+
+Now, let's construct the starting portion of any API endpoint URL and define the most basic headers that will be used by every call:
+
+[,python]
+----
+...
+base_url = '{thoughtspot_url}/api/rest/{version}/'.format(thoughtspot_url=thoughtspot_url, version=api_version)
+api_headers = {
+    'X-Requested-By': 'ThoughtSpot', 
+    'Accept': 'application/json'
+}
+----
+
+== 02 -  Use a Session object
+
+Rather than set the full configuration of each HTTP request you make, you can construct a `Session` object from the `requests` library, which an open HTTP connection and maintains settings like headers and cookies between individual HTTP actions.
+
+You send HTTP commands by calling the `.get()`, `.post()`, `.put()` and `.delete()` methods of the `Session` object.
+
+All of those methods will return a Response object, which you assign to a variable to do further processing. This will look something the following:
+
+[,python]
+----
+# Create a new Session object
+requests_session = requests.Session()
+
+# Set the headers for all uses of the requests_session object
+requests_session.headers.update(api_headers)
+
+# Define the JSON message, in Python object syntax (close but not exactly JSON)
+json_post_data = { // a request body }
+
+# Set the URL of the endpoint
+url = base_url + "{api_endpoint_ending}"
+
+# Issue the HTTP request and store the response to a variable
+resp = requests_session.post(url=url, json=json_post_data)
+----
+
+== 03 - Authenticate into ThoughtSpot REST API
+There are two ways of establishing authentication with ThoughtSpot's REST API, `cookie-based` with session cookies and `cookieless` using a bearer token in the headers.
+
+For backend scripts, we prefer the bearer token approach:
+
+1. Request a Full Access Token
+2. Update the Session object headers with the token
+3. Make any additional REST API requests
+
+=== Request a full access token
+
+In the REST API V2.0 Playground:
+
+. Go to *Authentication* > *Get Full Access Token*.
+. Specify the parameters.
+. Copy the JSON body from the right side of the Playground, Python Dict uses the same syntax, but you must update the booleans to be *uppercase*.
+. Replace any of the hard-coded values with the *global variables* you declared so that you can change your requests in an easy way at the top of your script and make sure the values change in all the necessary places:
++
+[,python]
+----
+...
+endpoint = 'auth/token/full'
+url = base_url + endpoint
+
+json_post_data = {
+  "username": "yourusername",
+  "password": "y0urP@ssword",
+  "validity_time_in_sec": 3600,
+  "org_id": org_id,
+  "auto_create": False  # make sure to uppercase in Python
+}
+----
+
+. Make a `.post()` request using the `Session` object. +
++
+We expect a JSON response on success, which you can access using the `.json()` method of the `Response` object. 
++
+
+From the Playground, we can see that there is `token` property in the response. 
+
+. Create a variable for the `token` value to use in the headers as the Bearer token.
++
+[,python]
+----
+....
+resp = requests_session.post(url=url, json=json_post_data)
+resp_json = resp.json()
+print(json.dumps(resp_json, indent=2))
+token = resp_json["token"]
+print("Here's the token:")
+print(token)
+....
+----
+
+==== Run the script to test
+At this point, the code should be functional. You can test in your IDE (Visual Studio Code pictured) by opening a *Terminal*, then running the script via the appropriate `python` command:
+
+[.widthAuto]
+image:images/tutorials/rest-api/open-terminal-vsc.png[Open Terminal in Visual Studio Code]
+
+[.widthAuto]
+image:images/tutorials/rest-api/python-command-in-terminal.png[Running script in Python]
+
+If you have a more complex local Python environment you are using, find the appropriate way to send the script you have updated through the Python environment set up for this tutorial.
+
+=== Update the Session object headers
+Almost all REST API endpoints other than the token requests require authentication, either within the cookies or via an `Authentication: Bearer {token}` header.
+
+You need to update the `Session` object with this new header while keeping the original ones.
+
+Use the `token` variable from above to form the exact header to update the original `api_headers` Dict, then use the `.headers.update()` method of the `Session` object: 
+
+[,python]
+----
+...
+token = resp_json["token"]
+
+# Update api_headers from before with header for Bearer token
+api_headers['Authorization'] = 'Bearer {}'.format(token)
+
+requests_session.headers.update(api_headers)
+----
+
+== 04 - Handle errors from the REST API
+The code we have written so far is correct from a logical perspective, but only works properly if everything goes as expected.
+
+Unfortunately, making a REST API request to a web server can result in any number of errors, even if the communication back and forth completes successfully.
+
+Good coding involves testing for and handling error situations.
+
+=== Using try and except in Python
+Python code raises `link:https://docs.python.org/3/tutorial/errors.html[Exceptions, target=_blank]` when an error is encountered. 
+
+If an `Exception` is raised and is not *handled*, the script exits and displays the message provided with the Exception and other details of what failed.
+
+A `try...except block` encloses a set of lines that may result in a known `Exception` in the `try` portion, and then the `except` line defines which `Exception` type to listen for and how to proceed if the `Exception` is thrown.
+
+Every HTTP request can potentially result in an error, and we don't want to continue within the script as planned if the expected action on the ThoughtSpot server did not complete correctly.
+
+The most generic `try...except` block will capture *any* `Exception`:
+[,python]
+----
+try: 
+    resp = requests_session.post(url=url, json=json_post_data)
+    resp_json = resp.json()  # Returns JSON body of resp to Python Dict
+    print(resp_json)
+    token = resp_json["token"]
+
+except Exception as e: 
+	# do whatever is necessary in exception case
+
+# Code after the try block will now run even after Exception
+----
+
+=== Checking for requests HTTPError exceptions
+The `requests` library does not raise an `Exception` when an HTTP request completes "properly", that is to say a well-formed HTTP response is received from a request.
+
+However, as you saw in the previous lesson, HTTP responses include a *Status Code* that indicates if the requested action was a *Success* or an *Error*.
+
+To cause `Exceptions` if the response does not include a *Success* status code, call the `Response.raise_for_status()` method for each call, which will throw the specifc `requests.exceptions.HTTPError` `Exception` when a 400 series or 500 status code is returned:
+
+[source,python]
+----
+try: 
+    resp = requests_session.post(url=url, json=json_post_data)
+    resp.raise_for_status()
+    print(resp)
+    token = resp["token"]
+except requests.exceptions.HTTPError as e:
+    print(e)
+    print(e.request)
+    print(e.request.url)
+    print(e.request.headers)
+    print(e.request.body)
+    print(e.response.content)
+----
+
+== 05 - Complete REST API request example
+With the addition of `try...except` blocks looking for `HTTPError` when we make the HTTP request, we now have a complete basic pattern for using the ThoughtSpot V2.0 REST API:
+
+[source,python]
+----
+import requests
+import json
+
+thoughtspot_url = 'https://{}.thoughtspot.cloud'
+org_id = 0
+api_version = '2.0'
+
+endpoint = 'auth/token/full'
+url = base_url + endpoint
+
+json_post_data = {
+  "username": "yourusername",
+  "password": "y0urP@ssword",
+  "validity_time_in_sec": 3600,
+  "org_id": org_id,
+  "auto_create": False  # make sure to uppercase in Python
+}
+
+try:
+    # requests returns back Response object 
+    resp = requests_session.post(url=url, json=json_post_data)
+
+    # This method causes Python Exception to throw if status not 2XX
+    resp.raise_for_status()
+
+    # Retrieve the JSON body of response and convert into Dict
+    # Some endpoints returns 204 not 200 for success, with no body, will error if you call .json() method
+    resp_json = resp.json()
+
+    # You can just print(resp_json) to see the Python Dict
+    print(json.dumps(resp_json, indent=2))
+
+    # 'token' property of the response is the Bearer Token to use
+    token = resp_json["token"]
+
+except requests.exceptions.HTTPError as e:
+    print(e)
+    print(e.request)
+    print(e.request.url)
+    print(e.request.headers)
+    print(e.request.body)
+    print(e.response.content)
+
+# Update api_headers from before with header for Bearer token
+api_headers['Authorization'] = 'Bearer {}'.format(token)
+
+requests_session.headers.update(api_headers)
+
+# Issue any other command using the same requests_session object
+
+user_search_url = base_url + "users/search"
+
+# Every request must be wrapped in try...except
+try:
+    search_resp = requests_session.get(url=user_search_url)
+    search_resp.raise_for_status()
+...
+----
+
+You may have noticed many steps that are repeated each time for any given request. 
+
+In the next lesson, we'll cover using a *library* that wraps most of these repeated steps, so that you can focus simply on the logic of your API workflows.
+
+'''
+
+xref:rest-api_lesson-01.adoc[< Previous: 01 - What is a REST API?] | xref:rest-api_lesson-03.adoc[Next: 03 - Complex REST API Workflows >]
