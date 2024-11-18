@@ -196,12 +196,120 @@ customizations: {
 ----
 
 === Variables and selectors
+ThoughtSpot provides a large number of pre-defined xref:customize-css-styles.adoc[CSS variables] for controlling the styling of major elements throughout the embedded components UI.
+
+These can all be declared directly within the `variables` block inside the `customCSS` block.
+
+The customization framework also allows using any CSS selector to target specific elements with changes that do not have a defined variable.
+
+Selectors are declared within the `rules_UNSTABLE` block inside `customCSS`, reflecting that specific selectors may change with new releases as elements of ThoughtSpot are updated.
+
+Let's add a selector to the code in our Playground. First, comment out the `customCSSUrl` line, then add the `rules_UNSTABLE` block below `variables`:
+[,javacript]
+----
+customizations: {
+  style: {
+    // customCSSUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/css-variables.css", // location of your style sheet
+
+    // To apply overrides for your style sheet in this init, provide variable values below, eg
+    customCSS: {
+      variables: {
+        "--ts-var-button--secondary-background": "#F0EBFF",
+        "--ts-var-button--secondary--hover-background": "#E3D9FC",
+        "--ts-var-root-background": "#F7F5FF",
+      },
+      rules_UNSTABLE: {
+
+      }
+    },
+  },
+},
+----
+
+Variables declare a *single* property, so are simply `"{var-name}" : "{value}"`, but selectors can define any number of properties to assign to the selected elements.
+
+[NOTE]
+====
+Selectors apply properties to elements with many layers of styling. Always add `!important` after each property to ensure the browser overrides whatever other style rules may be applied for the same property.
+====
+
+One use case of `rules_UNSTABLE` is `xref:css-customization.adoc#font-declarations[@font-face]` declarations, which by their nature have many properties.
+
+We will switch the main font to `Poppins`, available from Google Fonts.
+
+First, add the `--ts-var-root-font-family` variable to declare the new font (note you'll need to use the name exactly in `@font-face` declarations).
+
+Next we'll add a selector block within the `rules_UNSTABLE` block: 
+
+[,javacript]
+----
+...
+    customCSS: {
+      variables: {
+        "--ts-var-button--secondary-background": "#F0EBFF",
+        "--ts-var-button--secondary--hover-background": "#E3D9FC",
+        "--ts-var-root-background": "#F7F5FF",
+        "--ts-var-root-font-family": "Poppins"
+      },
+      rules_UNSTABLE: {
+        '/* ff-400 */ @font-face': {
+          'font-family': "Poppins",
+          'font-style': 'normal',
+          'font-weight': '400',
+          'font-display': 'swap',
+          'src': "url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2')"
+      }
+      }
+    },
+  },
+},
+----
+
+Notice the format is the *selector* as the *key*, then an object block containing individual key-value pairs for the properties.
+
+Because the *selector* is an *object key*, but all `@font-face` declarations start the same way, we add a *unique CSS comment* at the beginning to allow for multiple `@font-face` declarations.
+
+If you press `Run` in the Playground, you should now see the Liveboard reload with the Poppins font for most of the text.
+
 
 === CSS files
+You can collect a set of variables and selectors into a CSS file, rather than declaring them in the JavaScript code block.
 
-=== Fonts
+CSS files can be included from domain but they must be added to the `CSP style-src domains` and `CSP font-src` domains in the `Develop` -> `Customizations` -> `Security settings`. 
+
+Both `https://cdn.jsdelivr.net` and `https://fonts.gstatic.com` are always automatically part of ThoughtSpot's CSP allow list.
+
+Global variables should be declared in the `:root { }` block of the CSS file, while `@font-face` declarations of a named font can be placed anywhere:
+
+[,css]
+----
+:root {
+  --ts-var-button--primary-background: #2359B6;
+  --ts-var-button--primary--hover-background: blue;
+  --ts-var-button--primary--font-family: Poppins,Helvetica,Arial,sans-serif;;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2');
+}
+
+.bk-filter-option {
+  display: none!important;
+}
+----
 
 === Hiding elements
+As seen in the CSS file example above, one of the use cases for selectors is to *hide* elements of an emebed component that do not have a configuration option. 
+
+`display: none!important` is the most typical property to accomplish this, but you may choose any CSS rule that causes the desired effect.
+
+Make sure that the selector you use is specific and isn't affecting other elements that you don't intend to hide.
+
+Please contact ThoughtSpot if you find yourself hiding certain elements via CSS selectors, so that the overall configurations can be expanded over time. Similarly, provide feedback on properties that variables are unavailable for.
 
 == 04 - Text strings and image replacement
 
