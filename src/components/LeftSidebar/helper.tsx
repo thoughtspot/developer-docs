@@ -89,7 +89,7 @@ const isLinkMatching = (
     if (!href || !curLocation) return false;
 
     // Tutorials module pages have pageids like {subdirectory}_{real_url_ending}, must be split to generate matching URL
-    const pageIdSplit = pageid.split('_');
+    const pageIdSplit = pageid.split('__');
     if (pageIdSplit.length > 1){
          return (
             href.includes(`pageid=${pageid}`) ||
