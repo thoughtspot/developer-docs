@@ -43,7 +43,7 @@ exports.createPages = async function ({ actions, graphql }) {
         const pageId = e.node.pageAttributes.pageid;
         if (sourceName === 'tutorials'){
            const relPathSplit = relPath.split('/');
-           const pageIdSplit = pageId.split('_');
+           const pageIdSplit = pageId.split('__');
            let finalPageId = pageId;
            if( pageIdSplit.length > 1) {
                 finalPageId = pageIdSplit[1];
@@ -70,7 +70,7 @@ exports.createPages = async function ({ actions, graphql }) {
         if (sourceName === 'tutorials'){            
            // One-level of subdirectory part of stub
            const relPathSplit = relPath.split('/');
-           const pageIdSplit = pageId.split('_');
+           const pageIdSplit = pageId.split('__');
            let finalPageId = pageId;
            if( pageIdSplit.length > 1) {
                 finalPageId = pageIdSplit[1];
