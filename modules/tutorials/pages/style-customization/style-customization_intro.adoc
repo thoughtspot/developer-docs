@@ -342,7 +342,7 @@ Once you have the SVG file saved and accessible to ThoughtSpot, the `iconSpriteU
 ...
 customizations: {
  iconSpriteUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/icon-override1.svg",
-  content: {
+ content: {
      strings: {
          "Liveboard": "Dashboard",
          "SpotIQ": "Insights",
@@ -401,7 +401,68 @@ There is no longer a right-click *context menu* in the above example, because al
 The `disabledActions` array keeps the item in the menu but grays it out, with the `disabledActionReason` appearing when hovering over the menu item.
 
 === Triggering hidden menu items with HostEvents
+ThoughtSpot Visual Embed SDK defines two types of events: *link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent[EmbedEvents^]* for listening to actions within ThoughtSpot components and *link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent[HostEvents^]* to send messages to the ThoughtSpot components from the embedding application. 
+
+If a menu item has been hidden, you can still send in a *HostEvent* to cause the same behavior.
+
+Check the box next to `Use Host Event` above the code editor in the Playground and this code block will be added:
+
+[,javascript]
+----
+ document.getElementById('tryBtn').addEventListener('click', e => {
+      // Trigger events can be added here to bind to try button click!
+      // eg use the Reload Event so that clicking on "Try event" button reloads the embed:
+      embed.trigger(HostEvent.Reload);
+ });
+----
+
+If you look at the top right of the "Stax" app, to the left of the user icon, there is a `Try Event` button. The code block adds a click event to this button, within which we can *trigger* any *HostEvent*.
+
+Let's replace the default `Reload` event with `DownloadAsPdf`:
+
+[,javascript]
+----
+ document.getElementById('tryBtn').addEventListener('click', e => {
+      // Trigger events can be added here to bind to try button click!
+      // eg use the Reload Event so that clicking on "Try event" button reloads the embed:
+      embed.trigger(HostEvent.DownloadAsPdf);
+ });
+----
+
+Testing this requires two steps:
+
+1. Press `Run` button to reload the entire *Stax* embedded tester app
+2. Press the `Try Event` button
+
+You should see the PDF export modal dialog button pop up within the embedded component area.
+
+If you do not want the modal dialog to appear, you could instead use the ThoughtSpot REST API to accomplish the task either within the browser or in a back-end process. This allows for choosing vastly different behaviors than those that are allowed by the ThoughtSpot modal dialogs.
 
 === Adding new menu items with Custom Actions
+ThoughtSpot allows you to add new items to the menu system, called *xref:custom-actions.adoc[Custom Actions]*, both to the top menu for a given viz on a Liveboard or in the context menu when a single point is right-clicked.
 
+*Callback custom actions* require a three-part setup:
 
+1. Define the *Custom Action* within ThoughtSpot, with a particular *id*
+2. Assign the *Custom Action* to the viz
+3. Add a `EmbedEvent.CustomAction` listener within the Visual Embed SDK code
+
+If you click the checkbox next to `Handle custom actions`, you'll see the following code block added:
+
+[,javascript]
+----
+ .on(EmbedEvent.CustomAction, payload => {
+      const customActionId = 'insert Custom Action ID here';
+      if (payload.id === customActionId || payload.data.id === customActionId) {
+           console.log('Custom Action event:', payload.data);
+      }
+ })
+----
+
+There are additional *link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent[EmbedEvents^]* such as `VizPointClick` that fire off without involving the menu system that work similarly to context menu custom actions.
+
+06 - Conclusion
+
+This tutorial has covered how to start with the majority of capabilities used to customize the UI and UX of ThoughtSpot's embedded components, but only within the Visual Embed SDK Playground.
+
+The next steps are to move this code into the pages of your own application and configure the CSP and CORS settings for your application's test environments, so you begin integrating ThoughtSpot directly into your application.
