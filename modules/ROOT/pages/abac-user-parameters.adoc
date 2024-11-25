@@ -1,4 +1,4 @@
-= ABAC via token [beta betaBackground]^Beta^
+= ABAC via tokens [beta betaBackground]^Beta^
 :toc: true
 :toclevels: 3
 
@@ -11,36 +11,38 @@ Attribute-Based Access Control (ABAC) is a pattern where security entitlements a
 [IMPORTANT]
 ====
 [#beta-warning]
-RLS using ABAC via tokens is in BETA. As this feature directly impacts data security in your environment, ThoughtSpot does not support its use in a Production environment until it becomes Generally Available. ThoughtSpot is working on improvements in the upcoming releases that will change some of the best practices recommended in this article and result in the needed re-work of your deployment's security architecture. To understand the RLS best practices for your use case and  deployment timelines, and to get these features enabled on your ThoughtSpot instances, contact ThoughtSpot Support.
-====
+* RLS using ABAC via tokens is in __Beta__. As this feature directly impacts data security in your environment, ThoughtSpot does not support its use in a Production environment until it becomes Generally Available. ThoughtSpot is working on improvements in the upcoming releases that will change some of the best practices recommended in this article and result in the needed re-work of your deployment's security architecture. To understand the RLS best practices for your use case and  deployment timelines, and to get these features enabled on your ThoughtSpot instances, contact ThoughtSpot Support.
+* The ABAC via tokens method requires using link:https://docs.thoughtspot.com/cloud/latest/worksheet-create[Worksheets, target=_blank] or link:https://docs.thoughtspot.com/cloud/latest/models[Models, window=_blank] as data sources for Liveboards and Answers, rather than individual table objects.
+* The `user_parameters` property in `/api/rest/2.0/auth/token/full` and `/api/rest/2.0/auth/token/object` APIs is deprecated in 10.4.0.cl and not recommended for ABAC token generation. If your ThoughtSpot instance is on 10.4.0.cl or a later release version, we recommend using the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">/api/rest/2.0/auth/token/custom</a>+++ API endpoint to xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[generate a token with custom filter rules and user properties]. +
+* The examples in this article show the attributes available in the V2.0 Get token APIs in 10.3.0.cl and earlier versions. If your instance is 10.4.0.cl or a later version, refer to the filter attributes and persist options in the xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[generate a token with custom filter rules and user properties] section.
 
-Currently, the ABAC via tokens method requires using *link:https://docs.thoughtspot.com/cloud/latest/worksheet-create[Worksheets, target=_blank]* as data sources for Liveboards and Answers, rather than individual table objects.
+====
 
 == Overview
 
-In ThoughtSpot 10.0 and later releases, the following can be set for a user via the login token, along with the existing capability to assign ThoughtSpot groups:
+The following attributes can be set for a user via the login token, along with the existing capability to assign ThoughtSpot groups:
 
-* *xref:runtime-filters.adoc[Runtime filters]* +
-Can filter *multiple values* of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name).
-* *xref:runtime-parameters.adoc[Parameters]* +
-Binds a *single value* to any Parameter in any Worksheet by Parameter Name and Type match. Parameters can be used in *worksheet formulas* and then as *worksheet filters*.
-* *xref:runtime-sort.adoc[Runtime sorts]* +
-Overrides to sort order within columns.
+* xref:runtime-filters.adoc[Runtime filters] +
+Can filter multiple values of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name).
 
 [IMPORTANT]
 ====
 [#column-name-warning]
-The  `runtime_filters` require passing the *exact* ThoughtSpot worksheet column name or will not apply to the data set. You must coordinate between the team that maintains the worksheets and the team that builds the token request service if any changes will be made to a worksheet, or the filters will no longer be applied.
-
+The runtime filters require passing the *exact* ThoughtSpot Worksheet or Model column name or will not apply to the data set. You must coordinate between the team that maintains data models and the team that builds the token request service if any changes will be made to the data source object, or the filters will no longer be applied.
 For the same reasons, end users of an embedded app cannot have *edit* access to any worksheet using ABAC RLS via tokens.
 ====
 
-The request for a token with ABAC details can *xref:abac-user-parameters.adoc#persistForUser[persist]* the set of filters and parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
+* xref:runtime-parameters.adoc[Parameters] +
+Binds a single value to any Parameter in any Worksheet by Parameter Name and Type match. Parameters can be used in *worksheet formulas* and then as *worksheet filters*.
+* xref:runtime-sort.adoc[Runtime sorts] (Applicable to 10.3.0.cl and earlier versions) +
+Overrides to sort order within columns.
+
+The request for a token with ABAC details can xref:abac-user-parameters.adoc#persistForUser[persist] the set of filters and Parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
 
 == Token request
-The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 REST API Access Tokens, target=_blank], which are OAuth JWT tokens.
+The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, generated from an API requests to the V2.0 REST API token endpoint, which are OAuth JWT tokens.
 
-The token can be used as a bearer token for Cookieless Trusted Auth or REST API access, or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
+The token can be used as a bearer token for cookieless Trusted Auth or REST API access, or as a sign-in token to create a ThoughtSpot session, in which case the ABAC user parameters should be *persisted*.
 
 [NOTE]
 ====
@@ -48,6 +50,7 @@ ThoughtSpot compresses the size of JWT token by default to ensure that larger pa
 ====
 
 === Request format
+
 The ABAC request is sent using the `user_parameters` key of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank].
 
 There are three potential keys within `user_parameters`, each taking an array of objects:
@@ -93,7 +96,6 @@ The following is a `user_parameters` section that would be part of the JSON requ
     ]
   }
 ----
-
 
 === Apply to specific objects
 By default, any specified filter or parameter will bind to *any content* with an exact match for the column or parameter name.
