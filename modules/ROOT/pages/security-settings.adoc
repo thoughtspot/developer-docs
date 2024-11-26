@@ -19,74 +19,55 @@ The following settings on the **Security Settings** page appear as locked for Th
 * xref:trusted-authentication.adoc[Trusted authentication]
 ====
 
-
 == Security settings for ThoughtSpot embedding
 
-Most web browsers block cross-site scripting, cross-domain requests, and third-party cookies by default. Web browsers also have built-in security mechanisms such as same-origin and content security policies. These policies restrict how applications and scripts from one origin (domain) can interact with the resources hosted on another origin (domain). If you are embedding ThoughtSpot content in your application page, you can choose to implement xref:trusted-auth-sdk.adoc[cookieless authentication]. If using cookie-based authentication, make sure to configure CORS settings.
+Most web browsers block cross-site scripting, cross-domain requests, and third-party cookies by default. Web browsers also have built-in security mechanisms like same-origin and content security policies. These policies restrict how applications and scripts from one origin (domain) can interact with the resources hosted on another origin (domain). For embedded content and data security and to provide a seamless user experience, configure the settings described in this section.
 
+=== Third-party cookies
+When ThoughtSpot is embedded in another application, it is considered a third-party application in the host application context. As a result, cookies from ThoughtSpot are blocked by Web browsers.
+
+To avoid this issue, ThoughtSpot recommends the following:
+
+* Use cookieless authentication in your production environments. Developers can use either xref:embed-authentication.adoc#embedSSO[`AuthType.EmbeddedSSO`] or xref:trusted-auth-sdk.adoc[`AuthType.TrustedAuthTokenCookieless`] based on their embedding setup.
+* If you are using a ThoughtSpot Cloud instance, set up your instance to the same domain as your host application. For more information, see link:https://docs.thoughtspot.com/cloud/latest/custom-domains[Custom domain configuration, window=_blank].
 
 ////
-** CORS
-+
-To allow your application to call ThoughtSpot, access its resources, and render embedded content, you must add your domain as a trusted host and enable Cross-Origin Resource Sharing (CORS).
-
-** CSP
-+
-To allow your application to embed ThoughtSpot and access its content via web browsers, add your application domain as a trusted host in the CSP allowlist. You need to also add the domain URLs to the `connect-src` allowlist to load script interfaces and allow Javascript events.
+* If you are using authentication methods that rely on cookies, xref:_enable_partition_cookies[enable partition cookies].
 ////
 
+== Add domains to CSP and CORS allowlists
+
+To allow another application to embed ThoughtSpot, you must xref:security-settings.adoc#csp-viz-embed-hosts[add your host application domain as a CSP Visual Embed host].
+
+To allow your embedding application to call ThoughtSpot, access its resources, and render embedded content, xref:security-settings.adoc#cors-hosts[add your host application domain URL as a trusted host for CORS].
+
+To allow xref:security-settings.adoc#csp-connect-src[loading script interfaces and JavaScript events for custom actions], or xref:security-settings.adoc##csp-trusted-domain[to enable importing resources from other sites], add the source domain URLs as trusted hosts in the respective CSP allowlist.
 
 [#csp-viz-embed-hosts]
 === Add CSP visual embed hosts
 To allow your host domain to set the `frame-ancestors` CSP policy header and embed a ThoughtSpot object within your application frame, add your application domain as a CSP visual embed host.
 
-. Log in to your ThoughtSpot application instance.
-. For classic experience, click *Develop*.
-+
-If you are using the new experience, click the Application switcher image:./images/app_switcher.png[the app switcher menu] > *Developer*.
-. Go to *Customizations* > *Security settings*.
+. On your ThoughtSpot application instance, go to *Develop* > *Customizations* > *Security settings*.
 . Click *Edit*.
 . In the *CSP visual embed hosts* text box, add the domain names. For valid domain name formats, See xref:security-settings.adoc#csp-cors-hosts[Domain name format for CSP and CORS configuration].
 . Click *Save changes*.
 
 [NOTE]
 ====
-Only users with valid embed license can add Visual Embed hosts.
+Only users with a valid embed license can add Visual Embed hosts.
 ====
 
 [#csp-connect-src]
 === Add URLs to CSP connect-src allowlist
 If you plan to create custom actions with URL targets, you must add the domain names of these URLs to the `CSP connect-src` allowlist. This allows JavaScript events triggered by the custom action URLs.
 
-. Log in to your ThoughtSpot application instance.
-. For classic experience, click *Develop*.
-+
-If you are using the new experience, click the Application switcher image:./images/app_switcher.png[the app switcher menu] > *Developer*.
-. Go to *Customizations* > *Security settings*.
+. On your ThoughtSpot application instance, go to *Develop* > *Customizations* > *Security settings*.
 . Click *Edit*.
 . In the *CSP connect-src domains* text box, add the domain names. For valid domain name formats, See xref:security-settings.adoc#csp-cors-hosts[Domain name format for CSP and CORS configuration].
 . Click *Save changes*.
 
-[#cors-hosts]
-=== Enable CORS
-
-The CORS configuration for your cluster controls which domains can access and modify your application content. To allow your application to call ThoughtSpot or its REST API endpoints, and request resources, you must add your application domain to the CORS allowlist. For example, if your website is hosted on the `example.com` domain and the embedded ThoughtSpot content is hosted on the `example.thoughtspot.com`, you must add the `example.com` domain to the CORS allowlist for cross-domain communication. You can also add `\http://localhost:8080` to the CORS allowlist to test your deployments locally. However, we recommend that you disable `localhost` access in production environments.
-
-If you enable CORS for your application domain, ThoughtSpot adds the `Access-Control-Allow-Origin` header in its API responses when your host application sends a request to ThoughtSpot.
-
-To add domain names to the CORS allowlist, follow these steps:
-
-. Log in to your ThoughtSpot application instance.
-. For classic experience, click *Develop*.
-+
-If you are using the new experience, click the Application switcher image:./images/app_switcher.png[the app switcher menu] > *Developer*.
-. Under *Customizations* > *Security settings*.
-. Click *Edit*.
-. In the *CORS whitelisted domains* text box, add the domain names. For valid domain name formats, See xref:security-settings.adoc#csp-cors-hosts[Domain name format for CSP and CORS configuration].
-. Click *Save changes*.
-
-
-=== Add trusted domains to CSP allowlists
+[#csp-trusted-domain]
+=== Add other trusted domains
 
 To import images, fonts, and stylesheets from external sites, or load the content from an external site using an iFrame element, you must add the source URLs as trusted domains in the CSP allowlist.
 For example, in the Liveboard Note tiles, if you want to insert an image from an external site or embed content from an external site in an iFrame, you must add domain URLs of these sites to the CSP allowList. Similarly, to import fonts and custom styles from an external source, you must add the source URL as a trusted domain in ThoughtSpot.
@@ -107,8 +88,22 @@ Add the iframe source URL domains.
 If your application instance has Orgs, the CSP settings can be configured only at the cluster level.
 ====
 
+[#cors-hosts]
+=== Enable CORS
+
+The CORS configuration for your cluster controls which domains can access and modify your application content. To allow your application to call ThoughtSpot or its REST API endpoints, and request resources, you must add your application domain to the CORS allowlist. For example, if your website is hosted on the `example.com` domain and the embedded ThoughtSpot content is hosted on the `example.thoughtspot.com`, you must add the `example.com` domain to the CORS allowlist for cross-domain communication. You can also add `\http://localhost:8080` to the CORS allowlist to test your deployments locally. However, we recommend that you disable `localhost` access in production environments.
+
+If you enable CORS for your application domain, ThoughtSpot adds the `Access-Control-Allow-Origin` header in its API responses when your host application sends a request to ThoughtSpot.
+
+To add domain names to the CORS allowlist, follow these steps:
+
+. On your ThoughtSpot application instance, go to *Develop* > *Customizations* > *Security settings*.
+. Click *Edit*.
+. In the *CORS whitelisted domains* text box, add the domain names. For valid domain name formats, See xref:security-settings.adoc#csp-cors-hosts[Domain name format for CSP and CORS configuration].
+. Click *Save changes*.
+
 [#csp-cors-hosts]
-== Domain name format for CSP and CORS configuration
+=== Domain name format for CSP and CORS configuration
 
 [IMPORTANT]
 ====
@@ -204,5 +199,16 @@ a|+++Wildcard (*) for port+++
 |====
 --
 
+== Add permitted iFrame domains
+Some features in ThoughtSpot, such as link:https://docs.thoughtspot.com/software/latest/liveboard-notes[Liveboard Note tiles, window=_blank] and link:https://docs.thoughtspot.com/cloud/latest/chart-custom[custom charts, window=_blank], allow iFrame content. If you are planning to embed content from an external site, make sure the domain URLs of these sites are added to the iFrame domain allowlist:
+
+. On your ThoughtSpot application instance, go to *Develop* > *Customizations* > *Security settings*.
+. Click *Edit*.
+. In the *Permitted iFrame domains* text box, add the domain URL of the website or portal that you want to use for iFrame content.
+. Click *Save changes*.
+
 == Block access to non-embedded ThoughtSpot pages
-For information on restricting access to non-embedded ThoughtSpot content for embedded users, see xref:selective-user-access.adoc[Control User Access].
+If you have embedded ThoughtSpot content in your app, you may want your users to access only the ThoughtSpot pages embedded within the context of your host app. ThoughtSpot allows administrators to restrict user access to non-embedded application pages from the embedding application context or selectively grant access to specific user groups. For information, see xref:selective-user-access.adoc[Control User Access].
+
+
+

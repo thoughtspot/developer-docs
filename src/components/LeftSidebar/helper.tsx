@@ -88,11 +88,22 @@ const isLinkMatching = (
 ) => {
     if (!href || !curLocation) return false;
 
-    return (
-        href.includes(`pageid=${pageid}`) ||
-        href.includes(`/${encodeURI(pageid)}#`) ||
-        href.endsWith(`/${encodeURI(pageid)}`)
-    );
+    // Tutorials module pages have pageids like {subdirectory}_{real_url_ending}, must be split to generate matching URL
+    const pageIdSplit = pageid.split('__');
+    if (pageIdSplit.length > 1){
+         return (
+            href.includes(`pageid=${pageid}`) ||
+            href.includes(`/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}#`) ||
+            href.endsWith(`/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}`)
+        );
+    }
+    else {
+        return (
+            href.includes(`pageid=${pageid}`) ||
+            href.includes(`/${encodeURI(pageid)}#`) ||
+            href.endsWith(`/${encodeURI(pageid)}`)
+        );
+    }
 };
 
 const isCurrentNavOpen = (liEle: HTMLLIElement, activePageid: string) => {

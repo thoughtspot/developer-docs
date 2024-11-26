@@ -1,0 +1,240 @@
+= Init and Search embedding
+:toc: true
+:toclevels: 3
+
+:page-title: Init and Search embedding
+:page-pageid: tse-fundamentals__lesson-05
+:page-description: This lesson covers initializing the SDK and embedding a ThoughtSpot search page using the developer's playground to generate the required code.
+
+At this point, we are ready to start embedding ThoughtSpot content.
+In this lesson, we'll initialize the SDK and embed a search page.
+To make it quick and easy, we'll use the developer's playground to generate the code, then update our HTML and JS files to use the generated code.
+This is the longest lesson in the tutorial, but once you complete it, you'll understand how to embed other objects.
+
+== Pre-conditions
+
+If you've followed the steps in the previous sections, you should have a copy of the code and be able to run it and view the empty application in a web browser.
+If not, please revisit the previous lessons to get set up.
+
+== Add a nav link and function for the search
+
+First, add a nav link to run the search embed.
+In the `index.html` file, add a new `<li>` for the search page.
+The link needs an ID to add a listener.
+
+[source,html]
+----
+<div id="div-nav-links">
+  <ul id="ul-nav-links">
+    <li id="search-link">Search</li>  <!-- lesson 05 -->
+  </ul>
+</div>
+----
+
+Now, run the application, and you should see the Search link show up.
+It won't do anything yet, but it's always good to test code as you add functionality to find errors quickly.
+
+[.widthAuto]
+image:images/tutorials/tse-fundamentals/lesson-05-new-search-link.png[Nav bar with search link]
+
+== Add a listener for the search link
+
+In `tse.js`, add the following line of code.
+It adds a listener for the click event, so when the user clicks, it will call the `onSearch` function.
+Put this code in the section that begins with `Events for nav bar` towards the bottom of the file.
+
+`document.getElementById('search-link').addEventListener('click', onSearch);`
+
+Next, add the `onSearch` function.
+Right now, it only logs a comment to the console, but this confirms the function is being called.
+
+[source,javascript]
+----
+const onSearch = () => {
+  console.log('searching');
+}
+----
+
+Refresh the application and click on the Search link.
+You should see a message in the console window of the developer tools.
+If not, check for errors.
+You can also reference the example code (in the `src` folder).
+
+[.widthAuto]
+[.bordered]
+image:images/tutorials/tse-fundamentals/lesson-05-search-console.png[Console output]
+
+== Call init
+
+Before embedding the search, we need to initialize the SDK.
+Initializing the SDK tells it which ThoughtSpot instance to communicate with and the type of authentication.
+There are additional parameters you can pass, which you can read about in the link:https://developer-docs-nnh3ibjh0-thoughtspot-site.vercel.app/docs/tsembed#initSdk[documentation].
+
+One useful parameter to consider is `callPrefetch`, which can speed up the first embed object's load time by caching static content locally.
+This will not have an effect if caching is disabled during development but can improve performance in production.
+
+For a basic `init` call, add the following code to the `loadApp` function.
+We also set the embed to display a message asking the user to select an option.
+The variable `tsURL` refers to the constant defined earlier, for example, `const tsURL = "https://myx.thoughtspot.cloud";`.
+
+The final version of `loadApp` should look like this:
+
+[source,javascript]
+----
+const loadApp = () => {
+  init({
+    thoughtSpotHost: tsURL,
+    authType: AuthType.None
+  });
+
+  document.getElementById("embed").innerHTML = "<p>Select an option from above.</p>";
+}
+----
+
+== Generate a search to embed
+
+To simplify the process of creating an embed, use the developer's Playground.
+To access the Playground:
+
+* Log into ThoughtSpot as a developer.
+* Click on the **Develop** tab at the top of the screen.
+* Select the **Playground** option under Visual Embed SDK on the left.
+
+You'll see a screen like the following, though with default values.
+We'll set the values to create a search embed component.
+
+[.widthAuto]
+[.bordered]
+image:images/tutorials/tse-fundamentals/lesson-05-playground-search.png[Playground interface]
+
+The Playground is divided into three sections:
+
+* On the right: the running embed, showing how the embedded content will look.
+* On the top left: options for selecting components and their properties, starting with **Search Data**.
+* On the bottom left: the actual code for the embed component, which updates automatically as you make changes.
+
+Follow these steps to create the search component we want to embed:
+
+1. Select a data source from the dropdown.
+The code will update with the GUID for the data source.
+The Playground only supports one data source at a time.
++
+[.widthAuto]
+[.bordered]
+image:images/tutorials/tse-fundamentals/lesson-05-data-source-added.png[data source added]
+
+2. Click on **Collapse data panel** to collapse the data panel in the embed.
+3. Click on **Add search tokens**.
+This adds code for search options.
+The `searchTokenString` uses a TML query.
+Here's an example:
+
+[source,javascript]
+----
+searchOptions: {
+  searchTokenString: '[sales] by [item type]', // Example TML query
+  executeSearch: true,
+},
+----
+
+4. Modify available actions.
+You can disable, hide, or specify which actions are visible in the menu.
+Here's an example of disabling the download action and hiding the share action:
+
+[source,javascript]
+----
+disabledActions: [Action.Download],
+disabledActionReason: "Permission required",
+hiddenActions: [Action.Share],
+----
+
+Hit **Run** to see the results.
+If needed, adjust the settings.
+
+== Embed the search into the application
+
+Once the embed component is ready, we can add it to the `onSearch` function.
+Every embed component requires two steps:
+
+1. Create the embed object using `SearchEmbed`, `LiveboardEmbed`, etc.
+2. Render the object (with optional event listeners).
+
+Copy the generated code from the Playground into the `onSearch` function after the `console.log` statement.
+Be sure to change the ID from `#your-own-div` to `#embed` to match the `index.html` file.  Note that all IDs will
+be unique to your environment.
+
+[source,javascript]
+----
+const embed = new SearchEmbed("#embed", {
+    frameParams: {},
+    collapseDataSources: true,
+    disabledActions: [Action.Download],
+    disabledActionReason: "Permission required",
+    hiddenActions: [Action.Share],
+    dataSources: ["4d98d3f5-5c6a-44eb-82fb-d529ca20e31f"], // Your data source ID
+    searchOptions: {
+        searchTokenString: '[sales] [item type]',
+        executeSearch: true,
+    },
+});
+----
+
+Next, render the component using this line of code:
+
+`embed.render();`
+
+The completed `onSearch` function should look like this:
+
+[source,javascript]
+----
+const onSearch = () => {
+  const embed = new SearchEmbed("#embed", {
+    frameParams: {},
+    collapseDataSources: true,
+    disabledActions: [Action.Download],
+    disabledActionReason: "Permission required",
+    hiddenActions: [Action.Share],
+    dataSources: ["4d98d3f5-5c6a-44eb-82fb-d529ca20e31f"], // Your data source ID
+    searchOptions: {
+      searchTokenString: "[sales] [item type]",
+      executeSearch: true,
+    },
+  });
+
+  embed.render();
+};
+----
+
+== Test search embed
+
+To test the search embed, refresh the application with the cache disabled, then click the Search link.
+You should see something similar to this:
+
+[.widthAuto]
+[.bordered]
+image:images/tutorials/tse-fundamentals/lesson-05-search-embed.png[Embedded search result]
+
+== Note on loading times
+
+The initial render may take a long time as the content is re-downloaded from ThoughtSpot.
+This can be significantly improved by using `callPrefetch: true` in the `init` method.
+However, with caching disabled during development, re-downloading will still occur.
+
+== Activities
+
+1. Add the nav link and handler to your code.
+2. Import the `SearchEmbed`, `Action`, and `EmbedEvent` components in the import section.
+3. Add the `init` method.
+4. Use the Playground to create a search embed component.
+5. Copy the search embed component into your code and modify the `DIV` ID.
+6. Add a `render()` call.
+7. Test the code.
+
+If you run into issues, you can reference the code in the `src` folder.
+
+== Files changed
+
+* index.html
+* tse.js
+
+xref:tse-fundamentals-lesson-04.adoc[< prev] | xref:tse-fundamentals-lesson-06.adoc[next >]
