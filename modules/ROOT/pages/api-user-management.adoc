@@ -1,49 +1,173 @@
-= Users and group privileges
+= Users and groups
 :toc: true
+:toclevels: 3
 
 :page-title: Users and group privileges
 :page-pageid: api-user-management
 :page-description: You can manage users and user groups using REST APIs
 
-To provide access to ThoughtSpot content or define role-based privileges, you need to add users and groups in ThoughtSpot. You can create user accounts and user groups using REST API endpoints.
+To provide access to ThoughtSpot content or define privileges, you must add users and groups in ThoughtSpot. You can create user accounts and user groups in the ThoughtSpot UI or via REST API calls.
 
 == User creation and update
 
-You can create users using the xref:user-api.adoc#create-user[/tspublic/v1/user/] REST API endpoint and update user profiles via a xref:user-api.adoc#update-user[PUT call]. While you can xref:user-api.adoc#delete-user[delete users], it is preferable to xref:user-api.adoc#deactivate-user[deactivate the user] instead, which maintains the user's references within the system. 
+You can create users and update user profiles using xref:rest-api-reference.adoc#_user_management[REST API v1] or xref:rest-api-v2-reference.adoc#_users[v2 endpoints].
 
-When configuring xref:configure-saml.adoc[SAML SSO] in ThoughtSpot UI, you can select the *Automatically add SAML users to ThoughtSpot upon first authentication* option, which will use the values in the SAML assertion to create a user if they do not exist. ThoughtSpot can also add users to groups sent within the SAML assertion. To enable and configure the SAML groups capabilities, contact your ThoughtSpot team.
+While you can delete users, it is preferable to deactivate a user, which maintains the user's references within the system.
 
-By default, ThoughtSpot sends e-mail messages to a new user and enables onboarding workflows when they first log in, even when you are embedding ThoughtSpot content. To alter this behavior at a system-wide level, you need to xref:customize-email-settings.adoc[Customize the onboarding settings]. The xref:user-api.adoc#update-user[update user REST API] also allows setting onboarding experience values for an individual user through the JSON object of the `content` argument. If you need to modify the default behavior beyond the available UI options, contact your ThoughtSpot team.
+When configuring xref:configure-saml.adoc[SAML SSO] in ThoughtSpot UI, you can select the *Automatically add SAML users to ThoughtSpot upon first authentication* option, which will use the values in the SAML assertion to create a user if they do not already exist on ThoughtSpot. ThoughtSpot can also add users to groups sent within the SAML assertion. To enable and configure the SAML group attributes, contact your ThoughtSpot team.
+
+By default, ThoughtSpot sends e-mail messages to a new user and enables onboarding workflows when they  log in for the first time, even when you are embedding ThoughtSpot content. To alter this behavior at a system-wide level, you need to xref:customize-email-settings.adoc[Customize the onboarding settings].
+The user update API also allows setting onboarding experience values for an individual user. If you need to modify the default behavior beyond the available UI options, contact your ThoughtSpot team.
 
 [NOTE]
 ====
-ThoughtSpot supports the local management of user profiles. For initial development and testing purposes, you can create users in ThoughtSpot and manage their profiles locally. However, in large production environments, avoid creating local user profiles to reduce the administration overhead.
+ThoughtSpot supports local management of users. For initial development and testing purposes, you can create users in ThoughtSpot and manage their profiles locally. However, in large production environments, avoid creating local user profiles to reduce administration overhead.
 ====
 
-== User group creation and update
-Groups can be created via the xref:group-api.adoc#create-group[/tspublic/v1/group/] REST API endpoint. 
 
-xref:api-user-management.adoc#group-privileges[Group privileges] are set directly on groups, either at group creation time, an xref:group-api.adoc#update-group[update call], or through the xref:group-api.adoc#add-privilege[add privilege] and xref:group-api.adoc#remove-privilege[remove privilege] methods.
+////
+=== User account status
+The user state describes the current state of a user account in a ThoughtSpot instance. At any given time, the user account can be in one of the following states:
+
+* `ACTIVE`
++
+Indicates that the user account is active and the user logged in to their ThoughtSpot instance with their credentials at least once.
+
+* `INACTIVE`
++
+Indicates that the user account is deactivated and does not have access to the ThoughtSpot instance. If required, administrators can activate such user accounts and reset their password using the  `/api/rest/2.0/users/activate` API endpoint.
+
+* `PENDING`
++
+This state is used for link:https://docs.thoughtspot.com/cloud/latest/okta-iam[Identity and Access Management v2 (IAMv2), window=_blank] users who have been sent a ThoughtSpot account activation email, but have not logged in to their instance yet.
+
+* `LOCKED`
++
+Indicates that the user account is locked due to multiple incorrect login attempts. The account gets locked for an hour, after which the user can try to log in again.
+
+* `EXPIRED`
++
+This state indicates the user account has expired. For example, the free trial user accounts after the trial period expires.
+
+* `SUSPENDED`
+This state is used for IAMv2 users. The IAMv2 users do not require a password reset when transitioning between states such as `ACTIVE`, `EXPIRED`, or `INACTIVE`. It also supports seamless migration from IAMv1 to IAMv2 for embedded users. For more information, see xref:_authentication_with_iamv2[ Authentication with IAMv2]. +
+Note the following points about the `SUSPENDED` state:
+
+** Users in the `SUSPENDED` state will not be able to log in to their ThoughtSpot instance. This provides an effective way to manage access without compromising security.
+** Transitioning a user from `SUSPENDED` to `ACTIVE` or `PENDING` does not require a password reset.
+** When you create or update an `EXPIRED` or `INACTIVE` user via REST APIs, the user will be suspended. This change will effectively block user logins without altering the existing behavior.
+
+==== Common user state transitions
+The common user state transitions include:
+
+* `ACTIVE` to `EXPIRED`
+* `ACTIVE` to `INACTIVE`
+* `ACTIVE` to `SUSPENDED`
+* `LOCKED` to `ACTIVE`
+* `SUSPENDED` to `ACTIVE` (IAMv2 users)
+* `SUSPENDED` to `PENDING` (IAMv2 users)
+
+////
+
+
+////
+==== APIs for user state transitions
+To check the status of a user account, use one of the following API endpoints:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fsearch-user">POST /api/rest/2.0/users/search</a>+++  (REST API v2)
+* xref:user-api.adoc[GET /tspublic/v1/user/] (REST API v1)
+
+To create a user in the `SUSPENDED` state, use one of the following API endpoints:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fcreate-user">POST /api/rest/2.0/users/create</a>+++ (Rest API v2)
+* xref:user-api.adoc#create-user[POST /tspublic/v1/user] (Rest API v1)
+
+To update user status from `ACTIVE` or `PENDING` to `SUSPENDED`, or reactivate a `SUSPENDED` user to the ACTIVE or PENDING state, use one of the following API endpoints:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user"">POST /api/rest/2.0/users/{user_identifier}/update</a>+++ (Rest API v2)
+* xref:user-api.adoc#update-user[PUT /tspublic/v1/user/{userid}] (Rest API v1)
+
+To deactivate an `ACTIVE` user, use one of these API endpoints:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fdeactivate-user">POST /api/rest/2.0/users/deactivate</a>+++ (Rest API v2)
+* xref:user-api.adoc#deactivate-user[POST /tspublic/v1/user/inactivate] (Rest API v1)
+
+To activate an `INACTIVE` user account, use one of these API endpoints:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Factivate-user">POST /api/rest/2.0/users/activate</a>+++ (Rest API v2)
+* xref:user-api.adoc#activate-user[POST /tspublic/v1/user/activate] (Rest API v1)
+////
+
+
+////
+There is also a *Unsuspend user* button on the *Users* dashboard of the *Admin* page. This button is available for all users in the SUSPENDED state.
+The user’s state will transition from SUSPENDED to ACTIVE or PENDING on clicking *Unsuspend user*.
+
+image::./images/unsuspend.png[Unsuspended state]
+////
+
+=== User migration to IAMv2
+
+For link:https://docs.thoughtspot.com/cloud/latest/okta-iam[Identity and Access Management v2 (IAMv2), window=_blank], the `email` attribute is mandatory when creating a user in ThoughtSpot Okta. ThoughtSpot recommends users to provide a valid email address during the user creation. Administrators can manage the user account status for all users. For IAMv2 users, the API response for the following APIs will also include `SUSPENDED` as a user state:
+
+To create a user:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fcreate-user">POST /api/rest/2.0/users/create</a>+++ (Rest API v2)
+* xref:user-api.adoc#create-user[POST /tspublic/v1/user] (Rest API v1)
+
+To update user details:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user">POST /api/rest/2.0/users/{user_identifier}/update</a>+++ (Rest API v2)
+* xref:user-api.adoc#update-user[PUT /tspublic/v1/user/{userid}] (Rest API v1)
+
+
+////
+The IAMv2 users also have an additional user state, `SUSPENDED`. With this, the IAMv2 users do not require a password reset when transitioning between states such as `ACTIVE`, `EXPIRED`, or `INACTIVE`. It also supports seamless migration from IAMv1 to IAMv2 for embedded users.
+
+Note the following points about the `SUSPENDED` state:
+
+** Users in the `SUSPENDED` state will not be able to log in to their ThoughtSpot instance. This provides an effective way to manage access without compromising security.
+** Transitioning a user from `SUSPENDED` to `ACTIVE` or `PENDING` does not require a password reset.
+** When you create or update an `EXPIRED` or `INACTIVE` user via REST APIs, the user will be suspended. This change will effectively block user logins without altering the existing behavior.
+////
+
+
+For more information, see the following pages:
+
+* link:https://docs.thoughtspot.com/cloud/latest/user-account-activation-okta[Activate your account using IAMv2, window=_blank]
+* link:https://docs.thoughtspot.com/cloud/latest/saml-okta[Managing authentication with SAML using IAMv2, window=_blank]
+* link:https://docs.thoughtspot.com/cloud/latest/oidc-iamv2[Managing authentication with OIDC using IAMv2, window=_blank]
+* link:https://docs.thoughtspot.com/cloud/latest/okta-iam[IAMv2 documentation, window=_blank]
+
+
+
+== User group creation and update
+Groups can be created via xref:rest-api-v2-reference.adoc#_groups[REST API v2] or xref:rest-api-reference.adoc#_groups_and_privileges[REST API v1] API endpoint.
+
+The xref:api-user-management.adoc#group-privileges[Group privileges] are set directly on groups, either during group creation or via a group update API call.
 
 == User association to groups
-Users can can be added to specific groups when the user is being created, or you can use the xref:group-api.adoc#add-user-to-group[add a user to a group endpoint]. 
+You can add users to specific groups when creating a user or group via REST API endpoints.
 
-The xref:group-api.adoc#addMembers[group/addmemberships] endpoint allows adding multiple users to multiple groups in a single request.
+The REST API v1 xref:group-api.adoc#addMembers[group/addmemberships] endpoint allows adding multiple users to multiple groups in a single request.
 
-The set of members within a group can be requested using the xref:group-api.adoc#get-users-group[/group/listuser/{groupid}] or xref:group-api.adoc#get-usersInGroup[/group/{groupid}/users] endpoints. 
+To get a list of users assigned to a group, you can use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fsearch-user-groups">POST /api/rest/2.0/groups/search</a>+++ v2 endpoint or the xref:group-api.adoc#get-usersInGroup[/tspublic/v1/group/{groupid}/users] v1 endpoint.
 
-You can remove a user from a group xref:group-api.adoc#delete-user-assoc[individually] or xref:group-api.adoc#removeMembers[remove a list of users] from many groups at once.
+To remove a user from a group, use the update group REST v2 endpoint, or the following REST API v1 endpoints:
+
+* xref:group-api.adoc#delete-user-assoc[POST /tspublic/v1/group/{groupid}/user/{userid}] +
+removes a user from a specific group
+* xref:group-api.adoc#removeMembers[POST /tspublic/v1/group/removememberships] +
+removes a list of users] from many groups at once.
 
 == Access control (sharing)
-The content a user can access is determined by content *shared* directly to the user or the groups they belong to. It is easier to manage and audit sharing through groups rather than at the individual user level. 
+Access to objects is determined by content *shared* directly to the user or the groups they belong to. It is easier to manage and audit sharing through groups rather than object sharing at the individual user level.
 
-Sharing can be accomplished through the UI or the xref:security-api.adoc#share-object[/security/share REST API endpoint], including removing sharing from a user or group.  
+Users can share objects or modify sharing properties through the UI or via an API call to the `POST /api/rest/2.0/security/metadata/share` or xref:security-api.adoc#share-object[/tspublic/v1/security/share] endpoint.
 
 [#group-privileges]
 == Group privileges
-
 Each user group includes a set of privileges for its users. When a user is assigned to a group in ThoughtSpot, the default privileges associated with a group are assigned to its users. The group privileges allow users belonging to a group to perform specific operations and access workflows. If a user belongs to more than one group, they will have the highest level of privileges from all the groups they belong to.
-
 
 [NOTE]
 ====
@@ -57,4 +181,7 @@ include::{path}/group-privileges.adoc[]
 ThoughtSpot also has a default group called `All`. When you create new users in ThoughtSpot, they are automatically added to `All`. By default, the members of the `All` group do not have permission to download or upload data. To add these privileges, you can use the Group API endpoints.
 ====
 
+== Roles
+If Role-Based Access Control (RBAC) is enabled on your instance, administrators can define Role privileges and assign these to users via Groups.
 
+For more information, see xref:roles.adoc[Role-based access control] and link:https://docs.thoughtspot.com/cloud/latest/rbac[ThoughtSpot Product documentation, window=_blank].

@@ -516,6 +516,180 @@ curl -X POST \
 
 For more information, see xref:just-in-time-provisioning.adoc[Just-in-time provisioning].
 
+=== Get tokens with custom rules and filter conditions
+
+To get tokens encoded in JSON Web Token (JWT) format with security entitlements for a user, send a `POST` request with the user details, filter rules, and parameter values to the `/api/rest/2.0/auth/token/custom` API endpoint. This API allows administrators to generate a token with a specific set of rules and column filtering conditions that are applied when a user session is initiated.
+
+You can also use this API with the Visual Embed SDK to implement Attribute-Based Access Control (ABAC) for your embedding application users.
+
+[NOTE]
+====
+If your ThoughtSpot instance is on 10.4.0.cl or later, ThoughtSpot recommends using `/api/rest/2.0/auth/token/custom` to generate Attribute-Based Access (ABAC) Control tokens. The `user_parameters` property in `/api/rest/2.0/auth/token/full` and `/api/rest/2.0/auth/token/object` is deprecated in 10.4.0.cl and is not recommended for ABAC token generation.
+====
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`username`
+|__String__. Username of the ThoughtSpot user. If the user is not available in ThoughtSpot, a new user account will be created and added to ThoughtSpot.
+|`password`
+a|__String__. Password of the user account. If using `secret_key` to generate the token, do not specify the `Password`.
+|`secret_key`
+|__String__. The secret key string provided by the ThoughtSpot server. ThoughtSpot generates this secret key xref:trusted-authentication.adoc#trusted-auth-enable[when trusted authentication is enabled].
+|`validity_time_in_sec` +
+__Optional__| __Integer__. Token expiry duration in seconds. The default duration is 300 seconds.
+|`org_id` +
+__Optional__|__Integer__. If the Orgs feature is enabled on your instance, specify the ID of the Org for which you want to generate the authentication token. If Org ID is not  specified, the token is generated for the Primary Org (Org 0).
+|`persist_option` a| Indicates if the filter rules and Parameter attributes defined in the API request should persist for user sessions initiated with the token obtained from this API call. The following options are available:
+
+* `APPEND` +
+Adds the attributes defined in the API request to the user’s `user_properties`. These properties will be applied to user sessions and for scheduled jobs if any.
+
+* `NONE` +
+The security entitlements assigned via attributes will be used only for the user session initiated with the token generated from this API call.
+
+* `REPLACE` +
+Replaces existing `user_properties` of the user with the attributes defined in this API request.
+
+* `RESET` +
+Resets `user_properties` assigned to a user upon token generation.
+
+|`filter_rules`  a|__Array of filter rules__. An array of runtime filter conditions to pass via token. Each rule in the array must include the following information:
+
+* `column_name` +
+Name of the column in the data source object (Worksheet or Model).
+* `operator` +
+Filter operator to use. For a complete list of supported operators, see xref:runtime-filters.adoc#rtOperator[filter operators].
+* `values` +
+The values to filter on. To get all records, use `TS_WILDCARD_ALL` .
+
+[source,JSON]
+----
+  "filter_rules": [
+    {
+      "column_name": "Customer ID",
+      "operator": "EQ",
+      "values": [
+        "492810"
+      ]
+    },
+    {
+      "column_name": "Item type",
+      "operator": "EQ",
+      "values": [
+        "Jackets"
+      ]
+    }
+  ]
+----
+
+|`parameter_values` a| __Array of Parameter values__. Parameter rules to apply. Each rule in the array must include the following attributes:
+
+* `name` +
+Name of the column in the data source object (Worksheet or Model)
+* `value` +
+The values to use.
+
+[source,JSON]
+----
+"parameter_values": [
+    {
+      "name": "Discount",
+      "values": ["20"]
+    },
+    {
+      "name": "DATE,
+      "values": ["1656914873"]
+    }
+  ]
+----
+|`objects` +
+__Optional__ |__Array of strings__. Array of the object names or GUIDs to which you want to apply the security rules. The object `type` is mandatory if the object `name` is specified as the `identifier`.
+
+If no object is specified in the API request, the filter and Parameter rules will be applied to all objects that the user has access to.
+
+|`email` +
+__Optional__ |__String__. Email address of the user. Use this parameter to add the email address of the user if `auto_create` is set to `true`.
+|`display_name` +
+__Optional__ |__String__. Display name of the user. Use this parameter if `auto_create` is set to `true.
+|`auto_create` +
+__Optional__|__Boolean__. Creates a user if the specified username is not already available in ThoughtSpot. The default value is `true`.
+|`group_identifiers` +
+__Optional__|__Array of Strings__. GUIDs or names of the groups to assign the user to. This attribute can be used in conjunction with `auto_create` to dynamically assign groups and privileges to a user.
+|=====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/custom'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "UserA",
+  "validity_time_in_sec": 300,
+  "persist_option": "APPEND",
+  "auto_create": true,
+  "filter_rules": [
+    {
+      "column_name": "Item type",
+      "operator": "EQ",
+      "values": [
+        "Jackets","Bags"
+      ]
+    },
+    {
+      "column_name": "Customer ID",
+      "operator": "EQ",
+      "values": [
+        "412870"
+      ]
+    }
+  ],
+  "parameter_values": [
+    {
+      "name": "Discount",
+      "values": [
+        "20"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "type": "LIVEBOARD",
+      "identifier": "4c55ff63-d03e-497a-8ec6-1be083f160ee"
+    }
+  ],
+  "email": "UserA@thoughtspot.com",
+  "display_name": "User A",
+  "groups": [
+    {
+      "identifier": "a71d5d1f-6e02-4ee1-a6e9-e158af844367"
+    }
+  ],
+  "org_identifier": "2",
+  "secret_key": "4c55ff63-d03e-497a-8ec6-1be083f160ee"
+}'
+----
+
+==== API response
+If API request is successful, the API returns a token with the security rules and attributes applied.
+
+
+===== Response codes
+
+[options="header", cols="1,4"]
+|====
+|HTTP status code|Description
+|**204**|Successful token revocation
+|**400**|Invalid request
+|**401**|Unauthorized access
+|**403**|Forbidden access
+|**500**|Failed operation or unauthorized request
+|====
+
 == Get token details
 
 To get the authentication token assigned to the current session of the logged-in user, send a request to `/api/rest/2.0/auth/session/token`. You can also this API to get the token issued for the logged-in user for trusted authentication.
