@@ -1,0 +1,374 @@
+= Generate Answers from AI APIs [beta betaBackground]^Beta^
+:toc: true
+:toclevels: 3
+
+:page-title: Spotter APIs
+:page-pageid: spotter-api
+:page-description: You can use Spotter REST APIs to receive Answers for your analytical queries sent  through the conversational experience with ThoughtSpot.
+
+ThoughtSpot provides a set of Spotter AI APIs [beta betaBackground]^Beta^ to create a conversation session with Spotter, ask follow-up questions, and generate Answers for their analytic queries.
+
+This article describes how to use ThoughtSpot REST APIs for the following operations:
+
+* xref:spotter-apis.adoc#createManageConversations[Create a conversation and ask follow-up questions]
+* xref:spotter-apis.adoc#_generate_a_single_answer[Generate a single Answer for a natural language query]
+* xref:spotter-apis.adoc#process_results[Process results generated from Spotter APIs]
+
+[#createManageConversation]
+== Create and manage conversations
+Use the following Spotter AI APIs to initiate a conversation with Spotter and ask follow-up questions.
+
+* xref:spotter-apis.adoc#_create_conversation[Create a conversation session]
+* xref:spotter-apis.adoc#ask_question[Send a question to an ongoing conversation]
+
+[NOTE]
+====
+The Spotter AI APIs are in beta and disabled by default on ThoughtSpot instances. To enable these APIs on your instance, contact ThoughtSpot Support.
+====
+
+=== Create a conversation session
+To create a conversation session, send a `POST` request body with the data source ID and search token string to the `/api/rest/2.0/ai/conversation/create` API endpoint.
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Form parameter|Description
+|`metadata_identifier`|_String_. Required. Specify the GUID of the ThoughtSpot Worksheet or Model. The metadata object specified in the API request will be used as a data source for the conversation.
+|`tokens` __Optional__  a|_String_. To set the context for the conversation, you can specify a set of keywords as token string. For example, `[sales],[item type],[state]`.
+|=====
+
+==== Example requests
+
+===== With tokens
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/conversation/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+  "tokens": "[sales],[item type],[state]"
+}'
+----
+
+===== Without tokens
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/conversation/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+}'
+----
+
+==== API response
+
+If the API request is successful, a conversation identifier is created. Note the GUID of the conversation and use it when sending follow-up queries.
+
+[source,JSON]
+----
+{"conversation_identifier":"98f9b8b0-6224-4f9d-b61c-f41307bb6a89"}
+----
+
+////
+===== Response codes
+[width="100%" cols="2,4"]
+[options='header']
+|===
+|HTTP status code|Description
+|**200**| Successful operation
+|**400**| Invalid parameter
+|**401**| Unauthorized access
+|**500**| Internal error
+|===
+////
+
+[#ask_question]
+=== Send questions to a conversation session
+
+To send a follow-up query to an ongoing conversation, send a `POST` request body with conversation ID and query text to the `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse` API endpoint.
+
+==== Request parameters
+
+[width="100%" cols="2,2,4"]
+[options='header']
+|=====
+|Parameter|Type| Description
+|`conversation_identifier`|Path parameter|__String__. Required. Specify the GUID of the conversation received from the xref:spotter-apis.adoc#_create_a_conversation_session[create conversation API call].
+|`metadata_identifier`|Form parameter|_String_. Required. Specify the GUID of the ThoughtSpot Worksheet or Model. The metadata object specified in the API request will be used as a data source for the follow-up conversation.
+|`message`|Form parameter|_String_. Required. Specify the follow-up question as natural language query string. For example, `Sales data for Jackets`.
+|=====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/conversation/03f48527-b973-4efa-81fd-a8568a4f9e78/converse'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+  "message": "Top performing products in the west coast"
+}'
+----
+
+==== API response
+
+If the API request is successful, the following data is sent in the API response:
+
+* `session_identifier` +
+GUID of the Answer session.
+* `generation_number` +
+Number assigned to the Answer session.
+* `message_type`
+Type of response received for the query. For example, `TSAnswer` (ThoughtSpot Answer).
+* `visualization_type`
+The data format of the generated Answer; for example, chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
+* `tokens` +
+Tokens generated from the natural language search query string specified in the API request. You can use these tokens as input for `query_string` in your API request to `/api/rest/2.0/searchdata` and  export the raw data of the query, or as input to `POST /api/rest/2.0/ai/conversation/create` to initiate a new conversation with a new context.
+
+[NOTE]
+====
+Note the session ID and generation number. To export the Answer generated from this conversation, send these attributes in the `POST` request body to the `/api/rest/2.0/report/answer` endpoint.
+====
+
+[source,JSON]
+----
+[
+  {
+    "session_identifier": "1290f8bc-415a-4ecb-ae3b-e1daa593eb24",
+    "generation_number": 3,
+    "message_type": "TSAnswer",
+    "visualization_type": "Chart",
+    "tokens": "[sales], [state], [item type], [region] = [region].'west', sort by [sales] descending"
+  }
+]
+----
+
+==== Ask follow-up questions
+
+The API retains the context of previous queries when you send follow-up questions. To verify this, you can send another API request with a follow-up question to drill down the Answer data.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/conversation/03f48527-b973-4efa-81fd-a8568a4f9e78/converse'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+  "message": "which city has the better sales of jackets here?"
+}'
+----
+
+The API retrains the context of the initial question and returns a response:
+
+[source,JSON]
+----
+[
+  {
+    "session_identifier": "ee077665-08e1-4a9d-bfdf-7b2fe0ca5c79",
+    "generation_number": 3,
+    "message_type": "TSAnswer",
+    "visualization_type": "Table",
+    "tokens": "[sales], by [city], [state], [item type] = [item type].'jackets', [region] = [region].'west', sort by [sales] descending"
+  }
+]
+----
+
+////
+===== Response codes
+[width="100%" cols="2,4"]
+[options='header']
+|===
+|HTTP status code|Description
+|**200**| Successful operation
+|**400**| Invalid parameter
+|**401**| Unauthorized access
+|**500**| Internal error
+|===
+////
+
+== Generate a single Answer
+To generate an Answer from a natural language search query, send a `POST` request to the `/api/rest/2.0/ai/answer/create` API endpoint. In the request body, include the query and the data source ID.
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Form parameter| Description
+|`query`|__String__. Required. Specify the string as a natural language query. For example, `Top performing products in the west coast`.
+|`metadata_identifier`|_String_. Required. Specify the GUID of the ThoughtSpot Worksheet or Model. The metadata object specified in the API request will be used as a data source for the follow-up conversation.
+|=====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/answer/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN} \
+  --data-raw '{
+  "query": "Top performing products in the west coast",
+  "metadata_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+}'
+----
+
+==== API response
+
+If the API request is successful, the following data is sent in the API response:
+
+* `session_identifier` +
+GUID of the Answer session.
+* `generation_number` +
+Number assigned to the Answer session.
+* `message_type`
+Type of response received for the query. For example, `TSAnswer` (ThoughtSpot Answer).
+* `visualization_type`
+The data format of the generated Answer; for example, chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
+* `tokens` +
+Tokens generated from the natural language search query string specified in the API request. You can use these tokens as input for `query_string` in your API request to `/api/rest/2.0/searchdata` and  export the raw data of the query, or as input to `POST /api/rest/2.0/ai/conversation/create` to initiate a new conversation with a new context.
+
+[NOTE]
+====
+Note the session ID and generation number. To export the result generated from this API call, send these attributes in the `POST` request body to the `/api/rest/2.0/report/answer` endpoint.
+====
+
+[source,JSON]
+----
+[{
+  "session_identifier": "57784fa1-10fa-431d-8d82-a1657d627bbe",
+  "generation_number": 2,
+  "message_type": "TSAnswer",
+  "visualization_type": "Undefined",
+  "tokens": "[product], [region] = [region].'west', sort by [sales] descending"
+}]
+----
+
+////
+===== Response codes
+[width="100%" cols="2,4"]
+[options='header']
+|===
+|HTTP status code|Description
+|**200**| Successful operation
+|**400**| Invalid parameter
+|**401**| Unauthorized access
+|**500**| Internal error
+|===
+////
+[#process_results]
+== Process results generated from Spotter APIs
+You can process the results generated from Spotter APIs in the following ways:
+
+* xref:spotter-apis.adoc#exportSpotterData[Export the results as CSV or PNG]
+* xref:spotter-apis.adoc#_use_tokens_generated_from_spotter_apis_as_raw_data[Use tokens generated from Spotter APIs as raw data]
+
+[#exportSpotterData]
+=== Export data generated from Spotter APIs
+To export results generated from Spotter APIs, use the `/api/rest/2.0/report/answer` API endpoint. In the `POST` request body, include the session ID and generation number received from the xref:spotter-apis.adoc#ask_question[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] or xref:spotter-apis.adoc#_generate_a_single_answer[`POST /api/rest/2.0/ai/answer/create`] API call.
+
+
+==== Request parameters
+
+[width="100%" cols="3,4"]
+[options='header']
+|=====
+|Form parameter|Description
+|`metadata_identifier` +
+__Optional__|_String_. GUID of the object to export. In this case, the metadata object ID is not required, because you will be exporting the data generated from the conversation and not a saved Answer.
+a|`session_identifier` [beta betaBackground]^Beta^ a|_String_. Required. GUID of the session identifying the conversation. The session ID is generated from a xref:spotter-apis.adoc#ask_question[POST call] to the `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse` endpoint, or when an API request is sent to the `/api/rest/2.0/ai/answer/create` endpoint to xref:_generate_a_single_answer[generate a single Answer].
+a|`generation_number` [beta betaBackground]^Beta^ +
+__Optional__ a| _Integer_. Generation number identifying the conversation. The generation number is created in response to a xref:spotter-apis.adoc#ask_question[POST call] to the `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse` endpoint, or when an API request is sent to the `/api/rest/2.0/ai/answer/create` endpoint to xref:_generate_a_single_answer[generate a single Answer].
+
+|`file_format`  +
+__Optional__|__String__. Specifies the format of the output. You can export the Spotter-generated data as PNG or CSV file. By default, the API exports this data in PNG file format.
+|=====
+
+==== Request example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "file_format": "CSV",
+  "session_identifier": "ee077665-08e1-4a9d-bfdf-7b2fe0ca5c79",
+  "generation_number": 2
+}'
+----
+
+==== API Response
+
+If the API request is successful, ThoughtSpot returns the data in the specified file format. You can download the file to use it later or import it into your application environment.
+
+////
+===== Response codes
+[width="100%" cols="2,4"]
+[options='header']
+|===
+|HTTP status code|Description
+|**200**| Successful operation
+|**400**| Invalid parameter
+|**401**| Unauthorized access
+|**401**| Forbidden request
+|**500**| Internal error
+|===
+////
+=== Use tokens generated from Spotter APIs as raw data
+
+For every natural language query and follow-up question, Spotter APIs return tokens in the API response. You can use these tokens as raw data to generate an Answer from ThoughtSpot via  xref:data-report-v2-api.adoc#_search_data_api[`/api/rest/2.0/searchdata`] API.
+
+In the `POST` request body, include the session ID and generation number received from the xref:spotter-apis.adoc#ask_question[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] or xref:spotter-apis.adoc#_generate_a_single_answer[`POST /api/rest/2.0/ai/answer/create`] API call.
+
+==== Request example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/searchdata'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "query_string": "by [city], [product], [item type] = [item type].'\''jackets'\'', [region] = [region].'\''west'\'', sort by sum [sales] descending",
+  "logical_table_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+  "data_format": "COMPACT",
+  "record_offset": 0,
+  "record_size": 10
+}'
+----
+
+==== API response
+
+If the API request is successful, ThoughtSpot returns the Answer data for the query string sent in the API request.
+
+////
+===== Response codes
+[width="100%" cols="2,4"]
+[options='header']
+|===
+|HTTP status code|Description
+|**200**| Successful operation
+|**400**| Invalid parameter
+|**401**| Unauthorized access
+|**401**| Forbidden request
+|**500**| Internal error
+|===
+////

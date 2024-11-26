@@ -13,8 +13,9 @@ The behavior of each filter type and the mechanism for setting filters can diffe
 There are different types of filters, which can be applied in the following order:
 
 1. xref:rls-rulesl.adoc[RLS Rules]
-2. xref:abac-user-parameters.adoc[Attribute-Based Access Control (ABAC) *user_parameter* filters]
-3. xref:runtime-filters.adoc[runtime filters] and xref:runtime-parameters.adoc[runtime_parameters]
+
+2. xref:abac-user-parameters.adoc[Attribute-Based Access Control (ABAC) filter rules]
+3. xref:runtime-filters.adoc[Runtime filters] and xref:runtime-parameters.adoc[Runtime Parameters]
 4. link:https://docs.thoughtspot.com/cloud/latest/liveboard-filters[Liveboard filters, window=_blank]
 5. link:https://docs.thoughtspot.com/cloud/latest/liveboard-filters-cross[Liveboard cross filters, window=_blank]
 6. link:https://docs.thoughtspot.com/cloud/latest/filters[Search query filters, window=_blank]
@@ -28,58 +29,31 @@ Once in place, they always apply within the query generation layer.
 
 Multiple RLS Rules are appended to the query via `OR` logic, rather than `AND`.
 
-== user_parameter filters
+== ABAC filter rules
 Filters and parameter values defined via xref:abac-user-parameters.adoc[ABAC token] that apply at the data model layer are locked-in and always apply until changed or removed by a new token request.
 
-The `user_parameter` filters and runtime filters are converted into SQL with the same logic:
+The ABAC filter rules and runtime filters are converted into SQL with the same logic:
+ 
 
 1. clauses are appended via `AND`
 2. filters are applied to exact matching Worksheet Column names
 
-Any data restrictions resulting from `user_parameter` or runtime filters will be seen in the visible filter UI of the Liveboard filters and search_query filters layers, but there is no visible filter UI directly related to these filtering layers.
+Any data restrictions resulting from filter rules will be seen in the visible filter UI of the Liveboard filters and `search_query` filters layers, but there is no visible filter UI directly related to these filtering layers.
 
 === Worksheet filters
 Worksheet objects can have Parameters, formulas, and filters.
 
 End users cannot affect the formulas or filters, which are always applied, but any Parameters that are used in a formula can be set by these other methods.
 
-To create an adjustable formula-filter that is secure, use the `user_parameters` filtering layer to set the value of the parameter programmatically.
+To create an adjustable formula-filter that is secure, use the ABAC filtering layer to set the value of the parameter programmatically.
 
 If the parameter can be user-editable, then use the runtime Parameters layer to set the parameter value.
 
 == Runtime filters and Parameters
 You can define xref:runtime-filters.adoc[runtime filters] and xref:runtime-parameters.adoc[runtime parameters] within the browser for a given object at load time.
 
-The runtime filters layer applies to the link:https://developers.thoughtspot.com/docs/Interface_LiveboardViewConfig[LiveboardEmbed], link:https://developers.thoughtspot.com/docs/Interface_SearchViewConfig[SearchEmbed] and link:https://developers.thoughtspot.com/docs/Interface_SageViewConfig[SageEmbed] components, which have methods for setting values prior to load and events for interacting after load time.
+Filters and parameters set for ABAC token cannot be overridden by setting runtime filters or Parameters in the browser.
 
-Filters and parameters that are set in the `user_parameters` layer via ABAC token cannot be overridden by setting `runtime_filters` or runtime_parameters` in the browser.
-
-=== Setting values and events
-Runtime filters can be set prior to the load within the link:https://developers.thoughtspot.com/docs/Interface_LiveboardViewConfig#_runtimefilters[configuration object] of the loaded embed component:
-
-[source,JavaScript]
-----
-const embed = new LiveboardEmbed('#embed-container', {
-   ... // other options
-   runtimeFilters: [
-          {
-            columnName: 'value',
-             operator: RuntimeFilterOp.EQ,
-            values: ['string' | 123 | true],
-          },
-      ],
-})
-----
-
-After load time, runtime filters can be adjusted using the link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updateruntimefilters[HostEvent.UpdateRuntimeFilters]:
-
-[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateRuntimeFilters, [
-  {columnName: "state",operator: RuntimeFilterOp.EQ,values: ["michigan"]},
-  {columnName: "item type",operator: RuntimeFilterOp.EQ,values: ["Jackets"]}
-])
-----
 
 == Liveboard filters
 link:https://docs.thoughtspot.com/cloud/latest/liveboard-filters[Liveboard filters, window=_blank] display at the top of a Liveboard. When clicked, a modal filtering dialog appears with filter options appropriate for the data type.
@@ -171,13 +145,15 @@ liveboardEmbed.trigger(HostEvent.UpdateCrossFilter, {
 ----
 
 == Search query filters
-The lowest layer of filters are those that are defined as part of the search query for a given Answer or visualization on a Liveboard.
+
+The lowest layer of filters is defined as part of the search query for a given Answer or visualization on a Liveboard.
 
 The link:https://docs.thoughtspot.com/cloud/latest/filters[filter terms, window=_blank] are saved as part of the `search_query` of the object, visible in TML.
 
 When viewing an Answer or a visualization in the *Edit* mode, you will see the filter UI for `search_query` filters above the chart or table. These filters are not visible on a Liveboard.
 
-=== Liveboard filters override search_query filters
+=== Liveboard filters override search query filters
+
 When viewing a visualization on a Liveboard, any Liveboard filter on the same column as a `search_query`  filter will fully override the values.
 
 === Events

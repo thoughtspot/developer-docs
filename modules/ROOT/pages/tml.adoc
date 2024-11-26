@@ -40,25 +40,27 @@ The TML API endpoints allow you to programmatically export, validate, and import
 If using older versions of TML files for Liveboards, ensure that your TML file has the object name as `liveboard`. Replace any `pinboard` occurrences with `liveboard` before import.
 ====
 
-== Import a TML
+== Import TML
 To import a modified TML object, your account must have the `DATAMANAGEMENT` (*Can manage data*) or `ADMINISTRATION` (*Can administer ThoughtSpot*) privilege.
 
 You can import single or multiple objects using the `tml/import` API. If you are importing TML files one at a time, include the `fqn` property to distinguish objects that have the same name. If you have multiple connections or tables with the same name and the Connection or Table you reference in your TML does not have a unique name, it can lead to invalid object references. Adding `fqn` helps ThoughtSpot differentiate a Table from another with the same name.
 
-By default, the fqn parameter is not present in the TML file. However, you can export TML with FQNs and use it during the import.
+By default, the `fqn` parameter is not present in the TML file. However, you can export TML with FQNs and use it during the import.
 
-To import TML representation of the metadata objects into ThoughtSpot, use one of the the following API endpoints:
+To import TML representation of the metadata objects into ThoughtSpot, use one of  the following API endpoints:
 
 * `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fimport-metadata-tml[**POST** /api/rest/2.0/metadata/tml/import]` (REST API v2)
 * `xref:tml-api.adoc#import[**POST** /tspublic/v1/metadata/tml/import]` (REST API v1)
 
 //While the v1 API accepts a string containing a JSON array of TML objects to upload, in YAML or JSON format, the v2 accepts it only in the JSON format.
 
-There are multiple kinds of imports possible. They are:
+There are multiple kinds of imports possible:
 
 * `PARTIAL` imports all objects that validate successfully, and ignores objects that do not validate successfully.
 * `ALL_OR_NONE` imports the objects that validate successfully.
 * `VALIDATE_ONLY` validates the objects but does not import them.
+
+You can also specify additional parameters to skip validation and diff checks, and define Org context for the import operation.
 
 [NOTE]
 ====
@@ -67,7 +69,230 @@ If you import only a Worksheet object, it may take some time for the Worksheet t
 However, if you import a Worksheet along with Liveboards, answers, and other dependent objects in a single API call, the imported objects will be immediately available for use.
 ====
 
-Visit link:https://docs.thoughtspot.com/cloud/latest/scriptability[Import a TML object] for more information.
+== Import TML objects asynchronously
+The REST v1 and v2  `metadata/tml/import` APIs import TML objects synchronously. When you try to import large and complex metadata objects, the synchronous import operation takes more time to process data and sometimes can result in a timeout error.
+
+To allow mutually exclusive import tasks to run in parallel and process TML objects asynchronously,  ThoughtSpot provides the `POST /api/rest/2.0/metadata/tml/async/import`. The async TML import API allows you to create TML import tasks and fetch task status via `POST /api/rest/2.0/metadata/tml/async/status`.
+
+=== Schedule import tasks
+
+You can import TML objects asynchronously by scheduling TML import tasks via `POST` request to POST `/api/rest/2.0/metadata/tml/async/import` API endpoint. You can send the following parameters in the API request body:
+
+[width="100%" cols="2,4,1"]
+[options='header']
+|====
+|Form parameter|Description| Default
+|`metadata_tmls` |__Array of strings__. GUIDs of the metadata TML objects to import. |__None__
+|`create_new`  +
+__Optional__ |__Boolean__. To create TML objects with new GUIDs during import, specify `true`. By default, ThoughtSpot updates the existing objects that have the same GUID as the objects you are importing. | `false`
+|`all_orgs_context` +
+__Optional__ |__Boolean__. Specify if import operation must be run for all Orgs on your instance.
+
+__Requires Org administration privileges to access TML objects across all Orgs.__| `false`
+
+|`import_policy`  a|__String__. Policy to follow during import. The allowed values are:
+
+* `PARTIAL` +
+Imports objects that validate successfully. Skips the objects that do not validate successfully and their dependent objects if any.
+* `ALL_OR_NONE` +
+Imports all objects that validate successfully. If the import fails for one object, no objects will be imported.
+* `VALIDATE_ONLY` +
+Validates the objects but does not import them.
+* `PARTIAL_OBJECT` +
+Imports objects that validate successfully and skips the objects that do not validate successfully. If the import fails for a visualization object in a Liveboard TML, the Liveboard will be imported without that visualization object. Similarly, if importing a relationship in a logical table fails, the table TML will be imported with warnings in the API response.
+| `PARTIAL_OBJECT`
+
+|`skip_cdw_validation_for_tables` +
+__Optional__ |__Boolean__. Skips Cloud Data Warehouse validation for table TML imports. | `false`
+|`skip_diff_check` +
+__Optional__ |__Boolean__. Skips diff check before processing TMLs for imports. |`false`
+|`enable_large_metadata_validation` +
+__Optional__ |__Boolean__. Enables validation for large metadata objects. |`false`
+|====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-host}/api/rest/2.0/metadata/tml/async/import'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_tmls": [
+    "fa68ae91-7588-4136-bacd-d71fb12dda69",
+    "e26e5de0-3e4f-4786-b563-103eed06c0f6"
+  ],
+  "create_new": true,
+  "all_orgs_context": false,
+  "skip_cdw_validation_for_tables": true,
+  "import_policy": "PARTIAL_OBJECT",
+  "skip_diff_check": false,
+  "enable_large_metadata_validation": true
+}'
+----
+
+==== Example response
+
+If the API request is successful, ThoughtSpot schedules an import task, and returns the task name and ID in the API response:
+
+[source,JSON]
+----
+{
+  "tenant_id": "default-tenant-id",
+  "org_id": 0,
+  "task_id": "c8c8c4da-0bc8-4460-8039-cfa7fd598335",
+  "task_name": "ASYNC_TML_26:Nov:2024-06:06:24",
+  "import_response": null,
+  "task_status": "IN_QUEUE",
+  "author_id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
+  "import_policy": "PARTIAL_OBJECT",
+  "created_at": null,
+  "in_progress_at": null,
+  "completed_at": null,
+  "total_object_count": 2,
+  "object_processed_count": null,
+  "modified_at": null
+}
+----
+
+===== Response codes
+
+[options="header", cols="1,4"]
+|====
+|HTTP status code|Description
+|**200**|Async TML Import Task submitted successfully
+|**400**|Invalid request
+|**401**|Unauthorized access
+|**403**|Forbidden access
+|**500**|Unexpected Error
+|====
+
+=== Fetch status of the TML import task
+
+To fetch the status of a scheduled import task, send a `POST` request to the `POST /api/rest/2.0/metadata/tml/async/status` API endpoint.
+
+In the request body, include the following attributes:
+
+[width="100%" cols="2,4,1"]
+[options='header']
+|====
+|Form parameter|Description| Default
+|`task_ids` |__Array of strings__. Task IDs assigned to the scheduled TML async import operations. | __None__
+| `task_status` | __Array of strings__. Status of the scheduled import tasks to filter on. The following options are available: +
+
+* `COMPLETED` +
+* `IN_QUEUE` +
+* `IN_PROGRESS` +
+* `FAILED`
+| __None__
+|`author_identifier`  +
+__Optional__ |__String__. GUID of the author who initiated the import request or the name assigned to the import task being queried. For example, `ASYNC_TML_26:Nov:2024-06:06:24`. | __None__
+|`include_import_response` +
+__Optional__  |__Boolean__. Specify whether to include import response in the task status objects.| `false`
+|`record_offset` +
+__Optional__ |__Integer__. The offset point, starting from where the task status should
+be included in the response. | `0`
+|`record_size` +
+__Optional__ |__Integer__. The number of task statuses to include in the
+response starting from offset position. | `5`
+|====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-host}/api/rest/2.0/metadata/tml/async/status'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "record_offset": 0,
+  "record_size": 5,
+  "include_import_response": true,
+  "task_ids": [
+    "c8c8c4da-0bc8-4460-8039-cfa7fd598335"
+  ],
+  "task_status": [
+    "COMPLETED"
+  ],
+  "author_identifier": "95ac814f-eb01-4625-93c7-c7624b29d226"
+}'
+----
+
+==== Example response
+
+If the API request is successful, ThoughtSpot returns the status details of the TML async import tasks.
+If Orgs are enabled on your instance, the API returns task status only for objects within the current Org context.
+
+[source,JSON]
+----
+{
+  "status_list": [
+    {
+      "tenant_id": "default-tenant-id",
+      "org_id": 0,
+      "task_id": "c8c8c4da-0bc8-4460-8039-cfa7fd598335",
+      "task_name": "ASYNC_TML_26:Nov:2024-06:06:24",
+      "import_response": {
+        "object": [
+          {
+            "filename": "tml_0",
+            "zip_filename": "zip_tml_0",
+            "response": {
+              "status": {
+                "status_code": "ERROR",
+                "error_message": "Invalid YAML/JSON syntax in file."
+              }
+            },
+            "request_index": 0
+          },
+          {
+            "filename": "tml_1",
+            "zip_filename": "zip_tml_1",
+            "response": {
+              "status": {
+                "status_code": "ERROR",
+                "error_message": "Invalid YAML/JSON syntax in file."
+              }
+            },
+            "request_index": 1
+          }
+        ],
+        "status": {
+          "status_code": "OK",
+          "error_code": 0,
+          "error_message": ""
+        }
+      },
+      "task_status": "COMPLETED",
+      "author_id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
+      "import_policy": "PARTIAL_OBJECT",
+      "created_at": 1732601184212,
+      "in_progress_at": 1732601184255,
+      "completed_at": 1732601184476,
+      "total_object_count": 2,
+      "object_processed_count": 2,
+      "modified_at": 1732601184476
+    }
+  ],
+  "last_batch": true
+}
+----
+
+===== Response codes
+
+[options="header", cols="1,4"]
+|====
+|HTTP status code|Description
+|**200**|Async TML import task status fetched successfully
+|**400**|Invalid request
+|**401**|Unauthorized access
+|**403**|Forbidden access
+|**500**|Unexpected Error
+|====
 
 == Export a TML
 To export the TML data, your account must have the `DATAMANAGEMENT` (Can manage data) or `ADMINISTRATION` (Can administer ThoughtSpot) privilege..
