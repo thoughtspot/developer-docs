@@ -100,10 +100,62 @@ It does not need to be for each component load, but rather before any other Thou
 In the tutorial app, which is *only* displaying ThoughtSpot content, the `init()` function is run as soon as the app is loaded, in the `layout.tsx` file, via the `ThoughtSpotEmbed` component.
 
 === components/ThoughtSpotEmbed.tsx
+The pattern within `components/ThoughtSpotEmbed.tsx` is important, because it defines any initial configurations and other functions, and runs the `init()` function only once.
 
+At the bottom, we run the `tsInitialize()` function once, and then return a `div` with `id=ts-embed` that will be used as the container for any individual ThoughtSpot embed components loaded by the app later:
 
+[,tsx]
+----
+ tsInitialize();
 
+return (
+    <div className="w-full h-full">
+        <div className="w-full h-full" id="ts-embed">
+            {children}
+        </div>
+    </div>
+);
+----
 
+The `tsInitialize()` function wraps around the entire process of calling the `init()` function from the Visual Embed SDK (note that auth has not been implemented in this example):
+
+[,typescript]
+----
+    const tsInitialize = () => {
+        console.log("Initializing ThoughtSpot SDK");
+
+        // init() function defines basic configuration and auth for all ThoughtSpot embed components
+        // https://developers.thoughtspot.com/docs/Interface_EmbedConfig for all configurations
+        const ee = init({
+            thoughtSpotHost: constants.tsURL,
+            authType: AuthType.None,
+            username: constants.username,
+            getAuthToken: () => {
+                return getAuthToken(constants.username);
+            },
+            callPrefetch: true,
+            customizations: {},
+        } as EmbedConfig);
+
+        // Checks for Auth process completed as expected
+        if (ee) {
+            ee.on(AuthStatus.SUCCESS, () => {
+                console.log("Success");
+            })
+                .on(AuthStatus.SDK_SUCCESS, () => {
+                    console.log("SDK Success");
+                })
+                .on(AuthStatus.FAILURE, (reason) => {
+                    console.log("Failure:  " + reason);
+                });
+        }
+    };
+----
+
+== Conclusion
+At this point, the tutorial app framework is started with a layout that initializes the ThoughtSpot Visual Embed SDK. 
+
+The next lesson creates a page that will load an embed compponent into the layout.
 
 '''
 
