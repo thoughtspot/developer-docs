@@ -90,7 +90,7 @@ export const passThroughHandler = (html: string, params: object) => {
     let parsedHtml = html;
     const paramKeys = Object.keys(params);
     if (!html && paramKeys.length === 0) return parsedHtml;
-
+    parsedHtml = parsedHtml.replace(/&#8212;&#8203;/g, '--');
     const customPassThroughStart = '{{';
     const customPassThroughEnd = '}}';
 
