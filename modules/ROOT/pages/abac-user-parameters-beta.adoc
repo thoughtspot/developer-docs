@@ -1,4 +1,4 @@
-= ABAC via tokens (pre-10.4) [beta betaBackground]^Beta^
+= ABAC via tokens (pre-10.4.0.cl)
 :toc: true
 :toclevels: 3
 
@@ -6,31 +6,31 @@
 :page-pageid: abac-user-parameters-beta
 :page-description: Attribute-based access control pattern can be achieved via user parameters sent in the login token
 
-Attribute-Based Access Control (ABAC) is a pattern where security entitlements are sent in as lists of attributes at session creation time via the authentication service.
+Row-level security (RLS) using Attribute-Based Access Control (ABAC) via tokens in versions 10.3.0.cl and earlier is a __Beta__ implementation.
 
-RLS using ABAC via tokens in versions 10.3 and earlier exists as a __Beta__.
+This article describes the best practices to implement ABAC via tokens in a pre-10.4.0.cl environment.
 
-This article describes the best practice way to implement in a pre-10.4 environment.
-
-If you are on the ThoughtSpot 10.4 or later release, please implement using the xref:abac-user-parameters.adoc[GA documentation]. There is a xref:jwt-migration[migration guide] available if you are implemented on a beta release and have been upgraded.
+If your ThoughtSpot instance is on 10.4.0.cl or later, please refer to the xref:abac-user-parameters.adoc[GA documentation]. If you have implemented the beta version of the ABAC and your ThoughtSpot instance is running 10.4.0.cl or later, refer to the instructions in the xref:jwt-migration[migration guide] and update your implementation to use the `auth/token/custom` API endpoint for ABAC token generation.
 
 [IMPORTANT]
 ====
 [#beta-warning]
-*  As this feature directly impacts data security in your environment, ThoughtSpot does not support its use in a Production environment until it becomes Generally Available. ThoughtSpot is working on improvements in the upcoming releases that will change some of the best practices recommended in this article and result in the needed re-work of your deployment's security architecture. To understand the RLS best practices for your use case and  deployment timelines, and to get these features enabled on your ThoughtSpot instances, contact ThoughtSpot Support.
-
+As this feature directly impacts data security in your environment, ThoughtSpot does not support its use in a Production environment until it becomes Generally Available. ThoughtSpot is working on improvements in the upcoming releases that will change some of the best practices recommended in this article and result in the needed re-work of your deployment's security architecture. To understand the RLS best practices for your use case and  deployment timelines, and to get these features enabled on your ThoughtSpot instances, contact ThoughtSpot Support.
 ====
 
 == Overview
 
-The following attributes can be set for a user via the login token, along with the existing capability to assign ThoughtSpot groups:
+In ABAC implementation, security entitlements are sent in as lists of attributes with the token at session creation time via the authentication service.
+
+Administrators can set the following attributes for a user via the authentication token, along with the existing capability to assign ThoughtSpot groups:
 
 * xref:runtime-filters.adoc[Runtime filters] +
 Can filter multiple values of any data type. Binds to any Column in any Data Source with a matching Column Name (ThoughtSpot property, not underlying database table column name).
 
 * xref:runtime-parameters.adoc[Parameters] +
 Binds a single value to any Parameter in any Worksheet by Parameter Name and Type match. Parameters can be used in *worksheet formulas* and then as *worksheet filters*.
-* xref:runtime-sort.adoc[Runtime sorts] (Applicable to 10.3.0.cl and earlier versions) +
+
+* xref:runtime-sort.adoc[Runtime sorts]  +
 Overrides to sort order within columns.
 
 
@@ -42,7 +42,7 @@ The runtime filters require passing the *exact* ThoughtSpot Worksheet or Model c
 For the same reasons, end users of an embedded app cannot have *edit* access to any worksheet using ABAC RLS via tokens.
 ====
 
-The request for a token with ABAC details can xref:abac-user-parameters.adoc#persistForUser[persist] the set of filters and Parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
+The request for a token with ABAC details can xref:abac-user-parameters-beta.adoc#persistForUser[persist] the set of filters and Parameter values to the user's `user_parameters` property, after which all sessions and scheduled reports will use the persisted values.
 
 == Token request
 The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format, using the existing ThoughtSpot V2.0 REST API access tokens, which are OAuth JWT tokens.
@@ -56,7 +56,7 @@ ThoughtSpot compresses the size of JWT token by default to ensure that larger pa
 
 === Request format
 
-The ABAC request is sent using the `user_parameters` key of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank].
+The ABAC request is sent using the `user_parameters` key of the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token">V2.0 Full Access Token request</a>+++.
 
 There are three potential keys within `user_parameters`, each taking an array of objects:
 [code,javascript]
@@ -71,9 +71,9 @@ There are three potential keys within `user_parameters`, each taking an array of
 
 The format for the objects in each section follows the equivalent formats in the Visual Embed SDK for xref:runtime-filters.adoc[runtime filters], xref:runtime-parameters.adoc[runtime parameters], or xref:runtime-sort.adoc[runtime sorts].
 
-There is a `xref:abac-user-parameters.adoc#persistForUser[persist]` key to be added on each object that takes a boolean `true` or `false`. This determines if the values are persisted at the user level beyond just the token itself, for features such as alerts and subscriptions that run outside a user's session.
+There is a `xref:abac-user-parameters-beta.adoc#persistForUser[persist]` key to be added on each object that takes a boolean `true` or `false`. This determines if the values are persisted at the user level beyond just the token itself, for features such as alerts and subscriptions that run outside a user's session.
 
-The following is a `user_parameters` section that would be part of the JSON request of the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token[V2.0 Full Access Token request, target=_blank]:
+The following is a `user_parameters` section that would be part of the JSON request of the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-full-access-token">V2.0 Full Access Token request</a>+++:
 
 [source,JavaScript]
 ----
@@ -206,7 +206,7 @@ If the "check parameter" value from the token does not match the value defined i
 === Build the ABAC token request
 The xref:trusted-auth-token-request-service.adoc[token request service] must have the following to build a token request for ABAC:
 
-1. The *shared secret* to go into the "check parameter" 
+1. The *shared secret* to go into the "check parameter"
 2. Runtime filters for defining multi-value conditions on columns
 3. Any additional parameters
 
@@ -222,7 +222,7 @@ You can retrieve the attribute names and values from any source: the embedding a
 
 ==== Translate entitlements into runtime filters
 
-Runtime filters *match on the name property of a column* as defined in ThoughtSpot, not the column's name in the underlying database table. 
+Runtime filters *match on the name property of a column* as defined in ThoughtSpot, not the column's name in the underlying database table.
 
 The xref:trusted-auth-token-request-service.adoc[token request service] *MUST* know the ThoughtSpot column names that will be used for each of the attributes, so you'll need to coordinate between ThoughtSpot Worksheet designers and the xref:trusted-auth-token-request-service.adoc[token request service] to make sure the matching column names and values are being sent.
 
@@ -395,30 +395,61 @@ If you do not get all your data types correct, the ThoughtSpot-generated query w
 ==== Set a Worksheet filter on the Worksheet security formula
 The last step is to set a *Worksheet filter* on the *formula* you just created to evaluate the 'check parameter'.
 
-Click the Add new icon (+) next to Filters, and choose the formula you created (at the end of the list):
+The last step is to set a *Worksheet filter* on the *formula* you just created to evaluate the 'check parameter'.
+
+. Click the Add new icon (+) next to *Filters*. +
+. Click the formula you created (at the end of the list) in the *Filter* dialog.
++
 
 [.bordered]
-[.widthAuto]
-image::./images/new_worksheet_filter_step_1.png[Create New Filter on Worksheet]
-
-At the bottom of the filter dialog that appears, choose "Add values in bulk":
+image:./images/new_worksheet_filter_step_1.png[Create New Filter on Worksheet, width=449, height=589]
++
+. Click *Add values in bulk*.
++
 [.bordered]
-[.widthAuto]
-image::./images/new_worksheet_filter_step_2.png[Choose add values in bulk]
+image:./images/new_worksheet_filter_step_2.png[Choose add values in bulk, width=449, height=589]
 
-Type in the value *true* in the bulk dialog box, then press "Done":
-
+. Type in the value *true* in the bulk dialog box, and then click *Done*.
++
 [.bordered]
-[.widthAuto]
-image::./images/new_worksheet_filter_step_3.png[Type in true in bulk values box]
+image:./images/new_worksheet_filter_step_3.png[Type in true in bulk values box, width=457, height=301]
 
-Once you click **Done** on the filter dialog, you should see it listed on the Edit Worksheet page:
-
+. Click **Done** on the Filter dialog. +
+You should see it listed on the *Edit Worksheet* page:
++
 [.bordered]
-[.widthAuto]
-image::./images/new_worksheet_filter_step_4.png[Completed Worksheet filter]
+image:./images/new_worksheet_filter_step_4.png[Completed Worksheet filter]
 
 Now the 'check parameter' will be evaluated all the time, blocking all data unless the appropriate value is passed in via ABAC token.
+
+
+The last step is to set a *Worksheet filter* on the *formula* you just created to evaluate the 'check parameter'.
+
+. Click the Add new icon (+) next to *Filters*. +
+. Click the formula you created (at the end of the list) in the *Filter* dialog.
++
+
+[.bordered]
+image:./images/new_worksheet_filter_step_1.png[Create New Filter on Worksheet, width=449, height=589]
++
+. Click *Add values in bulk*.
++
+[.bordered]
+image:./images/new_worksheet_filter_step_2.png[Choose add values in bulk, width=449, height=589]
+
+. Type in the value *true* in the bulk dialog box, and then click *Done*.
++
+[.bordered]
+image:./images/new_worksheet_filter_step_3.png[Type in true in bulk values box, width=457, height=301]
+
+. Click **Done** on the Filter dialog. +
+You should see it listed on the *Edit Worksheet* page:
++
+
+[.bordered]
+image:./images/new_worksheet_filter_step_4.png[Completed Worksheet filter]
+
+
 
 == Indexing
 Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in Explore, use ThoughtSpot indexing.
