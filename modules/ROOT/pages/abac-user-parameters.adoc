@@ -126,9 +126,34 @@ You can choose the filter or parameter to apply only to specific ThoughtSpot obj
 
 [#persistForUser]
 === Token-based override vs. persisting values
-When `persist: false` is chosen for an ABAC attribute, it only acts as an *override*, with the values tied only to the specific token.
+`persist_option` has the following possible values :
 
-You can treat the REST API *token request* with any values where `persist: true` as "update user_parameters" API endpoint, even if you don't use the token in the response.
+[cols="1,1,2"]
+|=====
+|value|available version|behavior
+
+|`NONE`
+|10.4
+|User object is not updated by the token request
+
+|`APPEND`
+|10.4
+|New values in token request are added to existing set on user object
+
+|`RESET`
+|10.4
+|All persisted values on user object are cleared. Requested values are still encoded in token
+
+|`REPLACE`
+|10.5
+|All persisted values on user are replaced with the set specified in the token request
+
+|=====
+In 10.4, the `REPLACE` behavior can be achieved by making a `RESET` request followed by an `APPEND` request, then passing only the `APPEND` request token to the browser.
+
+When `"persist_option": "NONE" ` is chosen for an ABAC attribute, it only acts as an *override*, with the values tied only to the specific token.
+
+You can treat the REST API *token request* with any values where `persist_option` is not `NONE` as an "update the user object" API endpoint, even if you don't use the token in the response.
 
 Filters and parameters must be *persisted* for them to apply when using xref:trusted-authentication.adoc#cookie[cookie-based trusted authentication] or scheduled reports.
 
@@ -136,46 +161,35 @@ Filters and parameters must be *persisted* for them to apply when using xref:tru
 |=====
 |persist|authentication type|behavior
 
-|`false`
+|`NONE`
 |Cookieless Trusted Auth
-|Token values override user's values, without updating user_parameters
+|Token values override user's values, without updating user object
 
-|`true`
+|`APPEND` or `REPLACE`
 |Cookieless Trusted Auth
-|Token values override, but user_parameters is also updated by token request
+|Token values override, but user object is also updated by token request
 
-|`true`
+|`APPEND` or `REPLACE`
 |Cookie-based Trusted Auth
-|Token request updates user_parameters, token is used by SDK to start a session
+|Token request updates user object, token is used by SDK to start a session
 
-|`true`
+|`APPEND` or `REPLACE`
 |Discard token after request
-|Token request updates user_parameters
+|Token request updates user object
 
 |=====
 
-Remember, the successful *request* for a token updates the stored `user_parameters` property of the user, rather than the first use of the token.
+Remember, the successful *request* for a token updates the stored property of the user, rather than the first use of the token.
 
 Persisting values opens up use cases for ABAC outside of the cookieless Trusted Authentication pattern: even if users authenticate via SAML, OIDC, or go directly into ThoughtSpot via username and password, an administrator can make a token request with `persist: true` to set their stored `user_parameters`.
 
 === Remove persisted values
-The syntax to fully remove persisted elements in a user's `user_parameters` property is to pass an *empty array* for the category.
+The syntax to fully remove persisted elements on a user's object is to set `"persist_option" : "NONE"`.
 
-A request with an empty array affects persisted values despite there being no `persist` key within the request.
-
-The following would clear *all* persisted values of any type:
-[code,javascript]
-----
-"user_parameters": {
-   "runtime_filters": [],
-   "parameters" : [],
-   "runtime_sorts": []
-}
-----
+The requested token can still be used for ABAC if you included *filter_rules* or *parameter_values* in the request.
 
 == Filter rules for multi-value RLS
 The ABAC via tokens pattern allows for setting arbitrary filters and overriding the values of existing worksheet parameters. These two capabilities can be combined in a number of ways to create secure and unbreakable RLS.
-
 
 === Deny All by default
 Starting in ThoughtSpot 10.4, you can add `is_mandatory_token_filter: true` to the TML definition of any column in a worksheet or model.
