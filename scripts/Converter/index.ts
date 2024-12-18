@@ -523,9 +523,9 @@ class TypeDocParser {
                 (e) => e.tag === 'group',
             )[0];
         if (groupTag) {
-            if (!this.groupMap[groupTag.text])
-                this.groupMap[groupTag.text] = [];
-            this.groupMap[groupTag.text].push(node);
+            const groupName = groupTag.text.trim();
+            if (!this.groupMap[groupName]) this.groupMap[groupName] = [];
+            this.groupMap[groupName].push(node);
         }
         if (!this.childrenIdMap[node.id]) this.childrenIdMap[node.id] = node;
         if (!this.childrenNameMap[node.name])
