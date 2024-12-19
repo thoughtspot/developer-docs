@@ -1,0 +1,224 @@
+= Migrate ABAC ^BETA^ implementation to custom token API
+:toc: true
+:toclevels: 2
+
+:page-title: ABAC via tokens migration steps
+:page-pageid: abac-migration-guide
+:page-description: Steps for migrating your implementation to use custom token API workflow
+
+If your application instance is upgraded 10.4.0.cl or later version, ThoughtSpot recommends using the the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">/api/rest/2.0/auth/token/custom</a>+++ API endpoint to xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[generate a JWT token with custom security rules] instead of the `user_parameters` property in `/api/rest/2.0/auth/token/full` and `/api/rest/2.0/auth/token/object` APIs. The `user_parameters` property is deprecated in 10.4.0.cl.
+
+If your current application environment is using the beta version of the ABAC, follow the steps described in this article to smoothly migrate your ABAC implementation with the `/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` API endpoint to the new `/api/rest/2.0/auth/token/custom` API workflow. If you need additional help and assistance, contact ThoughtSpot Support.
+
+== Feature rollout
+
+To control the enablement and rollout of the ABAC via tokens feature, ThoughtSpot provides the following configuration settings:
+
+* `jwTokenFeatureEnabled` +
+Enabled by default on all ThoughtSpot instances running 9.12.5.cl and later. It controls the availability of the beta version of the ABAC token workflow.
+* `mandatoryTokenFilterFeatureEnabled` +
+Disabled by default on ThoughtSpot instances. It controls the availability of the ABAC token generation method via `/api/rest/2.0/auth/token/custom` API endpoint.
+* `honorJwTokenParametersFromBetaEndpoint` +
+Enabled by default on all instances running 10.5.0.cl and later. This setting governs which API endpoint is used for ABAC token generation. When set to `true`, the ABAC implementation with the `/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` API endpoint is explicitly chosen as the default JWT token method for the cluster, regardless of the status of the `mandatoryTokenFilterFeatureEnabled` flag.
+
+== User properties
+
+In the beta version of ABAC implementation with the V2.0 Get token APIs (`/api/rest/2.0/auth/token/full` and `/api/rest/2.0/auth/token/object`), security attributes are stored in the `user` > `user_parameters` object. To avoid ambiguity during the migration, ThoughtSpot uses a different user property to store security rules and other specifications defined via `/api/rest/2.0/auth/token/custom` API endpoint. For all ABAC implementation with the `/api/rest/2.0/auth/token/custom` API workflow, the user's security entitlement details are stored in the `user` > `access_control_properties` object as shown in this example:
+
+[source,JSON]
+----
+
+[
+  {
+    "id": "...","name":"UserA","display_name":"User A","visibility":"SHARABLE", [...],
+    "extended_properties": null,
+    "extended_preferences": null,
+    "user_parameters": null,
+    "access_control_properties": {
+      "0": {
+        "ALL": {
+          "filter_rules": [
+            {
+              "column_name": "Region",
+              "operator": "IN",
+              "values": [
+                "West"
+              ]
+            },
+            {
+              "column_name": "state",
+              "operator": "EQ",
+              "values": [
+                "california"
+              ]
+            }
+          ],
+          "parameter_values": []
+        }
+      }
+    }
+  }
+]
+
+----
+
+[IMPORTANT]
+====
+* If the `persist` attribute is set as `true` for the beta version of the JWT tokens generated using the `/api/rest/2.0/auth/token/full` endpoint, it will be updated as `"persist_option": "REPLACE"` in the user's `access_control_properties` after migration. +
+On instances running 10.4.0.cl, the persist option for the tokens generated using the `/api/rest/2.0/auth/token/custom` API appends new conditions by default, instead of replacing the existing rules. To replace the persisted attributes, set `persist_option=RESET` via a POST API call to `/api/rest/2.0/auth/token/custom`, and then send another API request with `persist_option=APPEND`.
+
+* The JWT tokens generated via `/api/rest/2.0/auth/token/custom` do not support runtime sorting.  If there are  any runtime sorting rules applied via JWT tokens generated from the `/api/rest/2.0/auth/token/full` API call, they will be ignored during migration.
+====
+
+== Migration steps
+
+This document assumes that you are currently using `/api/rest/2.0/auth/token/full` to create a JWT token to log in your users and to apply persisting security rules for user sessions in the `user_parameters` property of the user object.
+
+////
+=== Step 1: Verify the JWT token generation settings on your instance
+
+. Ensure that the `honorJwTokenParametersFromBetaEndpoint` flag is set to `true` on your ThoughtSpot instance. To check the status of this flag, send a `GET` request to the `/api/rest/2.0/system/config-overrides` API endpoint.
+
++
+[source,JSON]
+----
+{
+  "config_override_info": {
+    "honorJwTokenParametersFromBetaEndpoint": {
+      "category": "MAIN",
+      "dataType": "BOOLEAN",
+      "description": "Flag to enable honoring of JWT Token where from Beta Endpoint.",
+      "current": false
+    }
+  }
+}
+----
+
++
+[IMPORTANT]
+====
+If your ThoughtSpot instance is running 10.3.0.cl or earlier version, you must ensure that the `honorJwTokenParametersFromBetaEndpoint` is set to `true`. If this feature flag is not enabled on your instance, contact ThoughSpot Support before attempting to migrate your ABAC API workflow.
+====
+
+. Verify that you are using `POST /api/rest/2.0/auth/token/full` to generate tokens for ABAC for your users.
+. Verify that your users have persisted data security values. To check this, send a `POST` request body with the user IDs or names to the `POST /api/rest/2.0/users/search` API endpoint and verify the persist property settings under `user_parameters` in the API response.
+
+////
+
+=== Step 1: Enable the workflow with custom token API endpoint
+
+Create a ThoughtSpot Support request and ask for the JWT settings to be enabled on your instance. These settings will include the following:
+
+* A quick patch of your environment that adds the JWT flags to your instance.
+* Enabling the `honorJwTokenParametersFromBetaEndpoint` setting to ensure that your current JWT setup is honored while you work on the migration steps.
+* Setting the `mandatoryTokenFilterFeatureEnabled` attribute to `true` that allows you to set up security by default on the Worksheets or Models that you want to use for JWT security entitlements.
+
+=== Step 2: Flag columns whose data will be secured using the JWT endpoint.
+
+Navigate to your Worksheets / Models and set `is_mandatory_token_filter` to `true` on columns that you wish to secure via `filter_rules` set for ABAC.
+
+[.widthAuto]
+[.bordered]
+image:./images/worksheet-jwt-token-setting.png[Filter settings for ABAC token]
+
+For more information about `filter_rules`, see xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[Get tokens with custom rules and filter conditions].
+
+=== Step 3: Familiarize with the custom token authentication endpoint
+
+After migration or upgrade to ThoughtSpot 10.4.0.cl or later, you'll need to use the `/api/rest/2.0/auth/token/custom` API endpoint to apply security entitlements via JWT authentication tokens.
+
+We recommend using the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">REST API v2 Playground</a>+++ to familiarize yourself with the request payload and send test requests to demo users. Note that your production users will still be authenticated and secured via the `POST /api/rest/2.0/auth/token/full` endpoint until you complete the migration steps.
+
+=== Step 4: Create a script to migrate to the new endpoint
+
+Before creating a script, check the status of the `honorJwTokenParametersFromBetaEndpoint` flag on your instance:
+
+. Send a `GET` request to the `/api/rest/2.0/system/config-overrides` API endpoint.
+The API returns the configuration override details in the response.
+. Search for `honorJwTokenParametersFromBetaEndpoint` and check its current state.
+
++
+[source,JSON]
+----
+{
+  "config_override_info": {
+    "honorJwTokenParametersFromBetaEndpoint": {
+      "category": "MAIN",
+      "dataType": "BOOLEAN",
+      "description": "Flag to enable honoring of JWT Token where from Beta Endpoint.",
+      "current": false
+    }
+  }
+}
+----
+
+As long as the `honorJwTokenParametersFromBetaEndpoint` flag is set to `true`, the rules defined via tokens generated from the `POST /api/rest/2.0/auth/token/full` API call are applied to user profiles.
+To apply the rules defined via `POST /api/rest/2.0/auth/token/custom` API endpoint, `honorJwTokenParametersFromBetaEndpoint` must be set to `false`. Therefore, we recommend creating a script with the following logic:
+
+* if `honorJwTokenParametersFromBetaEndpoint` is set to `true`, use the token generated via `POST /api/rest/2.0/auth/token/full` API call to authenticate your users.
+* if the `honorJwTokenParametersFromBetaEndpoint` flag is set to `false`, use the token generated via  `POST /api/rest/2.0/auth/token/custom` API call to authenticate your users.
++
+This ensures a smooth transition between the two endpoints that will automatically adjust when ThoughtSpot Support changes the flag for you.
+
+While we strongly recommend using a script to dynamically adjust the endpoint usage during the transition period, the following options are also available:
+
+Option 1::
+
+Use `POST /api/rest/2.0/auth/token/full` until ThoughtSpot Support disables the `honorJwTokenParametersFromBetaEndpoint` setting.
++
+If your security rules change frequently, you may consider choosing Option 1. This option ensures that no data previously accessible to a user remains available to them longer than necessary. However, note that your users will see `No Data` for a period of time.
+
++
+Choosing option 1 results in the following behavior:
+
+. As long as `honorJwTokenParametersFromBetaEndpoint` is set to `true`: +
+Your users will be logged in with the data security entitlements assigned to the JWT token generated via `/api/rest/2.0/auth/token/full` endpoint, or via the data security rules persisted on the `user` > `user_parameters` object.
+. When `honorJwTokenParametersFromBetaEndpoint` is set to `false`: +
+Your users will see no data (assuming you secured your Worksheet/Model columns as described in xref:jwt-migration.adoc#_step_3_flag_columns_whose_data_will_be_secured_using_the_jwt_endpoint[Step 3]) until you switch to using the `POST /api/rest/2.0/auth/token/custom` endpoint. Your instance will start using this endpoint soon after the flag setting is switched.
+
+Option 2::
+
+Use the `POST /api/rest/2.0/auth/token/custom` endpoint after logging a Support request to disable the `honorJwTokenParametersFromBetaEndpoint` setting.
+
++
+If your security rules do not change often, consider using Option 2. For example, if the security rules defined via tokens generated from `POST /api/rest/2.0/auth/token/full` API call are the same as the rules that you plan to apply with tokens generated via `/api/rest/2.0/auth/token/custom`, you may start using the new endpoint.
+
++
+Choosing option 2 results in the following behavior:
+
+. As long as `honorJwTokenParametersFromBetaEndpoint` is set to `true`:  +
+Your users will be logged in with the data security rules previously persisted on the `user` > `user_parameters` object (as ThoughtSpot still honors the security rules applied via `/api/rest/2.0/auth/token/full`).
+. When `honorJwTokenParametersFromBetaEndpoint` is set to `false`: +
+Your users will now be logged in ThoughtSpot and assigned security entitlements via the JWT token generated from the `POST /api/rest/2.0/auth/token/custom` API call and persisted on `access_control_properties` of the `user` object.
+
+=== Step 6: Switch your workflow to auth/token/custom endpoint
+
+After the transition period and when ThoughtSpot confirms that the `honorJwTokenParametersFromBetaEndpoint` setting is disabled on your instance, you can update your script and start using `/api/rest/2.0/auth/token/custom` endpoint. For more information about this endpoint, see xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[Get tokens with custom rules and filter conditions].
+
+
+== Additional resources
+
+Check the ABAC examples on the link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/examples/abac_with_token_auth/abac_test.html[ts_everywhere_resources GitHub Repo, window=_blank].
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
