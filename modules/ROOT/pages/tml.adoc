@@ -40,25 +40,27 @@ The TML API endpoints allow you to programmatically export, validate, and import
 If using older versions of TML files for Liveboards, ensure that your TML file has the object name as `liveboard`. Replace any `pinboard` occurrences with `liveboard` before import.
 ====
 
-== Import a TML
+== Import TML
 To import a modified TML object, your account must have the `DATAMANAGEMENT` (*Can manage data*) or `ADMINISTRATION` (*Can administer ThoughtSpot*) privilege.
 
 You can import single or multiple objects using the `tml/import` API. If you are importing TML files one at a time, include the `fqn` property to distinguish objects that have the same name. If you have multiple connections or tables with the same name and the Connection or Table you reference in your TML does not have a unique name, it can lead to invalid object references. Adding `fqn` helps ThoughtSpot differentiate a Table from another with the same name.
 
-By default, the fqn parameter is not present in the TML file. However, you can export TML with FQNs and use it during the import.
+By default, the `fqn` parameter is not present in the TML file. However, you can export TML with FQNs and use it during the import.
 
-To import TML representation of the metadata objects into ThoughtSpot, use one of the the following API endpoints:
+To import TML representation of the metadata objects into ThoughtSpot, use one of  the following API endpoints:
 
-* `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fimport-metadata-tml[**POST** /api/rest/2.0/metadata/tml/import]` (REST API v2)
-* `xref:tml-api.adoc#import[**POST** /tspublic/v1/metadata/tml/import]` (REST API v1)
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fimport-metadata-tml">POST /api/rest/2.0/metadata/tml/import</a>+++ (REST API v2)
+* xref:tml-api.adoc#import[POST /tspublic/v1/metadata/tml/import] (REST API v1)
 
 //While the v1 API accepts a string containing a JSON array of TML objects to upload, in YAML or JSON format, the v2 accepts it only in the JSON format.
 
-There are multiple kinds of imports possible. They are:
+There are multiple kinds of imports possible:
 
 * `PARTIAL` imports all objects that validate successfully, and ignores objects that do not validate successfully.
 * `ALL_OR_NONE` imports the objects that validate successfully.
 * `VALIDATE_ONLY` validates the objects but does not import them.
+
+You can also specify additional parameters to set the Org context and skip CDW validation checks for Table TMLs.
 
 [NOTE]
 ====
@@ -67,7 +69,247 @@ If you import only a Worksheet object, it may take some time for the Worksheet t
 However, if you import a Worksheet along with Liveboards, answers, and other dependent objects in a single API call, the imported objects will be immediately available for use.
 ====
 
-Visit link:https://docs.thoughtspot.com/cloud/latest/scriptability[Import a TML object] for more information.
+== Import TML objects asynchronously
+The REST v1 and v2  `metadata/tml/import` APIs import TML objects synchronously. When you try to import large and complex metadata objects, the synchronous import operation takes more time to process data and sometimes can result in a timeout error.
+
+To allow mutually exclusive import tasks to run in parallel, process TML objects asynchronously, and check import task status, ThoughtSpot provides the following APIs:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fimport-metadata-tml-async">POST /api/rest/2.0/metadata/tml/async/import</a>+++ +
+Creates an import TML tasks and processes TMLs asynchronously
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Ffetch-async-import-task-status">POST /api/rest/2.0/metadata/tml/async/status</a>+++ +
+Fetches status of import tasks
+
+=== Schedule import tasks
+
+You can import TML objects asynchronously by scheduling TML import tasks via `POST` request to POST `/api/rest/2.0/metadata/tml/async/import` API endpoint. You can send the following parameters in the API request body:
+
+[width="100%" cols="2,4,1"]
+[options='header']
+|====
+|Form parameter|Description| Default
+|`metadata_tmls` |__Array of strings__. Array of the TML strings. |__None__
+|`create_new`  +
+__Optional__ |__Boolean__. To create TML objects with new GUIDs during import, specify `true`. By default, ThoughtSpot updates the existing objects that have the same GUID as the objects you are importing. | `false`
+|`all_orgs_context` +
+__Optional__ |__Boolean__. Specify if import operation must be run for all Orgs on your instance.
+
+__Requires Org administration privileges to access TML objects across all Orgs.__| `false`
+
+|`import_policy`  a|__String__. Available from 10.5.0.cl. Policy to follow during import. The allowed values are:
+
+* `PARTIAL` +
+Imports objects that validate successfully. Skips the objects that do not validate successfully and their dependent objects if any.
+* `ALL_OR_NONE` +
+Imports all objects that validate successfully. If the import fails for one object, no objects will be imported.
+* `VALIDATE_ONLY` +
+Validates the objects but does not import them.
+* `PARTIAL_OBJECT` +
+Imports objects that validate successfully and skips the objects that do not validate successfully. If the import fails for a visualization object in a Liveboard TML, the Liveboard will be imported without that visualization object. Similarly, if importing a relationship in a logical table fails, the table TML will be imported with warnings in the API response.
+| `PARTIAL_OBJECT`
+
+|`skip_cdw_validation_for_tables` +
+__Optional__ |__Boolean__. Skips Cloud Data Warehouse validation for table TML imports. | `false`
+
+|`enable_large_metadata_validation` +
+__Optional__
+ |__Boolean__. Available from 10.5.0.cl. Enables validation for large metadata objects. |`false`
+|====
+////
+|`skip_diff_check` +
+__Optional__
+|__Boolean__. Skips diff check before processing TMLs for imports. |`false`
+////
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-host}/api/rest/2.0/metadata/tml/async/import'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_tmls": [
+    "{\\\"guid\\\": \\\"2ed8192a-1e9d-47d1-810d-52b14cb0e9fe\\\",\\\"liveboard\\\": {\\\"name\\\": \\\"Total Sales\\\",\\\"visualizations\\\": [{\\\"id\\\": \\\"Viz_1\\\",\\\"answer\\\": {\\\"name\\\": \\\"Total quantity purchased, Total sales by region\\\",\\\"description\\\": \\\"test\\\",\\\"tables\\\": [{\\\"id\\\": \\\"(Sample) Retail - Apparel\\\",\\\"name\\\": \\\"(Sample) Retail - Apparel\\\"}],\\\"search_query\\\": \\\"[region] [quantity purchased] [sales]\\\",\\\"answer_columns\\\": [{\\\"name\\\": \\\"Total quantity purchased\\\"},{\\\"name\\\": \\\"Total sales\\\"},{\\\"name\\\": \\\"region\\\"}],\\\"table\\\": {\\\"table_columns\\\": [{\\\"column_id\\\": \\\"Total quantity purchased\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"Total sales\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"region\\\",\\\"show_headline\\\": false}],\\\"ordered_column_ids\\\": [\\\"region\\\",\\\"Total quantity purchased\\\",\\\"Total sales\\\"],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"tableVizPropVersion\\\\\\\": \\\\\\\"V1\\\\\\\"}\\\"},\\\"chart\\\": {\\\"type\\\": \\\"COLUMN\\\",\\\"chart_columns\\\": [{\\\"column_id\\\": \\\"Total quantity purchased\\\"},{\\\"column_id\\\": \\\"Total sales\\\"},{\\\"column_id\\\": \\\"region\\\"}],\\\"axis_configs\\\": [{\\\"x\\\": [\\\"region\\\"],\\\"y\\\": [\\\"Total quantity purchased\\\",\\\"Total sales\\\"]}],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"version\\\\\\\": \\\\\\\"V4DOT2\\\\\\\",\\\\\\\"chartProperties\\\\\\\": {\\\\\\\"responsiveLayoutPreference\\\\\\\": \\\\\\\"AUTO_ON\\\\\\\",\\\\\\\"chartSpecific\\\\\\\": {}},\\\\\\\"axisProperties\\\\\\\": [{\\\\\\\"id\\\\\\\": \\\\\\\"f6701821-5630-49cd-b26f-f98bebb4e98e\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total quantity purchased\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": false}},{\\\\\\\"id\\\\\\\": \\\\\\\"1e086aef-236d-4cf0-8909-9e04e04a1ac4\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total sales\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": true}},{\\\\\\\"id\\\\\\\": \\\\\\\"7be648d3-c791-43e4-bb13-63fea808f326\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"X\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"region\\\\\\\"]}}],\\\\\\\"systemSeriesColors\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"Total quantity purchased\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"Total sales\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"}]}\\\"},\\\"display_mode\\\": \\\"CHART_MODE\\\"},\\\"viz_guid\\\": \\\"b8b38851-5980-40a1-bd88-608b7a9c6e86\\\"},{\\\"id\\\": \\\"Viz_2\\\",\\\"answer\\\": {\\\"name\\\": \\\"Total sales in a year\\\",\\\"tables\\\": [{\\\"id\\\": \\\"(Sample) Retail - Apparel\\\",\\\"name\\\": \\\"(Sample) Retail - Apparel\\\"}],\\\"search_query\\\": \\\"[sales] [store] [date].monthly [date].'\''this year'\''\\\",\\\"answer_columns\\\": [{\\\"name\\\": \\\"Month(date)\\\"},{\\\"name\\\": \\\"Total sales\\\"},{\\\"name\\\": \\\"store\\\"}],\\\"table\\\": {\\\"table_columns\\\": [{\\\"column_id\\\": \\\"Month(date)\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"Total sales\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"store\\\",\\\"show_headline\\\": false}],\\\"ordered_column_ids\\\": [\\\"store\\\",\\\"Month(date)\\\",\\\"Total sales\\\"],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"tableVizPropVersion\\\\\\\": \\\\\\\"V1\\\\\\\"}\\\"},\\\"chart\\\": {\\\"type\\\": \\\"LINE\\\",\\\"chart_columns\\\": [{\\\"column_id\\\": \\\"Month(date)\\\"},{\\\"column_id\\\": \\\"Total sales\\\"},{\\\"column_id\\\": \\\"store\\\"}],\\\"axis_configs\\\": [{\\\"x\\\": [\\\"Month(date)\\\"],\\\"y\\\": [\\\"Total sales\\\"],\\\"color\\\": [\\\"store\\\"]}],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"version\\\\\\\": \\\\\\\"V4DOT2\\\\\\\",\\\\\\\"chartProperties\\\\\\\": {\\\\\\\"responsiveLayoutPreference\\\\\\\": \\\\\\\"AUTO_ON\\\\\\\",\\\\\\\"chartSpecific\\\\\\\": {}},\\\\\\\"axisProperties\\\\\\\": [{\\\\\\\"id\\\\\\\": \\\\\\\"feb33c4a-614b-4623-9d12-1c4cf2250801\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total sales\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": false}},{\\\\\\\"id\\\\\\\": \\\\\\\"e89293cb-d10a-40d5-b787-81be33cc8b81\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"X\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Month(date)\\\\\\\"]}}],\\\\\\\"systemSeriesColors\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"6a4acb32-9036-4d4c-a830-f2b06966a322\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"39e5242e-43d0-4ef7-8673-73b12433e0c5\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"arizona (85226)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"arizona (86001)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"california (91006)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FCC838\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"california (94702)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#06BF7F\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"colorado (80301)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#8C62F5\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"colorado (80920)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FF8142\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"connecticut (06110)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#ABC7F9\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"connecticut (06854)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#B5ECF2\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"delaware (19702)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FDE9AF\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"georgia (30022)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#9BE5CB\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"georgia (30329)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#D1C0FB\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"idaho (83704)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FFCCB3\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"illinois (60062)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2359B6\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"illinois (60642)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#369FAA\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"indiana (46250)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#BF982A\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"iowa (50266)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#049160\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"maryland (21045)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#6A4ABA\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"massachusetts (01701)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#C26232\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"massachusetts (02215)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#71A1F4\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"michigan (48103)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#82DFE9\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"michigan (49512)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FCD977\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"minnesota (55369)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#56D3A8\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"minnesota (55420)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#B094F8\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"missouri (63144)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FFA97E\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"montana (59106)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#163772\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"montana (59718)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#22636B\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"nevada (89052)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#785F1A\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"nevada (89145)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#025B3C\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"new hampshire (03860)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#422E75\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"new jersey (07936)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#7A3D1F\\\\\\\"}]}\\\"},\\\"display_mode\\\": \\\"CHART_MODE\\\"},\\\"viz_guid\\\": \\\"7efc7b0e-e680-44a4-ba9c-3bd5d7272367\\\"},{\\\"id\\\": \\\"Viz_3\\\",\\\"answer\\\": {\\\"name\\\": \\\"Total sales by item type and region\\\",\\\"tables\\\": [{\\\"id\\\": \\\"(Sample) Retail - Apparel\\\",\\\"name\\\": \\\"(Sample) Retail - Apparel\\\"}],\\\"search_query\\\": \\\"[sales] [item type] [region]\\\",\\\"answer_columns\\\": [{\\\"name\\\": \\\"Total sales\\\"},{\\\"name\\\": \\\"item type\\\"},{\\\"name\\\": \\\"region\\\"}],\\\"table\\\": {\\\"table_columns\\\": [{\\\"column_id\\\": \\\"Total sales\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"item type\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"region\\\",\\\"show_headline\\\": false}],\\\"ordered_column_ids\\\": [\\\"item type\\\",\\\"region\\\",\\\"Total sales\\\"],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"tableVizPropVersion\\\\\\\": \\\\\\\"V1\\\\\\\"}\\\"},\\\"chart\\\": {\\\"type\\\": \\\"STACKED_COLUMN\\\",\\\"chart_columns\\\": [{\\\"column_id\\\": \\\"Total sales\\\"},{\\\"column_id\\\": \\\"item type\\\"},{\\\"column_id\\\": \\\"region\\\"}],\\\"axis_configs\\\": [{\\\"x\\\": [\\\"item type\\\"],\\\"y\\\": [\\\"Total sales\\\"],\\\"color\\\": [\\\"region\\\"]}],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"version\\\\\\\": \\\\\\\"V4DOT2\\\\\\\",\\\\\\\"chartProperties\\\\\\\": {\\\\\\\"responsiveLayoutPreference\\\\\\\": \\\\\\\"AUTO_ON\\\\\\\",\\\\\\\"chartSpecific\\\\\\\": {}},\\\\\\\"axisProperties\\\\\\\": [{\\\\\\\"id\\\\\\\": \\\\\\\"a330db6d-3714-4b5f-aed7-cca5ab679502\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total sales\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": false}},{\\\\\\\"id\\\\\\\": \\\\\\\"96ac1ce3-7efd-455e-a569-2cd0792b5f95\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"X\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"item type\\\\\\\"]}}],\\\\\\\"systemSeriesColors\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"Total sales\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"92153012-664c-458e-9a74-6138c5030838\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"east\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#06BF7F\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"midwest\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FCC838\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"south\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"southwest\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#71A1F4\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"west\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"}]}\\\"},\\\"display_mode\\\": \\\"CHART_MODE\\\"},\\\"viz_guid\\\": \\\"9de47a0e-6f20-40ba-9a52-3374ee530f09\\\"},{\\\"id\\\": \\\"Viz_4\\\",\\\"answer\\\": {\\\"name\\\": \\\"Total sales by state\\\",\\\"tables\\\": [{\\\"id\\\": \\\"(Sample) Retail - Apparel\\\",\\\"name\\\": \\\"(Sample) Retail - Apparel\\\"}],\\\"search_query\\\": \\\"[state] [store] [sales]\\\",\\\"answer_columns\\\": [{\\\"name\\\": \\\"Total sales\\\"},{\\\"name\\\": \\\"state\\\"},{\\\"name\\\": \\\"store\\\"}],\\\"table\\\": {\\\"table_columns\\\": [{\\\"column_id\\\": \\\"Total sales\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"state\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"store\\\",\\\"show_headline\\\": false}],\\\"ordered_column_ids\\\": [\\\"state\\\",\\\"store\\\",\\\"Total sales\\\"],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"tableVizPropVersion\\\\\\\": \\\\\\\"V1\\\\\\\"}\\\"},\\\"chart\\\": {\\\"type\\\": \\\"GEO_AREA\\\",\\\"chart_columns\\\": [{\\\"column_id\\\": \\\"Total sales\\\"},{\\\"column_id\\\": \\\"state\\\"},{\\\"column_id\\\": \\\"store\\\"}],\\\"axis_configs\\\": [{\\\"x\\\": [\\\"state\\\"],\\\"y\\\": [\\\"Total sales\\\"]}],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"version\\\\\\\": \\\\\\\"V4DOT2\\\\\\\",\\\\\\\"chartProperties\\\\\\\": {\\\\\\\"chartSpecific\\\\\\\": {}},\\\\\\\"axisProperties\\\\\\\": [{\\\\\\\"id\\\\\\\": \\\\\\\"e4943da4-f159-470c-836b-7c6c55d59c2f\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total sales\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": false}},{\\\\\\\"id\\\\\\\": \\\\\\\"b99d582a-b215-4381-89ad-280c451979e3\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"X\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"state\\\\\\\"]}}],\\\\\\\"systemMultiColorSeriesColors\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"Total sales\\\\\\\",\\\\\\\"colorMap\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"state\\\\\\\",\\\\\\\"color\\\\\\\": [\\\\\\\"#ffffb2\\\\\\\",\\\\\\\"#fddd87\\\\\\\",\\\\\\\"#fba35d\\\\\\\",\\\\\\\"#f75534\\\\\\\",\\\\\\\"#f9140a\\\\\\\",\\\\\\\"#d70315\\\\\\\",\\\\\\\"#b10026\\\\\\\"]}]}]}\\\"},\\\"display_mode\\\": \\\"CHART_MODE\\\"},\\\"viz_guid\\\": \\\"4ab1ed61-2930-46d4-af6f-778279d7414a\\\"}],\\\"filters\\\": [{\\\"column\\\": [\\\"region\\\"],\\\"oper\\\": \\\"in\\\",\\\"values\\\": [\\\"Midwest\\\"],\\\"is_mandatory\\\": false,\\\"is_single_value\\\": false,\\\"display_name\\\": \\\"region\\\"}],\\\"layout\\\": {\\\"tabs\\\": [{\\\"name\\\": \\\"Tab 1\\\",\\\"description\\\": \\\"\\\",\\\"tiles\\\": [{\\\"visualization_id\\\": \\\"Viz_1\\\",\\\"x\\\": 0,\\\"y\\\": 0,\\\"height\\\": 8,\\\"width\\\": 6},{\\\"visualization_id\\\": \\\"Viz_4\\\",\\\"x\\\": 6,\\\"y\\\": 0,\\\"height\\\": 8,\\\"width\\\": 6}],\\\"id\\\": \\\"2c4014b5-a606-4639-8ad0-01032ff3fc13\\\"},{\\\"name\\\": \\\"Tab 2\\\",\\\"description\\\": \\\"\\\",\\\"tiles\\\": [{\\\"visualization_id\\\": \\\"Viz_2\\\",\\\"x\\\": 0,\\\"y\\\": 0,\\\"height\\\": 8,\\\"width\\\": 6},{\\\"visualization_id\\\": \\\"Viz_3\\\",\\\"x\\\": 6,\\\"y\\\": 0,\\\"height\\\": 8,\\\"width\\\": 6}],\\\"id\\\": \\\"185b4875-e7c5-43d2-a9bc-0a404107a3ec\\\"}]}}}\",     \"info\": {       \"filename\": \"Copy of Total Sales.liveboard.tml\",       \"name\": \"Copy of Total Sales\",       \"id\": \"2ed8192a-1e9d-47d1-810d-52b14cb0e9fe\",       \"type\": \"liveboard\",       \"status\": {         \"status_code\": \"OK\"       }     }"
+  ],
+  "create_new": true,
+  "all_orgs_context": false,
+  "skip_cdw_validation_for_tables": true
+}'
+----
+
+==== Example response
+
+If the API request is successful, ThoughtSpot schedules an import task, and returns the task name and ID in the API response:
+
+[source,JSON]
+----
+{
+  "tenant_id": "default-tenant-id",
+  "org_id": 0,
+  "task_id": "075c322f-b000-4776-9c44-89e13420980c",
+  "task_name": "ASYNC_TML_26:Nov:2024-06:06:24",
+  "import_response": null,
+  "task_status": "IN_QUEUE",
+  "author_id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
+  "import_policy": "PARTIAL_OBJECT",
+  "created_at": null,
+  "in_progress_at": null,
+  "completed_at": null,
+  "total_object_count": 2,
+  "object_processed_count": null,
+  "modified_at": null
+}
+----
+
+===== Response codes
+
+[options="header", cols="1,4"]
+|====
+|HTTP status code|Description
+|**200**|Async TML Import Task submitted successfully
+|**400**|Invalid request
+|**401**|Unauthorized access
+|**403**|Forbidden access
+|**500**|Unexpected Error
+|====
+
+=== Fetch status of the TML import task
+
+To fetch the status of a scheduled import task, send a `POST` request to the `POST /api/rest/2.0/metadata/tml/async/status` API endpoint.
+
+In the request body, include the following attributes:
+
+[width="100%" cols="2,4,1"]
+[options='header']
+|====
+|Form parameter|Description| Default
+|`task_ids` |__Array of strings__. Task IDs assigned to the scheduled TML async import operations. | __None__
+| `task_status` | __Array of strings__. Status of the scheduled import tasks to filter on. The following options are available: +
+
+* `COMPLETED` +
+* `IN_QUEUE` +
+* `IN_PROGRESS` +
+* `FAILED`
+| __None__
+|`author_identifier`  +
+__Optional__ |__String__. GUID of the author who initiated the import request. | __None__
+|`include_import_response` +
+__Optional__  |__Boolean__. Specify whether to include import response in the task status objects.| `false`
+|`record_offset` +
+__Optional__ |__Integer__. The offset point, starting from where the task status should
+be included in the response. | `0`
+|`record_size` +
+__Optional__ a|__Integer__. The number of task statuses to include in the
+response starting from offset position.
+
+[NOTE]
+====
+The maximum limit for the `record_size` that user can pass in an API request is 50. If the `record_size` exceeds this threshold, the API returns a bad request error. To extend the `record_size` limit, contact ThoughtSpot Support.
+====
+| `5`
+|====
+
+[IMPORTANT]
+====
+You can poll up to 100 API requests per minute to get details of your TML import tasks. The API returns an error if you exceed this rate limit.
+====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-host}/api/rest/2.0/metadata/tml/async/status'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "record_offset": 0,
+  "record_size": 5,
+  "include_import_response": true,
+  "task_ids": [
+    "c8c8c4da-0bc8-4460-8039-cfa7fd598335"
+  ],
+  "task_status": [
+    "COMPLETED"
+  ],
+  "author_identifier": "95ac814f-eb01-4625-93c7-c7624b29d226"
+}'
+----
+
+==== Example response
+
+If the API request is successful, ThoughtSpot returns the status details of the TML async import tasks.
+If Orgs are enabled on your instance, the API returns task status only for objects within the current Org context.
+
+[source,JSON]
+----
+{
+  "status_list": [
+    {
+      "tenant_id": "default-tenant-id",
+      "org_id": 0,
+      "task_id": "c8c8c4da-0bc8-4460-8039-cfa7fd598335",
+      "task_name": "ASYNC_TML_26:Nov:2024-06:06:24",
+      "import_response": {
+        "object": [
+          {
+            "filename": "tml_0",
+            "zip_filename": "zip_tml_0",
+            "response": {
+              "status": {
+                "status_code": "ERROR",
+                "error_message": "Invalid YAML/JSON syntax in file."
+              }
+            },
+            "request_index": 0
+          },
+          {
+            "filename": "tml_1",
+            "zip_filename": "zip_tml_1",
+            "response": {
+              "status": {
+                "status_code": "ERROR",
+                "error_message": "Invalid YAML/JSON syntax in file."
+              }
+            },
+            "request_index": 1
+          }
+        ],
+        "status": {
+          "status_code": "OK",
+          "error_code": 0,
+          "error_message": ""
+        }
+      },
+      "task_status": "COMPLETED",
+      "author_id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
+      "import_policy": "PARTIAL_OBJECT",
+      "created_at": 1732601184212,
+      "in_progress_at": 1732601184255,
+      "completed_at": 1732601184476,
+      "total_object_count": 2,
+      "object_processed_count": 2,
+      "modified_at": 1732601184476
+    }
+  ],
+  "last_batch": true
+}
+----
+
+===== Response codes
+
+[options="header", cols="1,4"]
+|====
+|HTTP status code|Description
+|**200**|Async TML import task status fetched successfully
+|**400**|Invalid request
+|**401**|Unauthorized access
+|**403**|Forbidden access
+|**500**|Unexpected Error
+|====
 
 == Export a TML
 To export the TML data, your account must have the `DATAMANAGEMENT` (Can manage data) or `ADMINISTRATION` (Can administer ThoughtSpot) privilege..
@@ -105,7 +347,7 @@ The `export_fqn` attribute is useful when ThoughtSpot has multiple objects with 
 
 === Export schema
 
-Specifies the schema version to use during TML export. By default, the API request uses v1 schema for Worksheets. If you are using Models, set `export_schema_version` to v2. link:https://docs.thoughtspot.com/cloud/latest/models[Models] are supported as new datasets from 9.10.0.cl onwards.
+Specifies the schema version to use during TML export. By default, the API request uses v1 schema for Worksheets. If you are using Models, set `export_schema_version` to v2. link:https://docs.thoughtspot.com/cloud/latest/models[Models, window=_blank] are supported as new datasets from 9.10.0.cl onwards.
 
 === Export in a batch
 This API operation supports exporting User, User Group, and Role objects only.
@@ -117,8 +359,7 @@ Exports the specified number of objects in a single API request. A batch size of
 * `batch_offset` +
 Offsets the API response by the specified number. Batch offset value defines the starting position of the records for the results returned by the API.
 
-
-Visit xref:tml-api.adoc[Export a TML object] for more information.
+For more information, see the API documentation in REST API v2 Playground and  xref:tml-api.adoc[Export a TML object using REST API v1].
 
 == TML modification
 
