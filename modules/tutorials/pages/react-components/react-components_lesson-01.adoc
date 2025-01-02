@@ -1,69 +1,70 @@
-= ThoughtSpot React Components Tutorial
+= Initializing ThoughtSpot Embed SDK
 :page-pageid: react-components__lesson-01
-:description: Build a page that returns a ThoughtSpot component
+:description: Initializing ThoughtSpot Embed SDK within React app
 :toc: true
 :toclevels: 2
 
-== app/dashboard/[dashboardId]/page.tsx
-The first page we will build uses the LiveboardEmbed component to display any Liveboard, if passed an ID that matches existing content.
+== Initializing the ThoughtSpot SDK 
+The Visual Embed SDK provides an `init()` function that handles authentication and other shared configuration options for all SDK components.
 
-As mentioned in the intro, Next.js uses *square brackets in a directory name* to denote a *variable route*. Whatever value is placed in the URL after `/dashboard/` will be available as the variable `dashboardId` in the `page.tsx` code.
+It does not need to be for each component load, but rather before any other ThoughtSpot components are loaded.
 
-Note the URL says *dashboard*, rather than Liveboard. When embedding ThoughtSpot, you can present every aspect of ThoughtSpot as completely whitelabeled, matching your own app's naming and design preferences.
+In the tutorial app, which is *only* displaying ThoughtSpot content, the `init()` function is run as soon as the app is loaded, in the `layout.tsx` file, via the `ThoughtSpotEmbed` component.
 
-=== Imports
-The `page.tsx` file starts with imports - some from React and some from the ThoughtSpot Visual Embed SDK.
+=== components/ThoughtSpotEmbed.tsx
+The pattern within `components/ThoughtSpotEmbed.tsx` is important, because it defines any initial configurations and other functions, and runs the `init()` function only once.
+
+At the bottom, we run the `tsInitialize()` function once, and then return a `div` with `id=ts-embed` that will be used as the container for any individual ThoughtSpot embed components loaded by the app later:
+
+[,tsx]
+----
+ tsInitialize();
+
+return (
+    <div className="w-full h-full">
+        <div className="w-full h-full" id="ts-embed">
+            {children}
+        </div>
+    </div>
+);
+----
+
+The `tsInitialize()` function wraps around the entire process of calling the `init()` function from the Visual Embed SDK (note that auth has not been implemented in this example):
 
 [,typescript]
 ----
-import { useEffect, useState } from "react";
+    const tsInitialize = () => {
+        console.log("Initializing ThoughtSpot SDK");
 
-import {
-  LiveboardEmbed,
-  useEmbedRef,
-} from "@thoughtspot/visual-embed-sdk/react";
+        // init() function defines basic configuration and auth for all ThoughtSpot embed components
+        // https://developers.thoughtspot.com/docs/Interface_EmbedConfig for all configurations
+        const ee = init({
+            thoughtSpotHost: constants.tsURL,
+            authType: AuthType.None,
+            username: constants.username,
+            getAuthToken: () => {
+                return getAuthToken(constants.username);
+            },
+            callPrefetch: true,
+            customizations: {},
+        } as EmbedConfig);
+
+        // Checks for Auth process completed as expected
+        if (ee) {
+            ee.on(AuthStatus.SUCCESS, () => {
+                console.log("Success");
+            })
+                .on(AuthStatus.SDK_SUCCESS, () => {
+                    console.log("SDK Success");
+                })
+                .on(AuthStatus.FAILURE, (reason) => {
+                    console.log("Failure:  " + reason);
+                });
+        }
+    };
 ----
 
-`LiveboardEmbed` is the component provided by ThoughtSpot to display a Liveboard object.
+'''
 
-The React components of the ThoughtSpot Visual Embed SDK *wrap* around the embedded ThoughtSpot components, which utilize modern iframe techniques to provide the full ThoughtSpot technology within a page.
-
-`useEffect`, `useState` and `useEmbedRef` all are used for managing aspects of React that do not need to be re-run every time a component is refreshed. Without proper use of these React features, the ThoughtSpot components may refresh or be rebuilt by the React application at unnecessary times.
-
-
-
-=== Pass Liveboard ID to the component
-React components have link:https://react.dev/learn/passing-props-to-a-component[props^], which are *properties* of the component.
-
-The most important prop of the `LiveboardEmbed` is the `liveboardId` prop that determines which object the component loads from ThoughtSpot.
-
-The `page.tsx` we are defining will return a fully configured `LiveboardEmbed` component as part of a larger `Dashboard` component.
-
-The `dashboardId` value needs to pass in from the URL to the `Dashboard` component. As mentioned earlier, in this example using Next.js, the directory name with `[dashboardId]` provides the value using the variable name within the brackets. Other routing systems will provide their own mechanism for receiving values from a URL.
-
-In the code below, the `Props` interface captures the `dashboardId` and passes it into the `const Dashboard` definition, making the value available within the `Dashboard` component via `params.dashboardId`. 
-
-[,typescript]
-----
-// Defines the expectation of the dashboardId variable from the URL
-interface Props {
-  params: { dashboardId: string };
-}
-
-const Dashboard = ({ params }: Props) => {
-  const [dashboardId, setDashboardId] = useState("");
-
-  // Interactions with systems outside of React app get wrapped in useEffect()
-  useEffect(() => {
-    setDashboardId(params.dashboardId);
-    {
-      console.log(`Dashboard Id: ${params.dashboardId}`);
-      setDashboardId(params.dashboardId);
-    }
-  }, [params.dashboardId]); // Only runs when dashboardId changes
-
-  // Required for referencing the LiveboardEmbed that is created in other code
-  const embedRef = useEmbedRef<typeof LiveboardEmbed>();
-...
-----
+xref:react-components_intro.adoc[< Previous: Intro] | xref:react-components_lesson-02.adoc[Next: 02 - ThoughtSpot component pages >]
 
