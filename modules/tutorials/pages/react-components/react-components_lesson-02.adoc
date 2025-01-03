@@ -28,7 +28,7 @@ import {
 
 The React components of the ThoughtSpot Visual Embed SDK *wrap* around the embedded ThoughtSpot components, which utilize modern iframe techniques to provide the full ThoughtSpot technology within a page.
 
-`useEffect`, `useState` and `useEmbedRef` all are used for managing aspects of React that do not need to be re-run every time a component is refreshed. Without proper use of these React features, the ThoughtSpot components may refresh or be rebuilt by the React application at unnecessary times.
+*link:https://react.dev/reference/react/useEffect[useEffect^]*, *link:https://react.dev/reference/react/useState[useState^]* and `useEmbedRef` all are used for managing aspects of React that do not need to be re-run every time a component is refreshed. Without proper use of these React features, the ThoughtSpot components may refresh or be rebuilt by the React application at unnecessary times.
 
 
 
@@ -51,6 +51,23 @@ interface Props {
 }
 
 const Dashboard = ({ params }: Props) => {
+...
+
+----
+
+=== Setting and updating state
+React components are design to react to changes in *link:https://react.dev/learn/reacting-to-input-with-state[state^]*. 
+
+By using the link:https://react.dev/reference/react/useState[useState^] function imported at the beginning of the code, a `dashboardId` state variable is created, with a `setDashboardId` update function:
+
+  const [dashboardId, setDashboardId] = useState("");
+
+The link:https://react.dev/reference/react/useEffect[useEffect^] function is necessary for proper syncronization of elements that are external to the React app. The first usage wraps around calling the `setDashboardId` state function.
+
+
+[,typescript]
+----
+const Dashboard = ({ params }: Props) => {
   const [dashboardId, setDashboardId] = useState("");
 
   // Interactions with systems outside of React app get wrapped in useEffect()
@@ -62,10 +79,75 @@ const Dashboard = ({ params }: Props) => {
     }
   }, [params.dashboardId]); // Only runs when dashboardId changes
 
-  // Required for referencing the LiveboardEmbed that is created in other code
-  const embedRef = useEmbedRef<typeof LiveboardEmbed>();
 ...
 ----
+
+=== Creating the ThoughtSpot embed component
+The final aspect of establishing proper interaction of the React app and the ThoughtSpot embed component prior to returning the component itself is declaring the `embedRef` const:
+
+ const embedRef = useEmbedRef<typeof LiveboardEmbed>();
+
+With the `embedRef` declared, the `LiveboardEmbed` component can be declared along with any necessary props:
+
+[,typescript]
+----
+...
+  // Required for referencing the LiveboardEmbed that is created in other code
+  const embedRef = useEmbedRef<typeof LiveboardEmbed>();
+
+  return (
+    (dashboardId && (
+      // ThoughtSpot LiveboardEmbed component with config properties. See https://developers.thoughtspot.com/docs/Interface_LiveboardViewConfig
+      <LiveboardEmbed
+        className="full-height"
+        ref={embedRef}
+        liveboardId={dashboardId}
+        showLiveboardTitle={true}
+        showLiveboardDescription={true}
+        //visibleActions={[]}
+      />
+    
+    )) || <div>No dashboard ID set.</div>
+  );
+};
+
+export default Dashboard;
+----
+
+=== Configuration options as component props
+The Visual Embed SDK defines a large number of properties to configure each component (ex. link:https://developers.thoughtspot.com/docs/Interface_LiveboardViewConfig[LiveboardViewConfig^] for the LiveboardEmbed component).
+
+The properties are sent as an object in the the second argument of the component constructor in the JavaScript components:
+
+[,js]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        width: '100%',
+        height: '100%',
+    },
+    liveboardId: '<%=liveboardGUID%>',
+});
+----
+Translating the Visual Embed SDK JavaScript documentation into the form used by the React components is relatively simple.
+
+The React components have the same properties available as *props* of the component, rather using a separate config object:
+
+[,typescript]
+----
+  <LiveboardEmbed
+        className="full-height"
+        ref={embedRef}
+        liveboardId={dashboardId}
+        showLiveboardTitle={true}
+        showLiveboardDescription={true}
+        //visibleActions={[]}
+      />
+----
+
+The use of *props* for configuration options and event handlers (see later lesson) is the biggest change between the React components and the JavaScript Visual Embed SDK.
+
+
 
 '''
 
