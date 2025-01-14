@@ -328,21 +328,6 @@ Parameters can be used in a formula to directly match a value in a column, or an
 
 `if ( parameter_name = field_name ) then true else false`
 
-===== Use Parameters with pass-through functions
-link:https://docs.thoughtspot.com/cloud/latest/formula-reference#passthrough-functions[ThoughtSpot SQL Pass-through functions, window=_blank] allow you to send arbitrary SQL to the data source, while passing in values to substitute from ThoughtSpot.
-
-The basic form of the SQL Pass-through function is:
-
-`sql_passthrough_function("<sql_statement>", <ThoughtSpot variable 1>, <ThoughtSpot variable 2>,...)`
-
-The list of variables after are substituted into the SQL statement using curly braces in the order listed, starting at 0:
-
-`sql_bool_op ( "tableName.columnName IN ({0}, {1})" , parameterName0, parameterName1)`
-
-If you are referencing a field NOT in ThoughtSpot, perhaps a column that is not part of the JOINed data model or of a complex data type ThoughtSpot does not natively recognize, you need to qualify the column with `tableName.columnName` syntax in your query, so that the SQL is not ambiguous if a similar column name exists on multiple tables.
-
-If you do not get all your data types correct, the ThoughtSpot-generated query will cause errors at the data warehouse level, which you will see in ThoughtSpot.
-
 ==== Set a Worksheet filter on the Worksheet security formula
 The last step is to set a *Worksheet filter* on the *formula* you just created to evaluate the 'check parameter'.
 
@@ -369,6 +354,39 @@ You should see it listed on the *Edit Worksheet* page:
 
 [.bordered]
 image:./images/new_worksheet_filter_step_4.png[Completed Worksheet filter]
+
+==== Use Parameters with pass-through functions
+link:https://docs.thoughtspot.com/cloud/latest/formula-reference#passthrough-functions[ThoughtSpot SQL Pass-through functions, window=_blank] allow you to send arbitrary SQL to the data source, while passing in values to substitute from ThoughtSpot.
+
+The basic form of the SQL Pass-through function is:
+
+`sql_passthrough_function("<sql_statement>", <ThoughtSpot variable 1>, <ThoughtSpot variable 2>,...)`
+
+The list of variables after are substituted into the SQL statement using curly braces in the order listed, starting at 0:
+
+`sql_bool_op ( "tableName.columnName IN ({0}, {1})" , parameterName0, parameterName1)`
+
+If you do not get all your data types correct, the ThoughtSpot-generated query will cause errors at the data warehouse level, which you will see in ThoughtSpot.
+
+===== Fully-qualify all column references
+If you are using a column that is part of the current ThoughtSpot worksheet, you can simply reference that column using the substitution syntax of the passthrough functions: 
+
+`sql_bool_op ( "{0} IN ({1}, {2})" , columnInWorksheet, parameterName0, parameterName1)`
+
+If you are referencing a field NOT in ThoughtSpot, perhaps a column that is not part of the JOINed data model or of a complex data type ThoughtSpot does not natively recognize, you need to *fully-qualify the column name* with at minimum `tableName.columnName` syntax in your query, so that the SQL is not ambiguous if a similar column name exists on multiple tables.
+
+You may need a full `database.schema.tableName.columnName` syntax, in the standard syntax of the particular data warehouse being used, for the SQL to work within the rest of the ThoughtSpot generated query.
+
+===== Sub-queries to solve multi-step filtering scenarios
+Many reporting solutions require very complex logic to establish a user's data entitlements.
+
+Traditionally this can be solved by either writing dynamically generated SQL queries into an application or by placing the logic within a database in a way that the results of the logic can be referenced easily by other SQL queries. This may involve stored procedures, user-defined functions, temporary tables or any of the many other tools provided by a given RDBMS. 
+
+ThoughtSpot does not allow for the writing of *arbitrary dynamic SQL*. Pass-through functions must be written and remain the same for all users, with *ThoughtSpot Parameters* being the only aspect that can be changed dynamically.
+
+Writing a *sub-query* as a pass-through function, with a parameter whose value is provided securly via ABAC, provides a method for accessing any number of tables or features within your data warehouse, while guranteeing the filter will be applied to all searches made using the ThoughtSpot worksheet.
+
+
 
 == Known limitations
 * The ABAC via tokens method requires using trusted authentication and using Worksheets or Models as data sources for Liveboards and Answers, rather than individual Table objects.
