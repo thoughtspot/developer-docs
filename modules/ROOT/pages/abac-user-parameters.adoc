@@ -386,7 +386,33 @@ ThoughtSpot does not allow for the writing of *arbitrary dynamic SQL*. Pass-thro
 
 Writing a *sub-query* as a pass-through function, with a parameter whose value is provided securly via ABAC, provides a method for accessing any number of tables or features within your data warehouse, while guranteeing the filter will be applied to all searches made using the ThoughtSpot worksheet.
 
+The basic form of the sub-query formula is:
 
+`sql_bool_op('{0} IN (SELECT DatabaseField FROM FullyQualfiedTable WHERE OtherField = {1})', WorksheetField , Param)`
+
+The SQL when expanded out looks like:
+
+[,sql]
+----
+ws.FieldNameAlias IN (
+   SELECT DatabaseField
+   FROM FullyQualifiedTable
+   WHERE OtherField = '{ParameterValue}'
+)
+----
+
+You could similarly call a UDF or stored procedure that returns a column of the same type as the WorksheetField:
+
+`sql_bool_op('{0} IN (udf_function_name({1}))', WorksheetField , Param)`
+
+The overall pattern is to use the Parameter value, sent in via ABAC, to retrieve a specific set of values set within the database, using whatever techniques are avaliable.
+
+An example workflow might be:
+
+1. User logs into embedding application
+2. A stored procedure is called in the database to grab their latest entitlements and store those in a table, with a single "entitlement_session_id" returned to the application
+3. The "entitlement_session_id" is sent as an ABAC parameter as part of the ThouhghtSpot token request for the user
+4. Worksheets that need these entitlements use the combination of pass-through function with parameter + formula + filter so that all queries in ThoughtSpot include a WHERE clause with the the sub-select
 
 == Known limitations
 * The ABAC via tokens method requires using trusted authentication and using Worksheets or Models as data sources for Liveboards and Answers, rather than individual Table objects.
