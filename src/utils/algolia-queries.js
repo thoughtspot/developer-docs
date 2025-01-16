@@ -102,7 +102,7 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
     let finalLink = `/${config.SITE_PREFIX}/${pageid}`;
     const pageIdSplit = pageid.split('__');
     if (pageIdSplit.length > 1){
-       finalLink = `/tutorials/${pageIdSplit[0]}/${pageIdSplit[1]}`;
+       finalLink = `/${config.SITE_PREFIX}/tutorials/${pageIdSplit[0]}/${pageIdSplit[1]}`;
     }
     
     return chunks.map((chunk, i) => ({
