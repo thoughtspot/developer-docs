@@ -98,6 +98,13 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
     const numberOfChunks = len / 8000 + 1;
     const chunks = splitStringIntoChunks(body, numberOfChunks);
 
+    // Code to deal with tutorials, which have pageId pattern of tutorialName__pageId
+    let finalLink = `/${config.SITE_PREFIX}/${pageid}`;
+    const pageIdSplit = pageid.split('__');
+    if (pageIdSplit.length > 1){
+       finalLink = `/tutorials/${pageIdSplit[0]}/${pageIdSplit[1]}`;
+    }
+    
     return chunks.map((chunk, i) => ({
         objectID: `${sectionId}_chunk_${i}`,
         sectionId,
@@ -106,7 +113,7 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
         pageid,
         type: 'ASCII',
         title: node.document.title,
-        link: `/${config.SITE_PREFIX}/${pageid}`,
+        link: finalLink,
     }));
 };
 
