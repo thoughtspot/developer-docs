@@ -16,12 +16,26 @@ The REST API automatically filters the results based on the permissions of the u
 The challenge is to ensure that the SDK use the session in the browser or a valid bearer token for the user logged into the app.
 
 == /app/dashboard/page.tsx: a tabular menu of Liveboards
-The example app has a dedicated `link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/dashboard/page.tsx[/app/dashboard/page.tsx^]` to display a tabular menu of available Liveboards.
+The example app has a dedicated link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/dashboard/page.tsx[/app/dashboard/page.tsx^] to display a tabular menu of available Liveboards.
 
 There are two steps to this page:
 
 1. Make a REST API request to ThoughtSpot to retrieve the details of the objects
-2. Building the table from the results, constructing links to the `link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/dashboard/%5BdashboardId%5D/page.tsx[/dashboard/{dashboardId^]` page to display the Liveboard.
+2. Building the table from the results, constructing links to the link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/dashboard/%5BdashboardId%5D/page.tsx[/dashboard/{dashboardId^] page to display the Liveboard.
+
+=== Creating state variables
+The menu page provides some UI options to configure the REST API request that generates the menu items. The pattern in React is for options to update shared link:https://react.dev/learn/reacting-to-input-with-state[state variables^] using the link:https://react.dev/reference/react/useState[useState()^] function, with updates triggered within components when the associated `setState()` function is called.
+
+The page uses the following three state variables, with the defaults set by the initial `useState()` function:
+
+[,typescript]
+----
+export default function DashboardList() {
+    const [metadataData, setMetadataData] = useState<object | null>();
+    const [showMyItems, setShowMyItems] = useState(false);
+    const [authorName, setAuthorName] = useState('');
+...
+----
 
 == ThoughtSpot REST API TypeScript SDK
 ThoughtSpot provides a link:https://developers.thoughtspot.com/docs/rest-api-sdk-typescript#_get_started[TypeScript REST API SDK^] that can be installed via Node and added to any React app.
@@ -122,7 +136,113 @@ useEffect(() => {
 }, [showMyItems]);
 ----
 
-=== Render the component
+== Render the component
+The visible UI of the page, including the tabular menu, is outside the `useEffect` function. It is created by returning JSX, including some logical operators to vary what displays depending on the current UI state.
+
+=== My Items filter checkbox
+At the top of the page, there is an input of `type="checkbox"`, that determines if the REST API results are filtered only to items created by the current user.
+
+[,tsx]
+----
+// Return the actual page after the API response has been retrieved
+return (
+...
+            {/* Checkbox for My Items filter */}
+            <label className="flex items-center gap-2">
+                <input
+                    type="checkbox"
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                    checked={showMyItems}
+                    onChange={(e) => setShowMyItems(e.target.checked)}
+                />
+                <span className="text-gray-700">Show my items</span>
+            </label>
+...
+----
+
+If you are unfamiliar with React, JSX format looks like HTML but has a syntax for variables that uses curly braces.
+
+Setting `checked={showMyItems}` within the `<input>` tag sets the value to match the current boolean `showMyItems` state variable set at the start of the page. Then the `onChange` function calls the `setShowMyItems()` function to update the state variable when the box is checked or unchecked.
+
+The `setShowMyItems()` function also triggers any other part of the component that listens for state changes to update. 
+
+The `useEffect()` function takes an array of state variables to listen to as it's second argument, at the very end of it's block:
+[,typescript]
+----
+const [showMyItems, setShowMyItems] = useState(false);
+...
+useEffect(() => {
+ ...
+ fetchFilteredData().then(); // Call the async function
+}, [showMyItems]);
+----
+
+The result is that a change triggerd by the checkbox UI causes the REST API endpoint to be called again, updating the `metadataData` state variable, before the menu table component is re-rendered with the new API response.
+
+Note that this a very simple implementation and does call the ThoughtSpot REST API on every change of the UI. ThoughtSpot's REST API is very efficient at answering the `/metadata/search` endpoint, but mechanisms to cache the results could be implemented within the React page to lessen the number of unnecessary API calls.
+
+=== Table of items and descriptions
+The menu itself is a basic HTML table with two columns.
+
+The first column displays the Liveboard names as links to the `/dashboard/[dashboardId]` page, and the second column is the text description property.
+
+The code uses JSX variables and logical operators to display a `No dashboards found` message instead of the table, is the length of the response set from the REST API is found to be 0.
+
+If not, it uses the `{metadataData.map((item) => ()` syntax to go through every item in the response, making the properties of the item available as the `item` variable for use within the components.
+
+[,tsx]
+----
+{metadataData && metadataData.length > 0 ? (
+
+<div className="h-[65vh] overflow-auto border border-gray-200 rounded-lg">
+    <table className="table-fixed border-collapse border border-gray-200 w-full">
+        <thead>
+        <tr className="bg-gray-100">
+            <th className="border border-gray-300 px-4 py-2 text-left w-1/2">Name</th>
+            <th className="border border-gray-300 px-4 py-2 text-left">Description</th>
+        </tr>
+        </thead>
+        <tbody>
+        {/* Build each row of the menu */}
+        {metadataData.map((item) => (
+            <tr key={item.metadata_id} className="border-b border-gray-200">
+                <td className="w-1/3 border border-gray-300 px-4 py-2 hover:underline">
+                    {/* Build the Link to the /dashboard/[dashboardId] routes */}
+                    <Link href={`/dashboard/${encodeURIComponent(item.metadata_id.trim())}`}>
+                        {item.metadata_name}
+                    </Link>
+                </td>
+                {/* Add description from metadata to the second column */}
+                <td className="w-1/3 border border-gray-300 px-4 py-2">
+                    {item.metadata_header.description || ''}
+                </td>
+            </tr>
+        ))}
+        </tbody>
+    </table>
+</div>
+) : (
+    <p className="text-gray-500 text-center">No dashboards found</p>
+)}
+----
+
+The most important aspect is building the `Link` component with the route to the component display page built in the previous lesson, and the `item.metadata_id` property as the end of the URL.
+
+[,typescript]
+----
+<Link href={`/dashboard/${encodeURIComponent(item.metadata_id.trim())}`}>
+    {item.metadata_name}
+</Link>
+----
+
+When this page renders, there is now a dynamic menu to get to any Liveboard the user has access to, with the ability to filter to easily filter to own created content.
+
+== Spotter embed pages and menu
+The example app contains an equivalent menu and component display page for Spotter content, under the link:https://github.com/thoughtspot/embed-example-react-app/tree/main/src/app/datachat[/app/datachat/^] subdirectory. 
+
+Spotter conversations are started against Models (formerly Worksheets), so the set of UI components and filters differs within the link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/datachat/page.tsx[menu page^].
+
+The basic concepts from the entire tutorial apply regardless of which component you are using.
 
 '''
 
