@@ -8,23 +8,27 @@ The ThoughtSpot component page from the previous lesson was designed to display 
 
 While you can hardcode a set of known objects with their names and IDs into a navigation menu, ThoughtSpot's true power is allowing users to ask new questions and build their own answers and Liveboards.
 
-The ThoughtSpot REST API provides the `/metadata/search` endpoint for listing out the content on the ThoughtSpot instance.
+The ThoughtSpot REST API provides the `xref:rest-api-v2-metadata-search.adoc
+[/metadata/search]` endpoint for listing out the content on the ThoughtSpot instance, with a number of options for filtering or retrieving more details than default.
 
-The REST API automatically filters the results to those objects a user has been granted access to via sharing, and provides many arguments for further filtering of the result set.
+The REST API automatically filters the results based on the permissions of the user who makes the request.
 
-== /app/dashboard/page.tsx
-The example app has a dedicated `page.tsx` to display a tabular menu of available Liveboards.
+The challenge is to ensure that the SDK use the session in the browser or a valid bearer token for the user logged into the app.
+
+== /app/dashboard/page.tsx: a tabular menu of Liveboards
+The example app has a dedicated `link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/dashboard/page.tsx[/app/dashboard/page.tsx^]` to display a tabular menu of available Liveboards.
 
 There are two steps to this page:
 
 1. Make a REST API request to ThoughtSpot to retrieve the details of the objects
-2. Building the table from the results, constructing links to the `/dashboard/{dashboardId}` page to display the Liveboard
+2. Building the table from the results, constructing links to the `link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/dashboard/%5BdashboardId%5D/page.tsx[/dashboard/{dashboardId^]` page to display the Liveboard.
 
 == ThoughtSpot REST API TypeScript SDK
 ThoughtSpot provides a link:https://developers.thoughtspot.com/docs/rest-api-sdk-typescript#_get_started[TypeScript REST API SDK^] that can be installed via Node and added to any React app.
 
 The SDK allows calling any of the V2.0 REST API endpoints and returns in a native JSON format, making it ideal for retrieving the details of objects that a user can see.
 
+=== Import REST API SDK
 To use the REST API SDK, import `createConfiguration`, `ServerConfiguration` and `ThoughtSpotRestApi` from `@thoughtspot/rest-api-sdk`:
 [,typescript]
 ----
@@ -43,6 +47,25 @@ import {constants} from "@/lib/constants";
 ----
 
 Note the `"use client";` at the very beginning of the code - this tells React that the REST API calls should be coming from the user's browser, rather than made on the server side. React doesn't explictly separate front and backend layers the way many traditional web application platforms did, so you have to be intentional when you do have a preference.
+
+=== Initializing the SDK for use
+The REST API SDK uses an object returned by the imported `createConfiguration()` function to define the attributes necessary to authenticate for a particular ThoughtSpot instance. `createConfiguration()` takes an object with a `baseServer` property that is set to a `ServerConfiguration` option.
+
+For the `ServerConfiguration` to use the ThoughtSpot session in the browser, rather than request a bearer token, it should be created like: `new ServerConfiguration(constants.tsURL, {})`.
+
+Individual endpoints are called by instantiating a `ThoughtSpotRestApi` object with the `ServerConfiguration` object, then calling methods on the `ThoughtSpotRestApi` object.
+
+[,typescript]
+----
+// API configuration using no auth.
+const config = createConfiguration({
+    baseServer: new ServerConfiguration(constants.tsURL, {}),
+});
+...
+// Use ThoughtSpot REST API SDK 
+const api = new ThoughtSpotRestApi(config);
+----
+
 
 '''
 
