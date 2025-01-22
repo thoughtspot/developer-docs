@@ -51,7 +51,7 @@ Note the `"use client";` at the very beginning of the code - this tells React th
 === Initializing the SDK for use
 The REST API SDK uses an object returned by the imported `createConfiguration()` function to define the attributes necessary to authenticate for a particular ThoughtSpot instance. `createConfiguration()` takes an object with a `baseServer` property that is set to a `ServerConfiguration` option.
 
-For the `ServerConfiguration` to use the ThoughtSpot session in the browser, rather than request a bearer token, it should be created like: `new ServerConfiguration(constants.tsURL, {})`.
+For the `ServerConfiguration` to use the ThoughtSpot session in the browser, rather than request a bearer token, it should be created like: `new ServerConfiguration(constants.tsURL, {})`. Examples of methods of authentication are available in the link:https://developers.thoughtspot.com/docs/rest-api-sdk-typescript#_setup_and_usage[REST API SDK documentation^].
 
 Individual endpoints are called by instantiating a `ThoughtSpotRestApi` object with the `ServerConfiguration` object, then calling methods on the `ThoughtSpotRestApi` object.
 
@@ -66,6 +66,63 @@ const config = createConfiguration({
 const api = new ThoughtSpotRestApi(config);
 ----
 
+=== Calling REST API endpoints within useEffect
+The general naming pattern for the REST API SDK follows the exact name in the REST API Playground, in camelcase (as opposed to being named after the endpoint URL). The full set of endpoint methods is link:https://developers.thoughtspot.com/docs/rest-api-sdk-typescript#_sdk_reference[documented here^]. 
+
+Every endpoint method is an async call, so you will need to use the appropriate patterns with `async` and `return await` when using the calls:
+
+To deal with the async nature of calling a REST API, particularly one outside of the React app itself, wrap any code that actually issues a REST API commands inside a React `link:https://react.dev/reference/react/useEffect[useEffect( () =>{ })^]` block:
+
+[,typescript]
+----
+// Wrapper function to retrieve current username from around api.getCurrentUserInfo() 
+const fetchUserName = async () => {
+    const userInfo = await api.getCurrentUserInfo();
+    console.log('user === ' + userInfo.name);
+    setAuthorName(userInfo.name);
+}
+
+useEffect(() => {
+    // Run necessary REST API calls before rendering the menu
+    fetchUserName().then();
+...
+}
+----
+
+For endpoints that take a body, declare a `const` and set it to the JSON body exactly as copied from the REST API Playground. You can add in optional logic to tie in to the UI state of the React app to change the arguments of the request body:
+[,typescript]
+----
+// Define the options for the metadata/search call
+const metadataOptions = {
+    record_size: -1,
+    include_headers: true,
+    metadata: [
+        {
+            "type": "LIVEBOARD"
+        }
+    ]
+}
+
+if (showMyItems) {
+    metadataOptions['created_by_user_identifiers'] = [authorName];
+}
+...
+const fetchFilteredData = await api.searchMetadata(metadataOptions);
+----
+
+Once the results come back, it is best to store them to a state variable:
+
+[,typescript]
+----
+const [showMyItems, setShowMyItems] = useState(false);
+...
+useEffect(() => {
+ ...
+ fetchFilteredData().then(); // Call the async function
+}, [showMyItems]);
+----
+
+=== Render the component
 
 '''
 
