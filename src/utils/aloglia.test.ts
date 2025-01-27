@@ -53,6 +53,11 @@ const htmlForPreambleEle = `
 const divForpreamble = new JSDOM(htmlForPreambleEle).window.document;
 const dummyPreambleEle = divForpreamble.querySelector('#preamble');
 
+const parentNode = {
+    name: 'testname',
+    sourceInstanceName: 'testsource',
+    relativePath: 'testpath',
+};
 const asciiNode = {
     id: 'fa556896-4e38-5e7a-ab35-a45ee93d58ee',
     pageAttributes: {
@@ -61,6 +66,7 @@ const asciiNode = {
     document: {
         title: 'About REST APIs',
     },
+    parent: parentNode,
 };
 
 const asciiAlgoliaObj = {
@@ -114,7 +120,7 @@ describe('test cases from algolia search', () => {
             algoliaSearch.pageToAlgoliaRecordForASCII(
                 dummySectionEle,
                 'section',
-                asciiNode,
+                { node: asciiNode },
             ),
         ).toStrictEqual([asciiAlgoliaObj]);
     });
@@ -124,7 +130,7 @@ describe('test cases from algolia search', () => {
             algoliaSearch.pageToAlgoliaRecordForASCII(
                 dummyPreambleEle,
                 'preamble',
-                asciiNode,
+                { node: asciiNode },
             ),
         ).toStrictEqual([asciiPremableAlgoliaObj]);
     });
