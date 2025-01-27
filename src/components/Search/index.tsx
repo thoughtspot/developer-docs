@@ -21,12 +21,12 @@ type SearchProps = {
     keyword: string;
     isMaxMobileResolution: boolean;
     isDarkMode: boolean;
-    optionSelected: (pageid: string, sectionId: string) => void;
+    optionSelected: (link: string, sectionId: string) => void;
     onChange: (e: React.FormEvent<HTMLInputElement>) => void;
     updateKeyword: Function;
     setDarkMode: Function;
     isPublicSiteOpen: boolean;
-    leftNavWidth: Number;
+    leftNavWidth: number;
 };
 
 const Search: React.FC<SearchProps> = (props) => {
@@ -93,7 +93,7 @@ const Search: React.FC<SearchProps> = (props) => {
                     }
                 } else {
                     props.optionSelected(
-                        props.options[highlightedIndex].pageid,
+                        props.options[highlightedIndex].link,
                         props.options[highlightedIndex].sectionId,
                     );
                 }
@@ -158,10 +158,7 @@ const Search: React.FC<SearchProps> = (props) => {
                         key={option.pageid}
                         className="result"
                         onClick={() => {
-                            props.optionSelected(
-                                option.pageid,
-                                option.sectionId,
-                            );
+                            props.optionSelected(option.link, option.sectionId);
                             onSearchOptionSelected();
                         }}
                         ref={(el: HTMLDivElement) => {
@@ -193,7 +190,7 @@ const Search: React.FC<SearchProps> = (props) => {
                 <div className="searchInputContainer">
                     <IconContext.Provider
                         value={{
-                            className: `icon searchIcon`,
+                            className: 'icon searchIcon',
                         }}
                     >
                         <BiSearch />
@@ -231,14 +228,14 @@ const Search: React.FC<SearchProps> = (props) => {
                 <span className="search-hint-icon">
                     <IconContext.Provider
                         value={{
-                            className: `icon searchIcon`,
+                            className: 'icon searchIcon',
                         }}
                     >
                         <BiUpArrowAlt />
                     </IconContext.Provider>
                     <IconContext.Provider
                         value={{
-                            className: `icon searchIcon`,
+                            className: 'icon searchIcon',
                         }}
                     >
                         <BiDownArrowAlt />
