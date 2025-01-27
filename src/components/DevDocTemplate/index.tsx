@@ -251,10 +251,18 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         }
     }, [keyword]);
 
-    const optionSelected = (pageid: string, sectionId: string) => {
+    const optionSelected = (link: string, sectionId: string) => {
         updateKeyword('');
-        if (sectionId) navigate(`/${pageid}#${sectionId}`);
-        else navigate(`/${pageid}`);
+
+        let linkToNavigate = `${link}`;
+
+        if (linkToNavigate.startsWith('/docs')) {
+            linkToNavigate = linkToNavigate.replace('/docs', '');
+        }
+        if (sectionId) {
+            linkToNavigate = `${linkToNavigate}#${sectionId}`;
+        }
+        navigate(linkToNavigate);
     };
 
     const isMaxMobileResolution = !(width < MAX_MOBILE_RESOLUTION);
