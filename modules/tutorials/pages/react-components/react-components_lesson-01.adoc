@@ -1,0 +1,93 @@
+= Initializing ThoughtSpot Embed SDK
+:toc: true
+:toclevels: 2
+
+:page-pageid: react-components__lesson-01
+:description: Initializing ThoughtSpot Embed SDK within React app
+
+
+The Visual Embed SDK provides an `init()` *function* that handles authentication and other shared configuration options for all SDK components.
+
+In your code, you need to call `init()` before any other ThoughtSpot components are loaded.
+
+In the tutorial app, which is *only* displaying ThoughtSpot content, the `init()` function is run as soon as the app is loaded, in the `layout.tsx` file, via the `ThoughtSpotEmbed` component.
+
+The link:https://developers.thoughtspot.com/docs/Interface_EmbedConfig[various configurations^] can be used exactly as defined within the standard Visual Embed SDK documentation, because the `init()` function is called within the TypeScript code of the component page, outside of the React component portions defined in JSX/TSX.
+
+== components/ThoughtSpotEmbed.tsx: running init() one time for all components
+The pattern within `link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/components/ThoughtSpotEmbed.tsx[components/ThoughtSpotEmbed.tsx^]` is important, because it defines any initial configurations and other functions, and runs the `init()` function only once.
+
+At the bottom, we run the `tsInitialize()` function once, and then return a `div` with `id=ts-embed` that will be used as the container for any individual ThoughtSpot embed components loaded by the app later:
+
+[,tsx]
+----
+ tsInitialize();
+
+return (
+    <div className="w-full h-full">
+        <div className="w-full h-full" id="ts-embed">
+            {children}
+        </div>
+    </div>
+);
+----
+
+The `tsInitialize()` function wraps around the entire process of calling the `init()` function from the Visual Embed SDK (note that authentication has not been implemented in this example):
+
+[source,typescript]
+----
+    const tsInitialize = () => {
+        console.log("Initializing ThoughtSpot SDK");
+
+        // init() function defines basic configuration and authentication for all ThoughtSpot embed components
+        // See https://developers.thoughtspot.com/docs/Interface_EmbedConfig for all  configurations
+        const ee = init({
+            thoughtSpotHost: constants.tsURL,
+            authType: AuthType.None,
+            username: constants.username,
+            getAuthToken: () => {
+                return getAuthToken(constants.username);
+            },
+            callPrefetch: true,
+            customizations: {},
+        } as EmbedConfig);
+
+        // Checks for Auth process completed as expected
+        if (ee) {
+            ee.on(AuthStatus.SUCCESS, () => {
+                console.log("Success");
+            })
+                .on(AuthStatus.SDK_SUCCESS, () => {
+                    console.log("SDK Success");
+                })
+                .on(AuthStatus.FAILURE, (reason) => {
+                    console.log("Failure:  " + reason);
+                });
+        }
+    };
+----
+
+== Common customizations in the init
+As mentioned above, link:https://developers.thoughtspot.com/docs/Interface_EmbedConfig[many configuration options] can be specified as part of the `init()` function.
+
+Common configurations include xref:prefetch-and-cache.adoc[prefetch for better performance] and the `link:https://developers.thoughtspot.com/docs/Interface_EmbedConfig#_autologin[autoLogin: true]` property when using xref:trusted-authentication.adoc[Trusted Authentication].
+
+You'll notice in the app options for some of the most common set of configurations involve link:https://developers.thoughtspot.com/docs/tutorials/style-customization/tutorial[style customizations^] such as CSS and text string replacement:
+
+[source,JavaScript]
+----
+ customizations: {
+    style: {
+        customCSS: customCss,
+    },
+    content: {
+        strings: stringsCustom
+    },
+    iconSpriteUrl: iconUrl
+}
+----
+
+'''
+
+xref:react-components_intro.adoc[< Previous: Intro] | xref:react-components_lesson-02.adoc[Next: 02 - ThoughtSpot component pages >]
+
