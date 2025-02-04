@@ -1,0 +1,159 @@
+= ThoughtSpot component pages
+:page-pageid: react-components__lesson-02
+:description: Build a page that returns a ThoughtSpot component
+:toc: true
+:toclevels: 2
+
+== app/dashboard/[dashboardId]/page.tsx
+The link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/dashboard/%5BdashboardId%5D/page.tsx[first page we will build^] uses the `LiveboardEmbed` component to display any Liveboard, if passed an ID that matches existing content.
+
+As mentioned in the introduction, Next.js uses *square brackets in a directory name* to denote a *variable route*. The value placed in the URL after `/dashboard/` will be available as the variable `dashboardId` in the `page.tsx` code.
+
+Note the URL says *dashboard*, rather than Liveboard. When embedding ThoughtSpot, you can present every aspect of ThoughtSpot as completely customized, matching your own app's naming and design preferences.
+
+=== Imports
+The `/app/dashboard/[dashboardId]/page.tsx` file starts with imports: some from React and some from the ThoughtSpot Visual Embed SDK.
+
+[source,typescript]
+----
+import { useEffect, useState } from "react";
+
+import {
+  LiveboardEmbed,
+  useEmbedRef,
+} from "@thoughtspot/visual-embed-sdk/react";
+----
+
+`LiveboardEmbed` is the component provided by ThoughtSpot to display a Liveboard object.
+
+The React components of the ThoughtSpot Visual Embed SDK *wrap* around the embedded ThoughtSpot components, which utilize modern iFrame techniques to provide the full ThoughtSpot interface  within a page.
+
+The `link:https://react.dev/reference/react/useEffect[useEffect^]`, `link:https://react.dev/reference/react/useState[useState^]`, and `useEmbedRef` Hooks are used for managing aspects of React that do not need to be re-run every time a component is refreshed. Without proper use of these React features, the ThoughtSpot components may refresh or be rebuilt by the React application at unnecessary times.
+
+=== Pass Liveboard ID to the component
+React components have link:https://react.dev/learn/passing-props-to-a-component[props^], which are *properties* of the component.
+
+The most important prop of the `LiveboardEmbed` is the `liveboardId` prop that determines which object the component loads from ThoughtSpot.
+
+The `page.tsx` we are defining will return a fully configured `LiveboardEmbed` component as part of a larger `Dashboard` component.
+
+The `dashboardId` value needs to pass in from the URL to the `Dashboard` component. As mentioned earlier, in this example using Next.js, the directory name with `[dashboardId]` provides the value using the variable name within the brackets. Other routing systems will provide their own mechanism for receiving values from a URL.
+
+In the following code, the `Props` interface captures the `dashboardId` and passes it into the `const Dashboard` definition, making the value available within the `Dashboard` component via `params.dashboardId`.
+
+[source,typescript]
+----
+ // Defines the expectation of the dashboardId variable from the URL
+ interface Props {
+   params: { dashboardId: string };
+ }
+
+ const Dashboard = ({ params }: Props) => {
+ ...
+----
+
+=== Set and update state
+React components are designed to react to changes in *link:https://react.dev/learn/reacting-to-input-with-state[state^]*.
+
+By using the link:https://react.dev/reference/react/useState[useState^] function imported at the beginning of the code, a `dashboardId` state variable is created, with a `setDashboardId` update function:
+
+[source,typescript]
+----
+const [dashboardId, setDashboardId] = useState("");
+----
+
+The link:https://react.dev/reference/react/useEffect[useEffect^] Hook is necessary for proper synchronization of elements that are external to the React app. The first usage wraps around calling the `setDashboardId` state function.
+
+[source,typescript]
+----
+const Dashboard = ({ params }: Props) => {
+  const [dashboardId, setDashboardId] = useState("");
+
+  // Interactions with systems outside of React app get wrapped in useEffect()
+  useEffect(() => {
+    setDashboardId(params.dashboardId);
+    {
+      console.log(`Dashboard Id: ${params.dashboardId}`);
+      setDashboardId(params.dashboardId);
+    }
+  }, [params.dashboardId]); // Only runs when dashboardId changes
+
+...
+----
+
+=== Create the ThoughtSpot embed component
+The final aspect of establishing proper interaction of the React app and the ThoughtSpot embed component prior to returning the component itself is declaring the `embedRef` const:
+
+[source,typescript]
+----
+ const embedRef = useEmbedRef<typeof LiveboardEmbed>();
+----
+
+With the `embedRef` declared, the `LiveboardEmbed` component can be declared along with any necessary props:
+
+[source,typescript]
+----
+...
+  // Required for referencing the LiveboardEmbed that is created in other code
+  const embedRef = useEmbedRef<typeof LiveboardEmbed>();
+
+  return (
+    (dashboardId && (
+      // ThoughtSpot LiveboardEmbed component with config properties. See https://developers.thoughtspot.com/docs/Interface_LiveboardViewConfig
+      <LiveboardEmbed
+        className="full-height"
+        ref={embedRef}
+        liveboardId={dashboardId}
+        showLiveboardTitle={true}
+        showLiveboardDescription={true}
+        //visibleActions={[]}
+      />
+    
+    )) || <div>No dashboard ID set.</div>
+  );
+};
+
+export default Dashboard;
+----
+
+Note that the `return` block above uses a standard link:https://react.dev/learn/conditional-rendering[conditional rendering^] pattern involving JavaScript's conditional operators, to provide the alternative `<div>No dashboard Id set.</div>` if the component was not provided a value for the `dashboardId`.
+
+Production code might include additional logical checks to be sure all necessary information has been provided before attempting to render a ThoughtSpot embed component.
+
+=== Configuration options as component props
+The Visual Embed SDK defines a large number of properties to configure each component. For example, link:https://developers.thoughtspot.com/docs/Interface_LiveboardViewConfig[LiveboardViewConfig^] for the LiveboardEmbed component.
+
+The properties are sent as an object in the second argument of the component constructor in the JavaScript components:
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        width: '100%',
+        height: '100%',
+    },
+    liveboardId: '<%=liveboardGUID%>',
+});
+----
+Translating the Visual Embed SDK JavaScript documentation into the form used by the React components is relatively simple.
+
+The React components have the same properties available as *props* of the component, rather than using a separate config object:
+
+[source,typescript]
+----
+  <LiveboardEmbed
+        className="full-height"
+        ref={embedRef}
+        liveboardId={dashboardId}
+        showLiveboardTitle={true}
+        showLiveboardDescription={true}
+        //visibleActions={[]}
+      />
+----
+
+The use of *props* for configuration options and xref:react-components_lesson-04.adoc[event handlers] is the biggest difference between the React components and the JavaScript Visual Embed SDK.
+
+
+'''
+
+xref:react-components_lesson-01.adoc[< Previous: 01 - Initializing ThoughtSpot Embed SDK] | xref:react-components_lesson-03.adoc[Next: 03 - Menus and other navigation elements >]
