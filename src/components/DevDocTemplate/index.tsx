@@ -49,6 +49,7 @@ import {
 import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
+import { ThemeBuilder } from './playGround/ThemeBuilder';
 
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
@@ -130,9 +131,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     );
     const isApiPlayground =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND;
+
+    const isThemeBuilder =
+        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.THEME_BUILDER;
+
     const isGQPlayGround =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
-    const isPlayGround = isGQPlayGround || isApiPlayground;
+    const isPlayGround = isGQPlayGround || isApiPlayground || isThemeBuilder;
 
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
@@ -432,6 +437,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     params={params}
                 />
             );
+
+        if (isThemeBuilder) {
+            return <ThemeBuilder backLink={backLink} />;
+        }
+
         return (
             <GraphQLPlayGround
                 location={location}

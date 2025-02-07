@@ -44,6 +44,7 @@ module.exports = {
         API_PLAYGROUND: 'restV2-playground',
         ASK_DOCS: 'ask-docs',
         GQ_PLAYGROUND: 'graphql-play-ground',
+        THEME_BUILDER: 'theme-builder',
     },
     CLUSTER_TYPES: {
         PROD: 'PROD',
