@@ -1,0 +1,254 @@
+= Menus and other navigation elements
+:page-pageid: react-components__lesson-03
+:description: Use REST APIs to create menus and other navigation elements
+:toc: true
+:toclevels: 2
+
+The ThoughtSpot component page from the previous lesson was designed to display any Liveboard with a valid ID as part of the URL.
+
+While you can hardcode a set of known objects with their names and IDs into a navigation menu, ThoughtSpot's true power is allowing users to ask new questions and build their answers and Liveboards.
+
+The ThoughtSpot REST API provides the `xref:rest-api-v2-metadata-search.adoc[/metadata/search]` endpoint for listing out the data objects on the ThoughtSpot instance, with a number of options for filtering or retrieving more details.
+
+The REST API automatically filters the results based on the permissions of the user who makes the request.
+
+The challenge is to ensure that the SDK uses the session in the browser or a valid bearer token for the user logged into the app.
+
+== /app/dashboard/page.tsx: a tabular menu of Liveboards
+The example app has a dedicated link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/dashboard/page.tsx[/app/dashboard/page.tsx^] to display a tabular menu of available Liveboards.
+
+The following steps are required for this page:
+
+1. Make a REST API request to ThoughtSpot to retrieve the details of the objects
+2. Build the table from the results and construct links to the link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/dashboard/%5BdashboardId%5D/page.tsx[/dashboard/{dashboardId}^] page to display the Liveboard.
+
+=== Create state variables
+The menu page provides some UI options to configure the REST API request that generates the menu items. The pattern in React is for options to update shared link:https://react.dev/learn/reacting-to-input-with-state[state variables^] using the link:https://react.dev/reference/react/useState[useState()^] function, with updates triggered within components when the associated `setState()` function is called.
+
+The page uses the following three state variables, with the default set by the initial `useState()` function:
+
+[source,typescript]
+----
+export default function DashboardList() {
+    const [metadataData, setMetadataData] = useState<object | null>();
+    const [showMyItems, setShowMyItems] = useState(false);
+    const [authorName, setAuthorName] = useState('');
+...
+----
+
+== ThoughtSpot REST API TypeScript SDK
+ThoughtSpot provides a link:https://developers.thoughtspot.com/docs/rest-api-sdk-typescript#_get_started[TypeScript REST API SDK^] that can be installed via Node and added to any React app.
+
+The SDK allows calling any of the V2.0 REST API endpoints and returns in a native JSON format, making it ideal for retrieving the details of objects that a user can see.
+
+=== Import REST API SDK
+To use the REST API SDK, import `createConfiguration`, `ServerConfiguration` and `ThoughtSpotRestApi` from `@thoughtspot/rest-api-sdk`:
+
+[source,typescript]
+----
+"use client";
+
+import {useEffect, useState} from "react";
+import Link from 'next/link';
+
+// Menu page to list available Liveboards to link to LiveboardEmbed display page
+
+import {createConfiguration, ServerConfiguration, ThoughtSpotRestApi} from "@thoughtspot/rest-api-sdk";
+
+import {constants} from "@/lib/constants";
+----
+
+Note the `"use client";` at the very beginning of the code. This tells React that the REST API calls should be coming from the user's browser, rather than made on the server side. React doesn't explicitly separate frontend and backend layers the way many traditional web application platforms did, so you have to be intentional when you do have a preference.
+
+=== Initialize the SDK
+
+The REST API SDK uses an object returned by the imported `createConfiguration()` function to define the attributes necessary to authenticate for a particular ThoughtSpot instance. `createConfiguration()` takes an object with a `baseServer` property that is set to a `ServerConfiguration` option.
+
+For the `ServerConfiguration` to use the ThoughtSpot session in the browser, rather than request a bearer token, it should be created as shown here:
+
+`new ServerConfiguration(constants.tsURL, {})`
+
+For examples of different authentication methods, see the link:https://developers.thoughtspot.com/docs/rest-api-sdk-typescript#_setup_and_usage[REST API SDK documentation].
+
+Individual endpoints are called by instantiating a `ThoughtSpotRestApi` object with the `ServerConfiguration` object, and then calling methods on the `ThoughtSpotRestApi` object.
+
+[source,typescript]
+----
+ // API configuration using no auth.
+ const config = createConfiguration({
+     baseServer: new ServerConfiguration(constants.tsURL, {}),
+ });
+ ...
+ // Use ThoughtSpot REST API SDK
+ const api = new ThoughtSpotRestApi(config);
+----
+
+=== Call REST API endpoints within useEffect
+The general naming pattern for the REST API SDK follows the exact name in the REST API Playground, in camel case (as opposed to being named after the endpoint URL). For a complete list of  endpoint methods, see link:https://developers.thoughtspot.com/docs/rest-api-sdk-typescript#_sdk_reference[REST API SDK Reference].
+
+Every endpoint method is an async call, so you will need to use the appropriate patterns with `async` and `return await` when using the calls:
+
+To deal with the async nature of calling a REST API, particularly one outside of the React app itself, wrap any code that issues a REST API commands inside a React `link:https://react.dev/reference/react/useEffect[useEffect( () =>{ })^]` block:
+
+[source,typescript]
+----
+ // Wrapper function to retrieve the current username from around api.getCurrentUserInfo()
+ const fetchUserName = async () => {
+     const userInfo = await api.getCurrentUserInfo();
+     console.log('user === ' + userInfo.name);
+     setAuthorName(userInfo.name);
+ }
+
+ useEffect(() => {
+     // Run necessary REST API calls before rendering the menu
+     fetchUserName().then();
+ ...
+ }
+----
+
+For endpoints that accept request parameters body, declare a `const` and set it to the JSON body exactly as copied from the REST API Playground. To change the arguments of the request body, you can add in optional logic to tie it in to the UI state of the React app:
+
+[source,typescript]
+----
+// Define the options for the metadata/search call
+const metadataOptions = {
+    record_size: -1,
+    include_headers: true,
+    metadata: [
+        {
+            "type": "LIVEBOARD"
+        }
+    ]
+}
+
+if (showMyItems) {
+    metadataOptions['created_by_user_identifiers'] = [authorName];
+}
+...
+const fetchFilteredData = await api.searchMetadata(metadataOptions);
+----
+
+Once the results come back, it is best to store them to a state variable:
+
+[source,typescript]
+----
+const [showMyItems, setShowMyItems] = useState(false);
+...
+useEffect(() => {
+ ...
+ fetchFilteredData().then(); // Call the async function
+}, [showMyItems]);
+----
+
+== Render the component
+The visible UI of the page, including the tabular menu, is outside the `useEffect` function. It is created by returning JSX, including some logical operators to vary what displays depending on the current UI state.
+
+=== My Items filter checkbox
+At the top of the page, there is an input of `type="checkbox"`, which determines if the REST API results are filtered only to items created by the current user.
+
+[,tsx]
+----
+// Return the actual page after the API response has been retrieved
+return (
+...
+            {/* Checkbox for My Items filter */}
+            <label className="flex items-center gap-2">
+                <input
+                    type="checkbox"
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                    checked={showMyItems}
+                    onChange={(e) => setShowMyItems(e.target.checked)}
+                />
+                <span className="text-gray-700">Show my items</span>
+            </label>
+...
+----
+
+If you are unfamiliar with React, JSX format looks like HTML but has a syntax for variables that uses curly braces.
+
+Setting `checked={showMyItems}` within the `<input>` tag sets the value to match the current boolean `showMyItems` state variable set at the start of the page. Then, the `onChange` function calls `setShowMyItems()`  to update the state variable when the box is selected or cleared.
+
+The `setShowMyItems()` function also triggers any other part of the component that listens for state changes to update. 
+
+The `useEffect()` function takes an array of state variables to listen to as its second argument  at the very end of the block:
+
+[source,typescript]
+----
+const [showMyItems, setShowMyItems] = useState(false);
+...
+useEffect(() => {
+ ...
+ fetchFilteredData().then(); // Call the async function
+}, [showMyItems]);
+----
+
+The result is that a change triggered by the checkbox UI state causes the REST API endpoint to be called again, updating the `metadataData` state variable, before the menu table component is re-rendered with the new API response.
+
+Note that this is a very simple implementation and does call the ThoughtSpot REST API on every change of the UI. ThoughtSpot's REST API is very efficient at answering the `/metadata/search` request. However, you can implement mechanisms within the React page to cache the results to reduce the number of API calls.
+
+=== Table of items and descriptions
+The menu itself is a basic HTML table with two columns.
+
+The first column displays the Liveboard names as links to the `/dashboard/[dashboardId]` page, and the second column is the text description property.
+
+The code uses JSX variables and logical operators to display a `No dashboards found` message instead of the table, when the length of the response set from the REST API is found to be 0.
+
+If not, it uses the `{metadataData.map((item) => ()` syntax to go through every item in the response, making the properties of the item available as the `item` variable for use within the components.
+
+[,tsx]
+----
+{metadataData && metadataData.length > 0 ? (
+
+<div className="h-[65vh] overflow-auto border border-gray-200 rounded-lg">
+    <table className="table-fixed border-collapse border border-gray-200 w-full">
+        <thead>
+        <tr className="bg-gray-100">
+            <th className="border border-gray-300 px-4 py-2 text-left w-1/2">Name</th>
+            <th className="border border-gray-300 px-4 py-2 text-left">Description</th>
+        </tr>
+        </thead>
+        <tbody>
+        {/* Build each row of the menu */}
+        {metadataData.map((item) => (
+            <tr key={item.metadata_id} className="border-b border-gray-200">
+                <td className="w-1/3 border border-gray-300 px-4 py-2 hover:underline">
+                    {/* Build the Link to the /dashboard/[dashboardId] routes */}
+                    <Link href={`/dashboard/${encodeURIComponent(item.metadata_id.trim())}`}>
+                        {item.metadata_name}
+                    </Link>
+                </td>
+                {/* Add description from metadata to the second column */}
+                <td className="w-1/3 border border-gray-300 px-4 py-2">
+                    {item.metadata_header.description || ''}
+                </td>
+            </tr>
+        ))}
+        </tbody>
+    </table>
+</div>
+) : (
+    <p className="text-gray-500 text-center">No dashboards found</p>
+)}
+----
+
+The most important aspect is building the `Link` component with the route to the component display page built in the previous lesson, and the `item.metadata_id` property as the end of the URL.
+
+[source,typescript]
+----
+<Link href={`/dashboard/${encodeURIComponent(item.metadata_id.trim())}`}>
+    {item.metadata_name}
+</Link>
+----
+
+When this page renders, there is now a dynamic menu to get to any Liveboard the user has access to, with the ability to filter to easily filter to own created content.
+
+== Spotter embed pages and menu
+The example app contains an equivalent menu and component display page for Spotter content, under the link:https://github.com/thoughtspot/embed-example-react-app/tree/main/src/app/datachat[/app/datachat/^] subdirectory. 
+
+Spotter conversations are started against Models (formerly Worksheets), so the set of UI components and filters differs within the link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/datachat/page.tsx[menu page^].
+
+The basic concepts from the entire tutorial apply regardless of which component you are using.
+
+'''
+
+xref:react-components_lesson-02.adoc[< Previous: 02 - ThoughtSpot component pages] | xref:react-components_lesson-04.adoc[Next: 04 - Event handling >]
