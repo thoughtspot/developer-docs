@@ -346,55 +346,71 @@ Filtering from a selection on a chart or table can be implemented by combining t
 
 The callback function from the `VizPointClick` event will need to read the response, parse out the attributes from the response that will be sent to the Runtime Filters object, and then send the attributes and their target fields in the format used by `UpdateRuntimeFilters`.
 
-=== Trigger actions without opening modals
+[#hostEventParameterization]
+=== Trigger and complete actions without modals
 
-To optimize user interactions and provide uninterrupted experience for workflows such as pinning an Answer to a Liveboard or saving a search result as an Answer, you can pre-define parameter values in host event objects and trigger actions directly without additional user input. For host events such as `HostEvent.Pin` and `HostEvent.SaveAnswer`, the SDK provides the option to define a set of parameters to complete the *Pin* or *Save* action without opening modals.
+To optimize user interactions and provide uninterrupted experience for workflows such as pinning an Answer to a Liveboard or saving a search result as an Answer, you can pre-define parameter values in host event objects and trigger actions directly without additional user input. For host events such as `HostEvent.Pin` and `HostEvent.SaveAnswer`, the SDK provides the option to define a set of parameters to complete the *Pin* or *Save* action without opening a modal or prompt for user input.
 
 ==== Parameters for HostEvent.Pin
-When defining `HostEvent.Pin`, you can use any of the following parameter keys to pin an Answer to Liveboard programmatically without opening the *Pin to Liveboard* modal.
 
-To add a visualization or Answer object to a Liveboard, use the following parameters:
+The *Pin* action is available on the charts and tables generated from a search query, saved Answers, and visualizations on a Liveboard. Generally, when a user initiates the pin action, the *Pin to Liveboard* modal opens and the user is prompted to specify the Liveboard to pin the object. The modal also allows the user to add or edit the title text of the visualization and create a new Liveboard if required.
+
+With `HostEvent.Pin`, you can automate the pin workflow to programmatically add an Answer or visualization to a  Liveboard. For example, to pin an object to an existing Liveboard, use the following parameters to the host event object:
 
 * `vizId` +
-__String__. GUID of the Answer or visualization to pin on a Liveboard
+__String__. GUID of the saved Answer or visualization to pin to a Liveboard. Note that after you pin an Answer to a Liveboard, ThoughtSpot creates a copy of the Answer with a new GUID, which is independent of the original Answer object. Optional for pinning a new chart or table generated from a Search query.
 * `liveboardId` +
-__String__. GUID of the Liveboard to pin the Answer.
+__String__. GUID of the Liveboard to pin the Answer. If there is no Liveboard, you must specify the `newLiveboardName` to create a new Liveboard.
+* `newVizName` +
+__String__. Name string for the Answer that will be added as visualization to the Liveboard. Note that each time the user clicks, a new visualization object with a new GUID is generated.
 * `tabId` +
 __String__. GUID of the Liveboard tab. Adds the Answer to the Liveboard tab specified in the code.
+* `newLiveboardName`
+__String__. Name string for the new Liveboard. Creates a new Liveboard object with the specified name.
+* `newTabName` +
+__String__. Name string for the new Liveboard tab. Adds a new tab to the Liveboard specified in the code.
+* `newVizName` +
+__String__. Name string for the visualization. When specified, it adds a new visualization or creates a copy of the Answer or visualization specified in `vizId`.
 
-In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to add a visualization to the Liveboard tab defined in the code:
+In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to add a specific visualization to a specific Liveboard tab:
 
 [source,JavaScript]
 ----
-embed.trigger(HostEvent.Pin, {
+ const pinResponse = await appEmbed.trigger(HostEvent.Pin, {
     vizId: "8fbe44a8-46ad-4b16-8d39-184b2fada490",
+    newVizName: "sales by item type",
     liveboardId: "fa68ae91-7588-4136-bacd-d71fb12dda69",
     tabId: "c135113c-fba0-4220-8e14-7a5f14e0e69f",
-});
+ })
 ----
 
-If the Liveboard to pin a visualization does not exist in your app, you can create a new Liveboard object and dd the visualization using the following parameters:
-
-* `newLiveboardName`
-__String__. Name of the Liveboard. Creates a new Liveboard object with the specified name.
-* `newTabName` +
-__String__. Name of the Liveboard. Adds a new tab to the Liveboard specified in the code.
-* `newVizName` +
-__String__. Adds or edits the title of a visualization.
-
-In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to create a new Liveboard and tab, and then adds the visualization to the new Liveboard object.
+In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to add a new visualization to a Liveboard:
 
 [source,JavaScript]
 ----
-appEmbed.trigger(HostEvent.Pin, {
-    vizId: "50efca7c-703e-44ff-82b8-91f24b84da77",
-    newVizName: `Sales by region`,
-    newLiveboardName: "Sales performance",
-    newTabName: "Products",
-});
+ const pinResponse = await searchEmbed.trigger(HostEvent.Pin, {
+     newVizName: `Sales by region`,
+     liveboardId: "5eb4f5bd-9017-4b87-bf9b-8d2bc9157a5b",
+ })
+----
+
+In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to create a new Liveboard with a tab and then pin the Answer or visualization to it.
+
+[source,JavaScript]
+----
+ const pinResponse = await appEmbed.trigger(HostEvent.Pin, {
+     newVizName: "Sales by item type for Arizona",
+     newLiveboardName: "Sales",
+     newTabName: "Southwest",
+ })
 ----
 
 If no parameters are defined in the `HostEvent.Pin` object, the event triggers the *Pin* action and opens the *Pin to Liveboard* modal.
+
+[source,JavaScript]
+----
+searchEmbed.trigger(HostEvent.Pin);
+----
 
 ==== Parameters for HostEvent.SaveAnswer
 
@@ -415,6 +431,11 @@ const saveAnswerResponse = await searchEmbed.trigger(HostEvent.SaveAnswer, {
 ----
 
 If no parameters are defined in the `HostEvent.SaveAnswer` object, the event triggers the save action and opens the *Describe your Answer* modal.
+
+[source,JavaScript]
+----
+searchEmbed.trigger(HostEvent.SaveAnswer);
+----
 
 === Event configuration for React components
 
