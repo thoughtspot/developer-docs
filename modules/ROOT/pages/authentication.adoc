@@ -574,16 +574,28 @@ __Optional__|__Integer__. If the Orgs feature is enabled on your instance, speci
 |`persist_option` a| Indicates if the filter rules and Parameter attributes defined in the API request should persist for user sessions initiated with the token obtained from this API call. The following options are available:
 
 * `APPEND` +
-Adds the attributes defined in the API request to the user’s user properties. These properties will be applied to user sessions and for scheduled jobs if any.
+Adds the attributes defined in the API request to the user properties. These properties will be applied to user sessions and for scheduled jobs if any.
 
 * `NONE` +
-The security entitlements assigned via attributes will be used only for the user session initiated with the token generated from this API call.
+
+Does not update the existing user properties. The attributes defined in the API request will be applied to the token, but do not persist when the token expires.
 
 * `REPLACE` +
-Available from 10.5.0.cl. Replaces existing user properties of the user with the attributes defined in this API request.
+Available from 10.5.0.cl. Replaces existing user properties of the user with the new attributes assigned to the token in the API request.
 
 * `RESET` +
-Resets the user properties assigned to a user upon token generation.
+Resets the existing user properties upon token generation and adds the new attributes defined in the request. By default, `"persist_option": "RESET"` resets all attributes, unless a specific `reset_option` is defined.
+
+|`reset_option` a|__Array of strings__. Allows you to define the type of attributes to reset upon token generation. The following options are available:
+
+* `FILTER_RULES` +
+Resets filter attributes.
+
+* `PARAMETERS`
+Resets only Parameters.
+
+* `GROUPS`
+Resets group assignments
 
 |`filter_rules`  a|__Array of filter rules__. An array of runtime filter conditions to pass via token. Each rule in the array must include the following information:
 
@@ -635,9 +647,14 @@ The values to use.
   ]
 ----
 |`objects` +
-__Optional__ |__Array of strings__. Array of the object names or GUIDs to which you want to apply the security rules. The object `type` is mandatory if the object `name` is specified as the `identifier`.
+__Optional__ a|__Array of strings__. An array of object names or GUIDs to which you want to apply the security rules. The object `type` is mandatory if the object `name` is specified as the `identifier`. Specify the object type as `LOGICAL_TABLE`.  
 
-If no object is specified in the API request, the filter and Parameter rules will be applied to all objects that the user has access to.
+If no object is specified in the API request, the filter and Parameter rules will be applied to all `LOGICAL_TABLE` objects that the user has access to.
+
+[NOTE]
+====
+The `LIVEBOARD` and `ANSWER` object types are not supported. 
+====
 
 |`email` +
 __Optional__ |__String__. Email address of the user. Use this parameter to add the email address of the user if `auto_create` is set to `true`.
@@ -688,7 +705,7 @@ curl -X POST \
   ],
   "objects": [
     {
-      "type": "LIVEBOARD",
+      "type": "LOGICAL_TABLE",
       "identifier": "4c55ff63-d03e-497a-8ec6-1be083f160ee"
     }
   ],
@@ -705,7 +722,7 @@ curl -X POST \
 ----
 
 ==== API response
-If API request is successful, the API returns a token with the security rules and attributes applied.
+If the API request is successful, ThoughtSpot returns a token with the security rules and attributes applied.
 
 [source,JSON]
 ----

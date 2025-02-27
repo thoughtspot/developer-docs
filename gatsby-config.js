@@ -190,6 +190,8 @@ module.exports = {
                 apiKey: process.env.ALGOLIA_ADMIN_KEY,
                 queries: require(`${__dirname}/src/utils/algolia-queries`)
                     .queries,
+                // for testing add dryRun as true,
+                // dryRun: true,
             },
         },
         {

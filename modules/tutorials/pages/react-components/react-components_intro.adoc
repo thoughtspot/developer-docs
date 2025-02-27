@@ -1,5 +1,204 @@
 = ThoughtSpot React Components Tutorial
-:page-pageid: react-components_intro
-:description: This is a self-guided course on the ThoughtSpot Visual Embed SDK React Components
 :toc: true
 :toclevels: 2
+
+:page-pageid: react-components__intro
+:description: This is a self-guided course on the ThoughtSpot Visual Embed SDK React Components
+
+
+ThoughtSpot provides xref:embed-ts-react-app.adoc[React components] as part of the link:https://github.com/thoughtspot/visual-embed-sdk[Visual Embed SDK^]. 
+
+There is also a link:https://github.com/thoughtspot/rest-api-sdk/tree/release/sdks/typescript[REST API SDK available in TypeScript^] which can be included in any React app.
+
+This tutorial walks through the process of installing and integrating the ThoughtSpot React components and REST API SDK into an link:https://github.com/thoughtspot/embed-example-react-app[existing React app^].
+
+The tutorial will discuss common React app features and how to integrate the ThoughtSpot technologies into the React patterns.
+
+Please download the link:https://github.com/thoughtspot/embed-example-react-app[example app from GitHub^] and follow the initial setup commands listed in the README within the GitHub repository.
+
+== Getting started with React
+link:https://react.dev/learn/thinking-in-react[React^] is a widely used web application framework. 
+
+There are many great resources for understanding React itself, including the link:https://react.dev/learn/thinking-in-react[React project's own website]. In the tutorial, React concepts will be briefly explained in relation to integrating ThoughtSpot components within the link:https://github.com/thoughtspot/embed-example-react-app[embedding React app^].
+
+React projects almost always use many different packages on top of the baseline "React" install.
+
+Within the tutorial, all packages will be given a brief explanation, with links to the respective project documentation.
+
+== Routes and pages
+*Routes* are URLs that load different "pages" within the app. 
+
+In some web application systems, a particular URL will load content from a distinct "page" that exists somewhere on the web server.
+
+React apps are typically "single-page apps": rather than there being many separate "actual" HTML pages loaded by the web browser, an initial page is loaded and then updates are made to that "single page". 
+
+*Routing* in React defines what components are retrieved for a given URL to update the "single page".
+
+ThoughtSpot provides various types of components that load objects using specific IDs of the content in the ThoughtSpot application.
+
+To make a flexible system, a page route must return the component and pass the ID of the content to load into that component.
+
+=== React Router
+The most common package for routing is *link:https://reactrouter.com/start/library/routing[react-router^]*, with most examples importing `react-router-dom` in their `App.tsx` file.
+
+An example of a dynamic page route using React Router might look like: 
+
+[source,typescript]
+----
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Root />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "dashboard/:id",
+    element: <ThoughtSpotLiveboard />,
+  },
+]);
+----
+
+where the `:id` portion of the path will be passed on to the component as one of the *props*. 
+
+If your app uses React Router, please work with your team to understand how to create and use dynamic variables in the routes and pass them into components.
+
+The app in this tutorial instead uses Next.js for routing.
+
+=== Next.js
+The tutorial app uses link:https://nextjs.org/docs/app/getting-started/project-structure[Next.js^], a platform built on top of React
+
+Next.js provides automatic *file-based* routing via defined patterns and directory structures.
+
+Under the `app` directory, any subdirectory *automatically becomes a URL route* with the same name, with the `page.tsx` file inside defining the returned component.
+
+Adding square brackets around a subdirectory name like `[variableName]` creates dynamic page route with the name in brackets sent to the component defined in `page.tsx`.
+
+== Tutorial app structure
+The tutorial walks through building out an link:https://github.com/thoughtspot/embed-example-react-app[app^] using link:https://nextjs.org/docs/app/getting-started/project-structure[Next.js^].
+
+=== Top-level subdirectory structure
+The app has three main directories, per a standard Next.js app structure:
+
+1. `app`: distinct app routes generated from the `page.tsx` of each subdirectory
+2. `components`: shared components in `.tsx` files that can be called by multiple other `page.tsx` files
+3. `lib`: other constant files
+
+[.widthAuto]
+image::images/tutorials/react-components/next-js-app-structure.png[App structure]
+
+=== lib/constants.ts: shared configurations
+link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/lib/constants.ts[app/constants.ts^] is a static file for declaring shared properties that might be re-used by any other page within the React app.
+
+The `constants` const is declared and exported with several properties, the most important of which is `tsURL`, because it configures the ThoughtSpot instance from which the content will load.
+
+[source,typescript]
+----
+export const constants = {
+  tsURL: "https://{}.thoughtspot.cloud",
+  username: "",
+  password: "",
+  appTopTitle: "My App",
+  appTopIconUrl: "/images/ts.png",
+  primaryColorCode: "rgb(0, 0 , 0)",
+  secondaryColorCode: "rgb(255, 255, 255)"
+};
+----
+
+You are welcome to add any additional properties you might want to use.
+
+Other pages import the code from `constants.ts` using a standard React import:
+
+[source,typescript]
+----
+import {constants, cssFiles} from "@/lib/constants";
+----
+
+=== app/layout.tsx: the React app itself
+link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/layout.tsx[app/layout.tsx^] is a standard Next.js file that defines the overall layout of the app. 
+
+It returns the `RootLayout()` function for the React framework, into with all other components will be added in as `{children}`.
+
+The actual JSX that is returned is simple, as the tutorial app is composed of only a top menu and a full-width area for displaying ThoughtSpot content:
+
+[,tsx]
+----
+ <body>
+        <>
+            <TopNavBar/>
+            <ThoughtSpotEmbed>
+                <div className="embeddedContent">{children}</div>
+            </ThoughtSpotEmbed>
+            <TSFooter/>
+        </>
+  </body>
+----
+
+Note that everything above is a React *component*, defined in other files and *included* at the top of `layout.tsx`.
+
+=== app/page.tsx: the default page
+`link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/app/page.tsx[app/page.tsx^]` is the page that contains the initial body that is loaded when a user comes to the app, without any other pages:
+
+[,tsx]
+----
+export default function Home() {
+    return (
+        <main className="flex min-h-fit flex-col items-center justify-between p-24">
+            <div id="welcome">
+                <h1>Welcome to the ThoughtSpot Embedding Example</h1>
+                <p>
+                    This application demonstrates some of the basic embedding techniques possible using React and the
+                    ThoughSpot SDK.
+                </p>
+                <p>&nbsp;</p>
+...
+            </div>
+        </main>
+    );
+}
+----
+
+You are welcome to put anything in this page, but it is really a placeholder that would instead be taken by the real app you embed ThoughtSpot components into.
+
+=== components/TopNavBar.tsx: the top menu bar
+`link:https://github.com/thoughtspot/embed-example-react-app/blob/main/src/components/TopNavBar.tsx[components/TopNavBar.tsx^]` is a component page that defines the top menu bar within the app.
+
+You'll notice it imports several components from link:https://flowbite.com/[Flowbite^], a commonly used React package with many available UI components, along with the `Link` component from Next.js. Do not feel bound to use any components in the tutorial, they are simply to show how to integrate the ThoughtSpot components with all of the various other React components and packages in use within a normal application project.
+
+[,tsx]
+----
+"use client";
+
+import Link from "next/link";
+import {Dropdown, Navbar} from "flowbite-react";
+
+import styles from "./TopNavBar.module.css";
+
+import {constants} from "@/lib/constants";
+
+interface NavBarProps {
+}
+----
+
+`TopNavBar.tsx` is where the links to routes for the menu pages are defined: 
+
+[,tsx]
+----
+ <Navbar.Collapse>
+    <Navbar.Link className={styles.navlink} href="/dashboard">
+        Dashboards
+    </Navbar.Link>
+    <Navbar.Link className={styles.navlink} href="/datachat">
+        Data Chat
+    </Navbar.Link>
+</Navbar.Collapse>
+----
+
+Again, this is simply to provide a simple example of how you will integrate routes to pages that display ThoughtSpot components within your own app.
+
+=== Other subdirectories and files
+The following lessons will cover the other files and the subdirectory structure used within the app to properly use the ThoughtSpot React components.
+
+'''
+
+xref:react-components_lesson-01.adoc[Next: 01 - Initializing ThoughtSpot Embed SDK >]
+
