@@ -20,9 +20,27 @@ In this method, a REST client sends the `username` and `password` to authenticat
 xref:authentication.adoc#trusted-auth-v2[Trusted authentication];;
 In this method, the REST client must send the `username` and `secret_key` in the API request to obtain an authentication token. The `secret_key` is generated if **Trusted authentication** is enabled on your ThoughtSpot instance.
 
+Multifactor authentication (MFA):: [beta betaBackground]^Beta^
++
+ThoughtSpot now supports multifactor authentication (MFA) for environments using local authentication with Identity and Access Management (IAMv2). If MFA  is enabled on your ThoughtSpot instance,
+
+*  The REST API calls to the API endpoints authenticating to ThoughtSpot with only `username` and `password` will return an error. You will now have an additional authentication factor.
++
+Contact https://community.thoughtspot.com/customers/s/login/?ec=302&startURL=%2Fcustomers%2Fs%2Fcontactsupport[ThoughtSpot Support] for assistance.
+* Embedded users authenticating to ThoughtSpot with basic authentication are recommended to switch to `AuthType.TrustedAuthTokenCookieless`.
+* Non-embedded users calling REST APIs authenticating to ThoughtSpot with only `username` and `password` will return an error. Contact https://community.thoughtspot.com/customers/s/login/?ec=302&startURL=%2Fcustomers%2Fs%2Fcontactsupport[ThoughtSpot Support] for assistance.
+
+For more information, see https://docs.thoughtspot.com/cloud/latest/authentication-local-mfa[Multifactor authentication for customers using local authentication, window=_blank].
+
 [#loginTS]
 == Cookie-based authentication
 For cookie-based authentication, make an API call to the `/api/rest/2.0/auth/session/login` endpoint with the `username`, `password`, and other attributes in the request body.
+
+[NOTE]
+====
+* If MFA is enabled on your ThoughtSpot instance then authentication with only `username` and `password` will return an error. Contact https://community.thoughtspot.com/customers/s/login/?ec=302&startURL=%2Fcustomers%2Fs%2Fcontactsupport[ThoughtSpot Support] for assistance.
+* MFA can be enabled on your instance only if Identity and Access Management (IAMv2) is already enabled.
+====
 
 === Request parameters
 [width="100%" cols="1,4"]
@@ -129,6 +147,12 @@ By default, the token obtained from ThoughtSpot is valid for 5 minutes (300 seco
 === Basic authentication
 
 You can obtain a token that grants read-only access to a ThoughtSpot metadata object via a `POST` request to the `/api/rest/2.0/auth/token/object` endpoint, or get a token that grants full access to  ThoughtSpot via `/api/rest/2.0/auth/token/full`.
+
+[NOTE]
+====
+* If MFA is enabled on your ThoughtSpot instance then authentication with only `username` and `password` will return an error. Contact https://community.thoughtspot.com/customers/s/login/?ec=302&startURL=%2Fcustomers%2Fs%2Fcontactsupport[ThoughtSpot Support] for assistance.
+* MFA can be enabled on your instance only if Identity and Access Management (IAMv2) is already enabled.
+====
 
 ==== Get a token for full access
 
@@ -539,7 +563,8 @@ If your current implementation is using the beta version of the ABAC and you wan
 |`username`
 |__String__. Username of the ThoughtSpot user. If the user is not available in ThoughtSpot, a new user account will be created and added to ThoughtSpot.
 |`password`
-a|__String__. Password of the user account. If using `secret_key` to generate the token, do not specify the `Password`.
+a|__String__. Password of the user account. If using `secret_key` to generate the token, do not specify the `Password`. +
+If MFA is enabled on your ThoughtSpot instance then API call with only `username` and `password` will return an error.
 |`secret_key`
 |__String__. The secret key string provided by the ThoughtSpot server. ThoughtSpot generates this secret key xref:trusted-authentication.adoc#trusted-auth-enable[when trusted authentication is enabled].
 |`validity_time_in_sec` +
@@ -549,16 +574,28 @@ __Optional__|__Integer__. If the Orgs feature is enabled on your instance, speci
 |`persist_option` a| Indicates if the filter rules and Parameter attributes defined in the API request should persist for user sessions initiated with the token obtained from this API call. The following options are available:
 
 * `APPEND` +
-Adds the attributes defined in the API request to the user’s user properties. These properties will be applied to user sessions and for scheduled jobs if any.
+Adds the attributes defined in the API request to the user properties. These properties will be applied to user sessions and for scheduled jobs if any.
 
 * `NONE` +
-The security entitlements assigned via attributes will be used only for the user session initiated with the token generated from this API call.
+
+Does not update the existing user properties. The attributes defined in the API request will be applied to the token, but do not persist when the token expires.
 
 * `REPLACE` +
-Available from 10.5.0.cl. Replaces existing user properties of the user with the attributes defined in this API request.
+Available from 10.5.0.cl. Replaces existing user properties of the user with the new attributes assigned to the token in the API request.
 
 * `RESET` +
-Resets the user properties assigned to a user upon token generation.
+Resets the existing user properties upon token generation and adds the new attributes defined in the request. By default, `"persist_option": "RESET"` resets all attributes, unless a specific `reset_option` is defined.
+
+|`reset_option` a|__Array of strings__. Allows you to define the type of attributes to reset upon token generation. The following options are available:
+
+* `FILTER_RULES` +
+Resets filter attributes.
+
+* `PARAMETERS`
+Resets only Parameters.
+
+* `GROUPS`
+Resets group assignments
 
 |`filter_rules`  a|__Array of filter rules__. An array of runtime filter conditions to pass via token. Each rule in the array must include the following information:
 
