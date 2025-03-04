@@ -8,22 +8,47 @@
 
 In Attribute-Based Access Control (ABAC) implementation, security entitlements are sent in as lists of attributes at session creation time via the authentication service.
 
-// Unlike xref:abac-user-parameters-beta.adoc[the beta version of ABAC implementation], 
-
-The ABAC via tokens feature in ThoughtSpot 10.4.0.cl and later versions involves generating a token with filter rules and parameter values using the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">auth/token/custom</a>+++ API endpoint. 
-
-// This article describes the steps required to implement ABAC for row-level security (RLS) using the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">Custom access token </a>+++ REST API endpoint. 
+This article provides a detailed overview of the ABAC implementation via tokens for row-level security (RLS), and lists configuration recommendations, and best practices.
 
 [IMPORTANT]
 ====
-// * The `user_parameters` property in `auth/token/full` and `auth/token/object` APIs used for the beta implementation of ABAC is deprecated in 10.4.0.cl. 
-// * Starting with 10.4.0.cl, security attributes for ABAC will not be stored in the `user` > `user_parameters` object. All ABAC-related security rules and filters applied via token generated using the `/api/rest/2.0/auth/token/custom` API endpoint are stored in the `user` > `access_control_properties` object.
-* To update your implementation from the xref:abac-user-parameters-beta.adoc[beta version of ABAC with the V2.0 Get token APIs] (`auth/token/full` or `auth/token/object`) to `/api/rest/2.0/auth/token/custom`, refer to the instructions in the xref:jwt-migration.adoc[migration guide].
+To enable the ABAC via tokens feature on your instance, contact ThoughtSpot Support.
 ====
 
-== ABAC attributes
 
-The most common *best practice* is to define *filter rules* within the token and place the `is_mandatory_token_filter: true` property on every column in a Worksheet or Model where a filter rule is expected. This will deny any access to data if a user has not been assigned values for the expected set of fields.
+// * The `user_parameters` property in `auth/token/full` and `auth/token/object` APIs used for the beta implementation of ABAC is deprecated in 10.4.0.cl. 
+// * Starting with 10.4.0.cl, security attributes for ABAC will not be stored in the `user` > `user_parameters` object. All ABAC-related security rules and filters applied via token generated using the `/api/rest/2.0/auth/token/custom` API endpoint are stored in the `user` > `access_control_properties` object.
+// * The  +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">Custom access token </a>+++ REST API endpoint.
+
+
+== Configuration recommendations and best practices
+
+Before you begin, note the following recommendations and feature limitations:
+
+* *API for token generation*  +
+The ABAC via tokens feature in ThoughtSpot 10.4.0.cl and later versions involves generating a token with filter rules and parameter values using the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">auth/token/custom</a>+++ API endpoint. To update your implementation from the xref:abac-user-parameters-beta.adoc[beta version of ABAC with the V2.0 Get token APIs] (`auth/token/full` or `auth/token/object`) to `/api/rest/2.0/auth/token/custom`, refer to the instructions in the xref:jwt-migration.adoc[migration guide].
+
+* *Mandatory token filters* +
+The most common *best practice* is to define *filter rules* within the token and place the `is_mandatory_token_filter: true` property on every column in a Worksheet or Model where a filter rule is expected. __This will deny any access to data if a user has not been assigned values for the expected set of fields__.
++
+[NOTE]
+====
+On instances running 10.5.0.cl and 10.4.0.cl versions, if a column is set as hidden (`is_hidden: true`), the `is_mandatory_token_filter: true` setting will not be applied to the column. Due to this, the user may see no data. To work around this issue, we recommend upgrading to 10.6.0.cl or set `is_hidden` to `false` on the column and then apply filter rules.
+====
+
+[#column-name-warning]
+* *Column names in Worksheet/ Model* +
+The filter rules require passing the *exact* ThoughtSpot Worksheet or Model column name the values will not bind to any column. You must coordinate between the team that maintains the Worksheets or Models and the team that builds the xref:trusted-auth-token-request-service.adoc[token request service] to know if any changes will be made to a Model or Worksheet. +
+For the same reasons, the end users of an embedded app cannot have *edit* access to any Worksheet or Model using ABAC RLS via tokens. +
+When column names change, ensure that the `is_mandatory_token_filter: true` property is set on every column where a filter rule is expected.
+
+* *Indexing* +
+Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in Explore mode, use ThoughtSpot indexing. Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token.
+ +
+You must turn off indexing for any field that needs to be restricted by RLS when using ABAC via tokens for RLS, or also include an RLS Rule on fields that must also be filtered for the Indexing system.
+
+
+== ABAC attributes
 
 Administrators can set the following attributes for a user via the authentication token, along with the capability to assign the user to ThoughtSpot groups:
 
@@ -32,14 +57,6 @@ Can filter multiple values of any data type. Binds to any Column in any Model or
 
 * xref:runtime-parameters.adoc[Parameter values] +
 Binds a single value to any Parameter in any Worksheet or Model by Parameter Name and Type match. Parameters can be used in *Worksheet formulas* and then as *Worksheet filters*.
-
-[IMPORTANT]
-====
-[#column-name-warning]
-The filter rules require passing the *exact* ThoughtSpot Worksheet or Model column name the values will not bind to any column. You must coordinate between the team that maintains the Worksheets and Models and the team that builds the xref:trusted-auth-token-request-service.adoc[token request service] if any changes will be made to a Model or Worksheet.
-For the same reasons, the end users of an embedded app cannot have *edit* access to any Worksheet or Model using ABAC RLS via tokens.
-When column names change, ensure that the `is_mandatory_token_filter: true` property is set on every column where a filter rule is expected.
-====
 
 The request for a token with ABAC details can xref:abac-user-parameters.adoc#persistForUser[persist] the set of filters and Parameter values to user sessions within ThoughtSpot, after which all sessions and scheduled reports will use the persisted values until they are changed by another token generation request.
 
@@ -89,6 +106,11 @@ An example of setting both `filter_rules` and `parameter_values` without any per
    }
  ]
 ----
+
+[NOTE]
+====
+Passing an empty array in a filter column clears all filter rules and doesn't apply the filters on the column.
+====
 
 === Apply to specific objects
 By default, any specified filter or parameter will bind to any content with an exact match for the column or Parameter name.
@@ -152,8 +174,11 @@ a|All persisted rules and attributes of the user object are replaced with the se
 
 [NOTE]
 ====
-In 10.4.0.cl, the `REPLACE` behavior can be achieved by making a `RESET` request followed by an `APPEND` request, then passing only the `APPEND` request token to the browser.
+* By default, the `RESET` option resets all attributes. In 10.6.0.cl and later versions, you can specify the attributes  to reset in the `reset_option` attribute. The `reset_option` allows resetting only filter rules, Parameters, or group properties in the token API request.
+* In 10.4.0.cl, the `REPLACE` behavior can be achieved by making a `RESET` request followed by an `APPEND` request, then passing only the `APPEND` request token to the browser.
 ====
+
+
 |=====
 
 Filters and parameters must be *persisted* for them to apply to user sessions when using xref:trusted-authentication.adoc#cookie[cookie-based trusted authentication] or scheduled reports.
