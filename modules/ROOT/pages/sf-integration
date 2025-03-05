@@ -1,0 +1,407 @@
+= ThoughtSpot + Salesforce Integration
+:toc: true
+:toclevels: 3
+
+:page-title: Salesforce Integration
+:page-pageid: sf-integration
+:page-description: Methods for embedding ThoughtSpot into Salesforce cloud products
+
+== Introduction
+Integrating ThoughtSpot with Salesforce enables users to access analytics directly within their Salesforce environment. By embedding ThoughtSpot content, organizations can deliver data-driven insights where your end users work, enhancing decision-making and efficiency. This guide explores the various embedding options, including SDK and non-SDK approaches, and discusses key considerations like authentication, data security, customization, and branding.
+
+== Embeddable Objects
+
+ThoughtSpot allows users to create several types of objects. Before we get into the details, it's important to understand that any of the following objects can be easily embedded into Salesforce:
+
+* *Search* - Self-service interface which allows users to perform searches on data to build visualizations
+* *Answers* - Individual visualizations generated and saved from user search queries
+* *Liveboards* - Interactive dashboards that contain one or more visualizations (answers)
+* *Spotter* - AI-powered assistant that helps users analyze data using natural language
+* *Full Application* - Allows you to embed the full ThoughtSpot application or the individual application pages
+
+== Embedding Methods
+Keeping things simple, there are two development options for this integration:
+
+=== ThoughtSpot SDK
+If you are using the `Salesforce Lightning platform`, we highly recommend using the ThoughtSpot SDK as it provides maximum flexibility and allows you to create highly customized solutions across all Salesforce cloud products. 
+
+.Key considerations
+
+* Simplified integration using Lightning Web Components
+* Enhanced customization and interactivity
+* Support for authentication mechanisms like SAML and Trusted Authentication
+
+=== iFrame
+For organizations using the `Salesforce Classic platform`, or that prefer not to use the SDK, embedding ThoughtSpot can be achieved via iframes. This method is simplier, but considered a legacy approach for embedding.
+
+.Key considerations
+
+* Fewer customization options
+* Potential styling limitations
+* SAML authentication only
+
+[sidebar]
+Now that we understand our options, let's walk through the implementation steps for each method.
+
+== High-level Implementation Steps
+
+=== ThoughtSpot SDK
+The Salesforce lightning platform moved developers away from Visualforce to *Lightning Web Components (LWC)*. If you are considering using the SDK, we will assume your Salesforce instance is running on lightning.
+
+NOTE: To simplify development, we recommend using the link:https://marketplace.visualstudio.com/items?itemName=salesforce.salesforcedx-vscode[Salesforce extensions pack] in Visual Studio Code.
+
+You have a couple of options:
+
+
+[%collapsible]
+.LWC from Scratch
+====
+NOTE: This guide does not cover LWC development. We will assume you have experience developing in Salesforce.  If not, no worries, we have engineers who can help.  Contact your ThoughtSpot sales representitve for details.
+
+Any LWC you develop in Salesforce will contain an html, js and meta.xml file.  Let's walk through a simple Liveboard embed component:
+
+[source, xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>ThoughtSpot Embed Template</masterLabel>
+    <targets>
+        <target>lightning__AppPage</target>
+        <target>lightning__RecordPage</target>
+        <target>lightning__HomePage</target>
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordPage">
+            <property label="What are you embedding?" name="embedType" type="String" datasource="Liveboard, Spotter" default="Liveboard"/>
+                <property
+                    name="tsURL"
+                    type="String"
+                    label="ThoughtSpot URL"
+                    required="false"
+                    description="The full URL to your ThoughtSpot host"
+                    default=""
+                />
+                <property
+                    name="tsOrg"
+                    type="String"
+                    label="TS Org ID - leave empty if not using orgs"
+                    required="false"
+                    description="ThoughtSpot Organization Identifier"
+                    default=""
+                />
+                <property
+                    name="tsObjectId"
+                    type="String"
+                    label="Liveboard or Datasource GUID"
+                    required="false"
+                    description="ThoughtSpot Content GUID"
+                    default=""
+                />
+                <property
+                    name="hideLiveboardHeader"
+                    type="Boolean"
+                    default="false"
+                    label="Hide Liveboard Header?"
+                />
+                <property
+                    name="showLiveboardTitle"
+                    type="Boolean"
+                    default="false"
+                    label="Show Liveboard Title?"
+                />
+                <property
+                    name="fullHeight"
+                    type="Boolean"
+                    default="false"
+                    label="Full Height Liveboard?"
+                />
+                
+                <supportedFormFactors>
+                    <supportedFormFactor type="Small" />
+                    <supportedFormFactor type="Large" />
+                </supportedFormFactors>
+            </targetConfig>
+            
+            <targetConfig targets="lightning__AppPage,lightning__HomePage,lightningCommunity__Default">
+                <property label="What to embed?" name="embedType" type="String" datasource="Liveboard, Spotter" default="Liveboard"/>
+
+                <property
+                    name="tsURL"
+                    type="String"
+                    label="ThoughtSpot URL"
+                    required="false"
+                    description="The full URL to your ThoughtSpot host"
+                    default=""
+                />
+                <property
+                    name="tsOrg"
+                    type="String"
+                    label="TS Org ID - leave empty if not using orgs"
+                    required="false"
+                    description="ThoughtSpot Organization Identifier"
+                    default=""
+                />
+                <property
+                    name="tsObjectId"
+                    type="String"
+                    label="Liveboard or Datasource GUID"
+                    required="false"
+                    description="ThoughtSpot Content GUID"
+                    default=""
+                />
+                <property
+                    name="hideLiveboardHeader"
+                    type="Boolean"
+                    default="false"
+                    label="Hide Liveboard Header?"
+                />
+                <property
+                    name="showLiveboardTitle"
+                    type="Boolean"
+                    default="false"
+                    label="Show Liveboard Title?"
+                />
+                <property
+                    name="fullHeight"
+                    type="Boolean"
+                    default="false"
+                    label="Full Height Liveboard?"
+                />
+                
+            </targetConfig>
+        </targetConfigs>
+    </LightningComponentBundle>
+----
+
+[source, html]
+----
+<template>
+    <div class="container" data-id="myContainer"> 
+        <div class="thoughtspotObject" data-id="thoughtspotObject" id="thoughtspotObject" lwc:dom="manual"></div>
+    </div>
+</template>
+----
+
+[source, js]
+----
+///////////////////////////////////////
+//Prototype for TS Liveboard Embed  
+//
+// High-level steps:
+//   : Update CCORS whitelisted domains settings in ThoughtSpot (Developer -> Security). Add your Salesforce url(s)
+//   : Update CORS and CSP settings in Salesforce with your thoughtspot cluster url
+//   : Upload the ThoughtSpot SDK into SF as Static Resource. Make sure name matches thoughtSpotSDK import below
+//   : Set values for your ThoughtSpot username & password below.
+// 
+// Notes:
+//   : Basic Auth used in this LWC, no SSO.
+//   : Do not use in production
+//
+///////////////////////////////////////
+import { LightningElement, api, track } from 'lwc';
+import getUserInfoByEmail from '@salesforce/apex/TSForSFUtils.getUserInfoByEmail';
+//import thoughtSpotSDK from '@salesforce/resourceUrl/thoughtSpotSDK';
+import thoughtSpotSDK from '@salesforce/resourceUrl/tsembedSpotter1331';
+import { loadScript } from 'lightning/platformResourceLoader';
+
+export default class TsEmbedTemplate extends LightningElement {
+    
+    @api objectApiName; /** Object API name - automatically passed when in a record page */
+    @api recordId;      /** Object record ID - automatically passed when in a record page */
+    
+    //track variables set in meta.xml
+    @api embedType;
+    @api tsObjectId;
+    @api tsURL;
+    @api tsOrg;
+    @api hideLiveboardHeader;
+    @api showLiveboardTitle;
+    @api fullHeight;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Basic Auth testing - use your ThoughtSpot credentials
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    myTestUser   = '';
+    myTestPW     = '';
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    async connectedCallback() {
+        console.log("### Loading the ThoughtSpotSDK...");
+        this.loadTSSDK();
+    }
+
+    loadTSSDK() {
+        loadScript(this, thoughtSpotSDK)
+            .then(() => {
+                // ThoughtSpot library loaded successfully
+                console.log("### SDK successfully loaded...initializing embed");
+                this.initSDKEmbed();
+            })
+            .catch(error => {
+                // Error occurred while loading the ThoughtSpot library
+                this.handleError(error);
+            });
+    }
+
+    async initSDKEmbed() {
+        const containerDiv = this.template.querySelector(
+            'div.thoughtspotObject'
+        );
+
+        try {
+            this.embedInit = tsembed.init({
+                thoughtSpotHost: this.tsURL,
+                authType: tsembed.AuthType.Basic,
+                username: this.myTestUser,
+                password: this.myTestPW,
+                org_id: this.tsOrg,
+                customizations: {
+                    style: {
+                        customCSSUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/css-variables.css", // location of your style sheet
+                
+                        // To apply overrides for your style sheet in this init, provide variable values below
+                        customCSS: {
+                            variables: {
+                                "--ts-var-button--secondary-background": "#9da7c2",  
+                                "--ts-var-button--secondary--hover-background": "#cacad5", 
+                                "--ts-var-button--primary--hover-background":"#cacad5",
+                                "--ts-var-button--primary-background": "#9da7c2", 
+                                "ts-var-button--primary-color": "#9da7c2",
+
+                                "--ts-var-root-background": "#b0c4df",
+                                "--ts-var-viz-border-radius": "22px",
+                                "--ts-var-viz-title-font-family": "Helvetica",
+                                "--ts-var-viz-background": "#ffffff",
+                                
+                                //"--ts-var-menu-color": "#",
+                                "--ts-var-menu-background": "#",
+                                "--ts-var-menu--hover-background": "#c9c9c9",
+                                "--ts-var-menu-font-family": "Helvetica",
+
+                                "--ts-var-chip-border-radius": "8px",
+                                "--ts-var-chip-box-shadow": false,
+                                "--ts-var-chip-background": "#4fbe75",
+                                "--ts-var-chip--active-color": "#CF112C",
+                                "--ts-var-chip--active-background": "#57a3fd",
+                                "--ts-var-chip--hover-color": "white",
+                                "--ts-var-chip--hover-background": "#A4A4A3",
+                                "--ts-var-chip-color": "#F9F6EE",
+                            },
+                        },
+                    },
+                    },
+            });
+
+            if( this.embedType === "Liveboard" ) {
+
+                console.log('### Configuring ' + this.embedType + ' embed');
+                console.log("### RECORD ID: ", this.recordId);
+    
+                this.embedObj = new tsembed.LiveboardEmbed(containerDiv, {
+                    frameParams: {
+                    },
+                    fullHeight: this.fullHeight,
+                    hideLiveboardHeader: this.hideLiveboardHeader,
+                    showLiveboardTitle: this.showLiveboardTitle,
+                    liveboardId: this.tsObjectId,
+                });
+            } 
+            else if(this.embedType === "Spotter") {
+
+                console.log('### Configuring ' + this.embedType + ' embed');
+
+                this.embedObj = new tsembed.ConversationEmbed(containerDiv, {
+                    frameParams: {
+                        height: 800,
+                    },
+                    worksheetId: this.tsObjectId,
+                });
+            } else {
+                console.log("###ERROR: No embed type selected in meta xml");
+            }
+
+            this.embedObj.render();
+
+            }
+            catch (error) {
+                console.error('Error:', error);
+            }
+    }
+
+    handleError(error) {
+        console.error('Error loading TS library:', error.message || error);
+    }
+}
+----
+
+====
+
+[%collapsible]
+.LWC Git Repo
+====
+We can provide all the code needed to get you started. Contact your ThoughtSpot sales representitive for access to our Git repos.
+
+NOTE: we have a team of embedding engineers who can help you
+====
+
+=== iFrame
+
+If you have configured ThoughtSpot to use the same SAML provider as your Salesforce instance, you can create a simple Visualforce page that can seamlessly embed a ThoughtSpot Liveboard or Answer.
+
+* Create a new Visualforce page in Salesforce
+** Setup -> Visualforce Pages -> New
+
+The following code example can be used for the new page. It defines the iFrame, with the ThoughtSpot URL using a runtime filter to personalize the results to the Salesforce user:
+
+TIP: Use only if embedding into *Salesforce Classic*
+
+
+[source, xml]
+----
+<apex:page standardController="Account" tabStyle="Account">
+  <apex:pageBlock title="ThoughtSpot"> 
+    <apex:iframe src="https://{thoughtspot-server}/?embedApp=true&p&col1={field_name}&op1=EQ&val1={!Account.Id}&OrgID={org_id}#/embed/viz/{liveboard_guid}
+" scrolling="true" height="800">
+    </apex:iframe>
+  </apex:pageBlock>
+</apex:page>
+----
+
+[NOTE]
+.Variable substitution required
+====
+
+* `{thoughtspot-server}` your ThoughtSpot host url.
+* `{field_name}` represents the column from your ThoughtSpot model to be filtered.
+* `{!account.Id}` is a Salesforce APEX variable, the value is automatically known based on the record page you are embedding into. The filter values you can pass is based on the `standardController=<object>` you set when configuring the apex page.
+* `{org_id}`` if using orgs in ThoughtSpot, provide your org identifier.  If not using orgs, set to 0.
+* `{liveboard_guid}` your liveboard identifier.
+====
+
+== Single Sign-On (SSO) Options
+Authentication is a critical component of embedding ThoughtSpot in Salesforce. The two primary options are:
+
+=== SAML-Based SSO
+* Allows users to authenticate via Salesforce’s Identity Provider (IdP).
+* Provides a seamless login experience without requiring additional credentials.
+* Requires ThoughtSpot to be configured as a service provider (SP).
+
+=== Trusted Authentication
+* Uses a secure token-based approach for authentication.
+* Provides more control over user access and permissions.
+* Ideal for embedding within customized Salesforce experiences.
+* Seamless embedding within the Salesforce mobile app.
+
+== Customization and Branding with the SDK
+The ThoughtSpot SDK allows extensive customization, including:
+* Styling the embedded Liveboards to match Salesforce’s look and feel.
+* Implementing filters and interactive elements.
+* Controlling user experience via ThoughtSpot’s developer-friendly APIs.
+
+== Conclusion
+Embedding ThoughtSpot into Salesforce enhances analytics accessibility, enabling users to gain insights without leaving their CRM. Whether using the ThoughtSpot SDK or iframe-based approaches, choosing the right authentication and embedding method is essential. By leveraging LWC and customizing ThoughtSpot’s appearance, organizations can create a seamless and powerful analytics experience within Salesforce.
+
