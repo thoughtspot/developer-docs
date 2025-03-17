@@ -1,15 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown';
-import { VERSION_DROPDOWN, TS_Version } from '../../configs/doc-configs';
+import { VERSION_DROPDOWN } from '../../configs/doc-configs';
 
 import './index.scss';
+
+interface VersionOption {
+    label: string;
+    link: string;
+    subLabel: string;
+    iframeUrl?: string;
+}
 
 const Dropdown = (props: { location: Location; isMobile: boolean }) => {
     const { location } = props;
     const options = VERSION_DROPDOWN;
-    const [currentVersion, setCurrentVersion] = useState({});
+    const [currentVersion, setCurrentVersion] = useState(options[0]);
 
     useEffect(() => {
+        const currentPath = location.pathname;
+        if (
+            currentPath === '/' ||
+            currentPath.startsWith('/introduction') ||
+            !currentPath.includes('-')
+        ) {
+            const latestVersion = options.find(
+                (option) => option.link === ' ' || option.link === '',
+            );
+            if (latestVersion) {
+                setCurrentVersion(latestVersion);
+                return;
+            }
+        }
+
+        const versionFromPath = options.find(
+            (option) =>
+                option.link !== ' ' &&
+                option.link !== '' &&
+                currentPath.includes(option.link),
+        );
+
+        if (versionFromPath) {
+            setCurrentVersion(versionFromPath);
+            return;
+        }
+
         const params = new URLSearchParams(location.search);
         const version =
             params.get('version') || localStorage.getItem('version');
@@ -18,14 +52,23 @@ const Dropdown = (props: { location: Location; isMobile: boolean }) => {
                 return label === version;
             }) || options[0];
         if (selectedOption) setCurrentVersion(selectedOption);
-    }, []);
+    }, [location.pathname]);
 
-    const handelClick = ({ label, link }) => {
-        // const params = new URLSearchParams(location.search);
-        // params.set('version', label);
+    const handelClick = (option: VersionOption) => {
+        const { label, link, iframeUrl } = option;
 
         localStorage.setItem('version', label);
-        window?.location?.replace(link);
+
+                if (link === ' ' || link === '') {
+            window?.location?.assign('/');
+            return;
+        }
+
+        if (iframeUrl && link !== ' ') {
+            window?.location?.assign(link);
+        } else {
+            window?.location?.replace(link);
+        }
     };
 
     return (
