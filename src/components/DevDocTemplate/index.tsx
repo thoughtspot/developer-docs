@@ -207,6 +207,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     }, []);
 
     useEffect(() => {
+         // This is to send navigation events to the parent app (if in Iframe)
+        // So that the parent can sync the url
+        const urlParams = new URLSearchParams(location.search);
+        const darkModeParam = urlParams.get('isDarkMode');
+        setDarkMode(darkModeParam === 'true');
         window.parent.postMessage(
             {
                 params: {
