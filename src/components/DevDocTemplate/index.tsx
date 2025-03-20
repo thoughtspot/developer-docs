@@ -158,6 +158,22 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             setKey('dark');
         }
     }, []);
+
+    // Listen for theme change messages
+    useEffect(() => {
+        const handleThemeMessage = (event: MessageEvent): void => {
+            if (event.data && event.data.type === 'THEME_CHANGE') {
+                setDarkMode(event.data.isDarkMode);
+            }
+        };
+
+        window.addEventListener('message', handleThemeMessage);
+
+        return () => {
+            window.removeEventListener('message', handleThemeMessage);
+        };
+    }, []);
+
     const getSearch = () => {
         const SearchIconHTML = getHTMLFromComponent(<BiSearch />, 'searchIcon');
 
@@ -192,6 +208,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)
         // So that the parent can sync the url
+        const urlParams = new URLSearchParams(location.search);
+        const darkModeParam = urlParams.get('isDarkMode');
+        setDarkMode(darkModeParam === 'true');
         window.parent.postMessage(
             {
                 params: {
