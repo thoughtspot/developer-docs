@@ -159,22 +159,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         }
     }, []);
 
-    // Listen for theme change messages
-    useEffect(() => {
-        console.log('checking');
-        const handleThemeMessage = (event: MessageEvent): void => {
-            if (event.data && event.data.type === 'THEME_CHANGE') {
-                setDarkMode(event.data.isDarkMode);
-            }
-        };
-
-        window.addEventListener('message', handleThemeMessage);
-
-        return () => {
-            window.removeEventListener('message', handleThemeMessage);
-        };
-    }, []);
-
     const getSearch = () => {
         const SearchIconHTML = getHTMLFromComponent(<BiSearch />, 'searchIcon');
 
