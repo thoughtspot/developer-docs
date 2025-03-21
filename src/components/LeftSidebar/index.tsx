@@ -71,7 +71,7 @@ const LeftSideBar = (props: {
                 const separator = hasParams ? '&' : '?';
                 link.setAttribute(
                     'href',
-                    `${href}${separator}isDarkTheme=${props.isDarkMode}`,
+                    `${href}${separator}isDarkMode=${props.isDarkMode}`,
                 );
             }
         });
