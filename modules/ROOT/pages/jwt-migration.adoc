@@ -6,10 +6,14 @@
 :page-pageid: abac-migration-guide
 :page-description: Steps for migrating your implementation to use custom token API workflow
 
-If your application instance is upgraded 10.4.0.cl or later version, ThoughtSpot recommends using the the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">/api/rest/2.0/auth/token/custom</a>+++ API endpoint to xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[generate a JWT token with custom security rules] instead of the `user_parameters` property in `/api/rest/2.0/auth/token/full` and `/api/rest/2.0/auth/token/object` APIs. The `user_parameters` property is deprecated in 10.4.0.cl.
+If your application instance is upgraded to 10.4.0.cl or a later version, ThoughtSpot recommends using +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">/api/rest/2.0/auth/token/custom</a>+++ API endpoint to xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[generate a JWT token with custom security rules] instead of former `/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` API endpoints.
 
-If your current application environment is using the beta version of the ABAC, follow the steps described in this article to smoothly migrate your ABAC implementation with the `/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` API endpoint to the new `/api/rest/2.0/auth/token/custom` API workflow. If you need additional help and assistance, contact ThoughtSpot Support.
+For new implementations of data security using JWT tokens, refer to the xref:abac-user-parameters.adoc[ABAC via tokens documentation] for guidance.
 
+If your current application environment is using the beta version of ABAC, follow the steps described in this article to smoothly migrate your ABAC implementation from using `/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` API endpoint to using `/api/rest/2.0/auth/token/custom`.
+
+
+////
 == Feature rollout
 
 To control the enablement and rollout of the ABAC via tokens feature, ThoughtSpot provides the following configuration settings:
@@ -20,6 +24,8 @@ Enabled by default on all ThoughtSpot instances running 9.12.5.cl and later. It 
 Disabled by default on ThoughtSpot instances. It controls the availability of the ABAC token generation method via `/api/rest/2.0/auth/token/custom` API endpoint.
 * `honorJwTokenParametersFromBetaEndpoint` +
 Enabled by default on all instances running 10.5.0.cl and later. This setting governs which API endpoint is used for ABAC token generation. When set to `true`, the ABAC implementation with the `/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` API endpoint is explicitly chosen as the default JWT token method for the cluster, regardless of the status of the `mandatoryTokenFilterFeatureEnabled` flag.
+////
+
 
 == User properties
 
@@ -59,15 +65,15 @@ In the beta version of ABAC implementation with the V2.0 Get token APIs (`/api/r
     }
   }
 ]
-
 ----
 
 [IMPORTANT]
 ====
-* If the `persist` attribute is set as `true` for the beta version of the JWT tokens generated using the `/api/rest/2.0/auth/token/full` endpoint, it will be updated as `"persist_option": "REPLACE"` in the user's `access_control_properties` after migration. +
-On instances running 10.4.0.cl, the persist option for the tokens generated using the `/api/rest/2.0/auth/token/custom` API appends new conditions by default, instead of replacing the existing rules. To replace the persisted attributes, set `persist_option=RESET` via a POST API call to `/api/rest/2.0/auth/token/custom`, and then send another API request with `persist_option=APPEND`.
+* If the `persist` attribute is set as `true` for the beta version of the JWT tokens generated via `/api/rest/2.0/auth/token/full` endpoint, please set the `persist_option` parameter to `REPLACE` in your API request to `/api/rest/2.0/auth/token/custom` to replicate this behavior after migration. +
 
-* The JWT tokens generated via `/api/rest/2.0/auth/token/custom` do not support runtime sorting.  If there are  any runtime sorting rules applied via JWT tokens generated from the `/api/rest/2.0/auth/token/full` API call, they will be ignored during migration.
+* On instances running 10.4.0.cl, the persist option for the tokens generated via `/api/rest/2.0/auth/token/custom` API endpoint uses the `APPEND` value by default, which appends the new conditions instead of replacing the existing rules. To replace the persisted attributes, set `persist_option` to `RESET` in your POST API call to `/api/rest/2.0/auth/token/custom`, and then send another API request with `persist_option` set as `APPEND`.
+
+* The JWT tokens generated via `/api/rest/2.0/auth/token/custom` do not support runtime sorting.  If there are any runtime sorting rules applied via JWT tokens generated from the `/api/rest/2.0/auth/token/full` API call, they will be ignored during migration.
 ====
 
 == Migration steps
@@ -105,17 +111,18 @@ If your ThoughtSpot instance is running 10.3.0.cl or earlier version, you must e
 
 ////
 
-=== Step 1: Enable the workflow with custom token API endpoint
+=== Step 1: Enable the API workflow for the custom token endpoint
 
-Create a ThoughtSpot Support request and ask for the JWT settings to be enabled on your instance. These settings will include the following:
+Create a ThoughtSpot Support request and ask for assistance to migrate to the JWT GA API workflow (`/api/rest/2.0/auth/token/custom`).
 
+////
 * A quick patch of your environment that adds the JWT flags to your instance.
 * Enabling the `honorJwTokenParametersFromBetaEndpoint` setting to ensure that your current JWT setup is honored while you work on the migration steps.
 * Setting the `mandatoryTokenFilterFeatureEnabled` attribute to `true` that allows you to set up security by default on the Worksheets or Models that you want to use for JWT security entitlements.
+////
 
-=== Step 2: Flag columns whose data will be secured using the JWT endpoint.
-
-Navigate to your Worksheets / Models and set `is_mandatory_token_filter` to `true` on columns that you wish to secure via `filter_rules` set for ABAC.
+=== Step 2: Set flags for columns and apply security rules
+Navigate to your Worksheets / Models and set `is_mandatory_token_filter` to `true` on columns you wish to secure via `filter_rules` set for ABAC.
 
 [.widthAuto]
 [.bordered]
@@ -123,14 +130,20 @@ image:./images/worksheet-jwt-token-setting.png[Filter settings for ABAC token]
 
 For more information about `filter_rules`, see xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[Get tokens with custom rules and filter conditions].
 
-=== Step 3: Familiarize with the custom token authentication endpoint
+=== Step 3: Build API requests for the custom token endpoint
+Using a ThoughtSpot development instance, you can enable the `/api/rest/2.0/auth/token/custom` endpoint to test how to create new JWT token requests, as well as test the behavior for your application user.
 
-After migration or upgrade to ThoughtSpot 10.4.0.cl or later, you'll need to use the `/api/rest/2.0/auth/token/custom` API endpoint to apply security entitlements via JWT authentication tokens.
+We recommend using the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">REST API v2 Playground</a>+++ to familiarize yourself with the request payload and send test requests to demo users.
 
-We recommend using the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">REST API v2 Playground</a>+++ to familiarize yourself with the request payload and send test requests to demo users. Note that your production users will still be authenticated and secured via the `POST /api/rest/2.0/auth/token/full` endpoint until you complete the migration steps.
+Note that an instance can only use either the JWT Beta API endpoint (`/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object`) or the JWT GA API endpoint (`/api/rest/2.0/auth/token/custom`) to define security rules and thus avoid ambiguity.
 
-=== Step 4: Create a script to migrate to the new endpoint
+=== Step 4: Switch your workflow to auth/token/custom endpoint
 
+To schedule your migration, please contact ThoughtSpot Support. We will help you verify the functionality of the new GA API endpoint (`/api/rest/2.0/auth/token/custom`) for your users and disable the JWT token generation workflow with beta endpoints (`/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` upon successful validation.
+
+For more information about the API request and response workflow to the custom token endpoint (JWT GA API endpoint), see xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[Get tokens with custom rules and filter conditions].
+
+////
 Before creating a script, check the status of the `honorJwTokenParametersFromBetaEndpoint` flag on your instance:
 
 . Send a `GET` request to the `/api/rest/2.0/system/config-overrides` API endpoint.
@@ -195,6 +208,7 @@ Your users will now be logged in ThoughtSpot and assigned security entitlements 
 
 After the transition period and when ThoughtSpot confirms that the `honorJwTokenParametersFromBetaEndpoint` setting is disabled on your instance, you can update your script and start using `/api/rest/2.0/auth/token/custom` endpoint. For more information about this endpoint, see xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[Get tokens with custom rules and filter conditions].
 
+////
 
 == Additional resources
 
