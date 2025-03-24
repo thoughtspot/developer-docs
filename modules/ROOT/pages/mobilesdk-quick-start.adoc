@@ -1,0 +1,193 @@
+= Embed ThoughtSpot  using React Native Mobile SDK
+:toc: true
+:toclevels: 2
+
+:page-title: Embed ThoughtSpot with mobile SDK
+:page-pageid: embed-ts-mobile-react-native
+:page-description: Using mobile SDK, you can now embed ThoughtSpot in your mobile apps
+
+ThoughtSpot's Mobile Embed SDK enables developers to embed ThoughtSpot Analytics in their mobile apps. The Mobile SDK is designed for the React Native framework to allow developers to build their mobile apps that run on *iOS* and *Android* platforms, using native resources and a single codebase.
+
+In the initial release, Mobile SDK supports embedding ThoughtSpot's Liveboard component and customizing the Liveboard view for the mobile app.
+
+To know how to embed ThoughtSpot content in your mobile app using the Mobile Embed SDK, follow the steps described in this Quick Start Guide.
+
+== Before you begin
+
+Before you get started, check the following:
+
+* You have access to a ThoughtSpot instance with necessary credentials.
+* Node.js and NPM are installed on your system.
+* link:https://reactnative.dev/docs/environment-setup[React Native environment, window=_blank] is set up.
+* If you are using Expo to build your application:
+** Ensure that the link:https://docs.expo.dev/tutorial/create-your-first-app/[Expo project is created, window=_blank].
+** The link:https://expo.dev/go[Expo Go, window=_blank] app installed on your mobile device (iOS or Android) to preview the app.
+
+== Get started with Embedding
+This section provides a set of steps to quickly embed a ThoughtSpot xref:faqs.adoc#lbDef[Liveboard] in a mobile app.
+
+=== Install the SDK
+
+The latest version of the Mobile Embed SDK is available at <TBD - Add NPMS site link when the SDK is published>
+
+[source,console]
+----
+npm install @thoughtspot/react-native-mobile-sdk
+----
+
+=== Import the SDK into your project
+
+[source,JavaScript]
+----
+ // NPM
+ import { LiveboardEmbed, AuthType, init } from '@thoughtspot/react-native-mobile-sdk';
+----
+
+After you import, your project should have the following files:
+
+* `Auth.ts` +
+Used for authentication with ThoughtSpot's REST API to get the authentication token.
+* `App.tsx` +
+Contains the main app setup with React navigation for screen transitions.
+* `Home.tsx` +
+The home page where you enter ThoughtSpot credentials to authenticate and view the embedded Liveboard. You can  use this file to update the `tsHost`, `username`, and `secretKey` values that match your ThoughtSpot account details. This file also includes the ID of the Liveboard that you'll embed in your mobile app.
+* `LiveboardView.tsx` +
+The view that embeds the Liveboard content using the `LiveboardEmbed` component from the SDK.
+
+=== Initialize the SDK and set up authentication
+
+To initialize the SDK, the following information is required:
+
+* `thoughtSpotHost` +
+The hostname of your ThoughtSpot application instance. For example, `team2.thoughtspot.cloud`. See xref:faqs.adoc#tsHostName[FAQs] to know how to find the hostname of your application instance.
+* `authType` +
+Authentication type. In the current version, mobile embedding supports only the Cookieless Trusted authentication method (`AuthType.TrustedAuthTokenCookieless`)
+
+[source,TypeScript]
+----
+init({
+    thoughtSpotHost: '<%=tshost%>',
+    authType: AuthType.TrustedAuthTokenCookieless,
+    getAuthToken: async () => Token,
+});
+----
+
+=== Add the Liveboard component
+
+[source,TypeScript]
+----
+const LiveboardEmbedView = () => {
+
+    return (
+        <LiveboardEmbed
+            ref = {webViewRef}
+            liveboardId={liveboardId}
+        />
+    )
+}
+----
+
+=== Build your app and preview the embedded content
+
+Build your app:
+[,bash]
+----
+$ npm run build
+----
+
+If you are using Expo project:
+
+. Build your project locally
++
+[,bash]
+----
+expo start
+----
+. Scan the QR code with the *Expo Go* app to see the app with the embedded content.
+
+== Customize your embedded page
+Just like the Visual Embed SDK for web application embed, the Mobile Embed SDK provides the following customziation options:
+
+* Control the xref:embed-actions.adoc[visibility of menu actions on the embedded page].
+* Customize app interactions and enable custom workflows with xref:embed-events.adoc[Embed and Host events].
+* Customize the styles and UI layout of the embedded view using ThoughtSpot's xref:css-customization.adoc[CSS customization framework].
+
+In the following code sample, the embedded view is customized to show only Drill down (`Action.DrillDown`) and Add filters (`Action.AddFilter`) actions. This code also includes embed events that register event listeners to log data or trigger a response from the app.
+
+[source,typescript]
+----
+import React, { useRef, useState } from 'react';
+import { StyleSheet, View, Text, Alert, TouchableOpacity } from 'react-native';
+import { Action, HostEvent, LiveboardEmbed } from '@thoughtspot/react-native-embed-sdk';
+
+export const LiveboardView = ({ navigation, route }) => {
+  const { viewConfig } = route.params;
+  const [loading, setLoading] = useState(true);
+  const webViewRef = useRef(null);
+
+  const reloadView = () => {
+    if (webViewRef?.current) {
+      webViewRef.current.trigger(HostEvent.Reload);
+    }
+  };
+
+  const goBack = () => {
+    if (webViewRef?.current) {
+      webViewRef.current.trigger(HostEvent.Share);
+    }
+  };
+
+  return (
+    <View style={styles.embedContainer}>
+      <LiveboardEmbed
+        ref={webViewRef}
+        liveboardId={viewConfig.liveboardId}
+        onAuthInit={() => setLoading(false)}
+        onError={(error) => Alert.alert("Error", `Error: ${JSON.stringify(error)}`)}
+        onLiveboardRendered={() => Alert.alert("Success", "Liveboard Rendered")}
+        visibleActions={[Action.DrillDown, Action.AddFilter]}
+        fullHeight={true}
+      />
+      {/* Optional buttons to reload or go back */}
+      <TouchableOpacity onPress={reloadView} style={styles.button}>
+        <Text>Reload View</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={goBack} style={styles.button}>
+        <Text>Go Back</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  embedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  button: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#007bff',
+    borderRadius: 5,
+  },
+});
+----
+
+== Test the App
+
+Once the app is running, you can enter your ThoughtSpot credentials and press "Connect" to authenticate. After successful authentication, it will navigate to the `LiveboardView`, where you can interact with the embedded Liveboard.
+
+<Add screeshots of the Liveboard view and customized content>
+
+
+== Known limitations
+
+<List feature limitations, styles, events and action customization options that are not available /work as expected>.
+
+
+== Additional resources
+
+* link:https://github.com/@thoughtspot/react-native-embed-sdk[Mobile Embed SDK (React Native) GitHub Repository, window=_blank]
+* link:https://snack.expo.dev/@git/github.com/thoughtspot/developer-examples:mobile/react-native-embed-sdk[Expo code sandbox, window=_blank]
