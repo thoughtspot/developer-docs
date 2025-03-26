@@ -83,6 +83,33 @@ liveboardEmbed.trigger(HostEvent.UpdateParameters, [{
 ])
 ----
 
+== Runtime parameters in object URLs
+
+You can apply overrides to Parameter values at runtime and visualize data with the adjusted values. Like runtime filters, you can append the Parameter attribute to the object URLs and modify the resulting output.
+
+For example, if you want to override the value of the inflation Parameter on a Liveboard or Answer, add the Parameters to the object URL as shown in these examples:
+
+.Liveboard
+----
+https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/pinboard/d084c256-e284-4fc4-b80c-111cb606449a
+----
+
+.Saved Answer
+----
+https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/saved-answer/3e84d95c-986e-4154-8362-3807906dad50
+----
+
+.Search data
+----
+https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/answer/
+----
+
+
+[IMPORTANT]
+====
+ThoughtSpot returns an error if an object URL with Parameter attributes exceeds 2000 characters.
+====
+
 == Apply Parameter overrides via REST API
 
 You can apply Parameter overrides to a Liveboard or Answer using REST v1 and v2 API endpoints.
@@ -274,29 +301,48 @@ curl -X POST \
 }'
 ----
 
-== Runtime parameters in object URLs
+== Show or hide Parameter chips in embedded sessions
+Parameter values can be set or overridden using multiple methods. In some use cases, you may want to hide the Parameter chips from ThoughtSpot's UI, while in other cases you may want to show the chips.
 
-You can apply overrides to Parameter values at runtime and visualize data with the adjusted values. Like runtime filters, you can append the Parameter attribute to the object URLs and modify the resulting output.
+=== Hide Parameter chips
+To hide the parameter chip in ThoughtSpot's UI, initialize a Parameter override before loading ThoughtSpot's page by using one of the following methods:
 
-For example, if you want to override the value of the inflation Parameter on a Liveboard or Answer, add the Parameters to the object URL as shown in these examples:
+* Use the `runtimeParameters` option in ThoughtSpot's Visual Embed SDK (Recommended)
+* Apply a Parameter override directly in the URL (if you are not using Visual Embed SDK)
 
-.Liveboard
-----
-https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/pinboard/d084c256-e284-4fc4-b80c-111cb606449a
-----
+To update the parameter's value once the page is loaded, use `HostEvent.UpdateParameters`. The Parameter chip will remain hidden, however its value in ThoughtSpot's visualizations will be updated accordingly.
 
-.Saved Answer
-----
-https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/saved-answer/3e84d95c-986e-4154-8362-3807906dad50
-----
+== Show Parameter chip in ThoughtSpot UI
+To show the parameter chip from ThoughtSpot's user interface, update the Parameter's value with `HostEvent.UpdateParameters` after the page has loaded. The Parameter chip will then be shown and updated with each new value passed via the event.
 
-.Search data
-----
-https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/answer/
-----
+[width="100%" cols="5,5,8"]
+[options='header']
+|=====
+|Parameter chip|Initialized via `runtimeParameters` or URL parameter? |Update via `HostEvent.UpdateParameters`
+|Hidden|Yes| Possible
+|Shown| No| Possible
+|=====
+
+== Parameters and JWT tokens
+Parameters work differently when used in JWT tokens to secure values for users.
+Setting a Parameter value via a JWT token will not hide the Parameter value by default. It lets you display a placeholder value on the Parameter chip, for example “Secured”, to indicate that the Parameter is used for security purposes. Note that the placeholder Parameter value is the default value set in your Parameter. Business users will see this value on the Parameter chip. However, the value of the parameter being used in the data displayed will be the one passed via the JWT token.
+
+Regardless of the user's interaction with the Parameter chip, Parameter values initiated via the JWT token cannot be overridden through the UI, to guarantee its use for security purposes only.
+
+ThoughtSpot recommends hiding the Parameter chip while using a JWT token to minimize confusion. To do so, set the `is_hidden` flag to `true` in the Worksheet TML for all Parameter columns that you wish to hide from ThoughtSpot's user interface:
+
+[.widthAuto]
+image:./images/parameter_hidden.png[Parameter hidden]
+
+[width="100%" cols="5,5,8"]
+[options='header']
+|=====
+|Is the Parameter value passed via a JWT?|
+Is the `is_hidden` property enabled for the Parameter in the Worksheet/Model? |Parameter chip behavior
+|Yes|No| The Parameter chip is visible and shows the parameter's default value. It uses the
+ Parameter value defined in the JWT in the data.
+User interactions with the filter chip will be ignored due to Parameter value defined via JWT token being locked.
+|Yes|Yes| The Parameter chip will be hidden. Uses the Parameter value defined in the JWT token.
+|=====
 
 
-[IMPORTANT]
-====
-ThoughtSpot returns an error if an object URL with Parameter attributes exceeds 2000 characters.
-====
