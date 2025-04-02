@@ -113,7 +113,7 @@ const isCurrentNavOpen = (liEle: HTMLLIElement, activePageid: string) => {
         paraEle &&
         isLinkMatching(
             (paraEle.children[0] as HTMLAnchorElement)?.href ||
-                (paraEle.children?.[0].children?.[0] as HTMLAnchorElement)
+                (paraEle.children?.[0]?.children?.[0] as HTMLAnchorElement)
                     ?.href,
             window.location,
             activePageid,
