@@ -62,20 +62,6 @@ const LeftSideBar = (props: {
             tag.classList.add('active');
         }
 
-
-        divElement.querySelectorAll('a').forEach((link) => {
-            const href = link.getAttribute('href');
-            if (href && !href.includes('://') && !href.startsWith('#')) {
-                // Only modify internal links (not external or anchor links)
-                const hasParams = href.includes('?');
-                const separator = hasParams ? '&' : '?';
-                link.setAttribute(
-                    'href',
-                    `${href}${separator}isDarkMode=${props.isDarkMode}`,
-                );
-            }
-        });
-
         const updatedHTML = addExpandCollapseImages(
             divElement.innerHTML,
             params[TS_PAGE_ID_PARAM],

@@ -156,21 +156,20 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         }
     }, []);
 
-    // Effect to handle URL parameters for dark mode
+    // Listen for theme change messages
     useEffect(() => {
-        if (isBrowser()) {
-            // Check URL for isDarkMode parameter
-            const urlParams = new URLSearchParams(window.location.search);
-            const darkModeParam = urlParams.get('isDarkMode');
-
-            if (darkModeParam !== null) {
-                // Update dark mode state from URL parameter
-                const newDarkMode = darkModeParam === 'true';
-                setDarkMode(newDarkMode);
-                localStorage.setItem('theme', newDarkMode ? 'dark' : 'light');
+        const handleThemeMessage = (event: MessageEvent): void => {
+            if (event.data && event.data.type === 'THEME_CHANGE') {
+                setDarkMode(event.data.isDarkMode);
             }
-        }
-    }, [location.search]);
+        };
+
+        window.addEventListener('message', handleThemeMessage);
+
+        return () => {
+            window.removeEventListener('message', handleThemeMessage);
+        };
+    }, []);
 
     const getSearch = () => {
         const SearchIconHTML = getHTMLFromComponent(<BiSearch />, 'searchIcon');
@@ -206,6 +205,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)
         // So that the parent can sync the url
+        const urlParams = new URLSearchParams(location.search);
+        const darkModeParam = urlParams.get('isDarkMode');
+        setDarkMode(darkModeParam === 'true');
         window.parent.postMessage(
             {
                 params: {
