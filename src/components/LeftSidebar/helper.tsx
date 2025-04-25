@@ -26,7 +26,7 @@ export const addExpandCollapseImages = (
     nav.innerHTML = navContent;
     nav.classList.add('navWrapper');
 
-    nav.querySelectorAll('li').forEach((el, i) => {
+    nav.querySelectorAll('li').forEach((el, index) => {
         if (el.children.length === 2) {
             const paragraphElement = el.children[0];
             if (paragraphElement.childNodes.length < 2) {
@@ -37,22 +37,32 @@ export const addExpandCollapseImages = (
                 const spanElementParent = document.createElement('span');
                 spanElementParent.classList.add('iconSpan');
                 const spanElementChild = document.createElement('span');
-                if (tabsClosed[text] === undefined || !tabsClosed[text]) {
+                
+                // Default state is collapsed (i.e., closed)
+                spanElementChild.innerHTML = ArrowForwardHTML;
+                el.children[1].classList.add('displayNone');
+                
+                // Only open if explicitly marked as open in tabsClosed
+                if (tabsClosed[text] === true) {
                     spanElementChild.innerHTML = ArrowDownHTML;
-                } else {
-                    spanElementChild.innerHTML = ArrowForwardHTML;
-                    el.children[1].classList.add('displayNone');
+                    el.children[1].classList.remove('displayNone');
                 }
 
-                // Checking if this div contains the active link
+                // Check if this div contains the active link
+                let containsActivePage = false;
                 const allLinks = el.children[1].querySelectorAll('a');
-                for (let i = 0; i < allLinks.length; i++) {
-                    const splitArr = allLinks[i].href.split('=');
+                for (let j = 0; j < allLinks.length; j++) {
+                    const splitArr = allLinks[j].href.split('=');
                     if (splitArr.length > 1 && splitArr[1] === pageId) {
-                        spanElementChild.innerHTML = ArrowDownHTML;
-                        el.children[1].classList.remove('displayNone');
+                        containsActivePage = true;
                         break;
                     }
+                }
+                
+                // If this section contains the active page, always expand it
+                if (containsActivePage) {
+                    spanElementChild.innerHTML = ArrowDownHTML;
+                    el.children[1].classList.remove('displayNone');
                 }
 
                 // Adding arrow icon to the p tags
@@ -90,20 +100,23 @@ const isLinkMatching = (
 
     // Tutorials module pages have pageids like {subdirectory}_{real_url_ending}, must be split to generate matching URL
     const pageIdSplit = pageid.split('__');
-    if (pageIdSplit.length > 1){
-         return (
-            href.includes(`pageid=${pageid}`) ||
-            href.includes(`/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}#`) ||
-            href.endsWith(`/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}`)
-        );
-    }
-    else {
+    if (pageIdSplit.length > 1) {
         return (
             href.includes(`pageid=${pageid}`) ||
-            href.includes(`/${encodeURI(pageid)}#`) ||
-            href.endsWith(`/${encodeURI(pageid)}`)
+            href.includes(
+                `/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}#`,
+            ) ||
+            href.endsWith(
+                `/${encodeURI(pageIdSplit[0])}/${encodeURI(pageIdSplit[1])}`,
+            )
         );
     }
+
+    return (
+        href.includes(`pageid=${pageid}`) ||
+        href.includes(`/${encodeURI(pageid)}#`) ||
+        href.endsWith(`/${encodeURI(pageid)}`)
+    );
 };
 
 const isCurrentNavOpen = (liEle: HTMLLIElement, activePageid: string) => {
@@ -113,7 +126,7 @@ const isCurrentNavOpen = (liEle: HTMLLIElement, activePageid: string) => {
         paraEle &&
         isLinkMatching(
             (paraEle.children[0] as HTMLAnchorElement)?.href ||
-                (paraEle.children?.[0].children?.[0] as HTMLAnchorElement)
+                (paraEle.children?.[0]?.children?.[0] as HTMLAnchorElement)
                     ?.href,
             window.location,
             activePageid,
@@ -145,6 +158,25 @@ export const collapseAndExpandLeftNav = (
     doc?.querySelectorAll(selectors.links).forEach((link) => {
         link.addEventListener('click', () => {
             setLeftNavOpen(false);
+
+            // When a link is clicked, store its parent's expanded state
+            // This will prevent the menu from collapsing during navigation
+            const parentLi = link.closest('li');
+            if (
+                parentLi &&
+                parentLi.parentElement &&
+                parentLi.parentElement.parentElement
+            ) {
+                const grandparentLi = parentLi.parentElement.parentElement;
+                if (
+                    grandparentLi.tagName === 'LI' &&
+                    grandparentLi.children.length === 2
+                ) {
+                    const headerText = (grandparentLi
+                        .children[0] as HTMLParagraphElement).innerText;
+                    toggleExpandOnTab(headerText);
+                }
+            }
         });
     });
 
@@ -157,8 +189,11 @@ export const collapseAndExpandLeftNav = (
 
             const isOpen = isCurrentNavOpen(el, activePageid);
             const divElement = el.children[1];
-            if (!isOpen) {
-                divElement.classList.toggle('displayNone');
+
+            // REMOVED: The code that was auto-collapsing menus here
+            // Only expand menus containing the active page, don't collapse others
+            if (isOpen) {
+                divElement.classList.remove('displayNone');
             }
 
             if (spanElement && (spanElement.children[0] as HTMLImageElement)) {

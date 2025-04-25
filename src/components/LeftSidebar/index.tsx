@@ -61,6 +61,7 @@ const LeftSideBar = (props: {
         if (tag) {
             tag.classList.add('active');
         }
+
         const updatedHTML = addExpandCollapseImages(
             divElement.innerHTML,
             params[TS_PAGE_ID_PARAM],
