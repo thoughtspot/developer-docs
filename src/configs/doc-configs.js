@@ -35,9 +35,15 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '10.6.0.cl',
+            label: '10.8.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
+        },
+        {
+            label: '10.6.0.cl',
+            link: ' ',
+            subLabel: 'Cloud',
+            iframeUrl: 'https://developer-docs-10-6-0-cl.vercel.app/docs',
         },
         {
             label: '10.1.0.sw',
