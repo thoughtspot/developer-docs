@@ -18,8 +18,28 @@ const Dropdown = (props: { location: Location; isMobile: boolean }) => {
 
     useEffect(() => {
         const currentPath = location.pathname;
+
+        // First check if we're on a versioned path
+        const versionFromPath = options.find(
+            (option) =>
+                option.link !== ' ' &&
+                option.link !== '' &&
+                (currentPath.includes(`/${option.link}`) ||
+                    currentPath.includes(
+                        `/${option.link.replace(/\./g, '-')}`,
+                    )),
+        );
+
+        if (versionFromPath) {
+            setCurrentVersion(versionFromPath);
+            return;
+        }
+
+        // Check for latest version paths
         if (
             currentPath === '/' ||
+            currentPath === '/docs' ||
+            currentPath === '/docs/' ||
             currentPath.startsWith('/introduction') ||
             !currentPath.includes('-')
         ) {
@@ -32,18 +52,7 @@ const Dropdown = (props: { location: Location; isMobile: boolean }) => {
             }
         }
 
-        const versionFromPath = options.find(
-            (option) =>
-                option.link !== ' ' &&
-                option.link !== '' &&
-                currentPath.includes(option.link),
-        );
-
-        if (versionFromPath) {
-            setCurrentVersion(versionFromPath);
-            return;
-        }
-
+        // Check in /docs/ path
         if (currentPath.startsWith('/docs/')) {
             const pathParts = currentPath.split('/');
             if (pathParts.length >= 3) {
@@ -55,7 +64,10 @@ const Dropdown = (props: { location: Location; isMobile: boolean }) => {
                     const optionPath = option.link.startsWith('/')
                         ? option.link.substring(1)
                         : option.link;
-                    return optionPath === versionPathInDocs;
+                    return (
+                        optionPath === versionPathInDocs ||
+                        optionPath.replace(/\./g, '-') === versionPathInDocs
+                    );
                 });
                 if (matchingVersion) {
                     setCurrentVersion(matchingVersion);
@@ -64,6 +76,7 @@ const Dropdown = (props: { location: Location; isMobile: boolean }) => {
             }
         }
 
+        // Fallback to query params or localStorage
         const params = new URLSearchParams(location.search);
         const version =
             params.get('version') || localStorage.getItem('version');
