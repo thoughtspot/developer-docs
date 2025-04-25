@@ -2,7 +2,6 @@ const fsExtra = require('fs-extra');
 const {
     DOC_NAV_PAGE_ID,
     NOT_FOUND_PAGE_ID,
-    VERSION_DROPDOWN,
 } = require('./src/configs/doc-configs');
 const { getDocLinkFromEdge } = require('./src/utils/gatsby-utils.js');
 
@@ -84,23 +83,5 @@ exports.createPages = async function ({ actions, graphql }) {
                 context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
             });
         }
-    });
-
-    VERSION_DROPDOWN.forEach((version) => {
-        if (version.link === ' ' || !version.iframeUrl) {
-            return;
-        }
-
-        const versionPath = version.link.startsWith('/')
-            ? version.link.substring(1)
-            : version.link;
-
-        actions.createPage({
-            path: `/${versionPath}`,
-            component: require.resolve(
-                './src/components/DevDocTemplate/index.tsx',
-            ),
-            context: { iframeUrl: version.iframeUrl },
-        });
     });
 };

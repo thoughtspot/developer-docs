@@ -24,6 +24,7 @@ import RenderPlayGround from './playGround/RESTAPI';
 import GraphQLPlayGround from './playGround/GraphQL';
 import { AskDocs } from './askDocs';
 import {
+    DOC_NAV_PAGE_ID,
     TS_HOST_PARAM,
     TS_ORIGIN_PARAM,
     TS_PAGE_ID_PARAM,
@@ -36,7 +37,6 @@ import {
     HOME_PAGE_ID,
     CUSTOM_PAGE_ID,
     BUILD_ENVS,
-    VERSION_DROPDOWN,
 } from '../../configs/doc-configs';
 import {
     LEFT_NAV_WIDTH_DESKTOP,
@@ -46,10 +46,10 @@ import {
     MAX_CONTENT_WIDTH_DESKTOP,
     MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
 } from '../../constants/uiConstants';
+import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import { ThemeBuilder } from './playGround/ThemeBuilder';
-import VersionIframe from '../VersionIframe';
 
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
@@ -57,7 +57,25 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         location,
         pageContext: { namePageIdMap },
     } = props;
+
     const isBrowser = () => typeof window !== 'undefined';
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const queryParams = new URLSearchParams(window.location.search);
+            const pageId = queryParams.get('pageid');
+            if (pageId) {
+                queryParams.delete('pageid');
+                if (queryParams.toString()) {
+                    navigate(`/${pageId}?${queryParams.toString()}`, {
+                        replace: true,
+                    });
+                } else {
+                    navigate(`/${pageId}`, { replace: true });
+                }
+            }
+        }
+    }, [location.search, location.pathname]);
 
     const { curPageNode, navNode } = data;
 
@@ -117,19 +135,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const isThemeBuilder =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.THEME_BUILDER;
 
-    const isVersionedIframe = VERSION_DROPDOWN.some(
-        (version) =>
-            props?.pageContext?.iframeUrl &&
-            version.iframeUrl === props?.pageContext?.iframeUrl,
-    );
-
     const isGQPlayGround =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
-    const isPlayGround =
-        isGQPlayGround ||
-        isApiPlayground ||
-        isThemeBuilder ||
-        isVersionedIframe;
+    const isPlayGround = isGQPlayGround || isApiPlayground || isThemeBuilder;
 
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
@@ -155,23 +163,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             setKey('dark');
         }
     }, []);
-
-    // Effect to handle URL parameters for dark mode
-    useEffect(() => {
-        if (isBrowser()) {
-            // Check URL for isDarkMode parameter
-            const urlParams = new URLSearchParams(window.location.search);
-            const darkModeParam = urlParams.get('isDarkMode');
-
-            if (darkModeParam !== null) {
-                // Update dark mode state from URL parameter
-                const newDarkMode = darkModeParam === 'true';
-                setDarkMode(newDarkMode);
-                localStorage.setItem('theme', newDarkMode ? 'dark' : 'light');
-            }
-        }
-    }, [location.search]);
-
     const getSearch = () => {
         const SearchIconHTML = getHTMLFromComponent(<BiSearch />, 'searchIcon');
 
@@ -223,43 +214,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             '*',
         );
     }, [location.search, location.hash]);
-
-    // Listen for messages from the iframe
-    useEffect(() => {
-        const handleMessage = (e) => {
-            if (e.data?.params || e.data?.subsection) {
-                console.log('Iframe message:', e.data);
-
-                if (e.data?.params?.pageid && typeof window !== 'undefined') {
-                    const isVersionedIframeMessage =
-                        e.origin &&
-                        VERSION_DROPDOWN.some(
-                            (version) =>
-                                version.iframeUrl &&
-                                e.origin.includes(
-                                    new URL(version.iframeUrl).hostname,
-                                ),
-                        );
-
-                    if (!isVersionedIframeMessage) {
-                        return;
-                    }
-
-                    const url = new URL(window.location.href);
-
-                    // Check if URL has _iframe flag - prevents infinite loops
-                    if (url.searchParams.get('_iframe')) {
-                        return;
-                    }
-
-                    url.searchParams.set('pageid', e.data.params.pageid);
-                    window.history.replaceState({}, '', url.toString());
-                }
-            }
-        };
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, []);
 
     // fetch adoc translated doc edges using graphql
 
@@ -488,16 +442,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             return <ThemeBuilder backLink={backLink} />;
         }
 
-        if (isVersionedIframe) {
-            return (
-                <VersionIframe
-                    iframeUrl={props.pageContext.iframeUrl}
-                    isDarkMode={isDarkMode}
-                    location={location}
-                />
-            );
-        }
-
         return (
             <GraphQLPlayGround
                 location={location}
@@ -598,7 +542,6 @@ type DevDocTemplateProps = {
         namePageIdMap: {
             [key: string]: string;
         };
-        iframeUrl?: string;
     };
     location: Location;
 };
