@@ -38,6 +38,7 @@ module.exports = {
             label: '10.8.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
+            iframeUrl: 'https://developers.thoughtspot.com/docs/'
         },
         {
             label: '10.6.0.cl',
