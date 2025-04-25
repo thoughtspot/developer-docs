@@ -38,19 +38,12 @@ module.exports = {
             label: '10.8.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
-            iframeUrl: 'https://developers.thoughtspot.com/docs/'
         },
         {
             label: '10.6.0.cl',
             link: '10.6.0.cl',
             subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-10-6-0-cl.vercel.app/docs',
-        },
-        {
-            label: '10.1.0.sw',
-            link: '10-1-0-sw',
-            subLabel: 'Software (Latest)',
-            iframeUrl: 'https://visual-embed-sdk-10-1.vercel.app/docs',
         },
         {
             label: '10.1.0.sw',
