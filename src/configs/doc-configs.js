@@ -50,11 +50,7 @@ module.exports = {
             link: '10.6.0.cl',
             subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-10-6-0-cl.vercel.app/docs',
-<<<<<<< HEAD
         }
-=======
-        },
->>>>>>> 9caa55e4 (sw link ref removal)
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
