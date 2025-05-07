@@ -646,6 +646,7 @@ class TypeDocParser {
         const sourceContent = TypeDocInternalParser.parseSources(
             enumMember.sources,
         );
+
         return [
             `=== ${enumMember.name}`,
             '[div typeDocBlock boxFullWidth]\n--',
