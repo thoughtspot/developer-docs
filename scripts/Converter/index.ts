@@ -1009,9 +1009,9 @@ const getFile = async (filePath: string) => {
 
 const main = async () => {
     const defaultCliOptions = {
-        branch: 'main',
+        branch: 'renameSpotter',
         typeDocFilePath:
-            'https://raw.githubusercontent.com/thoughtspot/visual-embed-sdk/{branch}/static/typedoc/typedoc.json',
+            'https://raw.githubusercontent.com/thoughtspot/visual-embed-sdk/renameSpotter/static/typedoc/typedoc.json',
     };
 
     const cliKeys = Object.keys(defaultCliOptions).map((key) => ({
