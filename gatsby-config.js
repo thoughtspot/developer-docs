@@ -168,7 +168,7 @@ module.exports = {
             options: {
                 name: 'htmlFiles',
                 remote: 'https://github.com/thoughtspot/visual-embed-sdk.git',
-                branch: 'renameSpotter',
+                branch: 'main',
                 patterns: 'static/typedoc/**',
             },
             __key: 'htmlFiles',
