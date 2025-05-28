@@ -1,0 +1,371 @@
+= Embed ThoughtSpot in a Flutter app
+:toc: true
+:toclevels: 3
+
+:page-title: Embed ThoughtSpot using Flutter SDK
+:page-pageid: embed-ts-flutter
+:page-description: Use the Flutter SDK to embed ThoughtSpot in your Android and iOS mobile apps
+
+Your application developers can now seamlessly integrate ThoughtSpot's analytics and insights into their Flutter applications using ThoughtSpot Flutter Embed SDK. The SDK provides the following components to embed a ThoughtSpot Liveboard into a Flutter app.
+
+* `LiveboardEmbedController`
+Controls and manages interactions with the embedded content.
+* `LiveboardEmbed Widget` +
+Renders the embedded Liveboard in the Flutter UI.
+
+== Before you begin
+Before you begin, check if your setup has the following:
+
+* A Flutter application project setup. For information about creating a Flutter app, see link:https://docs.flutter.dev/reference/create-new-app[Flutter documentation, window=_blank].
+* Access to a ThoughtSpot instance with administrator and developer privileges. +
+Ensure that your host app embedding ThoughtSpot is added to the nxref:security-settings.adoc[CSP and CORS allowlists] in ThoughtSpot.
+* Access to the Liveboard object that you want to embed.
+
+== Get started with embedding
+This section provides a set of steps to quickly embed a ThoughtSpot xref:faqs.adoc#lbDef[Liveboard] in a Flutter app.
+
+=== Install the SDK
+
+. Download the link:https://pub.dev/packages/flutter_embed_sdk[Flutter embed SDK package, window=_Blank] to your application setup.
+. In your Flutter project directory, locate the `pubspec.yaml` and add the necessary dependencies and import the Flutter SDK.
++
+[source,Dart]
+----
+ dependencies:
+ flutter_embed_sdk: ^<latest_version>
+----
++
+. Run the following command.
++
+[source,Dart]
+----
+flutter pub get
+----
+
+
+=== Import the SDK
+
+Import the SDK and initialize it in your `main.dart` file:
+
+[source,Dart]
+----
+import 'package:flutter/material.dart';
+import 'package:thoughtspot_flutter_embed/thoughtspot_flutter_embed.dart';
+----
+
+After you import, define the embed configuration and view settings using the `LiveboardEmbedController` component. The `LiveboardEmbedController` is the controller object used for configuring the settings required to embed a ThoughtSpot Liveboard in a Flutter app. The `LiveboardEmbedController` component allows you to do the following:
+
+* initialize the embed configuration such as ThoughtSpot host URL, authentication method.
+* handle authentication
+* set Liveboard ID, view configuration settings and customization options.
+* configure event listeners and manage app interactions
+
+Your code must include a `LiveboardEmbed widget` to pass the `LiveboardEmbedController` component and configuration settings to render embedded Liveboard within your Flutter app.
+
+=== Specify ThoughtSpot URL and configure authentication settings
+
+. Define the following attributes for `EmbedConfig`:
+
+* `thoughtSpotHost` +
+The hostname of your ThoughtSpot application instance. For example, `team2.thoughtspot.cloud`. See xref:faqs.adoc#tsHostName[FAQs] to know how to find the hostname of your application instance.
+* `authType` +
+Authentication type. In the current version, mobile embedding supports only the Cookieless Trusted authentication method (`AuthType.TrustedAuthTokenCookieless`).
++
+[source,Dart]
+----
+// Set up authentication and host URL
+    embedConfig = EmbedConfig(
+      authType: AuthType.TrustedAuthTokenCookieless,
+      thoughtSpotHost: '<YOUR_THOUGHTSPOT_HOST_URL>', // Replace `<YOUR_THOUGHTSPOT_HOST_URL>`. For example, 'https://your-instance.thoughtspot.cloud'
+      getAuthToken: GetAuthToken(),
+    );
+----
+
+. Initialize the `LiveboardEmbedController` component with the `EmbedConfig` and `LiveboardViewConfig` in a stateful widget.
++
+[source,Dart]
+----
+// Initialize the controller to manage the embedded view
+    liveboardEmbedController = LiveboardController(
+      embedConfig: embedConfig,
+      viewConfig: liveboardViewConfig,
+    );
+----
+
+=== Specify the Liveboard ID
+
+Specify the ID of the Liveboard that you want to embed.
+
+[source,Dart]
+----
+  liveboardViewConfig = LiveboardViewConfig(
+      liveboardId: '<YOUR_LIVEBOARD_ID>', // For example, 'aa435ee8-212a-4317-8be8-ee85b4b6cfb9'
+    );
+----
+
+=== Customize your embed view
+If you want to customize your embedded Liveboard view, there are several customization options available:
+
+* Control the xref:mobile-embed-qs-flutter.adoc#_customize_menu_actions[visibility of menu actions in the embedded view]
+* xref:mobile-embed-qs-flutter.adoc#_customize_styles[Customize the styles and UI layout] of the embedded view
+* xref:mobile-embed-qs-flutter.adoc#_handle_events_and_app_interactions[Handle events and app interactions].
+
+==== Customize menu actions
+By default, the SDK includes a xref:mobile-embed.adoc#actionsMobileEmbed[set of menu actions] in the embedded Liveboard view.
+
+To disable or hide a menu action, you must specify the action ID in the `disabledActions`, `visibleActions`, or `hiddenActions` array.
+
+[NOTE]
+====
+To show or hide menu actions, use either `visibleActions` or `hiddenActions`.
+====
+
+[source,Dart]
+----
+  //To show or hide menu actions, use either `visibleActions` or `hiddenActions` array.
+    visibleActions: [Action.AddFilter,Action.Share,Action.DrillDown,Action.AxisMenuFilter,Action.AxisMenuTimeBucket], //empty array removes all actions
+  //disable actions
+    disabledActions: [Action.DrillDown, Action.Edit],
+  //specify the reason for disabling menu actions
+    disabledActionReason: "Contact your administrator to enable this feature",
+----
+
+==== Customize styles
+You can use ThoughtSpot's xref:css-customization.adoc[CSS customization framework] to customize the text strings, icons, styles and the UI layout of the embedded view.
+
+[source,Dart]
+----
+ liveboardViewConfig = LiveboardViewConfig(
+      liveboardId: '<YOUR_LIVEBOARD_ID>', // e.g., 'aa435ee8-212a-4317-8be8-ee85b4b6cfb9'
+      //Define styles to customize the embedded page
+      customizations: CustomisationsInterface(
+         style: CustomStyles(
+           customCSS: customCssInterface(
+             variables: {
+               "--ts-var-root-background": "#f6f641",
+               "--ts-var-root-color": "#041a45",
+               "--ts-var-viz-background": "#38f193",
+               "--ts-var-viz-border-radius": "20px",
+             },
+           ),
+        ),
+     ),
+  );
+----
+
+==== Handle events and app interactions
+
+To listen to the events emitted by the embedded ThoughtSpot component, register xref:embed-events.adoc#embed-events[embed event] handlers.
+
+The following code adds event listeners for xref:EmbedEvent.adoc#_load[EmbedEvent.Load], xref:EmbedEvent.adoc#__error[EmbedEvent.Error], and xref:EmbedEvent.adoc#_data[EmbedEvent.Data].
+
+[source,Dart]
+----
+ // Add an event listeners
+    liveboardEmbedController.on(EmbedEvent.Data, (payload) {
+      print('Data: ${payload['displayMode']}');
+    });
+    liveboardEmbedController.on(EmbedEvent.Load, (payload) {
+      print('Liveboard loaded');
+    });
+    liveboardEmbedController.on(EmbedEvent.Error, (payload) {
+      print('Error: $error');
+    });
+  }
+----
+
+To trigger actions on the embedded ThoughtSpot interface, use xref:embed-events.adoc#host-events[Host events] as shown in this example:
+
+[source,Dart]
+----
+ // Switch to a specific tab on the Liveboard
+    liveboardEmbedController.trigger(HostEvent.SetActiveTab, {
+        'tabId': '<YOUR_TAB_ID>', // Replace with your Liveboard tab ID
+    }),
+
+ //Reload the Liveboard content
+    liveboardEmbedController.trigger(HostEvent.Reload),
+----
+
+=== Run the app and verify your embed
+
+. Review your code +
+Check if your final code is similar to the code shown in the following example:
++
+[source,Dart]
+----
+import 'package:flutter/material.dart';
+import 'package:thoughtspot_flutter_embed/thoughtspot_flutter_embed.dart';
+
+// Custom class to handle authentication token retrieval.
+class GetAuthToken extends EmbedConfigGetAuthToken {
+  @override
+  Future<String> operate() async {
+    return '<YOUR_AUTH_TOKEN>'; // Replace `<YOUR_AUTH_TOKEN>` with your actual trusted auth token.
+  }
+}
+
+// Main widget that displays the home page with ThoughtSpot embed.
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, required this.title});
+
+  final String title;
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  // Controller to manage the embedded Liveboard
+  late LiveboardController liveboardEmbedController;
+
+  // Configuration object for embed
+  late EmbedConfig embedConfig;
+
+  // Configuration for the specific Liveboard view
+  late LiveboardViewConfig liveboardViewConfig;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Set up authentication and host URL configuration
+    embedConfig = EmbedConfig(
+      authType: AuthType.TrustedAuthTokenCookieless, // Cookieless authentication type using token
+      thoughtSpotHost: '<YOUR_THOUGHTSPOT_HOST_URL>', // Replace with your ThoughtSpot URL. For example, 'https://your-instance.thoughtspot.cloud'
+      getAuthToken: GetAuthToken(), // Use the custom token getter defined above
+    );
+
+    // Define how the Liveboard should look and behave
+    liveboardViewConfig = LiveboardViewConfig(
+      liveboardId: '<YOUR_LIVEBOARD_ID>', // Replace with your Liveboard ID
+      customizations: CustomisationsInterface(
+        style: CustomStyles(
+          customCSS: customCssInterface(
+            variables: {
+              "--ts-var-root-background":
+                  "#f6f641", // Background color of the root container
+              "--ts-var-root-color": "#041a45", // Text color
+              "--ts-var-viz-background": "#38f193", // Visualization background
+              "--ts-var-viz-border-radius":
+                  "20px", // Rounded corners for visualizations
+            },
+          ),
+        ),
+      ),
+    );
+
+    // Create the controller to manage and handle embedded content
+    liveboardEmbedController = LiveboardController(
+      embedConfig: embedConfig,
+      viewConfig: liveboardViewConfig,
+    );
+
+    // Add event listener to handle data-related events from the embedded view
+    liveboardEmbedController.on(EmbedEvent.Data, (payload) {
+      print('Data: ${payload['displayMode']}');
+    });
+    // Add event listener to handle the object load
+    liveboardEmbedController.on(EmbedEvent.Load, (payload) {
+      print('Liveboard loaded');
+    });
+    // Add event listener to handle errors
+    liveboardEmbedController.on(EmbedEvent.Error, (payload) {
+      print('Error: $error');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(widget.title), // Show the title passed to the widget
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            // Display the embedded Liveboard view
+            child: LiveboardEmbed(
+              controller: liveboardEmbedController,
+            ),
+          ),
+          // Buttons to interact with the Liveboard
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Reload button to reload the Liveboard content
+              ElevatedButton(
+                onPressed: () => liveboardEmbedController.trigger(HostEvent.Reload),
+                child: const Text('Reload'),
+              ),
+              const SizedBox(width: 16),
+              // Button to switch to a specific tab on the Liveboard
+              ElevatedButton(
+                onPressed: () => liveboardEmbedController.trigger(HostEvent.SetActiveTab, {
+                  'tabId': '<YOUR_TAB_ID>', // Replace with your Liveboard tab ID
+                }),
+                child: const Text('Set Active Tab'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+----
+
+. Build your Flutter app and verify if the embedded component renders as expected.
+
+[source,Dart]
+----
+flutter run
+----
+
+== Test your embed
+* Before testing your embed, check if the platform-specific permissions for Android and iOS are configured. If platform-specific permissions are not configured, follow these steps and then build your app:
+
+For Android::
+. Open the Android module in your project.
+. Modify the `AndroidManifest.xml` file in the `android/app/src/main/` directory to enable Internet access:
++
+----
+<manifest>
+<uses-permission android:name="android.permission.INTERNET"/>
+</manifest>
+----
+
+For iOS::
+
+. Open the iOS module in your project.
+. Modify the `Info.plist` file in the `ios/Runner/` directory to allow WebView content loading:
+
++
+----
+<key>NSAppTransportSecurity</key>
+<dict>
+<key>NSAllowsArbitraryLoads</key>
+<true/>
+</dict>
+----
+
+* Check your app and verify if the embedded object loads. If you see a blank screen:
+
+** Ensure that your ThoughtSpot host URL is correct and accessible
+** Check if the authentication credentials in your code are valid
+** Verify if your app has the required network permissions
+
+* Check if your Liveboard renders with all its charts and tables. If the content is not loading, check if your code has the correct Liveboard ID. +
+Additionally, you can add a listener for `EmbedEvent.Error` and verify the logs.
+* In case of rendering issues, try adjusting the frame size constraints.
+* Verify if your custom styles are applied.
+
+== Known limitations
+
+For information about supported features and known limitations, see xref:mobile-embed.adoc#_known_limitations[Mobile embed limitations].
+
+== Additional resources
+
+* link:https://github.com/thoughtspot/flutter-embed-sdk[Flutter embed SDK GitHub repo, window=_blank]
+* link:https://pub.dev/packages/flutter_embed_sdk[Flutter embed SDK package, window=_blank]
