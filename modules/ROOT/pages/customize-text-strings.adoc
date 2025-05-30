@@ -10,84 +10,160 @@ You can customize text strings on the ThoughtSpot application interface using th
 
 == Overview
 
-When you customize text strings, all occurrences of the text across the ThoughtSpot UI are replaced. Therefore, check if the text string you want to customize appears on other pages of ThoughtSpot UI.
+The customization framework in the Visual Embed SDK provides the following attributes and objects to override the text strings in the UI:
 
-To customize all occurrences of the text string, use the `strings` property in the `customizations` object.
+* xref:customize-text-strings.adoc##stringIdOverrides[stringIDs] +
+The `stringIDs` object allows overriding specific occurrences of the UI text. It overrides only the UI text mapped to the string ID specified in your code and can be used for precise, granular, and controlled overrides.
 
-To replace a specific text string and avoid unintended changes, use the `stringIDs` property in the `customizations` object.
+* xref:customize-text-strings.adoc#stringIdUrlOverrides[stringIDsUrl] +
+The `stringIDsUrl` object allows loading string IDs with text overrides from a JSON file hosted on a remote server. Before applying overrides via `stringIDsUrl`, you must add the domain name of the server that hosts the JSON file to CSP and CORS allowlists in ThoughtSpot.
 
-Note the following points:
+* xref:customize-text-strings.adoc#_override_common_keywords_and_text_using_strings[strings] +
+The `strings` object overrides the UI text by matching the visible string. It replaces all occurrences of strings and substrings in the UI. If the overrides are not applied carefully, this method might introduce unintended changes to the UI text.
 
-* The text strings are case-sensitive.
-* Customization of user-defined text strings such as object names, titles, or description text is not supported.
-* When both `strings` and `stringIDs` properties are defined to override the same strings, the `stringIDs` definition will take precedence.
+You can use any of these attributes or a combination of all three methods to apply text overrides.
 
-== Customize strings
-To customize text strings, you can use the `strings` and `stringIDs` properties in the `customizations` object:
+If both `strings` and `stringIDs` properties are set to replace the same string, the text defined in the `stringIDs` override will take precedence.
 
-=== Override specific text strings using string IDs
-To replace a specific occurrence of the text string, you need the string IDs.
+[IMPORTANT]
+====
+* You can customize only the system-generated text in the UI. User-created text such as object names, titles, or description text are not customizable.
+* The strings and substrings in the ThoughtSpot UI are case-sensitive.
+* Before applying the overrides, sanitize the JSON file and your string ID definitions to ensure that there is no malicious script or code that can potentially break your implementation.
+* Ensure that only ThoughtSpot users with administrator or developer privilege are allowed to use the `exposeTranslationIDs` attribute and access the internal string IDs.
+====
 
-. Locate the ID of the text string that you want to override:
+[#stringIdOverrides]
+== Using string IDs for overrides
 
-.. Go to the *Visual Embed Playground*.
-.. Select the embed type and object.
-.. To find the string IDs, use the `exposeTranslationIDs` attribute as shown in this example:
+The `stringIDs` object overrides only the UI text mapped to the string ID specified in your code, therefore can be used for precise, granular, and controlled overrides with no unintended changes.
+
+For string ID overrides, the ID of the text string is required. To view the strings, you can use the `exposeTranslationIDs` attribute in the SDK.
+
+[#locateStringID]
+=== Find the string IDs
+To find string IDs for the UI text, use the Visual Embed Playground on your instance:
+
+. In the *Visual Embed Playground*, select the embed type and object.
+. Set the `exposeTranslationIDs` attribute to `true` in the code panel.
 +
 [source,JavaScript]
 ----
- additionalFlags: {
-   exposeTranslationIDs: true,
- }
+exposeTranslationIDs: true
 ----
-.. Click *Run*.
+. Click *Run*.
 +
-When the page is rendered, you'll see the string IDs enclosed in the angle brackets `< >`.
+When the page is rendered, the UI text is presented in the `<string[stringID]>` format. For example, the Liveboard button on the Home page appears as `<Liveboards[Facet.objectType.pinboards]>`.
+
+. Note the string IDs of the text that you want to override.
+
 +
 [.widthAuto]
 [.bordered]
 image::./images/stringIds.png[String IDs]
 
-.. Note the IDs.
 
-. Replace the string ID with your preferred text.
-+
-The following example shows how to replace the `Liveboard` and `Answer` text strings on the ThoughtSpot Home page using `stringIDs`:
-+
+=== Customize the UI text mapped to string IDs
+
+To customize the text mapped to a string ID, use the `stringIDs: { "<stringID>": "<text string value>" }` format:
+
 [source,JavaScript]
 ----
-// Initialize the SDK with custom text string replacements
-init({
-    // ...
-    customizations: {
-        content: {
-        // Use the stringIDs object to map the internal string IDs to the UI text and override the text with custom labels
-        stringIDs: {
-            // Change the label for "Answers" on the Home page type to "Reports"
-            "Facet.objectType.answers": "Reports",
-            // Change the label for "Liveboard" on the Home page to "Dashboards"
-            "Facet.objectType.pinboards":"Dashboards",
-            // Change `Spotter` prompt to "dataAnalyzer" on the Spotter page
-            "convassist.spotter.askSpotter": "dataAnalyzer",
-        },
-    }
-});
+ customizations: {
+     content: {
+         stringIDs: {
+             // Change "Liveboards" on the Home page to "Dashboards"
+             "Facet.objectType.pinboards":"Dashboards",
+             // Change "Answers" on the Home page to "Reports"
+             "Facet.objectType.answers": "Reports",
+             // Change `Spotter` on the Spotter page to "dataAnalyzer"
+             "convassist.spotter.askSpotter": "dataAnalyzer"
+         },
+     },
+ }
 ----
-The following figure shows the text string overrides for the preceding code:
 
-+
+Some string IDs in the ThoughtSpot UI include placeholders for dynamic content such as object names and variables, which will be substituted with actual names during runtime.
+
+For example, in the following strings, `{answerName}` and `{currentRowCount}` are placeholders for the Answer object name and row count respectively, which will be replaced with actual values.
+
+`<Select measures & attributes for '{answerName}'[a3.selectColumns]{"answerName": "My Answer"}>`
+
+`<Showing {currentRowCount} of many rows[answer.table.footer.infiniteMsg]{"currentRowCount":"1,000","totalRowCount":"1,000"}>`
+
+When overriding strings with placeholders, you may want to retain the placeholder text with dynamic content and only replace a part of the text with a custom string. In such cases, you can define the overrides as shown in this example:
+
+[source,JavaScript]
+----
+customizations: {
+    content: {
+    //...
+        stringIDs : {
+            "a3.selectColumns": "Choose dimensions for '{answerName}'",
+            "answer.table.footer.infiniteMsg": "Showing {currentRowCount} of {totalRowCount} rows"
+        }
+    }
+}
+----
+
+The following figures show the string IDs and custom text application:
+
 [.widthAuto]
 [.bordered]
 image::./images/stringid-customization2.png[Customize String ID]
 
-+
 [.widthAuto]
 [.bordered]
 image::./images/stringid-customization1.png[Customize String IDs]
 
-=== Override using a string ID map
 
-If you have a JSON map of string IDs for all visible UI text, you can host it on a server and specify the URL in the `stringIDsUrl` property of the `customizations` interface. Ensure that the URL is added to the CSP allowlist on the *Develop* > *Security Settings* page.
+////
+You can also override the variable definition for a string ID. For example, in the following strings, the `{objectType}` variable is set as "Liveboard":
+
+`<showing {objectType}[answer.footer] {"objectType": "<Liveboard [LIVEBOARD]>"}>`
+`<Make this {objectType} discoverable[shareDialog.setDiscoverabilityState]{"objectType":"<Liveboard[PINBOARD]>"}>`
+
+
+
+You can replace the value assigned to the `{objectType}` variable in as shown here:
+
+[source,JavaScript]
+----
+customizations: {
+    content: {
+    //...
+        stringIDs : {
+            "answer.footer": "You are viewing {objectType}",
+            "LIVEBOARD": "Dashboard",
+        }
+    }
+}
+----
+////
+
+[#stringIdUrlOverrides]
+== Override strings using a JSON file
+
+The `stringIDsUrl` property lets upload a JSON file with string ID overrides.
+
+Before applying overrides via JSON file, you must add the domain name of the site that hosts the JSON to the xref:security-settings.adoc[CSP and CORS allowlists] on the *Develop* > *Security Settings* page.
+
+To find the string ID of a specific text string, use the xref:customize-text-strings.adoc#locateStringID[exposeTranslationIDs] attribute in the SDK.
+
+The following example shows the format of the JSON content with string ID overrides:
+
+[source,JSON]
+----
+{
+  "Facet.objectType.answers": "Reports",
+  "Facet.objectType.pinboards": "Dashboards",
+  "convassist.spotter.askSpotter": "dataAnalyzer",
+  "a3.selectColumns": "Choose dimensions for '{answerName}'",
+  "answer.table.footer.infiniteMsg": "Showing {currentRowCount} of {totalRowCount} rows"
+}
+----
+
+When the JSON file is ready to use, you can host it on a trusted server and specify the URL in the `stringIDsUrl` attribute as shown here:
 
 [source,JavaScript]
 ----
@@ -95,14 +171,23 @@ init({
     // ...
     customizations: {
         content: {
-            stringIDsUrl: 'https://yourdomain.com/locales/en.json', // Replace with your string ID JSON hosting URL
+            stringIDsUrl: 'https://yourdomain.com/string-ids.json', // Replace with your string ID JSON hosting URL
         },
     },
 });
 ----
 
-=== Override text strings globally
-To replace all occurrences of the text strings in the ThoughtSpot UI, define the string and substrings as shown in this example:
+For testing purposes, you can use the following URL:
+
+`https://cdn.jsdelivr.net/gh/thoughtspot/custom-content-demo/string-ids.json`
+
+== Override common keywords and substrings
+
+The `strings` object overrides the UI text by matching the visible string. Use this object for global and substring-based replacement of common text and keywords in the UI.
+
+For example, if you want to replace every occurrence of  `Liveboard` with `Dashboard` regardless of where it appears in the UI, use the `strings` object to override all instances. However, you must exercise caution and verify the overrides thoroughly to prevent unintended changes.
+
+Overrides with the `strings` object are defined in the `strings : { "<substring-key>": "<substring-value>" }` format.
 
 [source,JavaScript]
 ----
@@ -127,12 +212,10 @@ init({
 });
 ----
 
-If using the `strings` property in the `customizations` object to override text strings, note the following limitations and recommendations:
+When using the `strings` object to override text strings in the UI, ensure that the string and substring are defined in the correct order.
+For example, if the `Liveboard` text string is defined as `Dashboard`, all instances of `Liveboard` will be updated as `Dashboard` in the UI. If you want to customize `Pin to Liveboard`, you must specify the next substring as `Pin to Dashboard` instead of `Pin to Liveboard`.
 
-* Ensure that string and substring are defined in the correct order. +
-For example, if the `Liveboard` text string is defined as `Dashboard`, all instances of `Liveboard` will be updated as `Dashboard` in the UI. If you want to customize `Pin to Liveboard` text string, you must specify the next substring as `Pin to Dashboard` instead of `Pin to Liveboard` as shown here.
 
-+
 [source,JavaScript]
 ----
 customizations: {
@@ -144,10 +227,9 @@ customizations: {
         }
     }
 ----
-+
 
 However, if the `Pin to Liveboard` string precedes the `"Liveboard": "Dashboard"` string, specify the substring as `Pin to Liveboard` as shown in this example.
-+
+
 [source,JavaScript]
 ----
 customizations: {
@@ -160,26 +242,7 @@ customizations: {
     }
 ----
 
-* When customize a text phrase, make sure to check if it contains strings that are already defined for overrides. For example, if you are replacing `Search` with `Analyze your data`, the `Search data` button in the UI will show as "Analyze your data data". In such cases, use the xref:customize-text-strings.adoc#_override_a_specific_instance_of_text_string_using_string_ids[string IDs] to replace strings systematically and avoid unintended overrides.
-
-
-
-////
-* Sometimes, you may need to break a text phrase or sentence into multiple substrings. If a text string contains a word or phrase, for example, `Liveboard`, which is already defined or must be defined as a separate substring, you can break the text string as shown in this example:
-
-+
-[source,JavaScript]
-----
-customizations: {
-    content: {
-      strings: {
-        "Request access for this": "Get access to this",
-        "Liveboard": "Dashboard"
-      }
-    }
-  }
-----
-////
+Additionally, check if any part of the text string is already defined for overrides. For example, if you are replacing `Search` with `Analyze your data`, the `Search data` button in the UI will show as "Analyze your data data". In such cases, use the xref:customize-text-strings.adoc#_override_a_specific_instance_of_text_string_using_string_ids[string IDs] to replace strings precisely and systematically.
 
 == Test your changes
 
@@ -192,3 +255,37 @@ To view the code for customization:
 The `customizations` code for CSS modifications appears in the code panel.
 . Add the text string customization code and verify the results.
 
+
+== Code sample
+
+[source,JavaScript]
+----
+// Initialize the SDK with custom text string replacements
+init({
+    // ... other init options ...
+    customizations: {
+        content: {
+            // Use the 'strings' object for substring-based replacements (case-sensitive, replaces all instances)
+            strings: {
+                "Model": "Data Sheet",  // Replaces all occurrences of "Model" with "Data Sheet"
+                "Connections": "Data pipeline"  // Replaces all occurrences of "Connections" with "Data pipeline"
+            },
+            // Use the 'stringIDs' object to override context-specific text with unique string IDs
+            stringIDs: {
+                // Change "Answers" on the Home page to "Reports"
+                "Facet.objectType.answers": "Reports",
+                // Change "Liveboards" on the Home page to "Dashboards"
+                "Facet.objectType.pinboards": "Dashboards",
+                // Change "Spotter" to "dataAnalyzer" on the Spotter page
+                "convassist.spotter.askSpotter": "dataAnalyzer",
+                // String ID with dynamic content placeholder. Example, "<Select measures & attributes for '{answerName}'[a3.selectColumns]{"answerName": "My Answer"}>'"
+                "a3.selectColumns": "Choose dimensions for '{answerName}'",
+                // String ID with variable text. Example, "<Showing {currentRowCount} of many rows[answer.table.footer.infiniteMsg]{"currentRowCount":"1,000","totalRowCount":"1,000"}>"
+                "answer.table.footer.infiniteMsg": "Showing {currentRowCount} of {totalRowCount} rows"
+            },
+            // Optionally, load additional stringID overrides from a JSON file hosted on a remote sever
+            stringIDsUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-content-demo/string-ids.json"
+        }
+    }
+});
+----
