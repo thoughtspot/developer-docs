@@ -6,7 +6,7 @@
 :page-pageid: embed-ts-android
 :page-description: Use the Android Embed SDK to embed ThoughtSpot in your Android mobile app
 
-Your application developers can embed a ThoughtSpot Liveboard in your Android app using the ThoughtSpot Android Embed SDK.
+Your application developers can embed a ThoughtSpot Liveboard in your native Android app using the ThoughtSpot Android Embed SDK.
 
 == Before you begin
 
@@ -16,6 +16,55 @@ Before you begin, ensure that your development environment has the following set
 Ensure that your host app embedding ThoughtSpot is added to the xref:security-settings.adoc[CSP and CORS allowlists] in ThoughtSpot.
 * Access to the Liveboard object that you want to embed.
 * Android Studio is installed. +
+
+== Install the SDK
+To download the Android Embed SDK from Maven Central to your project and install the libraries, add the following code to your app-level `build.gradle.kts`:
+
+[source,kotlin]
+----
+implementation("io.github.thoughtspot:android-embed-sdk:0.0.1-beta")
+----
+
+* `implementation` +
+Instructs Gradle to add the dependency for compile and runtime usage in your Android project.
+* `com.github.thoughtspot` +
+GitHub reference ID
+* `android-embed-sdk` +
+The GitHub repository containing the Android Embed SDK package.
+* `Tag` +
+Indicates the version of the SDK to use. Replace this with a specific release tag from the GitHub repository. For example,0.0.1-beta.
+
+The SDK may require network access to communicate with your ThoughtSpot instance. Ensure your app’s `AndroidManifest.xml` includes the following:
+
+== XML Layout
+
+In the `activity_main.xml` of your project, add the following to define a custom Android view component:
+
+[source,xml]
+----
+<!-- res/layout/activity_main.xml -->
+<com.thoughtspot.android.embedsdk.LiveboardEmbed
+    android:id="@+id/liveboard_embed_view"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:layout_constraintTop_toTopOf="parent"
+    app:layout_constraintBottom_toTopOf="@id/another_view"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintEnd_toEndOf="parent" />
+----
+
+* `<com.thoughtspot.android.embedsdk.LiveboardEmbed ... />` +
+Declares a custom view to render the Liveboard in the app.
+* `android:id="@+id/liveboard_embed_view"` +
+Assigns a unique ID to this view so you can reference it in your Kotlin/Java code.
+* `android:layout_width="match_parent"` and `android:layout_height="wrap_content"` +
+Sets the width and height of the layout for embedded view.
+* The `app:layout_constraint...` attributes +
+Positions the view relative to the other UI elements.
+
+You'll need to add a reference to this view in your code and then load a specific Liveboard into it.
+
+////
 
 == Import the SDK to your Android application project
 
@@ -74,74 +123,46 @@ GitHub reference ID
 The GitHub repository containing the Android Embed SDK package.
 * `<version>` +
 Replace it with the SDK version. For example, 1.0.0.
+////
 
-== Import the SDK and configure authentication
+== Initialize the SDK
 
-. Import the components from the SDK and configure authentication. You can initialize the SDK in your application class or MainActivity.
-
-+
-[source,kotlin]
-----
-package com.your-id.prj-name
-
-import android.app.Activity
-import android.content.res.Configuration
-import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
-import com.thoughtspot.android_embed_sdk.LiveboardEmbed
-import com.thoughtspot.android_embed_sdk.AuthType
-import com.thoughtspot.android_embed_sdk.EmbedEvent
-import com.thoughtspot.android_embed_sdk.HostEvent
-import customCssInterface
-import kotlinx.coroutines.*
-import CustomStyles
-import CustomisationsInterface
-import EmbedConfig
-import LiveboardViewConfig
-
-class MainActivity : AppCompatActivity() {
-   // You can instead fetch token from your backend.
-    private suspend fun fetchAuthTokenAsync(): String {
-        return "<YOUR_TRUSTED_AUTH_TOKEN>"
-    }
-    private val getAuthToken: () -> String = {
-        runBlocking {
-            fetchAuthTokenAsync()
-        }
-    }
-----
-
-. Add ThoughtSpot host URL and authentication method.
-+
-[source,kotlin]
-----
- val embedConfig = EmbedConfig(
-     thoughtSpotHost = "ts-host", // Replace it with your ThoughtSpot application URL
-     authType = AuthType.TrustedAuthTokenCookieless, //
- )
-----
-
-== Add the embed view to your application layout
-
-. Define the Liveboard embed view in the `activity_main.xml` file:
-+
-[source,xml]
-----
-<!-- res/layout/activity_main.xml -->
-<com.thoughtspot.androidembed.ThoughtSpotEmbedView
-    android:id="@+id/embedView"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent" />
-----
-
-. Add the embed view to your app layout.
+. In your application class or MainActivity, add the embedView.
 +
 [source,kotlin]
 ----
  val embedView = findViewById<LiveboardEmbed>(R.id.liveboard_embed_view)
 ----
 
-== Add the Liveboard
+. Specify ThoughtSpot application URL, authentication attributes and token fetching method.
++
+[source,kotlin]
+----
+val embedConfig = EmbedConfig(
+    thoughtSpotHost = "https://your.thoughtspot.instance",  // Replace it with your ThoughtSpot application URL
+    authType = AuthType.TrustedAuthTokenCookieless
+)
+
+val getAuthToken: () -> String = {
+    runBlocking {
+        // Replace with real token retrieval logic
+        "your-auth-token"
+    }
+}
+
+----
+. Initialize the SDK.
++
+[source,Kotlin]
+----
+embedView.initialize(
+    viewConfig = viewConfig,
+    embedConfig = embedConfig,
+    getAuthToken = getAuthToken
+)
+----
+
+== Add the Liveboard and configure the embed view
 
 Add the Liveboard GUID.
 
@@ -211,25 +232,13 @@ Define CSS variables to apply custom styles.
      liveboardId = "your-livebaord-id",
      enable2ColumnLayout = true,
      customizations = CustomisationsInterface(
-         style = CustomStyles(
-             customCSS = customCssInterface(
-                 variables = mapOf(
+        style = CustomStyles(
+            customCSS = customCssInterface(
+                variables = mapOf(
                     "--ts-var-primary-color" to "#0055ff",
                     "--ts-var-max-width" to "1200px",
                     "--ts-var-enable-2-column-layout" to "true",
                     "--ts-var-root-background" to "#fef4dd",
-                    "--ts-var-root-color" to "#4a4a4a",
-                    "--ts-var-viz-title-color" to "#8e6b23",
-                    "--ts-var-viz-title-font-family" to "'Georgia','Times New Roman',serif",
-                    "--ts-var-viz-title-text-transform" to "capitalize",
-                    "--ts-var-viz-description-color" to "#6b705c",
-                    "--ts-var-viz-description-font-family" to "'Verdana','Helvetica', sans-serif",
-                    "--ts-var-viz-border-radius" to "6px",
-                    "--ts-var-viz-box-shadow" to "0 3px 6px rgba(0, 0, 0, 0.15)",
-                    "--ts-var-viz-background" to "#fffbf0",
-                    "--ts-var-viz-legend-hover-background" to "#ffe4b5",
-                    "--ts-var-liveboard-dual-column-breakpoint" to "1100px",
-                    "--ts-var-liveboard-single-column-breakpoint" to "320px"
                  )
              )
          )
@@ -244,129 +253,98 @@ To listen to the events emitted by the embedded ThoughtSpot component, register 
 [source,Kotlin]
 ----
 // Register an event listener for authentication failures and custom actions
-   embedView.getController()?.on(EmbedEvent.Load) { payload ->
-       println("Liveboard loaded with payload: $payload")
+embedView.getController()?.on(EmbedEvent.AuthInit) { payload ->
+    println("Auth initialized: $payload")
+}
 ----
 
 To trigger actions on the embedded ThoughtSpot interface, use xref:embed-events.adoc#host-events[Host events].
 
 [source,Kotlin]
 ----
-// Trigger an action via a host event
-   embedView.getController()?.trigger(HostEvent.ReLoad) { payload ->
-       println("Liveboard reloaded with payload: $payload")
+// Trigger reload action
+embedView.getController()?.trigger(HostEvent.Reload)
 ----
 
 == Build your app and render the embedded object
 
-Initialize the SDK, build your app, and render your embed.
-
-[source,Kotlin]
-----
- embedView.initialize(
-      viewConfig = viewConfig,
-      embedConfig = embedConfig,
-      getAuthToken = getAuthToken
- )
-----
+Build your app, and render your embed.
 
 == Code sample
 
 [source,Kotlin]
 ----
-package com.your-id.prj-name
+import kotlinx.coroutines.runBlocking
+// Import other necessary ThoughtSpot SDK classes
 
-import android.app.Activity
-import android.content.res.Configuration
-import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
-import com.thoughtspot.android_embed_sdk.LiveboardEmbed
-import com.thoughtspot.android_embed_sdk.AuthType
-import com.thoughtspot.android_embed_sdk.EmbedEvent
-import com.thoughtspot.android_embed_sdk.HostEvent
-import customCssInterface
-import kotlinx.coroutines.*
-import CustomStyles
-import CustomisationsInterface
-import EmbedConfig
-import LiveboardViewConfig
+val embedView = findViewById<LiveboardEmbed>(R.id.liveboard_embed_view)
 
-class MainActivity : AppCompatActivity() {
-    // You can instead fetch token from your backend.
-    private suspend fun fetchAuthTokenAsync(): String {
-        return "<YOUR_TRUSTED_AUTH_TOKEN>"
-    }
-
-    private val getAuthToken: () -> String = {
-        runBlocking {
-            fetchAuthTokenAsync()
-        }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        val embedView = findViewById<LiveboardEmbed>(R.id.liveboard_embed_view)
-
-        val viewConfig = LiveboardViewConfig(
-            liveboardId = "your-livebaord-id",
-            enable2ColumnLayout = true,
-            visibleActions = listOf(
-                Action.AddFilter, //Add filter menu action
-                Action.Share,  // Share action
-                Action.DrillDown, // Drill down action
-                Action.AxisMenuFilter,  // Filter action on chart axis
-                Action.AxisMenuTimeBucket,  // Time bucket option in the chart axis
-            ),
-            // These actions will be grayed out and not clickable
-            disabledActions = listOf(Action.Download),
-            // Optionally, add a tooltip text for disabled actions
-            disabledActionReason = "Contact your administrator to enable this action",
-            customizations = CustomisationsInterface(
-                // Define CSS for custom styling
-                style = CustomStyles(
-                    customCSS = customCssInterface(
-                        variables = mapOf(
-                            "--ts-var-primary-color" to "#0055ff",
-                            "--ts-var-max-width" to "1200px",
-                            "--ts-var-enable-2-column-layout" to "true",
-                            "--ts-var-root-background" to "#fef4dd",
-                            "--ts-var-root-color" to "#4a4a4a",
-                            "--ts-var-viz-title-color" to "#8e6b23",
-                            "--ts-var-viz-title-font-family" to "'Georgia', 'Times New Roman', serif",
-                            "--ts-var-viz-title-text-transform" to "capitalize",
-                            "--ts-var-viz-description-color" to "#6b705c",
-                            "--ts-var-viz-description-font-family" to "'Verdana', 'Helvetica', sans-serif",
-                            "--ts-var-viz-border-radius" to "6px",
-                            "--ts-var-viz-box-shadow" to "0 3px 6px rgba(0, 0, 0, 0.15)",
-                            "--ts-var-viz-background" to "#fffbf0",
-                            "--ts-var-viz-legend-hover-background" to "#ffe4b5",
-                            "--ts-var-liveboard-dual-column-breakpoint" to "1100px",
-                            "--ts-var-liveboard-single-column-breakpoint" to "320px"
-                        )
-                    )
+val viewConfig = LiveboardViewConfig(
+    liveboardId = "your-liveboard-id", // Replace with your Liveboard ID
+    enable2ColumnLayout = true,
+    visibleActions = listOf(
+        Action.AddFilter,           // Add filter menu action
+        Action.Share,               // Share action
+        Action.DrillDown,           // Drill down action
+        Action.AxisMenuFilter,      // Filter action on chart axis
+        Action.AxisMenuTimeBucket   // Time bucket option in the chart axis
+    ),
+    // These actions will be grayed out and not clickable
+    disabledActions = listOf(Action.Download),
+    // Optionally, add a tooltip text for disabled actions
+    disabledActionReason = "Contact your administrator to enable this action",
+    customizations = CustomisationsInterface(
+        style = CustomStyles(
+            customCSS = customCssInterface(
+                variables = mapOf(
+                    "--ts-var-primary-color" to "#0055ff",
+                    "--ts-var-liveboard-dual-column-breakpoint" to "1100px",
+                    "--ts-var-max-width" to "1200px",
+                    "--ts-var-enable-2-column-layout" to "true",
+                    "--ts-var-root-background" to "#fef4dd",
+                    "--ts-var-root-color" to "#4a4a4a",
+                    "--ts-var-viz-title-color" to "#8e6b23",
+                    "--ts-var-viz-title-font-family" to "'Georgia', 'Times New Roman', serif",
+                    "--ts-var-viz-title-text-transform" to "capitalize",
+                    "--ts-var-viz-description-color" to "#6b705c",
+                    "--ts-var-viz-description-font-family" to "'Verdana', 'Helvetica', sans-serif",
+                    "--ts-var-viz-border-radius" to "6px",
+                    "--ts-var-viz-box-shadow" to "0 3px 6px rgba(0, 0, 0, 0.15)",
+                    "--ts-var-viz-background" to "#fffbf0",
+                    "--ts-var-viz-legend-hover-background" to "#ffe4b5",
+                    "--ts-var-liveboard-single-column-breakpoint" to "320px"
+                    // Add more variables as needed
                 )
             )
         )
+    )
+)
 
-        val embedConfig = EmbedConfig(
-            thoughtSpotHost = "ts-host",
-            authType = AuthType.TrustedAuthTokenCookieless
-        )
+val embedConfig = EmbedConfig(
+    thoughtSpotHost = "https://your.thoughtspot.instance",
+    authType = AuthType.TrustedAuthTokenCookieless
+)
 
-        embedView.initialize(
-            viewConfig = viewConfig,
-            embedConfig = embedConfig,
-            getAuthToken = getAuthToken
-        )
-
-        // Example: Listen to Reload event
-        embedView.getController()?.on(HostEvent.Reload) { payload ->
-            println("Liveboard reloaded with payload: $payload")
-        }
+val getAuthToken: () -> String = {
+    runBlocking {
+        // Replace with real token retrieval logic
+        "your-auth-token"
     }
 }
+
+embedView.initialize(
+    viewConfig = viewConfig,
+    embedConfig = embedConfig,
+    getAuthToken = getAuthToken
+)
+
+// Example: Listen to AuthInit event
+embedView.getController()?.on(EmbedEvent.AuthInit) { payload ->
+    println("Auth initialized: \$2ayload")
+}
+
+// Trigger reload action
+embedView.getController()?.trigger(HostEvent.Reload)
 ----
 
 == Test your embed
