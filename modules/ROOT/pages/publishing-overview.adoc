@@ -1,0 +1,83 @@
+=  Publishing content to Orgs
+:toc: true
+:toclevels: 2
+
+:page-title: Publishing data
+:page-pageid: publish-data-overview
+:page-description: Use the publishing feature to distrubute and propagete objects to Orgs within a ThoughtSpot instance.
+
+For multi-tenant deployments, ThoughtSpot provides the content publishing feature that enables administrators to  efficiently manage and distribute artifacts such as Liveboards, Answers, Models, Connections, and Tables, across multiple Orgs within a ThoughtSpot instance.
+
+== Overview
+
+The publishing feature includes a set of REST APIs to programmatically streamline the publishing process using variable parameterization and make your analytics content available across different Orgs. Unlike the current deployment and publishing method, which relies on TML export and import, the new publishing feature allows you to create a single, standardized object in the primary org and make it available to other destination Orgs, with the ability to parameterize Connections, Tables, and other variables per Org.
+
+The published content can be rendered in the read-only mode initially, with cluster and Org administrators controlling the propagation of the updates to objects in each Org.
+
+[IMPORTANT]
+====
+The publishing feature, including the REST APIs for variable CRUD operations, parameterizing metadata objects, and publishing content across Orgs, is in beta and turned off by default on ThoughtSpot instances. To enable this feature on your instance, contact ThoughtSpot Support.
+====
+
+=== When to use the publishing feature
+
+ThoughtSpot recommends using the publishing feature in the following scenarios:
+
+* Your instance is multi-tenant instance with Orgs and requires propagation of the same master object across different tenant Orgs
+* Your instance has development, test, staging, and production deployments maneged via Orgs. For example, to publish a Liveboard from a `dev` Org to a `staging` Org on the instance.
+
+Currently, ThoughtSpot allows deploying and publishing content to different instances or Orgs via TML modification and version control APIs. The publishing feature simplifies this process via variable parameterization.
+
+[width="100%" cols="7,7"]
+[options='header']
+|=====
+|Publishing feature |TML/Git Deployment and publishing
+|Allows publishing content to Orgs within an instance|Allows publishing content to Orgs within a ThoughtSpot instance, or from one ThoughtSpot instance to another
+|Publishes a master object to Orgs without creating a duplicate object| Creates a separate copy per Org via TML import
+|Recommended for multi-tenant instances requiring standardized and re-usable content|
+If an Org needs unique customizations that cannot be handled by variables, use TML-based deployment to create and maintain a separate object for that Org.
+|Allows customizing data properties with variables while maintaining a single source for published objects | Creates new copies per Org or instance and thus allows full customization
+|Automatically maps objects using variables and object IDs| Requires xref:guid-mapping.adoc[GUID mapping] and manual intevention
+|=====
+
+=== Parameters and variables
+The Connection and Table objects required for building analytics content can vary between data environments. The publishing feature allows specifying different sets of connection properties for each Org via variables. You can also enable Table-level customization per Org using parameters and variables to support scenarios that require different table definitions. You can also define global variables that can be referenced across multiple objects such as Liveboards, charts, and tables with some variations per Org.
+
+=== Version Control and validation
+
+The publishing feature supports API-driven workflows to define variables, parameterize objects, and publish content.
+
+You can use the xref:git_integration_overview[Git integration] APIs or UI for development, change tracking, and version control. However, to publish the final content or roll back the published object, you must use the publishing APIs.
+
+== Privileges required for Publishing Content
+Users with cluster administrator privilege can publish content to other Orgs on a ThoughtSpot instance.
+
+Cluster administrators require access to the master object or the underlying data source to create the master object in the primary Org.
+
+Org administrators can access the objects published in their respective Orgs and grant view or edit access to other users in their Org by sharing the object.
+
+== Publishing workflow
+
+The content publishing process with the new publishing method involves the following steps:
+
+. Step 1: Create master content that must be propagated to different Orgs on your instance. +
+This step involves building Answers and Liveboard from a Model or data object in primary Org. Ensure that the object references datasets, Tables, or Connections that can be parameterized.
+. Step 2: Define variables +
+For each destination Org, create a variable and assign appropriate values using `/api/rest/2.0/template/variables/create`. For example, set a variable to map the connection or schema for the target Org. This ensures the published object will use the correct data source or configuration in each Org.
+. Step 3: Parameterize metadata objects +
+In this step, you can replace the static values for certain properties of a Connection, Model, or Table with variables created from the previous step using the `/api/rest/2.0/metadata/parameterize`. This allows the same metadata object to be reused across different Orgs, with the actual values being supplied at runtime or per-Org.
+. Step 4: Publish the objects +
+Publish the objects to destination Orgs using the publish metadata API (`/api/rest/2.0/security/metadata/publish`).
+. Step 5: Verify and update objects
+Verify the published object and check if it's mapped to the correct data source.
+Update the master object and republish changes.
+Verify if the changes are published across all Orgs.
+
+
+== Known Limitations
+The publishing feature does not support the following:
+
+. Publishing Spotter-generated objects across Orgs
+. Sage data indexing on published objects
+. Publishing master content from user-defined Orgs
+. Git integration with published objects

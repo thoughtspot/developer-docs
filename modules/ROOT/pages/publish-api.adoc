@@ -1,0 +1,108 @@
+= Publish objects to Orgs
+:toc: true
+:toclevels: 2
+
+:page-title: Publish objects to Orgs
+:page-pageid: publish-to-orgs
+:page-description: Use the publish APIs to publish a master object from a primary Org to destination Orgs on a ThoughtSpot instance
+
+The publishing feature simplifies and automates the propagation of ThoughtSpot objects across multiple Orgs in a multi-tenant instance. Using the publish API, you can programmatically publish a Liveboard, Answer, or Model to one or several Orgs.
+
+For large-scale deployments that require the same analytics content with per Org customization, parameterize the underlying data source with variables to ensure that each Org receives a version of the object that is correctly configured for its environment.
+
+== Before you begin
+
+* Ensure that you have cluster administration permissions to publish content to Orgs on your instance
+* If you are publishing a Liveboard or Answer, ensure that the underlying data objects are parameterized to use dynamic values as per the Org requirements
+
+== Publish objects
+The publish API allows publishing Liveboards, Answers, and Models from the Primary Org to one or several destination Orgs, while ensuring that the variables assigned to metadata objects are substituted with correct values for each Org.
+
+To publish an object, send a `POST` request to the `/api/rest/2.0/security/metadata/publish` API endpoint, with the following parameters in the request body.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`metadata` a| __Array of strings__. Array of metadata objects to publish. Specify the ID and type of metadata in each array. The supported metadata object types are:
+
+* `LIVEBOARD` for Liveboards
+* `LOGICAL_TABLES` +
+For Worksheets ^Deprecated^, Models and Tables
+* `ANSWER` for Answers
+
+[NOTE]
+====
+The Spotter or AI-generated Answers are not supported.
+====
+|`org_identifiers` a|__Array of strings__. Array of Org names or IDs to which you want to publish the object.
+|`skip_validation` a|__Boolean__. When enabled, validates objects before publishing. By default, it's set to `False`.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/security/metadata/publish'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata": [
+    {
+      "identifier": "c6ce2676-90be-468a-8d92-c22f1255d9dc",
+      "type": "LIVEBOARD"
+    }
+  ],
+  "org_identifiers": [
+    "Staging1",
+    "Staging2",
+    "ProdOrg1"
+  ]
+}'
+----
+
+If the API request is successful, ThoughtSpot returns a 204 response indicating that the object has been successfully published to the Orgs specified in the request.
+
+== Validate published objects
+
+After publishing an object to target Orgs, the administrators must verify the content of the published object and check if the variables are substituted with correct values.
+
+When published, the object and its dependencies will be visible only to administrators of that specific Org. The administrators can share the objects to other users or user groups in their Org.
+
+
+== Synchronize updates
+
+Although the published object will be available to users in other Orgs, administrators must use the object in the Primary Org as the master version and propagate changes from this Org to other dependent Orgs. Any changes to the object at the Org level will be overridden when the cluster administrator republishes changes from the Primary Org.
+
+To publish new changes or republish the same object, use the xref:publish-api.adoc#_publish_objects[`/api/rest/2.0/security/metadata/publish`] API endpoint. The new changes will be visible in the Org on reloading the object in the UI.
+
+== Roll back published object
+
+If you want to roll back the published objects, send a `POST` request to the `/api/rest/2.0/security/metadata/unpublish` API endpoint, with the following attributes in the request body.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`metadata`|__Array of strings__. Array of the published objects that you want to roll back. Specify the ID and type of metadata in each array. The supported metadata object types are:
+
+* `LIVEBOARD` for Liveboards
+* `LOGICAL_TABLES` +
+For Worksheets ^Deprecated^, Models and Tables
+* `ANSWER` for Answers
+
+|`org_identifiers` a|__Array of strings__. Specify the Orgs from which you want to roll back the published object.
+
+|`include_dependencies` |__Boolean__. When set to `true`, the published object with all its dependent objects is rolled back and removed from the Orgs. If the dependent objects are associated to other objects in the Orgs, they will be retained in the Orgs.
+|`force` +
+__Optional__ a| __Boolean_. Removes the published objects from the Orgs. Exercise caution when using this option, because it  will break the object references in the currently published Orgs.
+|=====
+
