@@ -1,0 +1,486 @@
+= Swift Embed SDK for iOS apps
+:toc: true
+:toclevels: 3
+
+:page-title: Embed ThoughtSpot using Swift Embed SDK
+:page-pageid: embed-ts-swift
+:page-description: Use the Swift Embed SDK to embed ThoughtSpot in your iOS mobile apps
+
+The Swift Embed SDK enables developers to seamlessly embed ThoughtSpot content into iOS applications. This SDK provides native Swift components to embed a ThoughtSpot xref:faqs.adoc#lbDef[Liveboard] with charts and tables.
+
+== Before you begin
+Before you begin, ensure that your development setup includes the following:
+
+* Xcode 13 or later is installed. For information about Xcode and SwiftUI, see link:https://developer.apple.com/documentation/Xcode[Xcode  documentation, window=_blank].
+* iOS 14.0 or later is installed on your device to test your embed.
+* Access to a ThoughtSpot instance with administrator and developer privileges. +
+Ensure that your host app embedding ThoughtSpot is added to the xref:security-settings.adoc[CSP and CORS allowlists] in ThoughtSpot.
+* Access to the Liveboard object that you want to embed.
+
+== Install the Swift Embed Package
+To install the Swift Embed SDK package using Swift Package Manager:
+
+. In your Xcode project, go to *File* > *Add Packages*.
+. Search for Swift Embed Package from Swift Package GitHub repository:
++
+----
+https://github.com/thoughtspot/swift-embed-sdk.git
+----
+. Select the desired version and add it to your project.
+. Complete the integration process as prompted by Xcode.
+
+Alternatively, to install the SDK manually, add the following dependency to your `Package.swift` file:
+
+----
+dependencies: [
+    .package(url: "https://github.com/thoughtspot/swift-embed-sdk.git", from: "x.y.z")
+]
+----
+Check the tags published on GitHub repository.
+
+== Import the SDK package
+
+Import the following modules and the SDK package:
+----
+import SwiftUI
+import SwiftEmbedSDK
+import Combine
+----
+
+////
+=== Configure App Transport Security (Optional)
+If your ThoughtSpot instance uses HTTP (not HTTPS) or a self-signed certificate, you may need to update your app’s Info.plist to allow insecure connections for development. Add the following (if required):
+
+[source,xml]
+----
+xml
+<key>NSAppTransportSecurity</key>
+<dict>
+<key>NSAllowsArbitraryLoads</key>
+<true/>
+</dict>
+----
+////
+== Initialize the SDK and set up authentication
+
+Create a static embed configuration object with the ThoughtSpot host URL and authentication attributes. For embed view customization, you can create a customizationObject and initialize it with the embed configuration.
+
+[source,Swift]
+----
+ let staticEmbedConfig = EmbedConfig(
+    thoughtSpotHost: "https://your-thoughtspot-instance.com", // Replace with actual host URL
+    authType: AuthType.TrustedAuthTokenCookieless,
+    customizations: customizationsObject // For optional customizations
+ )
+----
+
+The SDK supports authentication using the `TrustedAuthTokenCookieless` method. You'll need to implement a function to fetch the authentication token. In the following code sample, the authentication token fetcher function uses the `/api/rest/2.0/auth/token/full` REST API to fetch authentication token in the backend:
+
+[source,Swift]
+----
+func fetchAuthToken(username: String, secretKey: String, host: String) async -> String? {
+    let urlString = "\(host)/api/rest/2.0/auth/token/full"
+    guard let url = URL(string: urlString) else {
+        print("Error: Invalid URL: \(urlString)")
+        return nil
+    }
+
+    let headers: [String: String] = [
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    ]
+
+    let body: [String: Any] = [
+        "username": username,
+        "validity_time_in_sec": 30,
+        "auto_create": false,
+        "secret_key": secretKey
+    ]
+
+    do {
+        let jsonData = try JSONSerialization.data(withJSONObject: body)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.allHTTPHeaderFields = headers
+        request.httpBody = jsonData
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            // Handle error response
+            return nil
+        }
+
+        let decodedResponse = try JSONDecoder().decode(AuthTokenResponse.self, from: data)
+        return decodedResponse.token
+
+    } catch {
+        print("Error fetching auth token: \(error)")
+        return nil
+    }
+}
+----
+
+=== Handle authentication
+
+. Create a token provider function to handle authentication.
++
+[source,Swift]
+----
+func getAuthToken() -> Future<String, Error> {
+  Future { promise in
+    Task {
+      if let token = await fetchAuthToken(
+        username: username, secretKey: secretKey, host: thoughtSpotHost)
+      {
+        promise(.success(token))
+      } else {
+        promise(
+          .failure(
+            NSError(
+              domain: "AuthError", code: 1,
+              userInfo: [NSLocalizedDescriptionKey: "Failed to fetch auth token"]
+            )))
+      }
+    }
+  }
+}
+----
+. Create a configuration object to call the static embed object and get token function.
++
+[source,Swift]
+----
+let tsEmbedConfig = TSEmbedConfig(
+embedConfig: staticEmbedConfig,
+getAuthToken: getAuthToken,
+)
+----
+
+== Embed the Liveboard object
+
+Add the Liveboard object and create a controller to manage the embed view:
+
+[source,Swift]
+----
+// Configure the Liveboard view with the desired Liveboard GUID
+let liveboardViewConfig = LiveboardViewConfig(
+    liveboardId: "your-liveboard-id" // Replace with the actual Liveoard GUID
+)
+
+// Create a controller for the embedded Liveboard
+let liveboardController = LiveboardEmbedController(
+    tsEmbedConfig: tsEmbedConfig,
+    viewConfig: liveboardViewConfig
+))
+----
+
+== Customize your embed view
+To customize the embedded view, the following customization settings are available:
+
+* Control the xref:mobile-embed-qs-swift.adoc#_customize_menu_actions[visibility of menu actions in the embedded view]
+* xref:mobile-embed-qs-swift.adoc#_customize_styles[Customize the styles and UI layout] of the embedded view
+* xref:mobile-embed-qs-swift.adoc#_handle_events_and_app_interactions[Handle events and app interactions]
+
+=== Customize menu actions
+
+By default, the mobile embed SDKs include a xref:mobile-embed.adoc#_menu_customization[specific set of menu actions] for Liveboard embeds in mobile view.
+
+To disable or hide a menu action, use the `disabledActions`, `visibleActions`, or `hiddenActions` array.
+
+[source,Swift]
+----
+let liveboardViewConfig = LiveboardViewConfig(
+  liveboardId: "your-liveboard-guid", // Replace with the actual Liveoard GUID
+
+  // Only these actions will be visible in the UI
+  visibleActions: [
+    Action.AddFilter, //Add filter menu action
+    Action.Share,  // Share action
+    Action.DrillDown, // Drill down action
+    Action.AxisMenuFilter,  // Filter action on chart axis
+    Action.AxisMenuTimeBucket,  // Time bucket  option in the chart axis
+  ],
+
+  // These actions will be grayed out and appear as unclickable
+  disabledActions: [
+    Action.DrillDown,  // Drill down action
+    Action.Edit  // Action.Edit
+  ],
+
+  // Optionally, add a tooltip text for disabled actions
+  disabledActionReason: "Contact your administrators to enable this action"
+)
+----
+
+[NOTE]
+====
+To show or hide menu actions, use either `visibleActions` or `hiddenActions`.
+====
+
+=== Customize styles
+
+. Define CSS variables to apply custom styles.
++
+[source,Swift]
+----
+// CSS variables
+let cssVariablesDict: [String: String] = [
+    "--ts-var-root-background": "#fef4dd",
+    "--ts-var-root-color": "#4a4a4a",
+    "--ts-var-viz-title-color": "#8e6b23",
+    "--ts-var-viz-title-font-family": "'Georgia', 'Times New Roman', serif",
+    "--ts-var-viz-title-text-transform": "capitalize",
+    "--ts-var-viz-description-color": "#6b705c",
+    "--ts-var-viz-description-font-family": "'Verdana', 'Helvetica', sans-serif",
+    "--ts-var-viz-border-radius": "6px",
+    "--ts-var-viz-box-shadow": "0 3px 6px rgba(0, 0, 0, 0.15)",
+    "--ts-var-viz-background": "#fffbf0",
+    "--ts-var-viz-legend-hover-background": "#ffe4b5"
+]
+
+// Create a custom CSS object
+let customCSSObject = customCssInterface(variables: cssVariablesDict)
+
+// Create a custom styles object
+let styleObject = CustomStyles(
+    customCSSUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/css-variables.css", // Optional
+    customCSS: customCSSObject
+)
+
+// Create a customizations object
+let customizationsObject = CustomisationsInterface(
+    style: styleObject
+)
+----
+
+. Include the customization object in your embed configuration object:
++
+[source,Swift]
+----
+let embedConfig = EmbedConfig(
+    //...
+    customizations: customizationsObject
+)
+----
+
+=== Handle events and app interactions
+
+To listen to the events emitted by the embedded ThoughtSpot component, register xref:embed-events.adoc#embed-events[embed event] handlers.
+
+The following example shows how to register event listeners for xref:EmbedEvent.adoc#_liveboardrendered[EmbedEvent.LiveboardRendered], xref:EmbedEvent.adoc#_authinit[EmbedEvent.AuthInit], xref:EmbedEvent.adoc#_error[EmbedEvent.Error], and xref:EmbedEvent.adoc#_authinit[EmbedEvent.AuthInit]:
+
+[source,Swift]
+----
+func registerSDKListeners() {
+// Listen for authentication initialization
+liveboardController.on(event: EmbedEvent.AuthInit) { payload in
+print("Authentication initialized. Payload: \(payload ?? "nil")")
+}
+
+    // Event listener for Liveboard rendering completion
+    liveboardController.on(event: EmbedEvent.LiveboardRendered) { payload in
+        print("Liveboard rendered. Payload: \(payload ?? "nil")")
+    }
+
+    // Event listener for error events
+    liveboardController.on(event: EmbedEvent.Error) { payload in
+        print("Error occurred. Payload: \(payload ?? "nil")")
+    }
+
+    // To remove a listener (removes all for the specified event)
+    // liveboardController.off(event: EmbedEvent.AuthInit)
+}
+----
+
+To trigger actions on the embedded ThoughtSpot interface, use xref:embed-events.adoc#host-events[Host events] as shown in this example:
+
+[source,Swift]
+----
+// Reload the Liveboard
+liveboardController.trigger(event: HostEvent.Reload)
+
+// Open the Share dialog
+liveboardController.trigger(event: HostEvent.Share)
+
+// Update runtime filters
+let filters = [
+    RuntimeFilter(columnName: "Region", operator: .EQ, values: ["East", "West"])
+]
+liveboardController.trigger(event: HostEvent.UpdateRuntimeFilters, payload: filters)
+----
+
+== Build your app and render the embedded objects
+
+Render your code and run your app.
+
+== Code sample
+
+[source,Swift]
+----
+import SwiftUI
+import SwiftEmbedSDK
+
+struct HomeView: View {
+
+    var username: "user" // ThoughtSpot username for authentication
+    var thoughtSpotHost: "https://your-thoughtspot-instance" //Replace with your actual ThoughtSpot application URL
+    var liveboardId: "your-liveboard-guid" //Replace with your actual Liveboard GUID
+    var secretKey: String  //Secret key used to fetch a trusted auth token
+
+    @StateObject var liveboardController: LiveboardEmbedController
+
+    init(username: String, thoughtSpotHost: String, liveboardId: String, secretKey: String) {
+        self.username = username
+        self.thoughtSpotHost = thoughtSpotHost
+        self.liveboardId = liveboardId
+        self.secretKey = secretKey
+
+        // Set up custom styling
+        let customizationsObject = createCustomizations()
+
+        // Embed configuration with your ThoughtSpot host and custom styles
+        let staticEmbedConfig = EmbedConfig(
+            thoughtSpotHost: thoughtSpotHost,
+            authType: AuthType.TrustedAuthTokenCookieless,
+            customizations: customizationsObject
+        )
+
+       // Set up auth token provider
+        func getAuthToken() -> Future<String, Error> {
+            Future { promise in
+                Task {
+                    if let token = await fetchAuthToken(username: username, secretKey: secretKey, host: thoughtSpotHost) {
+                        promise(.success(token))
+                    } else {
+                        promise(.failure(NSError(
+                            domain: "AuthError", code: 1,
+                            userInfo: [NSLocalizedDescriptionKey: "Failed to fetch auth token"]
+                        )))
+                    }
+                }
+            }
+        }
+
+        // Wrap embed configuration objects
+        let tsEmbedConfig = TSEmbedConfig(
+            embedConfig: staticEmbedConfig,
+            getAuthToken: getAuthToken,
+            initializationCompletion: { result in
+                // Optional: Handle embed init result
+            }
+        )
+
+        // Optional: Customize menu actions
+        // Show only these menu actions in the embedded UI
+        let visibleActions = [
+            Action.AddFilter,Action.Share,Action.DrillDown, Action.AxisMenuFilter,Action.AxisMenuTimeBucket
+        ]
+
+        // Show these actions as disabled (unclickable)
+        let disabledActions = ["drillDown", "edit"]
+
+        // Tooltip for disabled actions
+        let disabledActionReason = "Contact your administrator to enable this feature"
+
+        let liveboardViewConfig = LiveboardViewConfig(
+            liveboardId: liveboardId,
+            visibleActions: visibleActions,
+            disabledActions: disabledActions,
+            disabledActionReason: disabledActionReason
+        )
+
+        _liveboardController = StateObject(wrappedValue: LiveboardEmbedController(
+            tsEmbedConfig: tsEmbedConfig,
+            viewConfig: liveboardViewConfig
+        ))
+    }
+
+    var body: some View {
+        VStack {
+            LiveboardEmbed(controller: liveboardController)
+                .frame(height: 600)
+                .cornerRadius(12)
+                .onAppear {
+                    registerSDKListeners()
+                }
+
+            HStack {
+                Button {
+                    // Trigger Liveboard reload
+                    liveboardController.trigger(event: HostEvent.Reload)
+                } label: {
+                    Label("Reload", systemImage: "arrow.clockwise")
+                }
+
+                Button {
+                    //Open the Share dialog
+                    liveboardController.trigger(event: HostEvent.Share)
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+
+            }
+        }
+        .padding()
+    }
+
+    // Register listeners for ThoughtSpot embed events
+    func registerSDKListeners() {
+        // Emit when authentication is initialized
+        liveboardController.on(event: EmbedEvent.AuthInit) { _ in
+            print("Authentication initialized")
+        }
+       // Emit when Liveboard is rendered
+        liveboardController.on(event: EmbedEvent.LiveboardRendered) { _ in
+            print("Liveboard rendered")
+        }
+       // Event listener for error events
+        liveboardController.on(event: EmbedEvent.Error) { _ in
+            print("Error occurred")
+        }
+    }
+
+    // Customize styles with CSS variables
+    func createCustomizations() -> Customizations {
+        let cssVariablesDict: [String: String] = [
+            "--ts-var-root-background": "#fef4dd",
+            "--ts-var-root-color": "#4a4a4a",
+            "--ts-var-viz-title-color": "#8e6b23",
+            "--ts-var-viz-title-font-family": "'Georgia', 'Times New Roman', serif",
+            "--ts-var-viz-title-text-transform": "capitalize",
+            "--ts-var-viz-description-color": "#6b705c",
+            "--ts-var-viz-description-font-family": "'Verdana', 'Helvetica', sans-serif",
+            "--ts-var-viz-border-radius": "6px",
+            "--ts-var-viz-box-shadow": "0 3px 6px rgba(0, 0, 0, 0.15)",
+            "--ts-var-viz-background": "#fffbf0",
+            "--ts-var-viz-legend-hover-background": "#ffe4b5"
+        ]
+        let customCSS = CustomCss(variables: cssVariablesDict)
+        let styleObject = CustomStyles(customCSS: customCSS)
+
+        return Customizations(style: styleObject)
+    }
+}
+----
+
+== Test your embed
+
+* Check your app and verify if the embedded object loads. If you see a blank screen:
+
+** Ensure that your ThoughtSpot host URL is correct and accessible.
+** Check if the authentication credentials in your code are valid.
+
+* Check if your Liveboard renders with all its charts and tables. If the content is not loading, check if your code has the correct Liveboard ID. Additionally, you can add a listener for `EmbedEvent.Error` and verify the logs.
+* In case of rendering issues, adjust the frame size constraints and rerun your app.
+* Verify if custom styles are applied correctly.
+
+== Known limitations
+
+For information about supported features and known limitations, see xref:mobile-embed.adoc#_known_limitations[Mobile embed limitations].
+
+== Additional resources
+
+* link:https://github.com/thoughtspot/swift-embed-sdk[Swift Embed SDK GitHub repo, window=_blank]
+
