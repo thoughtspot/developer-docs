@@ -10,9 +10,10 @@ The link:https://github.com/thoughtspot/rest-api-sdk/tree/release/sdks/java[REST
 
 == Before you begin
 
-Before you begin, check your setup meets the following prerequisites:
+Before you begin, check if your setup meets the following requirements:
 
 * Your application setup has the necessary tools and environments for installing, deploying, and testing the SDK integration.
+* The REST API Java SDK library supports Java 8 and later. Ensure that your environment has Java 8 or later installed.
 * You have access to the necessary repositories on GitHub and Maven Central and network permissions download dependencies.
 * You have a ThoughtSpot instance with access to v2 REST APIs.  +
 For token-based authentication, you'll need access to the secret key.
@@ -27,7 +28,7 @@ If you are using Maven, add the REST API Java SDK as a dependency to the POM.xml
 <dependency>
   <groupId>io.github.thoughtspot</groupId>
   <artifactId>rest-api-sdk-lib</artifactId>
-  <version>2.13.0-beta</version> <!-- Use the latest version available -->
+  <version>2.14.0</version> <!-- Use the latest version available -->
   <scope>compile</scope>
 </dependency>
 ----
@@ -41,14 +42,59 @@ repositories {
 }
 
 dependencies {
-   implementation "io.github.thoughtspot:rest-api-sdk-lib:2.13.0-beta"
+   implementation "io.github.thoughtspot:rest-api-sdk-lib:2.14.0"
    // Use the latest version of the SDK
 }
 ----
 
+== API client configuration
+The **ApiClientConfiguration** class in the REST API Java SDK allows configuring the settings required for API clients to call REST APIs from their application context. This class allows you to specify following methods and parameters:
+
+* `basePath` +
+Sets the base path for API requests.
+* `bearerToken` +
+Sets bearer tokens to authenticate API requests.
+* `bearerTokenSupplier` +
+Sets the bearer token supplier for authentication.
+* `defaultHeader` +
+Adds a default header to API requests.
+* `defaultHeaderMap` +
+Sets a map of default headers to include in the API requests.
+* `defaultCookie` +
+Adds a default cookie to the client configuration.
+* `defaultCookieMap` +
+Sets a map of default cookies in the client configuration.
+* `verifyingSsl` +
+Enables Secure Sockets Layer (SSL) certificate verification for API requests.
+* `sslCaCert` +
+Configures client to use a specific input stream that contains the SSL CA certificate.
+* `keyManager` +
+Adds a key manager to the client configuration.
+* `keyManagers` +
+Adds a list of key managers to the client configuration.
+* `downloadPath` +
+Sets the download path for files.
+* `connectTimeoutMillis` +
+Sets the connection timeout.
+* `readTimeoutMillis` +
+Configures the maximum number of seconds the client will wait for a response after sending a request before timing out.
+* `writeTimeoutMillis` +
+Configures the maximum number of milliseconds the client will wait for the data to be written to the server after sending a request before timing out.
+
+[source,Java]
+----
+// Create configuration for the ThoughtSpot API client
+        ApiClientConfiguration apiClientConfiguration = new ApiClientConfiguration.Builder()
+                .basePath(BASE_PATH) // Your ThoughtSpot application URL
+                .verifyingSsl(false) // Disable SSL verification for testing purposes
+                .readTimeoutMillis(30000) // Extended read timeout to 30 seconds
+                .build();
+
+----
+
 == Authentication
 
-The REST API v2.0 supports different authentication methods. The most common method used for automation and application integration is the token-based authentication. To get a token from from authentication token endpoint, you need to specify the `username`, `password` or `secret_key`.
+The REST API v2.0 supports various authentication methods. The most common method used for automation and application integration is the token-based authentication. To get a token from from authentication token endpoint, you need to specify the `username`, `password` or `secret_key`.
 
 The following example shows the code for getting an authentication token by passing `username` and `password`, and creating a user session using this token:
 
@@ -57,12 +103,12 @@ The following example shows the code for getting an authentication token by pass
 package org.example;
 
 // Import classes:
-import org.thoughtspot.client.ApiClientConfiguration;
-import org.thoughtspot.client.ApiException;
-import org.thoughtspot.client.api.ThoughtSpotRestApi;
-import org.thoughtspot.client.model.GetFullAccessTokenRequest;
-import org.thoughtspot.client.model.Token;
-import org.thoughtspot.client.model.User;
+import com.thoughtspot.client.ApiClientConfiguration;
+import com.thoughtspot.client.ApiException;
+import com.thoughtspot.client.api.ThoughtSpotRestApi;
+import com.thoughtspot.client.model.GetFullAccessTokenRequest;
+import com.thoughtspot.client.model.Token;
+import com.thoughtspot.client.model.User;
 
 public class Example {
   private static final String BASE_PATH = *CLUSTER_URL*; // Your ThoughtSpot application URL
@@ -95,9 +141,15 @@ public class Example {
         // Apply the updated configuration to the ThoughtSpot API client
         tsRestApi.applyApiClientConfiguration(apiClientConfiguration);
 
-        // Current user information
-        User currentUser = tsRestApi.getCurrentUserInfo();  // Optionally, use .{REQUEST}WithHttpInfo() (eg: .getCurrentUserInfoWithHttpInfo()) if you want the response details
+       // Current user information
+        User currentUser = tsRestApi.getCurrentUserInfo();
         System.out.println("Current User: " + currentUser.toJson());
+
+        // Optionally, use .{REQUEST}WithHttpInfo() to get response details
+        ApiResponse<User> currentUserResponse = tsRestApi.getCurrentUserInfoWithHttpInfo();
+        System.out.println("Current User: " + currentUserResponse.getData().toString());
+        System.out.println("Status code: " + currentUserResponse.getStatusCode());
+        System.out.println("Response headers: " + currentUserResponse.getHeaders().toString());
     } catch (ApiException e) {
         System.err.println("Exception when calling ThoughtSpot API");
         System.err.println("Status code: " + e.getCode());
@@ -118,12 +170,12 @@ The following example shows the code for getting an authentication token by pass
 package org.example;
 
 // Import classes:
-import org.thoughtspot.client.ApiClientConfiguration;
-import org.thoughtspot.client.ApiException;
-import org.thoughtspot.client.api.ThoughtSpotRestApi;
-import org.thoughtspot.client.model.GetFullAccessTokenRequest;
-import org.thoughtspot.client.model.Token;
-import org.thoughtspot.client.model.User;
+import com.thoughtspot.client.ApiClientConfiguration;
+import com.thoughtspot.client.ApiException;
+import com.thoughtspot.client.api.ThoughtSpotRestApi;
+import com.thoughtspot.client.model.GetFullAccessTokenRequest;
+import com.thoughtspot.client.model.Token;
+import com.thoughtspot.client.model.User;
 
 public class Example {
   private static final String BASE_PATH = *CLUSTER_URL*; // Your ThoughtSpot application URL
@@ -145,7 +197,7 @@ public class Example {
         // Authenticate the user and retrieve the full access token using secret_key
         GetFullAccessTokenRequest getFullAccessTokenRequest = new GetFullAccessTokenRequest()
                 .username(USERNAME)
-                .secretKey(SECRET_KEY); // Use secretKey, not password
+                .secretKey(SECRET_KEY); // Use secretKey. Do not use password
 
         Token response = tsRestApi.getFullAccessToken(getFullAccessTokenRequest);
 
@@ -181,11 +233,11 @@ In this example, we'll create a user using the `CreateUserRequest` object.
 ----
 package org.example;
 
-import org.thoughtspot.client.ApiClientConfiguration;
-import org.thoughtspot.client.ApiException;
-import org.thoughtspot.client.api.ThoughtSpotRestApi;
-import org.thoughtspot.client.model.CreateUserRequest;
-import org.thoughtspot.client.model.User;
+import com.thoughtspot.client.ApiClientConfiguration;
+import com.thoughtspot.client.ApiException;
+import com.thoughtspot.client.api.ThoughtSpotRestApi;
+import com.thoughtspot.client.model.CreateUserRequest;
+import com.thoughtspot.client.model.User;
 
 public class AddUserExample {
     private static final String BASE_PATH = *CLUSTER_URL*; // Your ThoughtSpot application instance
@@ -206,11 +258,11 @@ public class AddUserExample {
 
             // Build the user creation request
             CreateUserRequest createUserRequest = new CreateUserRequest()
-                    .username("UserA@example.com")
+                    .name("UserA@example.com")
                     .displayName("User A")
                     .password("StrongPassword123!") // Set an initial password
-                    .groups(java.util.Arrays.asList("sales", "marketing")) // Optional: assign groups
-                    .orgId(Org_ID); // Optional: set Org ID if using a multi-tenant instance
+                    .groupIdentifiers(Arrays.asList("sales", "marketing")) // Optional: assign groups
+                    .addOrgIdentifiersItem(Org_ID); // Optional: set Org ID if using a multi-tenant instance
 
             // Create the user
             User createdUser = tsRestApi.createUser(createUserRequest);
@@ -228,64 +280,9 @@ public class AddUserExample {
 }
 ----
 
-The following example shows how to get a list of Liveboard objects using the `SearchMetadataRequest` object:
-
-[source,Java]
-----
-package org.example;
-
-import org.thoughtspot.client.ApiClientConfiguration;
-import org.thoughtspot.client.ApiException;
-import org.thoughtspot.client.api.ThoughtSpotRestApi;
-import org.thoughtspot.client.model.SearchMetadataRequest;
-import org.thoughtspot.client.model.SearchMetadataRequestMetadataInner;
-import org.thoughtspot.client.model.SearchMetadataResponse;
-
-import java.util.Arrays;
-
-public class SearchMetadataExample {
-    private static final String BASE_PATH = "https://your-thoughtspot-cluster";
-    private static final String BEARER_TOKEN = "YOUR_BEARER_TOKEN"; // Replace with your valid token
-
-    public static void main(String[] args) {
-        try {
-            // Configure the API client with the bearer token
-            ApiClientConfiguration apiClientConfiguration = new ApiClientConfiguration.Builder()
-                    .basePath(BASE_PATH)
-                    .bearerTokenSupplier(() -> BEARER_TOKEN)
-                    .verifyingSsl(false) // For testing only; enable SSL in production
-                    .readTimeoutMillis(30000)
-                    .build();
-
-            // Create an instance of the ThoughtSpot API client
-            ThoughtSpotRestApi tsRestApi = new ThoughtSpotRestApi(apiClientConfiguration);
-
-            // Build the search request for all Liveboards
-            SearchMetadataRequestMetadataInner metadataSelector = new SearchMetadataRequestMetadataInner()
-                    .type("LIVEBOARD"); // You can use other types like "LOGICAL_TABLE", "USER", etc.
-
-            SearchMetadataRequest searchRequest = new SearchMetadataRequest()
-                    .metadata(Arrays.asList(metadataSelector));
-
-            // Call the API to search metadata
-            SearchMetadataResponse response = tsRestApi.searchMetadata(searchRequest);
-
-            // Output the response
-            System.out.println("Search Metadata Response: " + response.toJson());
-        } catch (ApiException e) {
-            System.err.println("Exception when calling ThoughtSpot API");
-            System.err.println("Status code: " + e.getCode());
-            System.err.println("Reason: " + e.getResponseBody());
-            System.err.println("Response headers: " + e.getResponseHeaders());
-            e.printStackTrace();
-        }
-    }
-}
-----
-
 == Error handling
 
-<TBD>
+The SDK raises an exception when an API request fails. Inspect the HTTP status code, response body, and response headers to determine the cause of the failure and respond appropriately. Catching exceptions is a standard way to handle these errors. The code samples in this document show how to handle errors using the `ApiException` class.
 
 == Supported versions
 
@@ -295,8 +292,7 @@ Note the recommendation of Java SDK:
 [options='header']
 |====
 |ThoughtSpot release version|Supported SDK version
-a|ThoughtSpot Cloud: 10.9.0.cl | v2.14.0 (Recommended)
-v2.13.0-beta
+a|ThoughtSpot Cloud: 10.9.0.cl | v2.14.0
 |====
 
 
