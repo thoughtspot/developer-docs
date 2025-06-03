@@ -522,6 +522,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 id="wrapper"
                 data-theme={isDarkMode ? 'dark' : 'light'}
                 key={key}
+                style={{ height: '100vh', overflow: 'hidden' }}
             >
                 {isPublicSiteOpen && (
                     <Header
@@ -534,7 +535,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     ref={ref as React.RefObject<HTMLDivElement>}
                     className={getClassName()}
                     style={{
-                        height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
+                        height: !docContent
+                            ? MAIN_HEIGHT_WITHOUT_DOC_CONTENT
+                            : 'calc(100vh - 60px)',
+                        overflow: 'auto',
                     }}
                 >
                     {isPlayGround ? renderPlayGround() : renderDocTemplate()}
