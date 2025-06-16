@@ -42,12 +42,14 @@ If a tenant Org requires unique customizations that cannot be handled by variabl
 |=====
 
 == Parameters and variables
-The Connection and Table objects required for building analytics content can vary between data environments. To customize Connection and Table properties for each Org, you can use variables and parameterize object properties.
 
-You can create the following types of variables using variable API and use these variables to parameterize Connection or Table properties via metadata parameterization API:
+The Connection and Table objects required for building analytics content can vary between data environments. To customize Connection and Table properties for each Org, you can use variables and parameterize object properties. This approach ensures that metadata objects dynamically adapt to the configuration of each Org, supporting multi-tenant scenarios and reducing the need to duplicate objects for each Org
+
+You can create the following types of variables using xref:variables.adoc[variable API] and use these variables to parameterize Connection or Table properties via xref:metadata-parameterization.adoc[metadata parameterization API]:
 
 * `CONNECTION_PROPERTY` +
 The `CONNECTION_PROPERTY` variables allow parameterizing connection properties such as `accountName`, `warehouse`, `user`, `password`, `role` and so on.
+
 * `TABLE_MAPPING` +
 The **TABLE_MAPPING** variable allow parameterizing the following Table properties:
 
@@ -56,10 +58,10 @@ The **TABLE_MAPPING** variable allow parameterizing the following Table properti
 ** `tableName`
 
 * `CONNECTION_PROPERTY_PER_PRINCIPLE` +
-Allows parameterizing connection properties per user or user group. It doesn't allow parameterizing core Connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration and cannot set via variables. +
+Allows parameterizing connection properties per user or user group. However, it doesn't allow parameterizing core Connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration. +
 This feature is disabled by default. To enable this option, contact ThoughtSpot Support.
 
-The following figure illustrates how variable references in Connections and Table are replaced:
+The following figure illustrates variable substitution in Connections and Tables:
 
 [.widthAuto]
 image::./images/variables.png[Variables]
@@ -71,7 +73,7 @@ For the objects in the Primary Org, you can use the xref:git_integration_overvie
 == User access to objects
 ThoughtSpot administrator with access to all Orgs can publish content from the Primary Org to other Orgs on a ThoughtSpot instance. The administrators will also require edit access to the object and the underlying data source in the Primary Org.
 
-When an object is published to an Org, it is visible only to the administrators of that Org. Org administrators can access the objects published in their respective Org and grant view access to other users in their Org by sharing the object.
+The visibility of a published object in an Org depends on its sharing settings. Org administrators can view the objects published in their Org and grant view access to other users in their Org by sharing the object.
 
 == Limitations
 Note the following feature limitations:
@@ -93,22 +95,22 @@ Note the following feature limitations:
 The content publishing process with the new publishing method involves the following steps:
 
 . xref:intro-thoughtspot-objects.adoc#_content_creation_workflow[Step 1: Create a master object] +
-This step involves building Answers and Liveboard from a Model or data object in Primary Org. Ensure that the object references Tables or Connections that can be parameterized.
+This step involves building Answers and Liveboard from a Model or data object in Primary Org. Ensure that the object references Tables or Connections that can be parameterized with variables.
 
 . xref:variables.adoc[Step 2: Define variables] +
-Create a variable with placeholder values for each Org and assign appropriate values using `/api/rest/2.0/template/variables/create` API. For example, set a variable to map the connection or schema for the target Org. This ensures the published object will use the correct data source or configuration in each Org.
+Create a variable with placeholder values for each Org and assign values using `/api/rest/2.0/template/variables/create` API. For example, you can create a variable for table attributes,  such as schema, database, or table name, and assign the variable to the relevant table properties in via metadata parameterization API.  When you publish the object, it will use the variable, and the correct value for that variable will be substituted based on the Org.
 
 . xref:metadata-parameterization.adoc[Step 3: Parameterize metadata objects] +
-Replace the static values of object properties with variables created from the previous step. You can use  the `/api/rest/2.0/metadata/parameterize` API endpoint to assign variables. This step allows the same metadata object to be reused across different Orgs, with the actual values being supplied at runtime for each Org.
+Replace the static values of object properties with variables created from the previous step. You can use the `/api/rest/2.0/metadata/parameterize` API endpoint to assign variables to the relevant object properties. This step is required to enable the use of the same metadata object across different Orgs, with the actual values being supplied at runtime for each Org.
 
 . xref:publish-api.adoc[Step 4: Publish the objects] +
-Publish the objects to destination Orgs using the publish metadata API (`/api/rest/2.0/security/metadata/publish`).
+Publish the objects from the source Org (Primary Org) to target Orgs using the publish metadata API (`/api/rest/2.0/security/metadata/publish`).
 
 . xref:publish-api.adoc#_validate_published_objects[Step 5: Verify and update objects] +
-Verify the published object in each destination Org and check if it's mapped to the correct data source.
-Update the master object, republish changes, and verify if the changes are propagated to target Orgs.
+After publishing an object, verify the published object in each Org to ensure that the variables are correctly substituted with the appropriate values for that Org.
+Try updating the original object in the Primary Org, and verify whether the updates are automatically propagated to the target orgs and the published objects are synchronized.
 
-The steps required to publish objects from the Primary Org to other Orgs are illustrated in the following figure:
+The following figure provides a visual representation of the publishing workflow:
 
 [.widthAuto]
 image::./images/publishing-flowchart.png[Publishing process]
