@@ -6,9 +6,9 @@
 :page-pageid: publish-data-overview
 :page-description: Use the publishing feature to distrubute and propagete objects to Orgs within a ThoughtSpot instance.
 
-The publishing feature [beta betaBackground]^Beta^ enables administrators to efficiently manage and propagate objects such as Liveboards, Answers, and Models across multiple Orgs within a multi-tenant ThoughtSpot instance.
+The publishing feature [beta betaBackground]^Beta^ enables administrators to efficiently manage and propagate objects such as Liveboards and Answers across multiple Orgs within a multi-tenant ThoughtSpot instance.
 
-Unlike the deployment method that relies on TML import and Git integration, the publishing feature allows administrators to create an object in the Primary Org and publish it directly to target Orgs without creating duplicate copies of the object. The publishing feature also provides the ability to customize the object properties of the underlying Model, Table, or Connection using variables specific to each Org.
+Unlike the deployment method that relies on TML import and Git integration, the publishing feature allows administrators to create an object in the Primary Org and publish it directly to target Orgs without creating duplicate copies of the object. The publishing feature also provides the ability to customize the object properties of the underlying Table or Connection using variables specific to each Org.
 
 To streamline the publishing process programmatically, ThoughtSpot provides a set of REST APIs starting from the 10.10.0.cl release. Administrators can use these APIs to create and assign variables, parameterize object properties, and then publish objects and synchronize updates seamlessly from the Primary Org to other target Orgs on a ThoughtSpot instance.
 
@@ -18,7 +18,7 @@ To streamline the publishing process programmatically, ThoughtSpot provides a se
 The publishing feature, including the REST APIs for variable creation and edits, parameterizing metadata objects, and publishing content across Orgs, is in beta and turned off by default on ThoughtSpot instances. To enable this feature on your instance, contact ThoughtSpot Support.
 ====
 
-== When to use the publishing feature
+== When to use publishing feature
 
 ThoughtSpot recommends using the publishing feature in the following scenarios:
 
@@ -42,40 +42,64 @@ If a tenant Org requires unique customizations that cannot be handled by variabl
 |=====
 
 == Parameters and variables
-The Connection and Table objects required for building analytics content can vary between data environments. To customize  Connection and Table properties for each Org, you can use variables and parameterize object properties. You can also define global variables that can be referenced across multiple objects such as Liveboards, charts, and tables with some variations per Org.
+The Connection and Table objects required for building analytics content can vary between data environments. To customize Connection and Table properties for each Org, you can use variables and parameterize object properties.
 
-== Version Control and validation
+You can create the following types of variables using variable API and use these variables to parameterize Connection or Table properties via metadata parameterization API:
 
-The publishing feature supports API-driven workflows to define variables, parameterize objects, and publish content.
+* `CONNECTION_PROPERTY` +
+The `CONNECTION_PROPERTY` variables allow parameterizing connection properties such as `accountName`, `warehouse`, `user`, `password`, `role` and so on.
+* `TABLE_MAPPING` +
+The **TABLE_MAPPING** variable allow parameterizing the following Table properties:
 
-You can use the xref:git_integration_overview[Git integration] APIs or UI for development, change tracking, and version control. However, to publish the final content or roll back the published object, you must use the publishing APIs.
+** `databaseName`
+** `schemaName`
+** `tableName`
 
-== Privileges required for Publishing Content
-Users with cluster administrator privilege can publish content from the Primary Org to other Orgs on a ThoughtSpot instance.
-To create and publish content across Orgs, Cluster administrators require edit access to the object and the underlying data source in the Primary Org.
+* `CONNECTION_PROPERTY_PER_PRINCIPLE` +
+Allows parameterizing connection properties per user or user group. It doesn't allow parameterizing core Connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration and cannot set via variables. +
+This feature is disabled by default. To enable this option, contact ThoughtSpot Support.
+
+The following figure illustrates how variable references in Connections and Table are replaced:
+
+[.widthAuto]
+image::./images/variables.png[Variables]
+
+== Version control
+
+For the objects in the Primary Org, you can use the xref:git_integration_overview[Git integration] APIs or UI for development, change tracking, and version control. However, Git integration is not supported for objects published in the target Orgs.
+
+== User access to objects
+ThoughtSpot administrator with access to all Orgs can publish content from the Primary Org to other Orgs on a ThoughtSpot instance. The administrators will also require edit access to the object and the underlying data source in the Primary Org.
 
 When an object is published to an Org, it is visible only to the administrators of that Org. Org administrators can access the objects published in their respective Org and grant view access to other users in their Org by sharing the object.
 
-== Known Limitations
-The publishing feature does not support the following:
+== Limitations
+Note the following feature limitations:
 
-* Publishing Spotter-generated objects across Orgs
-* Publishing content from a user-defined Org to other Orgs
-* Search data indexing on published objects
-* Git integration for published objects
+* Only ThoughtSpot administrators with access to all Orgs can publish objects.
+* Objects can be published only from the Primary Org to other Orgs. Publishing from non-default Orgs is not supported.
+* In the target Orgs, published objects are available in read-only mode. The original object in the Primary Org remains editable by the cluster administrator and users with edit permissions.
+* Spotter functionality is not supported for published objects.
+* Search data indexing is disabled for published tables.
+* Git integration is not supported for published objects.
+
+////
+* Cohort publishing is not supported.
+* Custom calendars with different metadata across Orgs are not supported.
+////
 
 == Publishing workflow
 
 The content publishing process with the new publishing method involves the following steps:
 
 . xref:intro-thoughtspot-objects.adoc#_content_creation_workflow[Step 1: Create a master object] +
-This step involves building Answers and Liveboard from a Model or data object in Primary Org. Ensure that the object references datasets, Tables, or Connections that can be parameterized.
+This step involves building Answers and Liveboard from a Model or data object in Primary Org. Ensure that the object references Tables or Connections that can be parameterized.
 
 . xref:variables.adoc[Step 2: Define variables] +
 Create a variable with placeholder values for each Org and assign appropriate values using `/api/rest/2.0/template/variables/create` API. For example, set a variable to map the connection or schema for the target Org. This ensures the published object will use the correct data source or configuration in each Org.
 
 . xref:metadata-parameterization.adoc[Step 3: Parameterize metadata objects] +
-Replace the static values of object properties  with variables created from the previous step. You can use  the `/api/rest/2.0/metadata/parameterize` API endpoint to assign variables. This step allows the same metadata object to be reused across different Orgs, with the actual values being supplied at runtime for each Org.
+Replace the static values of object properties with variables created from the previous step. You can use  the `/api/rest/2.0/metadata/parameterize` API endpoint to assign variables. This step allows the same metadata object to be reused across different Orgs, with the actual values being supplied at runtime for each Org.
 
 . xref:publish-api.adoc[Step 4: Publish the objects] +
 Publish the objects to destination Orgs using the publish metadata API (`/api/rest/2.0/security/metadata/publish`).
@@ -84,8 +108,7 @@ Publish the objects to destination Orgs using the publish metadata API (`/api/re
 Verify the published object in each destination Org and check if it's mapped to the correct data source.
 Update the master object, republish changes, and verify if the changes are propagated to target Orgs.
 
-
-The steps required in the publishing process are illustrated in the following figure:
+The steps required to publish objects from the Primary Org to other Orgs are illustrated in the following figure:
 
 [.widthAuto]
 image::./images/publishing-flowchart.png[Publishing process]
