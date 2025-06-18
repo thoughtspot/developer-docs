@@ -1,0 +1,259 @@
+= Define variables
+:toc: true
+:toclevels: 2
+
+:page-title: Define template variables
+:page-pageid: variables
+:page-description: Use the variables REST API to create and update variables for publishing content across Orgs
+
+Variables allow you to define dynamic placeholders for specific properties of metadata objects such as Connections and Tables. By using variables, you can dynamically assign different values to the object properties for each Org and yet use a single source with a consistent data structure across different Orgs.
+
+Before publishing your analytics content to other Orgs, you must define and assign variables to metadata objects.
+
+== Before you begin
+
+* Ensure that you have edit access to the metadata objects to which you want to assign variables.
+* Ensure that you have administration privileges to create, edit, or delete a variable.
+
+== Create a variable
+To create a variable, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fcreate-variable">/api/rest/2.0/template/variables/create </a>+++ API endpoint, with the following parameters in the request body.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`type` a| __String__. Type of the variable. The API supports the following types of variables:
+
+* `CONNECTION_PROPERTY` +
+To define variables for connection properties. This variable allows editing core connection properties such as `accountName`, `warehouse`, `user`, `password`, `role` and so on.
+* `TABLE_MAPPING` +
+To map Tables properties to variables.
+* `CONNECTION_PROPERTY_PER_PRINCIPAL` +
+To define variables for connection properties per user or user group. This feature is disabled by default. To enable this option, contact ThoughtSpot Support.
+|`name`| __String__. Name of the variable. For example, `schema_var`.  Note that the name must be unique across all Orgs within the instance.
+|`sensitive` __Optional__ |__Boolean__. Indicates if the variable contains sensitive values such as passwords.
+|values a|__Array of strings__. Assign values for the variable. You must specify the variable values for each Org to which you want to publish content. The `values` array includes the following attributes:
+
+* `value` __String__ +
+The value for the variable. For the primary Org, you can define the variable value as `Primary`. For destination Orgs, specify a separate value, for example, `staging1`.
+* `org_identifier` __String__ +
+ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0.
+* `principal_type` and `principal_identifier`  __Optional__ +
+Specify if the variable should be applied per user or user group. Based on the principal type, specify the ID or name of the user or user group. These attributes are used if the variable type is `CONNECTION_PROPERTY_PER_PRINCIPAL`
+* `priority` __Optional__ +
+The priority assigned to this value. If there are two matching values, the one with a higher priority will be used.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "type": "TABLE_MAPPING",
+  "name": "schema_var",
+  "sensitive": false,
+  "values": [
+    {
+      "value": "primary",
+      "org_identifier": "primaryOrg"
+    },
+    {
+      "value": "TargetOrg1",
+      "org_identifier": "staging"
+    },
+    {
+      "value": "TargetOrg2",
+      "org_identifier": "prod"
+    }
+  ]
+}'
+----
+
+=== Example response
+
+If the API request is successful, the following response is returned:
+
+[source,JSON]
+----
+{
+  "id": "180a9cd3-8605-445b-8b70-aa0bcef5dfb0",
+  "name": "schema_var",
+  "variable_type": "TABLE_MAPPING",
+  "sensitive": false,
+  "values": [
+    {
+      "value": "primaryOrg",
+      "org_identifier": "Primary",
+      "principal_type": null,
+      "principal_identifier": null,
+      "priority": null
+    }
+  ]
+}
+----
+
+Note the variable ID.
+
+== Update variable values
+
+To update a variable, the following APIs are available:
+
+* `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable-values">POST /api/rest/2.0/template/variables/update</a>+++`
++
+Allows adding, removing, and replacing values for multiple variables in a single API call.
+
+* `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable">POST /api/rest/2.0/template/variables/{identifier}/update</a>+++`
++
+Allows modifying properties of a specific variable.
+
+=== Update properties of a variable
+
+To update the properties of a variable, send a `POST` request to `/api/rest/2.0/template/variables/{identifier}/update`  with modified properties. Specify the variable ID in the `{identifier}` path parameter.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/a1b2c3d4-e5f6-7890-abcd-ef1234567890/update'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "operation": "REPLACE",
+  "name": "schema_var1",
+  "values": [
+    {
+      "value": "stagingOrg1",
+      "org_identifier": "staging"
+    }
+  ]
+}'
+----
+
+=== Update properties of multiple variables
+
+To update properties of multiple variables in a single call, send a `POST` request to the `/api/rest/2.0/template/variables/update` API endpoint, with modified parameters for each `value` array in the request body.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/update'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "variable_updates": [
+    {
+      "variable_identifier": "e61ace04-6651-4725-9174-90ce33423ef9",
+      "variable_values": [
+        {
+          "value": "prod1",
+          "org_identifier": "ProdOrg1"
+        },
+        {
+          "value": "devOrg1",
+          "org_identifier": "devOrg"
+        }
+      ]
+    }
+  ],
+  "operation": "REPLACE"
+}'
+----
+
+If the update operation is successful, the API returns a JSON array of variables with the new values.
+
+== Get details of variables
+To get a list of variables or the details of a specific variable, send a `POST` request to the `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fsearch-variables">/api/rest/2.0/template/variables/search</a>+++` API endpoint.
+
+To search for a variable, specify the following parameters in your API request:
+
+* variable type
+* variable ID
+* Name pattern +
+Specify partial name of the variable. For wildcard search, use `%`.
+* output format +
+Specify one of the following values for output format:
+** `METADATA_ONLY` (default) +
+Returns only the variable metadata
+** `METADATA_AND_VALUES` +
+Returns variable metadata and values
+** `EDITABLE_METADATA_AND_VALUES` +
+Returns only the variable metadata and values that are editable
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "record_offset": 0,
+  "record_size": 10,
+  "output_format": "EDITABLE_METADATA_AND_VALUES",
+  "variable_details": [
+    {
+      "type": "TABLE_MAPPING"
+    }
+  ]
+}'
+----
+
+If the request is successful, the API returns the variable data in the response:
+
+[source,JSON]
+----
+[
+  {
+    "id": "180a9cd3-8605-445b-8b70-aa0bcef5dfb0",
+    "name": "schema_var",
+    "variable_type": null,
+    "sensitive": null,
+    "values": [
+      {
+        "value": "primaryOrg",
+        "org_identifier": "Primary",
+        "principal_type": null,
+        "principal_identifier": null,
+        "priority": null
+      },
+      {
+        "value": "test",
+        "org_identifier": "testOrg",
+        "principal_type": null,
+        "principal_identifier": null,
+        "priority": null
+      },
+      {
+        "value": "staging",
+        "org_identifier": "StagingOrg",
+        "principal_type": null,
+        "principal_identifier": null,
+        "priority": null
+      },
+    ]
+----
+
+== Delete a variable
+
+To delete a variable, send a `POST` request to the `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fdelete-variable">/api/rest/2.0/template/variables/{identifier}/delete</a>+++` API endpoint, with the variable ID in the path parameter.
+
+Note that you can delete only one variable at a time.
+
+If the variable is used by other objects, make sure to update the properties of the object before deleting the variable.
+
+[source,cURL]
+----
+curl -X POST \
+--url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/180a9cd3-8605-445b-8b70-aa0bcef5dfb0/delete' \
+-H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+If the API request is successful, ThoughtSpot returns a 204 response code.
+
