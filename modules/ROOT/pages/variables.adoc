@@ -19,7 +19,7 @@ Before publishing your analytics content to other Orgs, you must define and assi
 To create a variable, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fcreate-variable">/api/rest/2.0/template/variables/create </a>+++ API endpoint, with the following parameters in the request body.
 
 === Request parameters
-In your `POST` request body, include the following parameters:
+In your `POST` request body, you can include the following parameters:
 
 [width="100%" cols="1,4"]
 [options='header']
@@ -35,16 +35,20 @@ To map Tables properties to variables.
 To define variables for connection properties per user or user group. This feature is disabled by default. To enable this option, contact ThoughtSpot Support.
 |`name`| __String__. Name of the variable. For example, `schema_var`.  Note that the name must be unique across all Orgs within the instance.
 |`sensitive` __Optional__ |__Boolean__. Indicates if the variable contains sensitive values such as passwords.
-|values a|__Array of strings__. Assign values for the variable. You must specify the variable values for each Org to which you want to publish content. The `values` array includes the following attributes:
+|`values` __Optional__ a|__Array of strings__. Define the variable attributes. Although it's optional, make sure that you set the value for an Org before publishing content to that Org.
+
+The `values` array includes the following attributes:
 
 * `value` __String__ +
 The value for the variable. For the primary Org, you can define the variable value as `Primary`. For destination Orgs, specify a separate value, for example, `staging1`.
 * `org_identifier` __String__ +
 ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0.
+
 * `principal_type` and `principal_identifier`  __Optional__ +
-Specify if the variable should be applied per user or user group. Based on the principal type, specify the ID or name of the user or user group. These attributes are used if the variable type is `CONNECTION_PROPERTY_PER_PRINCIPAL`
+Specify if the variable should be applied per user or user group. Based on the principal type, specify the ID or name of the user or user group. These attributes are used if the variable type is `CONNECTION_PROPERTY_PER_PRINCIPAL`.
 * `priority` __Optional__ +
-The priority assigned to this value. If there are two matching values, the one with a higher priority will be used.
+The priority assigned to this value. If there are two matching values, the one with a higher priority will be used. This attribute can be defined for the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
+
 |=====
 
 === Example request
@@ -112,11 +116,44 @@ Allows adding, removing, and replacing values for multiple variables in a single
 
 * `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable">POST /api/rest/2.0/template/variables/{identifier}/update</a>+++`
 +
-Allows modifying properties of a specific variable.
+Allows adding, removing, and replacing values of a specific variable.
 
 === Update properties of a variable
 
-To update the properties of a variable, send a `POST` request to `/api/rest/2.0/template/variables/{identifier}/update`  with modified properties. Specify the variable ID in the `{identifier}` path parameter.
+To update the properties of a variable, send a `POST` request to `/api/rest/2.0/template/variables/{identifier}/update` with the following parameters in the request body. Specify the variable ID in the `{identifier}` path parameter.
+
+=== Request parameters
+
+In your `POST` request body, you can include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`identifier` __String__| ID or name of the variable. Include the variable ID as a path parameter in the request body.
+|`name` __String__ | New name for the variable. Specify a name if you want to rename the variable.
+|`Operation` __String__ a| Specify the update operation type. The following options are available:
+
+* `ADD` +
+Adds new values. Use this operation type if you want to add new attributes to the variable.
+* `REMOVE` +
+Removes the values assigned to the variable specified in the API request.
+* `REPLACE` +
+Replaces the existing attributes with new values.
+|values +
+__Optional__ a|__Array of strings__. Modify the values of the variable specified in the API request. The `values` array includes the following attributes:
+
+* `value` __String__ +
+The new value for the variable. for example, `staging1`.
+* `org_identifier` __String__ +
+ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0.
+* `principal_type` and `principal_identifier`  __Optional__ +
+Principal attributes such as user and user group. These attributes are applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
+* `priority` __Optional__ +
+The priority assigned to this value. Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
+|=====
+
+=== Example request
 
 [source,cURL]
 ----
@@ -126,19 +163,57 @@ curl -X POST \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "operation": "REPLACE",
-  "name": "schema_var1",
+  "name": "TableVar",
   "values": [
     {
-      "value": "stagingOrg1",
-      "org_identifier": "staging"
+      "value": "staging",
+      "org_identifier": "stagingOrg1"
     }
   ]
 }'
 ----
 
+If the update operation is successful, the API returns a 204 response to indicate that the variable was updated successfully.
+
 === Update properties of multiple variables
 
-To update properties of multiple variables in a single call, send a `POST` request to the `/api/rest/2.0/template/variables/update` API endpoint, with modified parameters for each `value` array in the request body.
+To update properties of multiple variables in a single call, send a `POST` request to the `/api/rest/2.0/template/variables/update` API endpoint with the following parameters in the request body.
+
+
+=== Request parameters
+
+In your `POST` request body, you can include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`variable_updates` a|Array of inputs for the variable update. Allows updating the following properties for each variable ID in the array:
+
+* `identifier` __String__. +
+ID or name of the variable to update.
+* `variable_values` __Optional__ +
+__Array of strings__. Assign new values for the variable attributes.
+
+** `value` __String__ +
+The new value for the variable. for example, `staging1`.
+** `org_identifier` __String__ +
+ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0.
+** `principal_type` and `principal_identifier`  __Optional__ +
+Principal attributes such as user and user group. These attributes are applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
+** `priority` __Optional__ +
+The priority assigned to this value. Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
+|`Operation` __String__ a| Specify the update operation type. The following values are available:
+
+* `ADD` +
+Adds new values. Use this operation type if you want to add new attributes to the variable.
+* `REMOVE` +
+Removes the values assigned to the variable specified in the API request.
+* `REPLACE` +
+Replaces the existing attributes with new values.
+|=====
+
+=== Request example
 
 [source,cURL]
 ----
@@ -166,7 +241,7 @@ curl -X POST \
 }'
 ----
 
-If the update operation is successful, the API returns a JSON array of variables with the new values.
+If the update operation is successful, the API returns a 204 response to indicate that the variable was updated successfully.
 
 == Get details of variables
 To get a list of variables or the details of a specific variable, send a `POST` request to the `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fsearch-variables">/api/rest/2.0/template/variables/search</a>+++` API endpoint.
@@ -184,7 +259,7 @@ Returns only the variable metadata
 ** `METADATA_AND_VALUES` +
 Returns variable metadata and values
 ** `EDITABLE_METADATA_AND_VALUES` +
-Returns only the variable metadata and values that are editable
+Returns metadata details, such as name, type, default value, and whether the variable is editable, and the current values of variables that can be edited.
 
 [source,cURL]
 ----
