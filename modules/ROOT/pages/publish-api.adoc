@@ -6,11 +6,11 @@
 :page-pageid: publish-to-orgs
 :page-description: Use the publish APIs to publish a master object from a primary Org to destination Orgs on a ThoughtSpot instance
 
-The publishing feature simplifies and automates content propagation from the Primary Org to other Orgs in a multi-tenant instance.
+The publishing feature simplifies and automates content distribution from the Primary Org to one or several target Orgs in a multi-tenant instance.
 
-For large-scale deployments that require similar analytics content generated from the data source objects with varied properties, use the xref:variables.adoc[variables] to parameterize object properties, so that each Org receives a version of the object with dynamically assigned properties based on the Org context.
+For large-scale deployments requiring the same analytics content, with the underlying Table or Connection properties that vary per Org, use xref:variables.adoc[variables] to parameterize the object properties. This ensures that the same object can be used across all target Orgs, with variable values dynamically adjusted to each Org's specific context.
 
-To publish objects programmatically from the Primary Org to one or several target Orgs, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fpublish-metadata">/api/rest/2.0/security/metadata/publish </a>+++ API endpoint.
+To publish objects programmatically from the Primary Org to one or several target Orgs in a single API call, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fpublish-metadata">/api/rest/2.0/security/metadata/publish </a>+++ API endpoint.
 
 == Before you begin
 
@@ -18,9 +18,9 @@ To publish objects programmatically from the Primary Org to one or several targe
 * If you are publishing a Liveboard or Answer and the properties of its underlying data source vary per Org, ensure that the xref:metadata-parameterization.adoc[underlying data objects are parameterized] to use dynamic values for the target Org context.
 
 == Publish objects
-The publish API allows publishing objects such as Liveboards and Answers from the Primary Org to one or several destination Orgs, while ensuring that the variables assigned to metadata objects are substituted with correct values for each Org.
+The publish API allows publishing objects such as Liveboards, Answers, Tables, and Model from the Primary Org to one or several destination Orgs. The API doesn't support publishing Connections.
 
-To publish an object, send a `POST` request to the `/api/rest/2.0/security/metadata/publish` API endpoint, with the following parameters in the request body.
+To publish an object to one or several Orgs, send a `POST` request to the `/api/rest/2.0/security/metadata/publish` API endpoint, with the following parameters in the request body.
 
 === Request parameters
 In your `POST` request body, include the following parameters:
@@ -33,7 +33,7 @@ In your `POST` request body, include the following parameters:
 
 * `LIVEBOARD` for Liveboards
 * `LOGICAL_TABLES` +
-For Models, and Tables
+For Models and Tables
 * `ANSWER` for Answers
 
 |`org_identifiers` a|__Array of strings__. Array of Org names or IDs to which you want to publish the object.
@@ -56,9 +56,9 @@ curl -X POST \
     }
   ],
   "org_identifiers": [
-    "Staging1",
-    "Staging2",
-    "ProdOrg1"
+    "MyOrg1",
+    "MyOrg2",
+    "MyOrg3"
   ]
 }'
 ----
@@ -97,9 +97,12 @@ For Models and Tables
 
 |`org_identifiers` a|__Array of strings__. Specify the Orgs from which you want to remove the published object.
 
-|`include_dependencies` |__Boolean__. When set to `true`, the published object with all its dependent objects is removed from the Orgs. If the dependent objects are associated to other objects in the Orgs, they will be retained in the Orgs.
+|`include_dependencies` |__Boolean__. When set to `true`, this attribute unpublishes and removes all dependent objects if no other published object is using them.
+
 |`force` +
-__Optional__ a| __Boolean__. Removes the published objects from the Orgs. Exercise caution when using this option, because it will break the object references in the currently published Orgs.
+__Optional__ a| __Boolean__. Force deletes the published objects from the Orgs specified in the request. If an Org has new content created from the published object, such as an Answer or Liveboard from a Model published from the Primary Org, the API returns an error unless the `force` attribute is set to `true`.
+
+Exercise caution when using this option, because it may break the association with objects that reference the published object.
 |=====
 
 === Example request
@@ -119,8 +122,8 @@ curl -X POST \
     }
   ],
   "org_identifiers": [
-    "testOrg",
-    "stagingOrg"
+    "MyOrg1",
+    "MyOrg2"
   ]
 }'
 ----

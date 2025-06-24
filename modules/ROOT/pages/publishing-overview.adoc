@@ -6,12 +6,11 @@
 :page-pageid: publish-data-overview
 :page-description: Use the publishing feature to distrubute and propagete objects to Orgs within a ThoughtSpot instance.
 
-The publishing feature [beta betaBackground]^Beta^ enables administrators to efficiently manage and propagate objects such as Liveboards and Answers across multiple Orgs within a multi-tenant ThoughtSpot instance.
+The publishing feature [beta betaBackground]^Beta^ enables administrators to efficiently manage and distribute ThoughtSpot metadata objects across multiple Orgs within a multi-tenant instance.
 
-Unlike the deployment method that relies on TML import and Git integration, the publishing feature allows administrators to create an object in the Primary Org and publish it directly to target Orgs without creating duplicate copies of the object. The publishing feature also provides the ability to customize the object properties of the underlying Table or Connection using variables.
+Unlike the deployment method that relies on TML import and Git integration, publishing allows administrators to create an object in the Primary Org and publish it directly to target Orgs without generating duplicate copies. It also allows dynamic customization of the underlying Table or Connection properties using variables.
 
-ThoughtSpot provides a set of REST APIs to manage the publishing workflow in the 10.10.0.cl release. Administrators can use these APIs to create and assign variables, parameterize object properties, and publish objects seamlessly from the Primary Org to other target Orgs on a ThoughtSpot instance.
-
+Starting with the 10.10.0.cl release, ThoughtSpot provides a set of REST APIs for administrators to create and assign variables, parameterize object properties, and publish objects from the Primary Org to other Orgs on their instances.
 
 [IMPORTANT]
 ====
@@ -20,10 +19,9 @@ The publishing feature—including the REST APIs for variable creation and updat
 
 == When to use publishing feature
 
-ThoughtSpot recommends using the publishing feature in the following scenarios:
+ThoughtSpot recommends using the publishing feature if you have a multi-tenant ThoughtSpot instance with Orgs and your deployment requires the same metadata objects across different tenant Orgs.
 
-* You have a multi-tenant ThoughtSpot instance with Orgs and your deployment requires the same metadata objects across different tenant Orgs
-* You have set up multiple environments using Orgs on your ThoughtSpot instance, and you want to publish content to multiple Orgs
+//* You have set up multiple environments using Orgs on your ThoughtSpot instance, and you want to publish content to multiple Orgs
 
 
 //For example, you want to publish content from a `development` environment to a `test` or `staging` environment. In such cases, you can set the Primary Org on your instance as the development Org and publish content from the Primary Org to other target Orgs.
@@ -41,28 +39,30 @@ If a tenant Org requires unique customizations that cannot be handled by variabl
 |Allows publishing content from the Primary Org to different Orgs within an instance|Allows publishing content to Orgs within a ThoughtSpot instance, or from one ThoughtSpot instance to another
 |Maintains a single source of the object and publishes content to Orgs without creating a duplicate object| Creates a separate copy per Org / per instance and can result in a higher memory usage.
 |Allows customizing data properties with variables | Creates new copies per Org or instance and thus allows full customization of objects
-|Automatically maps objects using variables and object IDs| Requires xref:guid-mapping.adoc[GUID mapping]
+|No change to metadata object IDs and references. Hence, GUID mapping is not required.| Requires xref:guid-mapping.adoc[GUID mapping]
 |=====
 
 == Parameters and variables
 
-The Connection and Table objects required for building analytics content can vary between data environments. To customize Connection and Table properties for each Org, you can use variables and parameterize object properties. This approach ensures that metadata objects dynamically adapt to the configuration of each Org, supporting multi-tenant scenarios and reducing the need to duplicate objects for each Org
+The Connection and Table objects required for building analytics content can vary between data environments. To customize Connection and Table properties for each Org, you can use variables and parameterize object properties.
 
-You can create the following types of variables using xref:variables.adoc[variable API] and use these variables to parameterize Connection or Table properties via xref:metadata-parameterization.adoc[metadata parameterization API]:
+You can create the following types of variables using the xref:variables.adoc[variable API] and use them to parameterize Connection or Table properties either through the xref:metadata-parameterization.adoc[metadata parameterization API] or by directly updating the TML for the Connection or Table. This approach ensures that the published metadata objects dynamically adapt to the configuration of each Org without the need for creating a copy of the object.
 
-* `CONNECTION_PROPERTY` +
-The `CONNECTION_PROPERTY` variables allow parameterizing connection properties such as `accountName`, `warehouse`, `user`, `password`, `role` and so on.
-
-* `TABLE_MAPPING` +
-The **TABLE_MAPPING** variable allow parameterizing the following Table properties:
+[width="100%" cols="7,7"]
+[options='header']
+|=====
+|Variable type| Description
+|`TABLE_MAPPING`| The **TABLE_MAPPING** variable allow parameterizing the following Table properties:
 
 ** `databaseName`
 ** `schemaName`
 ** `tableName`
-
-* `CONNECTION_PROPERTY_PER_PRINCIPLE` +
-Allows parameterizing connection properties per user or user group. However, it doesn't allow parameterizing core Connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration. +
+|`CONNECTION_PROPERTY`| The `CONNECTION_PROPERTY` variables allow parameterizing connection properties. For example, `accountName`, `warehouse`, `user`, `password`, `role` and so on.
+| `CONNECTION_PROPERTY_PER_PRINCIPLE` a| This variable supports modifying connection properties per principal (user or user group). This means you can set different values for connection properties depending on the user or group accessing the connection. For example, `warehouse`, `role`, `user`, `password`.
+The `CONNECTION_PROPERTY_PER_PRINCIPLE` variable does not allow parameterizing core connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration and cannot be set per user or user group. +
+[NOTE]
 This feature is disabled by default. To enable this option, contact ThoughtSpot Support.
+|=====
 
 The following figure illustrates variable substitution in Connections and Tables:
 
@@ -71,7 +71,7 @@ image::./images/variables.png[Variables]
 
 == Version control
 
-For the objects in the Primary Org, you can use the xref:git_integration_overview[Git integration] APIs for development, change tracking, and version control. However, Git integration is not supported for objects published in the target Orgs.
+For the objects in the Primary Org, you can use the xref:git_integration_overview[Git integration] APIs for development, change tracking, and version control. However, Git integration for the objects published in the target Orgs is not supported.
 
 == User access to objects
 ThoughtSpot administrator with access to all Orgs can publish content from the Primary Org to other Orgs on a ThoughtSpot instance. The administrators will also require edit access to the object and the underlying data source in the Primary Org.
@@ -104,10 +104,10 @@ ThoughtSpot is actively working on enhancements to support critical features and
 The content publishing process with the new publishing method involves the following steps:
 
 . xref:intro-thoughtspot-objects.adoc#_content_creation_workflow[Step 1: Create a master object] +
-This step involves building Answers and Liveboard from a Model or data object in Primary Org. Ensure that the object references Tables or Connections that can be parameterized with variables.
+This step involves building Answers and Liveboard from a Model or data object in Primary Org. Ensure that the object references Tables or Connections that can be parameterized with variables. Note that parameterizing default system tables is not supported.
 
 . xref:variables.adoc[Step 2: Define variables] +
-Create a variable for each Org and assign values using `/api/rest/2.0/template/variables/create` API. For example, you can create a variable for table attributes, such as schema, database, or table name, and assign the variable to the relevant table properties using the metadata parameterization API endpoint. When you publish the object, the object properties with the variables are dynamically assigned appropriate values configured for the Org.
+Create a variable for each Org using the `/api/rest/2.0/template/variables/create` API endpoint. For example, you can create a variable for table attributes, such as schema, database, or table name, and assign the variable to the relevant table properties using the metadata parameterization API endpoint. When you publish the object, the object properties with the variables are dynamically assigned appropriate values configured for the Org.
 
 . xref:metadata-parameterization.adoc[Step 3: Parameterize metadata objects] +
 Replace the static values of object properties with variables created from the previous step. You can use the `/api/rest/2.0/metadata/parameterize` API endpoint or directly edit the TML to assign variables to the relevant properties. This step is required to enable the use of the same metadata object across different Orgs, with the actual values being supplied at runtime for each Org.
@@ -115,9 +115,10 @@ Replace the static values of object properties with variables created from the p
 . xref:publish-api.adoc[Step 4: Publish the objects] +
 Publish the objects from the source Org (Primary Org) to target Orgs using the publish metadata API (`/api/rest/2.0/security/metadata/publish`).
 
-. xref:publish-api.adoc#_validate_published_objects[Step 5: Verify and update objects] +
-After publishing an object, verify the published object in each Org to ensure that the variables are correctly substituted with the appropriate values for that Org.
-Try updating the original object in the Primary Org, and verify whether the updates are automatically propagated to the target orgs and the published objects are synchronized.
+. xref:publish-api.adoc#_validate_published_objects[Step 5: Verify published objects] +
+After publishing an object, verify the published object and the associated TML object in each Org to ensure that the variables are correctly substituted with the appropriate values for that Org.
+
+Try updating the original object in the Primary Org and verify whether the published objects in the target Orgs are updated accordingly.
 
 The following figure provides a visual representation of the publishing workflow:
 
