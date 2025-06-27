@@ -1,4 +1,4 @@
-= Prerender components
+= Prerender embed components
 :toc: true
 :toclevels: 3
 
@@ -6,28 +6,167 @@
 :page-pageid: prerender
 :page-description: Prerender components to optimize user experience of your embedding application
 
-To optimize your user's experience when ThoughtSpot is embedded into your application, we recommend using the prerender method.
+ThoughtSpot supports the following rendering options for the embed components:
 
-== Prerender
+* Normal render +
+Normal render is the default behavior of the ThoughtSpot SDK. It loads the ThoughtSpot app when the component is rendered.
+* Pre-Render +
+Pre-renders the embed as soon as the component code is rendered. With this, the amount of ThoughtSpot assets left to load when the user accesses the embedded content is reduced.
+* On-demand pre-rendering +
+Pre-renders after the embed component is rendered at least once.
 
-You can load ThoughtSpot components that are not specific to the user's session before your application user accesses the embedded content. With this, the amount of ThoughtSpot assets left to load when the user accesses the embedded content is reduced.
+== Overview
+Pre-rendering allows application to load ThoughtSpot embed components in the background. You can use pre-rendering for performance optimization, reducing iframe initialization delays, and for seamless transition between the embed views and application pages.
 
-=== When to use prerender
+The prerender feature creates a placeholder element for the ThoughtSpot component. To preload it effectively, place the element in a section of your app that users see before accessing the component. For example, analytics applications often have custom landing pages that direct users to embedded content. Preloading the component on this page ensures it is ready to render when users click on a link.
+
+The following figure illustrates the benefits of the pre-render method:
+
+image::./images/prerender.png[prerender]
+
+=== When to use pre-render
 
 Use prerender in the following cases:
 
-* if you have applications that do not have ThoughtSpot on the landing page.
-* if you are embedding ThoughtSpot Liveboards in your applications.
+* If you want to preload an embed component, such as a Liveboard, Spotter interface, or full application, before it's shown to the user.
+* Your application has a tabbed interface with multiple embed views or your embed involves switching between pages, and you want to show the components on the next page instantly.
+
+== How to pre-render components
+To pre-render a component:
+
+. Add pre-render options to your embed code. +
+In this example, let's add a pre-render ID to the Liveboard embed instance.
++
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed('#embed', {
+  liveboardId: '<your-liveboard-id>',
+  preRenderId: 'my-prerender-id', // Unique ID for this pre-render instance
+  // Optionally, disable dynamic size tracking:
+  // doNotTrackPreRenderSize: true,
+});
+----
+You can also pre-render a generic instance in the background using the `prerenderGeneric` method. This preloads a generic instance of the component (without a specific path) in the background and applies flags. The `liveboardId` is passed when your embed is rendered. This is a generic pre-render where only the basic assets needed for rendering the app are loaded.
+This method might not be as fast as pre-rendering with `liveboardId` but it is faster than normal rendering.
+
++
+[source,JavaScript]
+----
+await liveboardEmbed.prerenderGeneric();
+----
+. Create a placeholder shell. +
+This sets up the pre-render shell and is hidden by default.
+
++
+[source,JavaScript]
+----
+await liveboardEmbed.preRender();
+----
+. Show pre-rendered component.
++
+[source,JavaScript]
+----
+await liveboardEmbedembed.showPreRender();
+----
+. For style synchronization such as adjusting the position, width, and height of the pre-rendered component to match the embedding element, call the `syncPreRenderStyle` method to ensure a seamless display of styles.
++
+[source,JavaScript]
+----
+embed.syncPreRenderStyle();
+----
+
+== Code sample
+
+[source,JavaScript]
+----
+import {
+    LiveboardEmbed,
+    AuthType,
+    init,
+    prefetch,
+} from '@thoughtspot/visual-embed-sdk';
+
+// Initialize SDK
+init({
+    thoughtSpotHost: 'https://<your-thoughtspot-host>',
+    authType: AuthType.None,
+});
+
+//Create LiveboardEmbed instance
+const liveboardEmbed = new LiveboardEmbed('#embed', {
+    liveboardId: '<your-liveboard-id>', //Replace with your actual Liveboard ID
+    preRenderId: 'my-prerender-id', //Replace with the actual ID
+});
+
+// Pre-render in the background
+liveboardEmbed.showPreRender();
+
+//Show the pre-rendered component when needed
+document.getElementById('show-liveboard-btn').onclick = () => {
+    liveboardEmbed.render();
+};
+----
+
+== Best practices
+* Use unique `preRenderId` values for each separate embed.
+* Place the pre-render shell in the DOM early (on page mount).
+* If using `prerenderGeneric`, call this method early.
+* Avoid multiple re-instantiations. Initialize once and reuse the instance.
+* Use `full-height` if necessary.
+
+== SDK reference for pre-rendering methods and properties
+
+The Visual Embed SDK provides the following methods and properties for pre-rendering embed components:
+
+[width="100%" cols="5,7,7"]
+[options="header"]
+|====
+| Name
+| Description
+| Example
+| xref:AppEmbed.adoc#_prerender[preRender]
+| This method creates `preRender` shell. Optionally, shows the preRender after rendering components.
+a| `await embed.preRender();`
+| xref:AppEmbed.adoc#_prerendergeneric[prerenderGeneric]
+| This method pre-renders a generic instance of the ThoughtSpot embed component.
+| `await embed.prerenderGeneric();`
+| xref:AppEmbed.adoc#_showprerender[showPreRender]
+| This method displays the pre-rendered component. If the component is not pre-rendered, it creates and renders it.
+| `await embed.showPreRender();`
+| xref:AppEmbed.adoc#_hideprerender[hidePreRender]
+| This method hides the pre-rendered component if available.
+| `embed.hidePreRender();`
+| xref:AppViewConfig.adoc#_getprerenderids[getPreRenderIds]
+| This method retrieves unique HTML element IDs for pre-render-related elements, based on `preRenderId`.
+| `embed.getPreRenderIds();`
+| xref:AppEmbed.adoc#_getprerenderids[preRenderId]
+| This configuration property allows defining the object ID for the pre-rendered instance. Can be used with `showPreRender`/`hidePreRender`.
+| `preRenderId: "preRenderId-123"`
+| xref:AppEmbed.adoc#_syncprerenderstyle[syncPreRenderStyle]
+| This method synchronizes style, position, width, height of the pre-rendered component with embedding element.
+| `embed.syncPreRenderStyle();`
+| xref:AppViewConfig.adoc#_donottrackprerendersize[doNotTrackPreRenderSize]
+| This configuration setting disables dynamic size tracking for pre-render component when set to true.
+| `doNotTrackPreRenderSize: true`
+|====
+
+== Additional resources
+
+* link:https://github.com/thoughtspot/developer-examples/tree/main/visual-embed/pre-rendering[Pre-rendering examples GitHub repository, window=_blank]
+* link:https://codesandbox.io/p/sandbox/github/thoughtspot/developer-examples/tree/main/visual-embed/pre-rendering[Code sandbox, window=_blank]
+
+
+////
+== Prerender
+
+You can load ThoughtSpot components that are not specific to the user's session before your application user accesses the embedded content.
+
 
 === How it works
 
 Pre-render allows developers to pre-load the ThoughtSpot application in the background before the user navigates to the embedded content.
 
 It allows you to create a placeholder element on the page for the Liveboard to eventually populate. To preload components, you must place this element into a section of your application that will be viewed before the Liveboard. For example, it is common for analytics applications to have a custom-built landing page that directs users to relevant pieces of embedded content. This would be an ideal place to preload the component, so the frame is ready to render by the time the user clicks on a specific link.
-
-The following figure illustrates the benefits of the pre-render method:
-
-image::./images/prerender.png[prerender]
 
 === How to implement prerender
 
@@ -278,7 +417,6 @@ function toggleLiveboardSelect(e){
 }
 ----
 
-////
 == Turn on CDN
 
 Using a Content Delivery Network (CDN) reduces the time to pre-render static or dynamic ThoughtSpot assets by caching resources closer to the end user. When your application users navigate to ThoughtSpot very quickly after the embedding application loads, they need not wait for assets to finish pre-rendering.
