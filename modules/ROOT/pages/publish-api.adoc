@@ -1,0 +1,131 @@
+= Publish objects to Orgs
+:toc: true
+:toclevels: 2
+
+:page-title: Publish objects to Orgs
+:page-pageid: publish-to-orgs
+:page-description: Use the publish APIs to publish a master object from a primary Org to destination Orgs on a ThoughtSpot instance
+
+The publishing feature simplifies and automates content distribution from the Primary Org to one or several target Orgs in a multi-tenant instance.
+
+For large-scale deployments requiring the same analytics content, with the underlying Table or Connection properties that vary per Org, use xref:variables.adoc[variables] to parameterize the object properties. This ensures that the same object can be used across all target Orgs, with variable values dynamically adjusted to each Org's specific context.
+
+To publish objects programmatically from the Primary Org to one or several target Orgs in a single API call, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fpublish-metadata">/api/rest/2.0/security/metadata/publish </a>+++ API endpoint.
+
+== Before you begin
+
+* Ensure that you have administration permissions with access to all Orgs to publish content to Orgs on your instance.
+* If you are publishing a Liveboard or Answer and the properties of its underlying data source vary per Org, ensure that the xref:metadata-parameterization.adoc[underlying data objects are parameterized] to use dynamic values for the target Org context.
+
+== Publish objects
+The publish API allows publishing objects such as Liveboards, Answers, Tables, and Model from the Primary Org to one or several destination Orgs. The API doesn't support publishing Connections.
+
+To publish an object to one or several Orgs, send a `POST` request to the `/api/rest/2.0/security/metadata/publish` API endpoint, with the following parameters in the request body.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`metadata` a| __Array of strings__. Array of metadata objects to publish. Specify the ID and type of metadata in each array. The supported metadata object types are:
+
+* `LIVEBOARD` for Liveboards
+* `LOGICAL_TABLES` +
+For Models and Tables
+* `ANSWER` for Answers
+
+|`org_identifiers` a|__Array of strings__. Array of Org names or IDs to which you want to publish the object.
+|`skip_validation` a|__Boolean__. When set to `true`, it skips validation of objects before publishing. By default, it's set to `false`.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/security/metadata/publish'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata": [
+    {
+      "identifier": "c6ce2676-90be-468a-8d92-c22f1255d9dc",
+      "type": "LIVEBOARD"
+    }
+  ],
+  "org_identifiers": [
+    "MyOrg1",
+    "MyOrg2",
+    "MyOrg3"
+  ]
+}'
+----
+
+If the API request is successful, ThoughtSpot returns a 204 response indicating that the object has been successfully published to the Orgs specified in the request.
+
+== Verify published objects
+
+After publishing an object to target Orgs, the administrators with all Orgs access can verify the published object in target Orgs and check the object TML to ensure that the variables are substituted with correct values.
+
+When published, the object and its dependencies will be visible only to administrators of that specific Org. The administrators can share the objects to other users or user groups in their Org.
+
+== Synchronize updates
+
+The published object will be available to users in read-only mode within the target Orgs. While users can interact with the published object, only the original version in the Primary Org is editable.
+When the object in the Primary Org is updated, the changes are automatically propagated to the published versions in the target Orgs and will be visible to users upon the next reload.
+
+== Remove published objects
+
+To remove published objects from the target Orgs, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Funpublish-metadata">/api/rest/2.0/security/metadata/unpublish</a>+++ API endpoint, with the following attributes in the request body.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`metadata` a|__Array of strings__. Array of the published objects to remove from the Orgs. Specify the ID and type of metadata. The supported metadata object types are:
+
+* `LIVEBOARD` for Liveboards +
+* `LOGICAL_TABLES` +
+For Models and Tables
+* `ANSWER` for Answers
+
+|`org_identifiers` a|__Array of strings__. Specify the Orgs from which you want to remove the published object.
+
+|`include_dependencies` |__Boolean__. When set to `true`, this attribute unpublishes the target object and also the other objects that depend on the target object. However, note that this parameter does not unpublish or remove the objects that the target object is dependent on. For example  if you unpublish a model and set `include_dependencies` to `true`, the API tries to unpublish the Model and all objects such as Liveboards and Answers that depend on it, but not the underlying Tables or Connections that the Model is dependent on. The operation fails if any dependent objects have other dependents.
+
+|`force` +
+__Optional__ a| __Boolean__. Force deletes the published objects from the Orgs specified in the request. If an Org has new content created from the published object, such as an Answer or Liveboard from a Model published from the Primary Org, the API returns an error unless the `force` attribute is set to `true`.
+
+Exercise caution when using this option, because it may break the association with objects that reference the published object.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}//api/rest/2.0/security/metadata/unpublish'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "include_dependencies": true,
+  "metadata": [
+    {
+      "identifier": "Sales_Liveboard",
+      "type": "LIVEBOARD"
+    }
+  ],
+  "org_identifiers": [
+    "MyOrg1",
+    "MyOrg2"
+  ]
+}'
+----
+
+If the API request is successful, ThoughtSpot returns a 204 response code indicating that the published object is removed from the target Orgs.
