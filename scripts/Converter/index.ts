@@ -164,7 +164,7 @@ class TypeDocInternalParser {
     ) => string;
 
     static GITHUB_LINK =
-        'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
+        'https://github.com/thoughtspot/visual-embed-sdk/blob/typo-fixes/src';
 
     static covertTypeDocText = (text: string) => {
         // convert all {@link Name.hash}
