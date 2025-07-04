@@ -1,0 +1,156 @@
+= Integrate Pendo with ThoughtSpot Embed
+:toc: true
+:toclevels: 2
+
+:page-title: Pendo integration guide
+:page-pageid: pendo-integration
+:page-description: This document describes how to intregate Pendo in your embed experience.
+
+To launch Pendo guides and analytics within your ThoughtSpot embedded instance, you must integrate Pendo with your ThoughtSpot embed environment. This integration typically requires adding a custom JavaScript to enable product tours, feature announcements, and usage tracking within the embedded experience.
+
+[IMPORTANT]
+====
+By default, the third-party tool integration feature is disabled on ThoughtSpot instances. To enable this feature, contact ThoughtSpot Support.
+====
+
+== Before you begin
+Before you begin, make sure your application environment has the following:
+
+* Admin access to your ThoughtSpot instance. If Orgs are enabled on your instance, ensure that you have logged in to the All Orgs context.
+* A publicly accessible URL to host your integration script.
+* Approval from ThoughtSpot Support to enable integration.
+* Review and understand potential security risks. +
+Malicious scripts introduce XSS risks and can compromise user data and application integrity. Therefore, both ThoughtSpot Support and the customer must explicitly enable and approve the integration to ensure that only vetted and trusted script URLs are allowed.
+
+== Step 1: Sign in to your Pendo Account
+
+If you have a Pendo account, sign in to Pendo. +
+If you have not installed Pendo or do not have a Pendo account, link:https://app.pendo.io/register[sign up for a trial, window=_blank] Pendo account.
+
+For integration with ThoughtSpot embed, you'll need to use a custom script. For this, you need to identify the information you want to capture, define visitors and accounts, and segment data. This information will be used as metadata for the variables in the Pendo install script. For more information, see link:https://support.pendo.io/hc/en-us/articles/21326198721563-Choose-IDs-and-metadata[Pendo documentation].
+
+== Step 2: Create an integration script
+
+To integrate Pendo with ThoughtSpot embed, you'll need a custom JavaScript that is designed to install and initialize the Pendo agent in your ThoughtSpot embed environment.
+
+The script typically includes the following components:
+
+* The Pendo app key
+The Pendo app key is unique to a customer accounts. It maps the data that the agent collects to the product in your Pendo subscription. You must also include a variable for this app key in the Visual Embed SDK.
+* A JavaScript function that includes the initialize method required to retrieve, activate, and load the Pendo agent, `pendo.js`.
+
+You can either create your own integration script or use the xref:pendo-integration.adoc#_sample_javascript_for_pendo_integration[sample JavaScript] provided by ThoughtSpot.
+
+For more information about the script creation and components, refer to the following articles in Pendo documentation:
+
+* link:https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script[Developer's guide to implementing Pendo using the install script]
+* link:https://support.pendo.io/hc/en-us/articles/21362607464987-Components-of-the-install-script#01H6S2EXET8C9FGSHP08XZAE4F[Components of the install script].
+
+=== Sample JavaScript for Pendo integration
+To assist you with the Pendo integration process, ThoughtSpot provides a sample JavaScript, `pendoIntegrationScript.js` for app integration. You can access this sample JavaScript in the link:https://github.com/thoughtspot/developer-examples/blob/524ef13121fcae4756a951648e3e6dc4bb29aa26/visual-embed/pendo-integration/pendoIntegrationScript.js[ThoughtSpot Developer examples, window=_blank] GitHub repository.
+
+The script performs the following actions:
+
+* Access custom variables defined in the SDK. It waits for the Visual Embed SDK to initialize and load. +
+* Listen for authentication. +
+It waits for the user to authenticate with ThoughtSpot.
+* Fetches user and context data +
+When the user authentication is successful, the script retrieves the current user's information, such as user ID, name, email, and groups from the SDK. It also listens for navigation events within the embedded ThoughtSpot app to capture the current page or context.
+* Initialize Pendo +
+The script initializes Pendo with the user and context data, so that Pendo can track the user and their actions within the embedded app.
+* Update Pendo on navigation +
+Whenever the user navigates to a new page or context within the embedded ThoughtSpot app, the script updates Pendo with the new context information.
+
+== Step 3: Host the script on a public domain
+
+When your integration script is ready, host it on a publicly accessible domain; For example, for AWS S3, Azure Blob, or a trusted CDN.
+
+Note the domain URL. You need to send this URL to ThoughtSpot Support and add it to your CSP allowlist later.
+
+== Step 4: Contact ThoughtSpot Support to enable integration
+
+Create a ThoughtSpot Support request to enable Pendo integration with your ThoughtSpot Embed.
+In your support request:
+
+* Specify the domains that will host your script in the embedding environment. Make sure that you  send the full URL path, including the `.js` extension at the end.
+* Send the script that you want to integrate.
+
+Wait for ThoughtSpot Support to validate and approve your request. This step will ensure that only scripts from the trusted and vetted domains are allowed to run scripts in your embed environment.
+
+== Step 5: Verify feature enablement
+
+After ThoughtSpot enables the integration for your instance:
+
+. Log in to your ThoughtSpot instance as an administrator.
+. Go to **Develop** > **Security Settings**.
+. Make sure that you are in the *All Orgs* context.
+. Check if the *CSP script-src domains* setting is visible on the *Security Settings* page.
+. Add the domain that hosts your script to the **CSP script-src** allowlist.
+
+== Step 5: Pass variables to your script via Visual Embed SDK
+
+To execute the script properly, in your embed code, pass the variables in `init ()` configuration. To pass the variables to your script, use the link:https://developers.thoughtspot.com/docs/Interface_EmbedConfig#_customvariablesforthirdpartytools[customVariablesForThirdPartyTools] object in the Visual Embed SDK.
+
+Add the following variables in the `init()` configuration:
+
+* `pendoClientKey`
+* `pendoVisitorConfig`
+* `pendoAccountConfig`
+
+[source,JavaScript]
+----
+init({
+    //...embedConfig,
+    customVariablesForThirdPartyTools: {
+        {
+            pendoKey: 'your-key',
+            pendoVisitorConfig: {
+                id: 'user-id',
+                name: 'user-name'
+            },
+            pendoAccountConfig: {
+                id: 'account-id',
+                name: 'account-name'
+            }
+        }
+    }
+}
+});
+----
+
+Note that these variables include private information such as credentials or keys. Your Pendo integration script  will include the following code to access these variables via the `window.tsEmbed` object and initialize the Pendo agent in your ThoughtSpot embed environment.
+
+[source,JavaScript]
+----
+const pendoKey = window.tsEmbed.pendoKey;
+const pendoVisitorConfig = window.tsEmbed.pendoVisitorConfig; // Make sure to pass atleast id and name in the customVariablesForThirdPartyTools
+const pendoAccountConfig = window.tsEmbed.pendoAccountConfig; // Make sure to pass atleast id and name in the customVariablesForThirdPartyTools
+----
+
+When the SDK initializes and the authentication is completed successfully, your hosted JavaScript will run seamlessly in your ThoughtSpot embed environment.
+
+== Step 6: Validate and test Pendo integration
+To validate and test Pendo integration in your embed:
+
+. Log in to your embedded ThoughtSpot application as an end user.
+. Confirm that the Pendo script loads and initializes as expected.
+. Check if custom variables are passed and used correctly.
+. Access Pendo and create a Pendo tour or guide using the Pendo dashboard and verify whether the guides appear inside the embedded ThoughtSpot instance.
+
+== Troubleshooting
+
+If the script is not loading:
+
+* Check the browser console for CSP or network errors.
+* Check if the domain hosting the script is added to the CSP allowlist in ThoughtSpot.
+
+If the variables are not available:
+
+* Check if the SDK is initialized and the variables are passed in the `customVariablesForThirdPartyTools` object in the `init()` function in the SDK.
+* Check whether your script has access to `window.tsEmbed` after the embed has initialized.
+
+== Additional resources
+
+*  link:https://github.com/thoughtspot/developer-examples/blob/524ef13121fcae4756a951648e3e6dc4bb29aa26/visual-embed/pendo-integration/pendoIntegrationScript.js[ThoughtSpot Developer examples GitHub repository, window=_blank]
+* link:https://www.pendo.io/resources/getting-started-with-pendo/[Pendo Getting Started Guide]
+* link:https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script[Pendo Documentation, window=_blank]
