@@ -10,34 +10,56 @@
 
 The following diagrams illustrate how ThoughtSpot embed components load in a typical application, both for normal and pre-rendered scenarios. Reviewing these will help set the context for the strategies described in this guide.
 
-image::./images/pre-render/embed_load.png[]
-image::./images/pre-render/liveboardEmbed_load.png[]
+=== Basic Embed Load Flow
+
+When a ThoughtSpot embed loads, it goes through several distinct phases:
+
+image::./images/pre-render/dig1.1.png[]
+
+In the diagram above, each block represents a step in the embed loading process, and each block takes time to complete. The ThoughtSpot embed loading process consists of:
+
+1. **Host App Load** - Your application initializes and loads
+2. **Init** - ThoughtSpot SDK initialization and login.
+3. **ThoughtSpot Embed Loads** - The load time taken for the embed to load.
+
+image::./images/pre-render/dig1.2.png[]
+
+As shown in the detailed diagram above, each block represents a distinct step that takes time to execute. The ThoughtSpot embed load process can be further broken down into the following phases:
+  
+* **Common Asset Load** – Loading shared JavaScript and CSS files
+* **Common Bootstrap** – Setting up the basic embed framework
+* **Embed Level Asset Load** – Loading specific assets for the embed type
+* **Embed API Calls** – Fetching data and rendering the content
+
+=== Optimized Load Flow with Early Init
+
+For applications that have a loading screen or home page before the liveboard embed, you can optimize performance by calling init in parallel:
+
+image::./images/pre-render/dig2.png[]
+
+This diagram shows how you can start the authentication/login process early by calling init while the end user is still on the home page or loading screen. Note that this only handles the login process in parallel - no assets are loaded during this phase.
 
 == How Embedding Normally Works (The Basics)
 
-When you embed ThoughtSpot (or any analytics app) in your application, the typical flow is:
+When you embed ThoughtSpot in your application, the typical flow is:
 
-. The user navigates to a page with the embed component.
-. The embed component is rendered in the DOM.
-. The browser loads the ThoughtSpot iframe and all required assets (JS, CSS, etc).
-. The iframe initializes, fetches data, and finally displays the analytics.
+. Call init (authentication/SDK initialization)
+. Render the embed component
+. Embed loads the iframe
+. Iframe loads assets, calls APIs, and shows the analytics
 
-This means *every time* a user visits the page, the iframe and all assets are loaded from scratch, causing a visible delay before analytics appear.
-
-image::./images/pre-render/embed_load.png[]
+This means *every time* an end user visits the page, the iframe and all assets are loaded from scratch, causing a visible delay before analytics appear.
 
 == What is Pre-rendering?
 
-Pre-rendering changes this flow by *loading some or all of the assets and initialization steps in the background*, before the user actually navigates to the analytics. This way, when the user visits the page, the analytics are ready to show instantly (or much faster).
+Pre-rendering changes this flow by *loading some or all of the assets and initialization steps in the background*, before the end user actually navigates to the analytics. This way, when the end user visits the page, the analytics are ready to show instantly (or much faster).
+
+You can preload just the common assets, or even a specific liveboard, depending on your needs. This doc explains the different pre-render strategies, when to use each, and how to implement them in React or JavaScript.
 
 [NOTE]
 ====
-Pre-rendering is most effective when your application has a loading page, landing page, or pre-embed page where you can start the pre-render process before the user navigates to the analytics. If a user navigates directly to the embed page (for example, via a direct link or bookmark), pre-rendering cannot provide a speed benefit because there is no opportunity to load assets in advance.
+Pre-rendering is most effective when your application has a loading page, landing page, or pre-embed page where you can start the pre-render process before the end user navigates to the analytics. If an end user navigates directly to the embed page (for example, via a direct link or bookmark), pre-rendering cannot provide a speed benefit because there is no opportunity to load assets in advance.
 ====
-
-Pre-rendering can preload just the common assets, or even a specific liveboard, depending on your needs. The rest of this doc explains the different strategies and how to use them.
-
-Pre-rendering lets you load ThoughtSpot embed components in the background, so users see analytics instantly when they navigate to them. This doc explains the different pre-render strategies, when to use each, and how to implement them in React or JavaScript.
 
 == Why Pre-render?
 
@@ -51,9 +73,11 @@ Pre-rendering lets you load ThoughtSpot embed components in the background, so u
 
 - Fully loads the embed iframe, including all assets and liveboard data, as soon as the component is rendered.
 - Fastest experience for a specific liveboard.
-- Maximum resource usage if the user never views the embed.
+- Maximum resource usage if the end user never views the embed.
 
-To use this strategy, place the following component on your application's home page, loading page, or landing page (before the user navigates to the analytics):
+image::./images/pre-render/dig3_pre_with_livid.png[]
+
+To use this strategy, place the following component on your application's home page, loading page, or landing page (before the end user navigates to the analytics):
 
 [source,jsx]
 ----
@@ -70,30 +94,26 @@ The value of `preRenderId` can be any string, but it must match the `preRenderId
 Limitation: Any props you want to pass to the embed (such as configuration options) must be passed to the `PreRenderedLiveboardEmbed` component on the home page. If you later render a `LiveboardEmbed` with the same `preRenderId`, those new props will not be respected if the iframe is already loaded. This is a current limitation of the pre-rendering approach.
 ====
 
-[example]
-----
-// React example
-import { LiveboardEmbed } from "@thoughtspot/visual-embed-sdk/react";
+When you actually want to show the liveboard, call this component:
 
-const PreRenderLiveboardWithLiveboardId = () => (
-  <LiveboardEmbed
-    preRenderId="pre-render-with-liveboard-id"
-    liveboardId="e40c0727-01e6-49db-bb2f-5aa19661477b"
-    className="embed-div"
-  />
-);
+[source,jsx]
 ----
-
-image::./images/pre-render/pre_render_with_liveboard_id.png[]
+<LiveboardEmbed
+  preRenderId="pre-render-with-liveboard-id"
+  liveboardId="e40c0727-01e6-49db-bb2f-5aa19661477b"
+/>
+----
 
 === 2. Prerender without Liveboard ID
 
 - Loads common assets and bootstrap logic early.
 - Defers liveboard-specific data/API calls until needed.
 - Keeps the app ready, making the first liveboard load faster.
-- Still loads some assets even if the user never opens the embed.
+- Still loads some assets even if the end user never opens the embed.
 
-To use this strategy, place the following component on your application's home page, loading page, or landing page:
+image::./images/pre-render/dig4_wo_livid.png[]
+
+To use this strategy, place the following component on your application's home page, loading page, or landing page (before the end user navigates to the analytics):
 
 [source,jsx]
 ----
@@ -102,34 +122,30 @@ To use this strategy, place the following component on your application's home p
 />
 ----
 
-Again, the value of `preRenderId` can be any string, but it must match the `preRenderId` you use when rendering the actual embed later.
+The value of `preRenderId` can be any string, but it must match the `preRenderId` you use when rendering the actual embed later.
 
 [NOTE]
 ====
 Limitation: Any props you want to pass to the embed must be passed to the `PreRenderedLiveboardEmbed` component on the home page. If you later render a `LiveboardEmbed` with the same `preRenderId`, those new props will not be respected if the iframe is already loaded.
 ====
 
-[example]
-----
-// React example
-import { LiveboardEmbed } from "@thoughtspot/visual-embed-sdk/react";
+When you actually want to show the liveboard, call this component:
 
-const PreRenderLiveboardWithoutLiveboardId = () => (
-  <LiveboardEmbed
-    preRenderId="pre-render-without-liveboard-id"
-    liveboardId="e40c0727-01e6-49db-bb2f-5aa19661477b"
-    className="embed-div"
-  />
-);
+[source,jsx]
 ----
-
-image::./images/pre-render/prerender_without_liveboard_id.png[]
+<LiveboardEmbed
+  preRenderId="pre-render-without-liveboard-id"
+  liveboardId="e40c0727-01e6-49db-bb2f-5aa19661477b"
+/>
+----
 
 === 3. Prerender On Demand
 
-- Loads nothing up front; the embed is loaded only when the user navigates to it.
+- Loads nothing up front; the embed is loaded only when the end user navigates to it.
 - On first visit, the embed loads normally; on return, the iframe is reused and appears instantly.
 - Most efficient; only loads if needed, and reuses the iframe for instant reloads.
+
+image::./images/pre-render/dig5_ondemand.png[]
 
 When you render a component with a `preRenderId` for the first time, it loads as usual. The next time you render a component with the same `preRenderId`, the load is instant because the iframe is reused.
 
@@ -137,47 +153,34 @@ This strategy does not require special configuration—simply pass a `preRenderI
 
 [source,jsx]
 ----
-<LiveboardEmbed preRenderId="pre-render-on-demand" className="embed-div" />
+<LiveboardEmbed preRenderId="pre-render-on-demand" />
 ----
-
-[example]
-----
-// React example
-import { LiveboardEmbed } from "@thoughtspot/visual-embed-sdk/react";
-
-const PreRenderEmbedOnDemand = () => (
-  <LiveboardEmbed preRenderId="pre-render-on-demand" className="embed-div" />
-);
-----
-
-image::./images/pre-render/preRender_on_demand.png[]
 
 === 4. Normal Render
 
 - Default behavior; loads the embed only when the component is rendered.
 - On every visit, the iframe is recreated and the embed loads from scratch.
-- Efficient if the embed is rarely used, but slow for the user every time.
+- Efficient if the embed is rarely used, but slow for the end user every time.
+
+image::./images/pre-render/dig2.png[]
 
 [example]
 ----
-// React example
-import { AppEmbed } from "@thoughtspot/visual-embed-sdk/react";
-
-const NormalEmbed = () => <AppEmbed className="embed-div" />;
+<LiveboardEmbed liveboardId="some-liveboard-id" />
 ----
 
-image::./images/pre-render/normal_embed_load.png[]
-
-=== 5. Prefetch
+=== 5. Prefetch Assets
 
 - Loads a few common JS/CSS assets in parallel with your app.
 - No liveboard data or API calls are made.
 - Minimal benefit (modern browsers cache these assets anyway).
-- Wastes bandwidth if the user never opens the embed.
+- Wastes bandwidth if the end user never opens the embed.
+
+image::./images/pre-render/dig6_prefetch.png[]
 
 [NOTE]
 ====
-Prefetch is generally not recommended unless you have a specific need, as modern browsers already cache static assets efficiently. Using prefetch may result in unnecessary network usage without significant performance gain.
+As modern browsers already cache static assets efficiently, using prefetch may not provide a significant performance gain.
 ====
 
 .Example: Prefetching assets
@@ -198,8 +201,6 @@ init({
   authType: AuthType.None,
 });
 ----
-
-image::./images/pre-render/preFetch.png[]
 
 == Strategy Comparison Table
 
