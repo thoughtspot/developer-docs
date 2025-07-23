@@ -8,7 +8,7 @@
 
 The `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fsearch-metadata[/metadata/search, target=_blank]` endpoint is the most versatile of all metadata endpoints. It can be used to search for lists or to retrieve very detailed information about specific objects. This endpoint replaces `metadata/list`, `metadata/listobjectheaders`, `metadata/details`, and `metadata/listvizheaders` from REST API v1.
 
-The overall structure of `metadata/search` request is link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fapi-rest-20-metadata-search-request[described as a combination of objects, target=_blank].
+The overall structure of `metadata/search` request is link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fapi-rest-20-metadata-search-request[described as a combination of objects^].
 
 Note that many parameters in the request are *optional*, and leaving the parameter name out entirely has a different effect from including the parameter and specific values.
 
@@ -24,8 +24,90 @@ Throughout this article, requests and responses will be shown as JSON, without a
 
 If you are not using filtering options such as `tag_identifiers`, `type`, `created_by_user_identifiers`, `modified_by_user_identifiers`, `owned_by_user_identifiers`, `exclude_objects`, `include_auto_created_objects`, or `favorite_object_options`, set `record_size` to `-1` and `record_offset` to `0` for precise results.
 
+== Metadata search API
+The basic metadata selectors for the `/metadata/search` are placed in the `metadata` parameter as an array of link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fmetadata-list-item-input[Metadata List objects, target=_blank].
+
+=== Retrieve specific objects
+
+The API gets the details of an object if an object ID or name is specified in the request. The `identifier` parameter allows referencing an object by name or by object GUID.
+
+Specific objects can be retrieved via the object GUID without specifying `type`:
+
+[source,JSON]
+----
+{
+ "metadata": [
+    {
+      "identifier": "009d8d6c-5026-47a9-96d7-9e0f84896d17"
+    }
+  ]
+}
+----
+
+If you do not send specific object IDs as part of your request, the API lists all the objects. By default, the metadata `type` is set to `LiVEBOARD`. If you send a request without specifying the object ID or type, the API returns a list of Liveboards.
+
+=== Metadata object type
+
+The `type` attribute is optional when an object ID is specified in the API request. However, if the request includes only the name of object in the `identifier` key, you must specify the `type`.
+
+[source,JSON]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD",
+      "identifier": "My Great Liveboard"
+    }
+  ]
+}
+----
+
+=== Metadata object sub-types
+For metadata types such as Worksheets (Deprecated), Models, Tables, and Views, specify the `type` as `LOGICAL_TABLE`. For `LOGICAL_TABLE` object type, you can specify the subtype as an additional option to filter API response. Valid values for the `LOGICAL_TABLE` sub-types are:
+
+* `ONE_TO_ONE_LOGICAL` for tables
+* `WORKSHEET` for Models or Worksheets (Deprecated)
+* `PRIVATE_WORKSHEET` for private Worksheets or Models not shared with any users.
+* `USER_DEFINED` for data imported from other sources such as a CSV file.
+* `AGGR_WORKSHEET` for Views. A *View* in ThoughtSpot refers to a Table materialized from a saved Answer that was saved as a View by a user.
+* `SQL_VIEW` for SQL Views. +
+An SQL View is a virtual table and data source created from writing and saving a SQL query against your external data warehouse connection.
+
+[source,JSON]
+----
+{
+"metadata": [
+    {
+      "type": "LOGICAL_TABLE",
+      "subtypes": [
+        "WORKSHEET"
+      ]
+    }
+  ]
+}
+----
+
+=== Search by name pattern
+
+To match names against a pattern, you can use the `name_pattern` parameter, including `%` for wildcard purposes:
+
+[source,JSON]
+----
+{
+ "metadata": [
+    {
+      "type": "LIVEBOARD",
+      "name_pattern": "Standard %"
+    }
+  ]
+}
+----
+
+
 == Response format
-The response from any call to `metadata/search` will resemble the following:
+
+The response from any call to `metadata/search` returns an array of link:https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/rest/playgroundV2_0?apiResourceId=http%2Fmodels%2Fstructures%2Fmetadata-search-response[Metadata Response Objects, target=_blank]:
+
 
 [source,JSON]
 ----
@@ -42,8 +124,14 @@ The response from any call to `metadata/search` will resemble the following:
   "stats": null,
   },
 ...
+
 ]
+
 ----
+
+You'll notice a number of other keys with a `null` value. Various request parameters cause those sections of the response to be filled in with additional details.
+
+The `metadata_header` key is always returned with values, regardless of the request. This section resembles the V1 REST API response from the xref:metadata-api.adoc#metadata-list[`metadata/list`] and xref:metadata-api.adoc#object-header[`metadata/listobjectheaders`] endpoints.
 
 The value of `metadata_header` is a complex object with the most important set of attributes of the item. Note that `author` is the creator or current user who has been assigned the __ownership__ of the object, while `owner` describes a hierarchical relationship between ThoughtSpot objects (for example, this Liveboard has an `owner` property identical to its own `id` property):
 
@@ -82,98 +170,7 @@ The value of `metadata_header` is a complex object with the most important set o
  }
 ----
 
-You'll notice a number of other keys with a `null` value. Various request parameters cause those sections of the response to be filled in with additional details.
-
-== Lists of metadata
-The `/metadata/search` API performs listing functions when you do not send specific object IDs as part of your request.
-
-The basic metadata selectors are placed in the `metadata` parameter as an array of link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fstructures%2Fmetadata-list-item-input[Metadata List objects, target=_blank].
-
-For example, to get all Liveboards, you need to send only a single metadata object with `type` parameter set to  `LIVEBOARD`.
-
-[source,JSON]
-----
-{
- "metadata": [
-    {
-      "type": "LIVEBOARD"
-    }
-  ]
-{
-----
-
-[NOTE]
-====
-The `type` attribute is set to `LIVEBOARD` by default. In other words, even if the `type` attribute is not defined and the API request is sent with an empty body, ThoughtSpot returns only Liveboard objects.
-====
-
-To match names against a pattern, you can use the `name_pattern` parameter, including `%` for wildcard purposes:
-
-
-[source,JSON]
-----
-{
- "metadata": [
-    {
-      "type": "LIVEBOARD",
-      "name_pattern": "Standard %"
-    }
-  ]
-}
-----
-You may still want to process the result set further within your programming language.
-
-== Retrieve specific objects
-The `identifier` parameter allows referencing an object by name or by object GUID.
-
-Specific objects can be retrieved via the object GUID without specifying `type`:
-
-[source,JSON]
-----
-{
- "metadata": [
-    {
-      "identifier": "009d8d6c-5026-47a9-96d7-9e0f84896d17"
-    }
-  ]
-}
-----
-
-You can specify an object name in the `identifier` key, but you must include the `type` in this request:
-
-[source,JSON]
-----
-{
- "metadata": [
-    {
-      "type": "LIVEBOARD",
-      "identifier": "My Great Liveboard"
-    }
-  ]
-}
-----
-
-The response to a `metadata/search` request takes the form of an array of link:https://try-everywhere.thoughtspot.cloud/v2/#/everywhere/api/rest/playgroundV2_0?apiResourceId=http%2Fmodels%2Fstructures%2Fmetadata-search-response[Metadata Response Objects, target=_blank]:
-
-[source,JSON]
-----
-"[
-  {
-    "metadata_id": "009d8d6c-5026-47a9-96d7-9e0f84896d17"
-    "metadata_name": "New Liveboard"
-    "metadata_type": "LIVEBOARD"
-    "dependent_objects": null
-    "incomplete_objects": null
-    "metadata_detail": null
-    "metadata_header": {...}
-    "visualization_headers": null
-    "stats": null
-  },
-  ...
-]
-----
-
-The `metadata_header` key is always returned with values, regardless of the request. This section resembles the V1 REST API response from the xref:metadata-api.adoc#metadata-list[`metadata/list`] and xref:metadata-api.adoc#object-header[`metadata/listobjectheaders`] endpoints.
+//You may still want to process the result set further within your programming language.
 
 == Filtering and sorting
 
