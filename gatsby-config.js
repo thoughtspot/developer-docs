@@ -247,5 +247,13 @@ module.exports = {
                 debug: false,
             },
         },
+        'gatsby-plugin-anchor-links',
+        {
+            resolve: 'gatsby-plugin-anchor-links',
+            options: {
+                offset: -100, // adjust for fixed headers if needed
+                duration: 1000,
+            },
+        },
     ],
 };
