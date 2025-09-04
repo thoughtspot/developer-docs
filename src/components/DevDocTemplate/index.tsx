@@ -63,7 +63,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const isHomePage = curPageNode?.pageAttributes?.pageid === HOME_PAGE_ID;
 
-    const { width, ref } = useResizeDetector();
+    // use window.innerWidth if window is defined else use useResizeDetector width
+    const {
+        width = isBrowser() ? window?.innerWidth : 0,
+        ref,
+    } = useResizeDetector();
     const [params, setParams] = useState({
         [TS_HOST_PARAM]: DEFAULT_HOST,
         [TS_ORIGIN_PARAM]: '',
