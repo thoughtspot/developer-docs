@@ -39,6 +39,31 @@ module.exports = {
             link: ' ',
             subLabel: 'Cloud (Latest)',
         },
+        {
+             label: '10.11.0.cl',
+             link: '10.11.0.cl',
+             subLabel: 'Cloud',
+             iframeUrl: 'https://developer-docs-10-11-0-cl.vercel.app/docs/',
+        },
+        {
+             label: '10.10.0.cl',
+             link: '10.10.0.cl',
+             subLabel: 'Cloud',
+             iframeUrl: 'https://developer-docs-10-10-0-cl.vercel.app/docs/',
+        },
+        {
+             label: '10.9.0.cl',
+             link: '10.9.0.cl',
+             subLabel: 'Cloud',
+             iframeUrl: 'https://developer-docs-10-9-0-cl.vercel.app/docs/',
+        },
+        {
+             label: '10.8.0.cl',
+             link: '10.8.0.cl',
+             subLabel: 'Cloud',
+             iframeUrl: 'https://developer-docs-10-8-0-cl.vercel.app/docs',
+        },
+
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
