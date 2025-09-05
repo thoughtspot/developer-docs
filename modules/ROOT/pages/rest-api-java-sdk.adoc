@@ -1,0 +1,603 @@
+= Java SDK for REST APIs
+:toc: true
+:toclevels: 3
+
+:page-title: REST API Java SDK
+:page-pageid: rest-api-sdk-java
+:page-description: Use the Java client libraries to call REST APIs from your web application.
+
+The link:https://github.com/thoughtspot/rest-api-sdk/tree/release/sdks/java[REST API Java SDK, window=+blank] provides a client library to interact with ThoughtSpot REST API v2 endpoints from Java applications.
+
+== Before you begin
+
+Before you begin, check if your setup meets the following requirements:
+
+* Your application setup has the necessary tools and environments for installing, deploying, and testing the SDK integration.
+* The REST API Java SDK library supports Java 8 and later. Ensure that your environment has Java 8 or later installed.
+* You have access to the necessary repositories on GitHub and Maven Central and network permissions download dependencies.
+* You have a ThoughtSpot instance with access to v2 REST APIs.  +
+For token-based authentication, you'll need access to the secret key.
+* User privileges and object permissions to view, edit, or create ThoughtSpot objects and resources.
+
+== Import the SDK to your application environment
+
+If you are using Maven, add the REST API Java SDK as a dependency to the POM.xml file in your project:
+
+[source,xml]
+----
+<dependency>
+  <groupId>io.github.thoughtspot</groupId>
+  <artifactId>rest-api-sdk-lib</artifactId>
+  <version>2.14.0</version> <!-- Use the latest version available -->
+  <scope>compile</scope>
+</dependency>
+----
+
+If you are using Gradle, add the REST API Java SDK as a dependency to your build file:
+
+[source,]
+----
+repositories {
+  mavenCentral()
+}
+
+dependencies {
+   implementation "io.github.thoughtspot:rest-api-sdk-lib:2.14.0"
+   // Use the latest version of the SDK
+}
+----
+
+== API client configuration
+
+The **ApiClientConfiguration** class in the REST API Java SDK allows configuring the settings required for API clients to call REST APIs from their application context. Use this class to specify any of the following methods and parameters:
+
+* `basePath` - Sets the base path for API requests.
+* `bearerToken` - Sets bearer tokens to authenticate API requests.
+* `bearerTokenSupplier` - Sets the bearer token supplier for authentication.
+* `defaultHeader` -  Adds a default header to API requests.
+* `defaultHeaderMap` - Sets a map of default headers to include in the API requests.
+* `defaultCookie` - Adds a default cookie to the client configuration.
+* `defaultCookieMap` - Sets a map of default cookies in the client configuration.
+* `verifyingSsl` - Enables Secure Sockets Layer (SSL) certificate verification for API requests.
+* `sslCaCert` - Configures the client to use a specific input stream that contains the SSL CA certificate.
+* `keyManager` - Adds a key manager to the client configuration.
+* `keyManagers` - Adds a list of key managers to the client configuration.
+* `downloadPath` - Sets the download path for files.
+* `connectTimeoutMillis` - Sets the connection timeout.
+* `readTimeoutMillis` - Configures the maximum number of seconds the client will wait for a response after sending a request before timing out.
+* `writeTimeoutMillis` - Configures the maximum number of milliseconds the client will wait for the data to be written to the server after sending a request before timing out.
+
+[source,Java]
+----
+// Create configuration for the ThoughtSpot API client
+        ApiClientConfiguration apiClientConfiguration = new ApiClientConfiguration.Builder()
+                .basePath(BASE_PATH) // Your ThoughtSpot application URL
+                .verifyingSsl(false) // Disable SSL verification for testing purposes
+                .readTimeoutMillis(30000) // Extended read timeout to 30 seconds
+                .build();
+
+----
+
+== Authentication
+
+The REST API v2.0 supports various authentication methods. The most common method used for automation and application integration is the token-based authentication. To get a token from from authentication token endpoint, you need to specify the `username` and `password` or `secret_key`.
+
+The following example shows the code for getting an authentication token by passing `username` and `password`, and creating a user session using this token:
+
+[source,Java]
+----
+package org.example;
+
+// Import classes:
+import com.thoughtspot.client.ApiClientConfiguration;
+import com.thoughtspot.client.ApiException;
+import com.thoughtspot.client.api.ThoughtSpotRestApi;
+import com.thoughtspot.client.model.GetFullAccessTokenRequest;
+import com.thoughtspot.client.model.Token;
+import com.thoughtspot.client.model.User;
+
+public class Example {
+  private static final String BASE_PATH = *CLUSTER_URL*; // Your ThoughtSpot application URL
+  private static final String USERNAME = "tsUserA"; // Username
+  private static final String PASSWORD = "Your-Password"; // Password
+
+  public static void main(String[] args) {
+    try {
+        // Create configuration for the ThoughtSpot API client
+        ApiClientConfiguration apiClientConfiguration = new ApiClientConfiguration.Builder()
+                .basePath(BASE_PATH)
+                .verifyingSsl(false) // Disable SSL verification for testing purposes
+                .readTimeoutMillis(30000) // Extended read timeout to 30 seconds
+                .build();
+
+        // Create an instance of the ThoughtSpot API client
+        ThoughtSpotRestApi tsRestApi = new ThoughtSpotRestApi(apiClientConfiguration);
+
+        // Authenticate the user and retrieve the full access token
+        GetFullAccessTokenRequest getFullAccessTokenRequest = new GetFullAccessTokenRequest()
+                .username(USERNAME)
+                .password(PASSWORD);
+        Token response = tsRestApi.getFullAccessToken(getFullAccessTokenRequest);
+
+        // Update the API client configuration with the access token
+        apiClientConfiguration = apiClientConfiguration.toBuilder()
+                .bearerTokenSupplier(response::getToken) // You can pass your own token supplier here
+                .build();
+
+        // Apply the updated configuration to the ThoughtSpot API client
+        tsRestApi.applyApiClientConfiguration(apiClientConfiguration);
+
+       // Current user information
+        User currentUser = tsRestApi.getCurrentUserInfo();
+        System.out.println("Current User: " + currentUser.toJson());
+
+        // Optionally, use .{REQUEST}WithHttpInfo() to get response details
+        ApiResponse<User> currentUserResponse = tsRestApi.getCurrentUserInfoWithHttpInfo();
+        System.out.println("Current User: " + currentUserResponse.getData().toString());
+        System.out.println("Status code: " + currentUserResponse.getStatusCode());
+        System.out.println("Response headers: " + currentUserResponse.getHeaders().toString());
+    } catch (ApiException e) {
+        System.err.println("Exception when calling ThoughtSpot API");
+        System.err.println("Status code: " + e.getCode());
+        System.err.println("Reason: " + e.getResponseBody());
+        System.err.println("Response headers: " + e.getResponseHeaders());
+        e.printStackTrace();
+    }
+  }
+}
+----
+
+You can also obtain a token by sending `username` and `secret_key` in your authentication token request. The secret key is generated when xref:trusted-auth-secret-key.adoc[*Trusted authentication* is enabled] on your instance and can be viewed on the *Develop* > *Security Settings* page.
+
+The following example shows the code for getting an authentication token by passing `username` and `secret_key`, and creating a user session using this token:
+
+[source,Java]
+----
+package org.example;
+
+// Import classes:
+import com.thoughtspot.client.ApiClientConfiguration;
+import com.thoughtspot.client.ApiException;
+import com.thoughtspot.client.api.ThoughtSpotRestApi;
+import com.thoughtspot.client.model.GetFullAccessTokenRequest;
+import com.thoughtspot.client.model.Token;
+import com.thoughtspot.client.model.User;
+
+public class Example {
+  private static final String BASE_PATH = *CLUSTER_URL*; // Your ThoughtSpot application URL
+  private static final String USERNAME = "tsUserA"; // Username
+  private static final String SECRET_KEY = "YOUR_SECRET_KEY"; // Secret key generated for your instance
+
+  public static void main(String[] args) {
+    try {
+        // Create configuration for the ThoughtSpot API client
+        ApiClientConfiguration apiClientConfiguration = new ApiClientConfiguration.Builder()
+                .basePath(BASE_PATH)
+                .verifyingSsl(false) // Disable SSL verification for testing only
+                .readTimeoutMillis(30000)
+                .build();
+
+        // Create an instance of the ThoughtSpot API client
+        ThoughtSpotRestApi tsRestApi = new ThoughtSpotRestApi(apiClientConfiguration);
+
+        // Authenticate the user and retrieve the full access token using secret_key
+        GetFullAccessTokenRequest getFullAccessTokenRequest = new GetFullAccessTokenRequest()
+                .username(USERNAME)
+                .secretKey(SECRET_KEY); // Use secretKey. Do not use password
+
+        Token response = tsRestApi.getFullAccessToken(getFullAccessTokenRequest);
+
+        // Update the API client configuration with the access token
+        apiClientConfiguration = apiClientConfiguration.toBuilder()
+                .bearerTokenSupplier(response::getToken)
+                .build();
+
+        // Apply the updated configuration to the ThoughtSpot API client
+        tsRestApi.applyApiClientConfiguration(apiClientConfiguration);
+
+        // Current user information
+        User currentUser = tsRestApi.getCurrentUserInfo();
+        System.out.println("Current User: " + currentUser.toJson());
+    } catch (ApiException e) {
+        System.err.println("Exception when calling ThoughtSpot API");
+        System.err.println("Status code: " + e.getCode());
+        System.err.println("Reason: " + e.getResponseBody());
+        System.err.println("Response headers: " + e.getResponseHeaders());
+        e.printStackTrace();
+    }
+  }
+}
+----
+
+== Create a test API request
+
+Make a test API call to test the integration and verify the response.
+
+In this example, we'll use the `CreateUserRequest` object to create a user.
+
+[source, Java]
+----
+package org.example;
+
+import com.thoughtspot.client.ApiClientConfiguration;
+import com.thoughtspot.client.ApiException;
+import com.thoughtspot.client.api.ThoughtSpotRestApi;
+import com.thoughtspot.client.model.CreateUserRequest;
+import com.thoughtspot.client.model.User;
+
+public class AddUserExample {
+    private static final String BASE_PATH = *CLUSTER_URL*; // Your ThoughtSpot application instance
+    private static final String BEARER_TOKEN = "YOUR_AUTH_TOKEN"; // Token obtained from ThoughtSpot to authorize your API calls
+
+    public static void main(String[] args) {
+        try {
+            // Configure the API client with the bearer token
+            ApiClientConfiguration apiClientConfiguration = new ApiClientConfiguration.Builder()
+                    .basePath(BASE_PATH)
+                    .bearerTokenSupplier(() -> BEARER_TOKEN)
+                    .verifyingSsl(false) // For testing only; enable SSL in production
+                    .readTimeoutMillis(30000)
+                    .build();
+
+            // Create an instance of the ThoughtSpot API client
+            ThoughtSpotRestApi tsRestApi = new ThoughtSpotRestApi(apiClientConfiguration);
+
+            // Build the user creation request
+            CreateUserRequest createUserRequest = new CreateUserRequest()
+                    .name("UserA@example.com")
+                    .displayName("User A")
+                    .password("StrongPassword123!") // Set an initial password
+                    .groupIdentifiers(Arrays.asList("sales", "marketing")) // Optional: assign groups
+                    .addOrgIdentifiersItem(Org_ID); // Optional: set Org ID if using a multi-tenant instance
+
+            // Create the user
+            User createdUser = tsRestApi.createUser(createUserRequest);
+
+            // Output the created user details
+            System.out.println("User created: " + createdUser.toJson());
+        } catch (ApiException e) {
+            System.err.println("Exception when calling ThoughtSpot API");
+            System.err.println("Status code: " + e.getCode());
+            System.err.println("Reason: " + e.getResponseBody());
+            System.err.println("Response headers: " + e.getResponseHeaders());
+            e.printStackTrace();
+        }
+    }
+}
+----
+
+== Error handling
+
+The SDK raises an exception when an API request fails. Inspect the HTTP status code, response body, and response headers to determine the cause of the failure and respond appropriately. Catching exceptions is a standard way to handle these errors. The code samples in this document show how to handle errors using the `ApiException` class.
+
+== Supported versions
+
+Note the recommendation of Java SDK:
+
+[width="100%" cols="2,4"]
+[options='header']
+|====
+|ThoughtSpot release version|Supported SDK version
+a|ThoughtSpot Cloud: 10.9.0.cl | v2.14.0 or later
+a|ThoughtSpot Cloud: 10.10.0.cl | v2.15.1 or later
+|====
+
+
+== SDK Reference
+
+[width="100%" cols="3,5"]
+[options='header']
+
+|=====
+|Method|HTTP request
+|link:ThoughtSpotRestApi.md#activateUser[activateUser, window=_blank] |*POST*
+/api/rest/2.0/users/activate
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#assignChangeAuthor[assignChangeAuthor^]
+|*POST* /api/rest/2.0/security/metadata/assign
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#assignTag[assignTag^] |*POST*
+/api/rest/2.0/tags/assign
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#changeUserPassword[changeUserPassword^]
+|*POST* /api/rest/2.0/users/change-password
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#commitBranch[commitBranch^] |*POST*
+/api/rest/2.0/vcs/git/branches/commit
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#convertWorksheetToModel[convertWorksheetToModel^]
+|*POST* /api/rest/2.0/metadata/worksheets/convert
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#copyObject[copyObject^] |*POST*
+/api/rest/2.0/metadata/copyobject
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createConfig[createConfig^] |*POST*
+/api/rest/2.0/vcs/git/config/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createConnection[createConnection^] |*POST*
+/api/rest/2.0/connection/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createConversation[createConversation^]
+|*POST* /api/rest/2.0/ai/conversation/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createCustomAction[createCustomAction^]
+|*POST* /api/rest/2.0/customization/custom-actions
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createOrg[createOrg^] |*POST*
+/api/rest/2.0/orgs/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createRole[createRole^] |*POST*
+/api/rest/2.0/roles/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createSchedule[createSchedule^] |*POST*
+/api/rest/2.0/schedules/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createTag[createTag^] |*POST*
+/api/rest/2.0/tags/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createUser[createUser^] |*POST*
+/api/rest/2.0/users/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#createUserGroup[createUserGroup^] |*POST*
+/api/rest/2.0/groups/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#dbtConnection[dbtConnection^] |*POST*
+/api/rest/2.0/dbt/dbt-connection
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#dbtGenerateSyncTml[dbtGenerateSyncTml^]
+|*POST* /api/rest/2.0/dbt/generate-sync-tml
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#dbtGenerateTml[dbtGenerateTml^] |*POST*
+/api/rest/2.0/dbt/generate-tml
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#dbtSearch[dbtSearch^] |*POST*
+/api/rest/2.0/dbt/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deactivateUser[deactivateUser^] |*POST*
+/api/rest/2.0/users/deactivate
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteConfig[deleteConfig^] |*POST*
+/api/rest/2.0/vcs/git/config/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteConnection[deleteConnection^] |*POST*
+/api/rest/2.0/connection/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteConnectionV2[deleteConnectionV2^]
+|*POST* /api/rest/2.0/connections/\{connection_identifier}/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteCustomAction[deleteCustomAction^]
+|*POST*
+/api/rest/2.0/customization/custom-actions/\{custom_action_identifier}/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteDbtConnection[deleteDbtConnection^]
+|*POST* /api/rest/2.0/dbt/\{dbt_connection_identifier}/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteMetadata[deleteMetadata^] |*POST*
+/api/rest/2.0/metadata/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteOrg[deleteOrg^] |*POST*
+/api/rest/2.0/orgs/\{org_identifier}/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteRole[deleteRole^] |*POST*
+/api/rest/2.0/roles/\{role_identifier}/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteSchedule[deleteSchedule^] |*POST*
+/api/rest/2.0/schedules/\{schedule_identifier}/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteTag[deleteTag^] |*POST*
+/api/rest/2.0/tags/\{tag_identifier}/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteUser[deleteUser^] |*POST*
+/api/rest/2.0/users/\{user_identifier}/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deleteUserGroup[deleteUserGroup^] |*POST*
+/api/rest/2.0/groups/\{group_identifier}/delete
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#deployCommit[deployCommit^] |*POST*
+/api/rest/2.0/vcs/git/commits/deploy
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#downloadConnectionMetadataChanges[downloadConnectionMetadataChanges^]
+|*POST*
+/api/rest/2.0/connections/download-connection-metadata-changes/\{connection_identifier}
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#exportAnswerReport[exportAnswerReport^]
+|*POST* /api/rest/2.0/report/answer
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#exportLiveboardReport[exportLiveboardReport^]
+|*POST* /api/rest/2.0/report/liveboard
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#exportMetadataTML[exportMetadataTML^]
+|*POST* /api/rest/2.0/metadata/tml/export
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#exportMetadataTMLBatched[exportMetadataTMLBatched^]
+|*POST* /api/rest/2.0/metadata/tml/export/batch
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#fetchAnswerData[fetchAnswerData^] |*POST*
+/api/rest/2.0/metadata/answer/data
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#fetchAnswerSqlQuery[fetchAnswerSqlQuery^]
+|*POST* /api/rest/2.0/metadata/answer/sql
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#fetchAsyncImportTaskStatus[fetchAsyncImportTaskStatus^]
+|*POST* /api/rest/2.0/metadata/tml/async/status
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#fetchConnectionDiffStatus[fetchConnectionDiffStatus^]
+|*POST*
+/api/rest/2.0/connections/fetch-connection-diff-status/\{connection_identifier}
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#fetchLiveboardData[fetchLiveboardData^]
+|*POST* /api/rest/2.0/metadata/liveboard/data
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#fetchLiveboardSqlQuery[fetchLiveboardSqlQuery^]
+|*POST* /api/rest/2.0/metadata/liveboard/sql
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#fetchLogs[fetchLogs^] |*POST*
+/api/rest/2.0/logs/fetch
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#fetchPermissionsOfPrincipals[fetchPermissionsOfPrincipals^]
+|*POST* /api/rest/2.0/security/principals/fetch-permissions
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#fetchPermissionsOnMetadata[fetchPermissionsOnMetadata^]
+|*POST* /api/rest/2.0/security/metadata/fetch-permissions
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#forceLogoutUsers[forceLogoutUsers^] |*POST*
+/api/rest/2.0/users/force-logout
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#getCurrentUserInfo[getCurrentUserInfo^]
+|*GET* /api/rest/2.0/auth/session/user
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#getCurrentUserToken[getCurrentUserToken^]
+|*GET* /api/rest/2.0/auth/session/token
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#getCustomAccessToken[getCustomAccessToken^]
+|*POST* /api/rest/2.0/auth/token/custom
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#getFullAccessToken[getFullAccessToken^]
+|*POST* /api/rest/2.0/auth/token/full
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#getObjectAccessToken[getObjectAccessToken^]
+|*POST* /api/rest/2.0/auth/token/object
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#getSystemConfig[getSystemConfig^] |*GET*
+/api/rest/2.0/system/config
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#getSystemInformation[getSystemInformation^]
+|*GET* /api/rest/2.0/system
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#getSystemOverrideInfo[getSystemOverrideInfo^]
+|*GET* /api/rest/2.0/system/config-overrides
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#importMetadataTML[importMetadataTML^]
+|*POST* /api/rest/2.0/metadata/tml/import
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#importMetadataTMLAsync[importMetadataTMLAsync^]
+|*POST* /api/rest/2.0/metadata/tml/async/import
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#importUserGroups[importUserGroups^] |*POST*
+/api/rest/2.0/groups/import
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#importUsers[importUsers^] |*POST*
+/api/rest/2.0/users/import
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#login[login^] |*POST*
+/api/rest/2.0/auth/session/login
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#logout[logout^] |*POST*
+/api/rest/2.0/auth/session/logout
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#queryGetDecomposedQuery[queryGetDecomposedQuery^]
+|*POST* /api/rest/2.0/ai/analytical-questions
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#resetUserPassword[resetUserPassword^]
+|*POST* /api/rest/2.0/users/reset-password
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#revertCommit[revertCommit^] |*POST*
+/api/rest/2.0/vcs/git/commits/\{commit_id}/revert
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#revokeToken[revokeToken^] |*POST*
+/api/rest/2.0/auth/token/revoke
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchCommits[searchCommits^] |*POST*
+/api/rest/2.0/vcs/git/commits/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchConfig[searchConfig^] |*POST*
+/api/rest/2.0/vcs/git/config/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchConnection[searchConnection^] |*POST*
+/api/rest/2.0/connection/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchCustomActions[searchCustomActions^]
+|*POST* /api/rest/2.0/customization/custom-actions/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchData[searchData^] |*POST*
+/api/rest/2.0/searchdata
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchMetadata[searchMetadata^] |*POST*
+/api/rest/2.0/metadata/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchOrgs[searchOrgs^] |*POST*
+/api/rest/2.0/orgs/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchRoles[searchRoles^] |*POST*
+/api/rest/2.0/roles/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchSchedules[searchSchedules^] |*POST*
+/api/rest/2.0/schedules/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchTags[searchTags^] |*POST*
+/api/rest/2.0/tags/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchUserGroups[searchUserGroups^] |*POST*
+/api/rest/2.0/groups/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#searchUsers[searchUsers^] |*POST*
+/api/rest/2.0/users/search
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#sendMessage[sendMessage^] |*POST*
+/api/rest/2.0/ai/conversation/\{conversation_identifier}/converse
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#shareMetadata[shareMetadata^] |*POST*
+/api/rest/2.0/security/metadata/share
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#singleAnswer[singleAnswer^] |*POST*
+/api/rest/2.0/ai/answer/create
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#unassignTag[unassignTag^] |*POST*
+/api/rest/2.0/tags/unassign
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateConfig[updateConfig^] |*POST*
+/api/rest/2.0/vcs/git/config/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateConnection[updateConnection^] |*POST*
+/api/rest/2.0/connection/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateConnectionV2[updateConnectionV2^]
+|*POST* /api/rest/2.0/connections/\{connection_identifier}/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateCustomAction[updateCustomAction^]
+|*POST*
+/api/rest/2.0/customization/custom-actions/\{custom_action_identifier}/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateDbtConnection[updateDbtConnection^]
+|*POST* /api/rest/2.0/dbt/update-dbt-connection
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateMetadataHeader[updateMetadataHeader^]
+|*POST* /api/rest/2.0/metadata/headers/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateMetadataObjId[updateMetadataObjId^]
+|*POST* /api/rest/2.0/metadata/update-obj-id
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateOrg[updateOrg^] |*POST*
+/api/rest/2.0/orgs/\{org_identifier}/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateRole[updateRole^] |*POST*
+/api/rest/2.0/roles/\{role_identifier}/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateSchedule[updateSchedule^] |*POST*
+/api/rest/2.0/schedules/\{schedule_identifier}/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateSystemConfig[updateSystemConfig^]
+|*POST* /api/rest/2.0/system/config-update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateTag[updateTag^] |*POST*
+/api/rest/2.0/tags/\{tag_identifier}/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateUser[updateUser^] |*POST*
+/api/rest/2.0/users/\{user_identifier}/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#updateUserGroup[updateUserGroup^] |*POST*
+/api/rest/2.0/groups/\{group_identifier}/update
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#validateMerge[validateMerge^] |*POST*
+/api/rest/2.0/vcs/git/branches/validate
+
+|link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md#validateToken[validateToken^] |*POST*
+/api/rest/2.0/auth/token/validate
+|===
+
+== Additional Resources
+
+* For information about new features, breaking changes, and deprecated parameters, see xref:rest-apiv2-changelog.adoc[API changelog].
+* For SDK reference, see link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/java/docs/ThoughtSpotRestApi.md[Java SDK documentation, window=_blank]
+
+
