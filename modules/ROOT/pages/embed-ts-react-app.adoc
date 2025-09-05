@@ -496,13 +496,13 @@ const FullApp = () => {
 ////
 
 == Embed Spotter for conversation analytics
-To embed ThoughtSpot Spotter interface and enable conversation analytics, use the `SpotterEmbed` component.
+To embed ThoughtSpot Spotter page with AI search experience and conversation analytics, use the `SpotterEmbed` component.
 
-=== Create a conversation component
+=== Create a Spotter component
 
 In your React app project:
 
-. Go to the **Components ** folder in your app directory and add a page for the embedded search object; for example, `conversation.tsx`.
+. Go to the **Components ** folder in your app directory and add a page for the embedded search object; for example, `spotter.tsx`.
 . Import the `SpotterEmbed` component.
 +
 [source,TypeScript]
@@ -536,7 +536,7 @@ ts-data-app> npm start
 ----
 
 === Code sample
-The following code sample shows additional attributes and properties:
+The following code sample shows the following attributes and properties:
 
 * A `SpotterEmbed` function with `worksheetId` prop to pass the ID of the data object. +
 [NOTE]
@@ -559,15 +559,15 @@ import { SpotterEmbed, useEmbedRef } from "@thoughtspot/visual-embed-sdk/react";
 
 // Initialize ThoughtSpot
 init({
-  thoughtSpotHost: "<%=tshost%>",
-  authType: AuthType.None,
+   thoughtSpotHost: "https://your-thoughtspot-host", // Replace with your ThoughtSpot application URL
+   authType: AuthType.None, // Use the appropriate AuthType for your setup
 });
 const SpotterEmbed = () => {
   // Define search options
   const searchOptions = {
     searchQuery: "sales by region" // Search query to execute
   };
-  const worksheetId = "c8684f7f-d8a4-4bc9-b87d-115433c5e458"; // Replace with ID of the data source object such as a Model
+  const worksheetId = "your-worksheet-id", // ID of the data source object (Model) to query data
 
   // Add Event handlers
   const onInit = () => {
@@ -594,7 +594,7 @@ const SpotterEmbed = () => {
 
 For more information, see the following pages:
 
-* xref:SpotterEmbed.adoc[SageEmbed]
+* xref:SpotterEmbedViewConfig.adoc[Spotter view configuration settings]
 * xref:EmbedEvent.adoc[EmbedEvent]
 * xref:Action.adoc[Actions]
 
@@ -607,113 +607,152 @@ For more information, see the following pages:
 [.bordered]
 image::./images/converseEmbed-with-query.png[Conversation embed]
 
-== Embed a Natural Language Search
-To embed ThoughtSpot Natural Language Search interface, complete the steps listed in the following sections.
 
-=== Create a Natural Language Search component
+== Embed Spotter Agent in your own app
+
+To embed only the Spotter AI search component without additional features or Spotter page body in your app, use the `SpotterAgentEmbed` component.
+
+=== Create a SpotterAgentEmbed component
 
 In your React app project:
 
-. Go to the **Components ** folder in your app directory and add a page for the embedded search object; for example, `Sage.tsx`.
-. Import the `SageEmbed` component and event libraries.
+. Go to the **Components * folder in your app directory and add a page for the embedded search object; for example, `SpotterAgent.tsx`.
+. Import the `SpotterAgentEmbed` component and `useSpotterAgent` React hook.
 +
 [source,TypeScript]
 ----
-import { AuthType, init, EmbedEvent, HostEvent } from "@thoughtspot/visual-embed-sdk";
-
+import React, { useState, useRef } from "react";
+import { init, logout, AuthType } from "@thoughtspot/visual-embed-sdk";
 import {
-  SageEmbed,
-  useEmbedRef
-} from "@thoughtspot/visual-embed-sdk/react'";
+  useSpotterAgent,
+  SpotterMessage,
+} from "@thoughtspot/visual-embed-sdk/react";
 ----
-+
-If you are using Webpack 4, import the React components as shown in this example:
-+
+
+For Spotter Agent embedding, Visual Embed SDK provides the `useSpotterAgent` custom React hook, to manage your app interactions with the Spotter Agent embed component at the backend. You can use this hook to:
+
+* Provide a function to send the query and get the data back.
+* Provide a component to render the answer with the information received from the data query.
+
+=== Initialize the SDK
+
 [source,TypeScript]
 ----
-import { SageEmbed,
-  useEmbedRef } from '@thoughtspot/visual-embed-sdk/lib/src/react';
+init({
+    thoughtSpotHost: "https://your-thoughtspot-host", // Replace with your ThoughtSpot URL
+    authType: AuthType.None, // Use the appropriate AuthType for your setup
+});
 ----
 
-. Initialize the SDK and specify the xref:embed-authentication.adoc[authentication method].
-. Add constructor options as props.
-.. For Embed events, use the `on<EventName>` convention.
-.. For Host events, use the `trigger(HostEvent.<EventName>)` method.
+=== Add constructors and props
 
-. Render the app.
-+
+Create the Spotter Agent component using `useSpotterAgent`, and pass the data source ID. The code includes the following properties and functions:
+
+* `worksheetId`: The GUID of the data source to run queries on.
+* `sendMessage(query: string)`: Sends a natural language query to ThoughtSpot and returns a structured response.
+
+[source,TypeScript]
+----
+const { sendMessage: sendSpotterMessage } = useSpotterAgent({
+  worksheetId: "YOUR_WORKSHEET_ID", // ID of the data source object (Model) to query data
+});
+const [response, setResponse] = useState<any | null>(null);
+const handleSend = async () => {
+  if (!input.trim()) return;
+  const result = await sendSpotterMessage(input);
+  setResponse(result.message);
+  setInput("");
+};
+----
+
+To render the visualizations generated by Spotter, pass the `message` data in the `<SpotterMessage />` component.
+
+[source,TypeScript]
+----
+<SpotterMessage
+  message={response.message}
+  style={{height: "600px", backgroundColor: "red" }}
+/>
+----
+
+Render your app and load the embedded component:
+
 ----
 ts-data-app> npm start
 ----
 
 === Code sample
-The following code sample shows additional attributes and properties:
-
-* A `Sage` function with a data source ID.
-* The `searchOptions` property to pass a search query `number of jackets sold today` and execute the query.
-* Event handlers for `init` and `Load` embed events.
-
-+
-[source,TypeScript]
 ----
-import { init, EmbedEvent, HostEvent } from "@thoughtspot/visual-embed-sdk";
-import { SageEmbed } from "@thoughtspot/visual-embed-sdk/react";
+import React, { useState } from "react";
+import { init, AuthType, logout } from "@thoughtspot/visual-embed-sdk";
+import { useSpotterAgent, SpotterMessage } from "@thoughtspot/visual-embed-sdk/react";
 
-// If you are using Webpack 4 (which is the default when using create-react-app v4), you would need to import
-// the React components using the below:
-// import { SageEmbed } from "@thoughtspot/visual-embed-sdk/lib/src/react";
-
-// Initialize ThoughtSpot
+// Initialize ThoughtSpot SDK
 init({
-  thoughtSpotHost: "<%=tshost%>",
+  thoughtSpotHost: "https://your-thoughtspot-host", // Replace with your ThoughtSpot host
   authType: AuthType.None,
 });
-const Sage = () => {
-  // Define search options
-  const searchOptions = {
-    searchQuery: "number of jackets sold today",  // Search query to execute
-    executeSearch: true,  // Execute search immediately
-  },
-    dataSource: "c8684f7f-d8a4-4bc9-b87d-115433c5e458", // Replace with your actual data source
-  };
-  // Add Event handlers
-  const onInit = () => {
-    console.log(EmbedEvent.Init, {});
+
+const worksheetId = "YOUR_WORKSHEET_ID"; // Replace with your worksheet ID
+
+const SpotterAgentComponent: React.FC = () => {
+  const { sendMessage: sendSpotterMessage } = useSpotterAgent({ worksheetId });
+
+  const [input, setInput] = useState("");
+  const [response, setResponse] = useState<any | null>(null);
+
+  const handleLogout = () => {
+    logout();
   };
 
-  const onLoad = () => {
-    console.log(EmbedEvent.Load, {});
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const result = await sendSpotterMessage(input);
+    setResponse(result.message);
+    setInput("");
   };
 
   return (
-    <SageEmbed
-      frameParams={{
-        height: 720px
-      }}
-      searchOptions={searchOptions}
-      onLoad={onLoad}
-      onInit={onInit}
-    />
+    <div className="app-container">
+      {/* Header */}
+      <div className="header">
+        <h1>Spotter Agent app</h1>
+        <button className="logout-btn" onClick={handleLogout}>
+          Logout
+        </button>
+      </div>
+
+      {/* Input and Response */}
+      <div>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          placeholder="Ask something..."
+        />
+        <button onClick={handleSend}>Send</button>
+
+        {response && (
+          <div style={{ marginTop: "20px" }}>
+            <SpotterMessage message={response} />
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
+
+export default SpotterAgentComponent;
 ----
-
-For more information about `SageEmbed` objects and attributes, see the following pages:
-
-* xref:SageEmbed.adoc[SageEmbed]
-* xref:SageViewConfig.adoc[SageViewConfig]
-* xref:HostEvent.adoc[HostEvent]
-* xref:EmbedEvent.adoc[EmbedEvent]
-* xref:Action.adoc[Actions]
 
 === Test your app
 
-* Load your application.
-* Check if the ThoughtSpot natural language search bar is rendered with the search query you specified.
+* Load your application and verify if the page loads with the Spotter Agent Search component.
 +
+[.widthAuto]
 [.bordered]
-image::./images/sage-embed.png[]
-
+image::./images/spotterAgentEmbed.png[Spotter Agent embed]
 
 == Embed token-based Search
 
@@ -721,7 +760,7 @@ To embed ThoughtSpot Search page, complete the following steps:
 
 === Create a Search component
 
-In your React app project, go to the **Components ** folder in your app directory and add a page for the embedded search object; for example, `Search.tsx`.
+In your React app project, go to the **Components** folder in your app directory and add a page for the embedded search object; for example, `Search.tsx`.
 
 . Import the `SearchEmbed` component and event libraries
 +
@@ -868,6 +907,113 @@ image::./images/search-query-changed.png[]
 * Check the console log to verify if the registered events are emitted.
 ////
 
+
+== Embed a Natural Language Search (Legacy interface)
+To embed ThoughtSpot Natural Language Search interface, complete the steps listed in the following sections.
+
+=== Create a Natural Language Search component
+
+In your React app project:
+
+. Go to the **Components ** folder in your app directory and add a page for the embedded search object; for example, `Sage.tsx`.
+. Import the `SageEmbed` component and event libraries.
++
+[source,TypeScript]
+----
+import { AuthType, init, EmbedEvent, HostEvent } from "@thoughtspot/visual-embed-sdk";
+
+import {
+  SageEmbed,
+  useEmbedRef
+} from "@thoughtspot/visual-embed-sdk/react'";
+----
++
+If you are using Webpack 4, import the React components as shown in this example:
++
+[source,TypeScript]
+----
+import { SageEmbed,
+  useEmbedRef } from '@thoughtspot/visual-embed-sdk/lib/src/react';
+----
+
+. Initialize the SDK and specify the xref:embed-authentication.adoc[authentication method].
+. Add constructor options as props.
+.. For Embed events, use the `on<EventName>` convention.
+.. For Host events, use the `trigger(HostEvent.<EventName>)` method.
+
+. Render the app.
++
+----
+ts-data-app> npm start
+----
+
+=== Code sample
+The following code sample shows additional attributes and properties:
+
+* A `Sage` function with a data source ID.
+* The `searchOptions` property to pass a search query `number of jackets sold today` and execute the query.
+* Event handlers for `init` and `Load` embed events.
+
++
+[source,TypeScript]
+----
+import { init, EmbedEvent, HostEvent } from "@thoughtspot/visual-embed-sdk";
+import { SageEmbed } from "@thoughtspot/visual-embed-sdk/react";
+
+// If you are using Webpack 4 (which is the default when using create-react-app v4), you would need to import
+// the React components using the below:
+// import { SageEmbed } from "@thoughtspot/visual-embed-sdk/lib/src/react";
+
+// Initialize ThoughtSpot
+init({
+  thoughtSpotHost: "<%=tshost%>",
+  authType: AuthType.None,
+});
+const Sage = () => {
+  // Define search options
+  const searchOptions = {
+    searchQuery: "number of jackets sold today",  // Search query to execute
+    executeSearch: true,  // Execute search immediately
+  },
+    dataSource: "c8684f7f-d8a4-4bc9-b87d-115433c5e458", // Replace with your actual data source
+  };
+  // Add Event handlers
+  const onInit = () => {
+    console.log(EmbedEvent.Init, {});
+  };
+
+  const onLoad = () => {
+    console.log(EmbedEvent.Load, {});
+  };
+
+  return (
+    <SageEmbed
+      frameParams={{
+        height: 720px
+      }}
+      searchOptions={searchOptions}
+      onLoad={onLoad}
+      onInit={onInit}
+    />
+  );
+};
+----
+
+For more information about `SageEmbed` objects and attributes, see the following pages:
+
+* xref:SageEmbed.adoc[SageEmbed]
+* xref:SageViewConfig.adoc[SageViewConfig]
+* xref:HostEvent.adoc[HostEvent]
+* xref:EmbedEvent.adoc[EmbedEvent]
+* xref:Action.adoc[Actions]
+
+=== Test your app
+
+* Load your application.
+* Check if the ThoughtSpot natural language search bar is rendered with the search query you specified.
++
+[.bordered]
+image::./images/sage-embed.png[]
 
 [#react-routes]
 == Add routes for navigation
