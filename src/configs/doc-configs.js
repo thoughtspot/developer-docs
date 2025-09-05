@@ -40,10 +40,9 @@ module.exports = {
             subLabel: 'Cloud (Latest)',
         },
         {
-             label: '10.11.0.cl',
-             link: '10.11.0.cl',
-             subLabel: 'Cloud',
-             iframeUrl: 'https://developer-docs-10-11-0-cl.vercel.app/docs/',
+            label: '10.11.0.cl (Cloud)',
+            link: '10.11.0.cl',
+            iframeUrl: 'https://developer-docs-10-11-0-cl.vercel.app/docs/',
         },
         {
              label: '10.10.0.cl',
@@ -57,12 +56,12 @@ module.exports = {
              subLabel: 'Cloud',
              iframeUrl: 'https://developer-docs-10-9-0-cl.vercel.app/docs/',
         },
-        {
-             label: '10.8.0.cl',
-             link: '10.8.0.cl',
-             subLabel: 'Cloud',
-             iframeUrl: 'https://developer-docs-10-8-0-cl.vercel.app/docs',
-        },
+        //{
+        //     label: '10.8.0.cl',
+        //     link: '10.8.0.cl',
+        //     subLabel: 'Cloud',
+        //     iframeUrl: 'https://developer-docs-10-8-0-cl.vercel.app/docs',
+        //},
 
     ],
     CUSTOM_PAGE_ID: {
