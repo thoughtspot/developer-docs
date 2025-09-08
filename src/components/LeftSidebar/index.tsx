@@ -71,9 +71,7 @@ const LeftSideBar = (props: {
     }, [params[NAV_PREFIX], params[TS_PAGE_ID_PARAM], props.navContent]);
 
     useEffect(() => {
-        if (ref?.current?.offsetWidth) {
-            props.handleLeftNavChange(ref?.current?.offsetWidth);
-        }
+        props.handleLeftNavChange(ref?.current?.offsetWidth);
     }, [width]);
 
     const toggleExpandOnTab = (text: string) => {
