@@ -34,7 +34,6 @@ const LeftSideBar = (props: {
     leftNavOpen: boolean;
     isMaxMobileResolution: boolean;
     isDarkMode: boolean;
-    handleLeftNavChange: (width: number) => void;
     location: Location;
     setLeftNavOpen: Function;
     isPublicSiteOpen: boolean;
@@ -70,12 +69,6 @@ const LeftSideBar = (props: {
         setNavContent(updatedHTML);
     }, [params[NAV_PREFIX], params[TS_PAGE_ID_PARAM], props.navContent]);
 
-    useEffect(() => {
-        if (ref?.current?.offsetWidth) {
-            props.handleLeftNavChange(ref?.current?.offsetWidth);
-        }
-    }, [width]);
-
     const toggleExpandOnTab = (text: string) => {
         const allTabsRef = { ...expandedTabsRef.current };
         if (allTabsRef[text] !== undefined) {
@@ -101,39 +94,40 @@ const LeftSideBar = (props: {
 
     const renderLeftNav = () => {
         return isMaxMobileResolution ? (
-            <ResizableBox
-                width={
-                    isMaxTabletResolution
-                        ? LEFT_NAV_WIDTH_DESKTOP
-                        : LEFT_NAV_WIDTH_TABLET
-                }
-                minConstraints={[
-                    isMaxTabletResolution
-                        ? MIN_LEFT_NAV_WIDTH_DESKTOP
-                        : MIN_LEFT_NAV_WIDTH_TABLET,
-                ]}
-                maxConstraints={[
-                    isMaxTabletResolution
-                        ? MAX_LEFT_NAV_WIDTH_DESKTOP
-                        : MAX_LEFT_NAV_WIDTH_TABLET,
-                ]}
-                axis="x"
-                className="resizable"
-                height={height || 0} // Height is set to 0 when element is not rendered
-            >
-                <NavContent
-                    backLink={props.backLink}
-                    navContent={navContent}
-                    navTitle={props.navTitle}
-                    refObj={ref as React.RefObject<HTMLDivElement>}
-                    leftNavOpen={props.leftNavOpen}
-                    isPublicSiteOpen={props.isPublicSiteOpen}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={props.setDarkMode}
-                    isDarkMode={props.isDarkMode}
-                    searchClickHandler={props.searchClickHandler}
-                />
-            </ResizableBox>
+            <div className="resizable-container">
+                <ResizableBox
+                    width={
+                        isMaxTabletResolution
+                            ? LEFT_NAV_WIDTH_DESKTOP
+                            : LEFT_NAV_WIDTH_TABLET
+                    }
+                    minConstraints={[
+                        isMaxTabletResolution
+                            ? MIN_LEFT_NAV_WIDTH_DESKTOP
+                            : MIN_LEFT_NAV_WIDTH_TABLET,
+                    ]}
+                    maxConstraints={[
+                        isMaxTabletResolution
+                            ? MAX_LEFT_NAV_WIDTH_DESKTOP
+                            : MAX_LEFT_NAV_WIDTH_TABLET,
+                    ]}
+                    axis="x"
+                    className="resizable"
+                >
+                    <NavContent
+                        backLink={props.backLink}
+                        navContent={navContent}
+                        navTitle={props.navTitle}
+                        refObj={ref as React.RefObject<HTMLDivElement>}
+                        leftNavOpen={props.leftNavOpen}
+                        isPublicSiteOpen={props.isPublicSiteOpen}
+                        isMaxMobileResolution={isMaxMobileResolution}
+                        setDarkMode={props.setDarkMode}
+                        isDarkMode={props.isDarkMode}
+                        searchClickHandler={props.searchClickHandler}
+                    />
+                </ResizableBox>
+            </div>
         ) : (
             <div className="menuMain">
                 <div className="menuContainer">
