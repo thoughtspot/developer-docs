@@ -93,11 +93,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         fetchChild(initialNavContentData) || [],
     );
     const [showSearch, setShowSearch] = useState(false);
-    const [leftNavWidth, setLeftNavWidth] = useState(
-        width > MAX_TABLET_RESOLUTION
-            ? LEFT_NAV_WIDTH_DESKTOP
-            : LEFT_NAV_WIDTH_TABLET,
-    );
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
     const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(false);
@@ -327,16 +322,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         });
     }
 
-    const calculateDocumentBodyWidth = () => {
-        if (isMaxMobileResolution && !isCustomPage) {
-            if (width > MAX_CONTENT_WIDTH_DESKTOP) {
-                if (isHomePage) return width - leftNavWidth;
-                return `${MAX_CONTENT_WIDTH_DESKTOP - 300}px`;
-            }
-            return `${width - 300}px`;
-        }
-        return '100%';
-    };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
@@ -385,7 +370,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         setDarkMode={setDarkMode}
                         isDarkMode={isDarkMode}
                         isPublicSiteOpen={isPublicSiteOpen}
-                        leftNavWidth={leftNavWidth}
                     />
                 </div>
             </Modal>
@@ -406,7 +390,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     navTitle={navTitle}
                     navContent={navContent}
                     docWidth={width}
-                    handleLeftNavChange={setLeftNavWidth}
                     location={location}
                     setLeftNavOpen={setLeftNavOpen}
                     leftNavOpen={leftNavOpen}
@@ -422,16 +405,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 />
             </div>
             {isAskDocsPage ? (
-                <div
-                    className="documentBody"
-                    style={{
-                        width: calculateDocumentBodyWidth(),
-                        display: 'flex',
-                        marginLeft: isMaxMobileResolution
-                            ? `${leftNavWidth}px`
-                            : '0px',
-                    }}
-                >
+                <div className="documentBody">
                     <AskDocs />
                 </div>
             ) : (
@@ -439,24 +413,20 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     className={`documentBody ${
                         isHomePage ? 'doc-home' : 'doc-wrapper-detail'
                     }`}
-                    style={{
-                        width: calculateDocumentBodyWidth(),
-                        marginLeft: isMaxMobileResolution
-                            ? `${leftNavWidth}px`
-                            : '0px',
-                    }}
                 >
                     <div className="introWrapper">
-                        <Document
-                            shouldShowRightNav={shouldShowRightNav}
-                            pageid={params[TS_PAGE_ID_PARAM]}
-                            docTitle={docTitle}
-                            docContent={docContent}
-                            breadcrumsData={breadcrumsData}
-                            isPublicSiteOpen={isPublicSiteOpen}
-                        />
+                        <div className="documentWrapperContainer">
+                            <Document
+                                shouldShowRightNav={shouldShowRightNav}
+                                pageid={params[TS_PAGE_ID_PARAM]}
+                                docTitle={docTitle}
+                                docContent={docContent}
+                                breadcrumsData={breadcrumsData}
+                                isPublicSiteOpen={isPublicSiteOpen}
+                            />
+                        </div>
                         {shouldShowRightNav && (
-                            <div>
+                            <div className="docmapWrapper">
                                 <Docmap
                                     docContent={docContent}
                                     location={location}
@@ -522,7 +492,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 id="wrapper"
                 data-theme={isDarkMode ? 'dark' : 'light'}
                 key={key}
-                style={{ height: '100vh', overflow: 'hidden' }}
             >
                 {isPublicSiteOpen && (
                     <Header
@@ -532,16 +501,16 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     />
                 )}
                 <main
-                    ref={ref as React.RefObject<HTMLDivElement>}
                     className={getClassName()}
-                    style={{
-                        height: !docContent
-                            ? MAIN_HEIGHT_WITHOUT_DOC_CONTENT
-                            : 'calc(100vh - 60px)',
-                        overflow: 'auto',
-                    }}
+                    ref={ref as React.RefObject<HTMLDivElement>}
                 >
-                    {isPlayGround ? renderPlayGround() : renderDocTemplate()}
+                    {isPlayGround ? (
+                        <div className="playgroundWrapper">
+                            {renderPlayGround()}
+                        </div>
+                    ) : (
+                        renderDocTemplate()
+                    )}
                 </main>
             </div>
         </>
