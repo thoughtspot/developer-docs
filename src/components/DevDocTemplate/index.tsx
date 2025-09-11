@@ -99,7 +99,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [showSearch, setShowSearch] = useState(false);
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
-    const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(false);
+    const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(() => {
+        if (typeof window !== 'undefined') return isPublicSite(location.search);
+        return false;
+    });
     const checkout =
         typeof window !== 'undefined'
             ? localStorage.getItem('theme') === 'dark'
@@ -504,9 +507,22 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         isDarkMode={isDarkMode}
                     />
                 )}
+                <div
+                    className="headerPlaceholder"
+                    style={
+                        isPublicSiteOpen
+                            ? { height: '65px' }
+                            : { height: '0px' }
+                    }
+                ></div>
                 <main
                     className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}
+                    style={
+                        !isPublicSiteOpen
+                            ? { height: '100vh' }
+                            : { height: 'calc(100vh -  65px)' }
+                    }
                 >
                     {isPlayGround ? (
                         <div className="playgroundWrapper">
