@@ -7,6 +7,7 @@ export const AskDocs = () => {
             src="https://tse-app-builder.vercel.app/complete?embed=true"
             frameBorder="0"
             id="iframe"
+            width="100%"
         />
     );
 };

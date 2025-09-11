@@ -26,7 +26,6 @@ type SearchProps = {
     updateKeyword: Function;
     setDarkMode: Function;
     isPublicSiteOpen: boolean;
-    leftNavWidth: number;
 };
 
 const Search: React.FC<SearchProps> = (props) => {
