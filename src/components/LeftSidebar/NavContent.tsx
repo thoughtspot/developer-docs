@@ -16,10 +16,6 @@ const NavContent = (props: {
     setDarkMode: Function;
     searchClickHandler: Function;
 }) => {
-    if (props.navContent === '') {
-        return <aside ref={props.refObj} key={'aside'}></aside>;
-    }
-
     return (
         <aside
             ref={props.refObj}

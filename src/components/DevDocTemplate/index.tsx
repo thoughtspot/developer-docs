@@ -101,7 +101,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [keyword, updateKeyword] = useState('');
     const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(() => {
         if (typeof window !== 'undefined') return isPublicSite(location.search);
-        return false;
+        return true;
     });
     const checkout =
         typeof window !== 'undefined'
