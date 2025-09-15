@@ -111,7 +111,7 @@ Parameters such as `hideLiveboardHeader`, `hideTabPanel`, `isLiveboardHeaderStic
 
 Along with xref:Action.adoc[Actions] there is very fine-grained control of the display of the `LiveboardEmbed` component, which can be varied for each user or content object displayed depending on the desires of the app development team.
 
-[widthAuto]
+[.widthAuto]
 image::./images/liveboard_view_config_callouts_2.png[LiveboardViewConfig parameters]
 
 The `hideLiveboardHeader` property removes the entire header area above the Liveboard, including filters and the overall Liveboard menu, which is a common pattern for "read-only' use cases or rebuilding your own menus and buttons using xref:embed-events.adoc[HostEvents].
@@ -140,6 +140,12 @@ When `fullHeight` is set to `true`, the SDK ignores the `isLiveboardHeaderSticky
 `visibleVizs` and `visibleTabs` allow for limiting the experience for certain users from a Liveboard with many more elements.
 
 For example, a template Liveboard with many different KPIs could be reduced down to a smaller set by giving a user an interface to select the particular visualizations to show, storing their selections, and using that saved set of visualization GUIDs as the array for `visibleVizs` on page load (there is an equivalent xref:embed-events.adoc[HostEvent] called `SetVisibleVizs` to make an update after the Liveboard has loaded).
+
+=== Redefine Liveboard breakpoint widths
+When turned on, the `enable2ColumnLayout` allows for customising the Liveboard breakpoint width for embedded users.
+The current 12 column layout changes to 2 columns per row at 1024px, and to 1 column per row layout at 630px in the new Liveboard experience. Once enabled, these breakpoints would apply to all Liveboards in the ThoughtSpot instance, and cannot be set only for individual Liveboards.
+
+These breakpoint widths are customisable for the embedded customers. Contact ThoughtSpot support for assistance with customisation.
 
 [#lbv2]
 == Liveboard experience
@@ -201,9 +207,11 @@ The `activeTabId` property is available only in the `LiveboardEmbed` package and
 
 === Filters
 
-To view specific data across the tables and charts on a Liveboard, users can apply filters in the embedded view. You can apply filters before embedding a Liveboard or xref:runtime-filters.adoc[apply runtime filters] via Visual Embed SDK. Embedding application users can also apply filters across visualizations using the link:https://docs.thoughtspot.com/software/latest/liveboard-filters-cross[cross-filter feature, window=_blank].
+To view specific data across the tables and charts on an embedded Liveboard, users can use Liveboard filter options. You can apply filters when embedding a Liveboard or xref:runtime-filters.adoc[apply runtime filters] via Visual Embed SDK and load the Liveboard with filters applied.
 
-The Visual Embed SDK provides several types of host events to trigger an action to get or update filters:
+Embedding application users can also apply filters across visualizations using the link:https://docs.thoughtspot.com/cloud/latest/liveboard-filters-cross[cross-filter feature, window=_blank].
+
+The Visual Embed SDK provides the following host events to trigger an action to get or update filters:
 
 * link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_getfilters[`HostEvent.GetFilters`]
 * link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updatefilters[`HostEvent.UpdateFilters`]
@@ -214,43 +222,45 @@ The Visual Embed SDK provides several types of host events to trigger an action 
 
 For `DATE` and `DATE_TIME` data types, you must provide the date and time values in the Epoch time format when xref:runtime-filters.adoc#_apply_runtime_filters_on_embedded_objects[applying or updating runtime filters] via SDK or REST API.
 
-However, when updating filters using `HostEvent.UpdateFilters`, you must specify the date filter `type`. You can use one of the following values for `type`:
+However, when updating filters using `HostEvent.UpdateFilters`, you must include the date filter `type` along with the time period to apply any rolling or fixed time windows.
 
-* `EXACT_DATE` +
-Examples: `2023-07-31`, `2023/07/31`
-* `EXACT_DATE_RANGE` +
-Specify the start date and end date in the `values` array. Ensure that the start date is lower than the end date. +
-Example: `"2023-01-31","2023-03-31"`.
-* `EXACT_DATE_TIME` +
-Example: `2023/07/31 23:59:59`
-* `EXACT_TIME` +
-Example: `10:10`
-* `LAST_N_Period` +
-Example: `Last 2 week` +
-* `LAST_PERIOD` +
-Example: `Last week`
-* `MONTH_ONLY` +
-Example: `July`
-* `MONTH_YEAR` +
-Specify the month and year in the `values` array. +
-Example: `"July","2023"`.
-* `YEAR_ONLY` +
-Example: `2023`
-* `NEXT_N_PERIOD` +
-Example: `Next 7 week`
-* `NEXT_PERIOD` +
-Example: `Next week`
-* `QUARTER_YEAR` +
-Example: `"Q1","2023"`
-* `THIS_PERIOD` +
-Example: `This week`
-* `PERIOD_TO_DATE` +
-Example: `month to date`
-* `YESTERDAY` +
-* `TODAY` +
-* `TOMORROW` +
+[NOTE]
+====
+For `PERIOD` filters, you must include the `datePeriod` attribute in the date filter object.
+====
 
-==== HostEvent.UpdateFilters examples
+The following table lists the supported filter types and examples for each type:
+
+[width="100%" cols="3,5,8"]
+[options='header']
+|=====
+|Type| Description | Example
+
+| `YESTERDAY`  | Specify the `type` as `YESTERDAY`. a|
+[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: [""],
+        type: "YESTERDAY"
+       }
+   });
+----
+| `TODAY` | Specify the `type` as `TODAY`. a|
+[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: [""],
+        type: "TODAY"
+       }
+   });
+----
+| `TOMORROW` | Specify the `type` as `TOMORROW`. a|
 
 [source,JavaScript]
 ----
@@ -258,29 +268,209 @@ liveboardEmbed.trigger(HostEvent.UpdateFilters, {
     filter: {
         column: "date",
         oper: "EQ",
-        values: ["July","2023"],
-        type: "MONTH_YEAR"
+        values: [""],
+        type: "TOMORROW"
        }
    });
 ----
+
+|`EXACT_DATE` | Allows filtering column data to show details for the exact date, before or after the date. For example, to filter data for dates greater than `2023/07/31`, specify `2023/07/31` as value, with the filter operator as `GT`.  a| [source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "GT",
+        values: ["2023-07-31"],
+        type: "EXACT_DATE"
+       }
+   });
+----
+|`EXACT_DATE_RANGE` |Specify the start date and end date in the `values` array. Ensure that the start date is lower than the end date. For example, `"2023-01-31","2023-03-31"`. a|
 
 [source,JavaScript]
 ----
 liveboardEmbed.trigger(HostEvent.UpdateFilters, {
     filter: {
         column: "date",
-        operator: "BW_INC",
-        values: [
-            "2023-01-31","2023-03-31"
-        ],
+        oper: "BW_INC",
+        values: ["2023-01-31","2023-03-31"],
         type: "EXACT_DATE_RANGE"
-    }
-});
+       }
+   });
 ----
+
+|`LAST_N_PERIOD` |Specify the period. You must include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are `SECOND`, `MINUTE`, `HOUR`, `DAY`, WEEK`, `MONTH`, `QUARTER`, and `YEAR`. For example, to filter column data by last 2 weeks, set `datePeriod` to `WEEK` and `values` to `2`.
+
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: [2],
+        datePeriod: "WEEK",
+        type: "LAST_N_PERIOD"
+      }
+   });
+----
+
+|`NEXT_N_PERIOD` | Specify the period. You must include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are `SECOND`, `MINUTE`, `HOUR`, `DAY`, WEEK`, `MONTH`, `QUARTER`, and `YEAR`. For example, to filter column data by next 2 months, set `datePeriod` to `MONTH` and `values` to `2`.
+
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: [2],
+        datePeriod: "MONTH",
+        type: "NEXT_N_PERIOD"
+      }
+   });
+----
+
+| `THIS_PERIOD` | Specify the period. You must include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are  `SECOND`, `MINUTE`, `HOUR`, `DAY`, WEEK`, `MONTH`, `QUARTER`, and `YEAR`.
+
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: [""],
+        datePeriod: "MONTH",
+        type: "THIS_PERIOD"
+      }
+   });
+----
+
+| `PERIOD_TO_DATE` |Specify the period. You must include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are `WEEK`, `MONTH`, `QUARTER`, and `YEAR`.
+
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: [""],
+        datePeriod: "QUARTER",
+        type: "PERIOD_TO_DATE"
+      }
+   });
+----
+|`YEAR_ONLY` |Specify the year. For example, 2023.
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: ["2023"],
+        type: "YEAR_ONLY"
+      }
+   });
+----
+
+| `MONTH_YEAR` |Specify the month and year in the `values` array. For example, `"July","2023"`.
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: ["July","2023"],
+        type: "MONTH_YEAR"
+      }
+   });
+----
+
+|`QUARTER_YEAR` | Specify the quarter and year in the `values` array. For example, `"Q1","2023"`.
+
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: ["Q1","2023"],
+        type: "QUARTER_YEAR"
+      }
+   });
+----
+|=====
+
+////
+
+| `EXACT_DATE_TIME` |Specify the date and time in epoch or the regular date and time format. For example, 2023/07/31 22:50:05. a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: ["2023/07/31 22:50:05"],
+        type: "EXACT_DATE_TIME"
+       }
+   });
+----
+
+|`EXACT_TIME` |Specify the time value in epoch or `hh:mm:ss` format.
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: ["22:50:05"],
+        type: "EXACT_TIME"
+       }
+   });
+----
+
+|`MONTH_ONLY` |Specify the month. For example, July.
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: ["July"],
+        type: "MONTH_ONLY"
+      }
+   });
+----
+|`LAST_PERIOD` |Specify the time period. For example, Last week. You must also include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are `DAY`, WEEK`, `MONTH`, QUARTER, and YEAR.
+
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: [""],
+        datePeriod: "DAY",
+        type: "LAST_PERIOD"
+      }
+   });
+----
+
+|`NEXT_PERIOD` |Specify the time period. For example, next week. You must also include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are `DAY`, WEEK`, `MONTH`, QUARTER, and YEAR.
+a|[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "date",
+        oper: "EQ",
+        values: [""],
+        datePeriod: "DAY",
+        type: "LAST_PERIOD"
+      }
+   });
+
+////
 
 [#noteTiles]
 === Note tiles
-You can add a link:https://docs.thoughtspot.com/software/latest/liveboard-notes[Liveboard Note tile, window=_blank] with custom text, images, and links on an embedded Liveboard.
+You can add a link:https://docs.thoughtspot.com/cloud/latest/liveboard-notes[Liveboard Note tile, window=_blank] with custom text, images, and links on an embedded Liveboard.
 
 * Only users with edit access to a Liveboard can add a Note tile.
 * Users require `Can upload data` privilege to upload an image to the note tile.
