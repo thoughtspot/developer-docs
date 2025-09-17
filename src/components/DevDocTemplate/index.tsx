@@ -537,7 +537,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     style={{
                         height: !docContent
                             ? MAIN_HEIGHT_WITHOUT_DOC_CONTENT
-                            : 'calc(100vh - 60px)',
+                            : '100%',
                         overflow: 'auto',
                     }}
                 >
