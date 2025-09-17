@@ -520,8 +520,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     ref={ref as React.RefObject<HTMLDivElement>}
                     style={
                         !isPublicSiteOpen
-                            ? { height: '100vh' }
-                            : { height: 'calc(100vh -  65px)' }
+                            ? { height: '100lvh' }
+                            : { height: 'calc(100lvh -  65px)' }
                     }
                 >
                     {isPlayGround ? (
