@@ -1,0 +1,151 @@
+= Parameterize metadata objects
+:toc: true
+:toclevels: 2
+
+:page-title: parameterize metadata objects
+:page-pageid: parameterze-metdata
+:page-description: Use the metadata parameterization APIs to assign dynamic values via variables to connection or table properties
+
+In ThoughtSpot, metadata parameterization refers to the process of assigning variables to certain properties and fields within metadata objects such as Connections and Tables. These variables can have different values assigned for each Org context, which are applied dynamically at runtime, rather than relying on hardcoded static values.
+
+Metadata parameterization with variables allows administrators to reuse and propagate the same metadata object across various Orgs and environments within a ThoughtSpot instance while maintaining a consistent data structure of objects across Orgs.
+
+== Before you begin
+
+* Ensure that that xref:variables.adoc[variables are available] on your instance. You can use the xref:variables.adoc#_get_details_of_variables[variable search API] to get a list of variables.
+* Ensure that you have edit access to the Connections and Tables to which you want to assign variables.
+
+== How to parameterize objects
+You can update the properties of a Connection or Table to parameterize or remove parameterization by using one of the following options:
+
+* Use REST APIs +
+To parameterize the properties of a metadata object, send an xref:metadata-parameterization.adoc#_remove_parameterization_using_rest_api[API request to the `/api/rest/2.0/metadata/parameterize` endpoint]. +
+To remove parameterization, use the xref:metadata-parameterization.adoc#_remove_parameterization_using_rest_api[the `/api/rest/2.0/metadata/parameterize` API endpoint].
+* Edit the TML representation of the object +
+You can edit the TML object directly and assign variables. +
+For example, to parameterize the properties of a Table, open the TML of the Table object in the edit mode and assign the variables to the properties as shown here:
++
+[source,YAML]
+----
+table:
+  name: Sales
+  db: "${DATABASE}"
+  schema: "${SCHEMA_VAR}"
+  db_table: "${TABLE_VAR}"
+----
+
+== Parameterize object properties using REST API
+To parameterize properties of a metadata object, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fparameterize-metadata">/api/rest/2.0/metadata/parameterize</a>+++ API endpoint, with the following attributes in the request body.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`metadata_type` __Optional__ a| __String__. Type of the metadata object. Valid values are:
+
+* `LOGICAL_TABLE` +
+Use this option for Tables
+* `CONNECTION` +
+Use this option for data connection objects.
+
+Note that this attribute is __optional__ if a GUID is specified as `metadata_identifier` in the request. If you have specified the object name instead of the GUID, and multiple objects in your Org share that name, make sure to specify the metadata type.
+
+|`metadata_identifier` a| __String__. ID or name of the metadata object.
+
+|`field_type` a|__String__. Type of object property. Valid values are:
+
+* `ATTRIBUTE`  for Tables
+* `CONNECTION_PROPERTY` for Connections
+|`field_name` a|__String__. The name of the field to parameterize.
+
+For tables, use one of the following names, depending on the property that you want to parameterize:
+
+* `databaseName`
+* `schemaName`
+* `tableName`
+
+For connection objects, specify the exact name of the field or property to parameterize. For example, `accountName`, `role`, and `warehouse`.
+
+|`variable_identifier` a| __String__. ID or name of the variable.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/parameterize'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_identifier": "eefd754f-7146-432d-9ad6-2c730264ecc8",
+  "field_type": "ATTRIBUTE",
+  "field_name": "schemaName",
+  "variable_identifier": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "metadata_type": "LOGICAL_TABLE"
+}'
+----
+
+If the API request is successful, ThoughtSpot returns a 204 response indicating that the variable has been successfully assigned to the specified object.
+
+== Remove parameterization using REST API
+To remove the variables assigned to a Connection or Table and restore static values, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Funparameterize-metadata">/api/rest/2.0/metadata/unparameterize</a>+++ API endpoint, with the following attributes in the request body.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`metadata_type` __Optional__ a| __String__. Type of the metadata object. Valid values are:
+
+* `LOGICAL_TABLE` +
+Use this option for Tables
+* `CONNECTION` +
+Use this option for data connection objects
+
+Note that this attribute is __optional__ if a GUID is specified as `metadata_identifier` in the request. If you have specified the object name instead of the GUID, and multiple objects in your Org share that name, make sure to specify the metadata type.
+
+|`metadata_identifier` a| __String__. ID or name of the metadata object.
+
+|`field_type` a|__String__. Type of object property. Valid values are:
+
+* `ATTRIBUTE`  for Tables
+
+* `CONNECTION_PROPERTY` for Connections
+
+|`field_name` a|__String__. The name of the field to parameterize.
+
+For Table attributes, use one of the following options:
+
+* `databaseName`
+* `schemaName`
+* `tableName`
+
+For connection objects, specify the name of the field or property for which you want to restore a static value.
+|`value` a| __String__. Value to assign to the object property. This will assign a static value and remove the variable from the object property.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/unparameterize'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_identifier": "metadata_identifier2",
+  "field_type": "ATTRIBUTE",
+  "field_name": "field_name0",
+  "value": "sales",
+  "metadata_type": "LOGICAL_TABLE"
+}'
+----
+
+If the API request is successful, ThoughtSpot returns a 204 response indicating that the variable has been successfully removed from the specified object.
