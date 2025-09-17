@@ -91,6 +91,9 @@ export const passThroughHandler = (html: string, params: object) => {
     const paramKeys = Object.keys(params);
     if (!html && paramKeys.length === 0) return parsedHtml;
 
+    // During document processing, the character replacement step converts textual characters to the decimal format of their Unicode code points. 
+    // This causes the '--' to be replaced with the em-dash (&#8212;) followed by a zero-width space (&#8203;). Ref : https://docs.asciidoctor.org/asciidoc/latest/subs/replacements/
+    parsedHtml = parsedHtml.replace(/&#8212;&#8203;/g, '--');
     const customPassThroughStart = '{{';
     const customPassThroughEnd = '}}';
 

@@ -2,6 +2,7 @@ const { JSDOM } = require('jsdom');
 const { htmlToText } = require('html-to-text');
 const config = require('../configs/doc-configs');
 const { getAlgoliaIndex } = require('../configs/algolia-search-config');
+const { getDocLinkFromEdge } = require('./gatsby-utils.js');
 
 const getPathPrefix = () => {
     return config.SITE_PREFIX;
@@ -48,6 +49,13 @@ query {
                   description
               }
               html       
+              parent {
+                ... on File {
+                    name
+                    sourceInstanceName
+                    relativePath
+                }
+              }
           }
       }
   }
@@ -78,7 +86,13 @@ function splitStringIntoChunks(input, n) {
     return result;
 }
 
-const pageToAlgoliaRecordForASCII = (ele, type, node) => {
+const getDocLink = (edge) => {
+    const link = getDocLinkFromEdge(edge);
+    return `/${config.SITE_PREFIX}${link}`;
+};
+
+const pageToAlgoliaRecordForASCII = (ele, type, edge) => {
+    const node = edge.node;
     const pageid = node.pageAttributes.pageid;
     let sectionId;
     let sectionTitle;
@@ -98,6 +112,8 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
     const numberOfChunks = len / 8000 + 1;
     const chunks = splitStringIntoChunks(body, numberOfChunks);
 
+    const docLink = getDocLink(edge);
+
     return chunks.map((chunk, i) => ({
         objectID: `${sectionId}_chunk_${i}`,
         sectionId,
@@ -106,7 +122,7 @@ const pageToAlgoliaRecordForASCII = (ele, type, node) => {
         pageid,
         type: 'ASCII',
         title: node.document.title,
-        link: `/${config.SITE_PREFIX}/${pageid}`,
+        link: docLink,
     }));
 };
 
@@ -129,7 +145,7 @@ const queries = [
                             ? pageToAlgoliaRecordForASCII(
                                   preambleEle,
                                   'preamble',
-                                  edge.node,
+                                  edge,
                               )
                             : null;
                         const sections = Array.prototype.map.call(
@@ -138,7 +154,7 @@ const queries = [
                                 pageToAlgoliaRecordForASCII(
                                     sect,
                                     'section',
-                                    edge.node,
+                                    edge,
                                 ),
                         );
                         if (preamble) {

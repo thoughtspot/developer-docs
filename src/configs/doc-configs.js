@@ -35,7 +35,7 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '10.1.0.sw',
+            label: '10.10.0.sw',
             link: ' ',
             subLabel: 'Software (Latest)',
         },
@@ -44,6 +44,7 @@ module.exports = {
         API_PLAYGROUND: 'restV2-playground',
         ASK_DOCS: 'ask-docs',
         GQ_PLAYGROUND: 'graphql-play-ground',
+        THEME_BUILDER: 'theme-builder',
     },
     CLUSTER_TYPES: {
         PROD: 'PROD',
