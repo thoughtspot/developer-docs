@@ -8,6 +8,6 @@ export const MAX_LEFT_NAV_WIDTH_DESKTOP = 400;
 export const MIN_LEFT_NAV_WIDTH_TABLET = 150;
 export const MAX_LEFT_NAV_WIDTH_TABLET = 400;
 export const INTRO_WRAPPER_MARGIN_TOP = 150;
-export const MAIN_HEIGHT_WITHOUT_DOC_CONTENT = '100vh';
+export const MAIN_HEIGHT_WITHOUT_DOC_CONTENT = '100lvh';
 export const DOC_VERSION_PROD = '';
 export const DOC_VERSION_DEV = '-dev';
