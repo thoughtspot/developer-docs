@@ -18,15 +18,18 @@ const Docmap = (props: {
         const tocEl = doc.querySelector('#toc');
         if (tocEl) {
             const { hash } = props.location;
+            setToc(tocEl.innerHTML);
             if (hash) {
                 const ele = document.querySelector(hash);
                 if (ele) {
                     ele.scrollIntoView({
                         block: 'start',
                     });
+
+                    // Apply offset to keep header visible
+                    window.scrollBy(0, -55);
                 }
             }
-            setToc(tocEl.innerHTML);
         } else {
             setToc('');
         }
