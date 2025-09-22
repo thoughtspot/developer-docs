@@ -27,7 +27,7 @@ const Docmap = (props: {
                     });
 
                     // Apply offset to keep header visible
-                    window.scrollBy(0, -55);
+                    window.scrollBy(0, -70);
                 }
             }
         } else {
