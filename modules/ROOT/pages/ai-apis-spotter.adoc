@@ -1,0 +1,1137 @@
+= Spotter AI APIs [beta betaBackground]^Beta^
+:toc: true
+:toclevels: 2
+
+:page-title: AI APIs
+:page-pageid: ai-apis
+:page-description: You can use Spotter REST APIs to receive Answers for your analytical queries sent  through the conversational experience with ThoughtSpot.
+
+ThoughtSpot provides a set of Spotter AI APIs [beta betaBackground]^Beta^ to create a conversation session with Spotter, ask follow-up questions, and generate Answers for their analytic queries.
+
+This article describes how to use ThoughtSpot REST APIs for the following operations:
+
+* xref:spotter-apis.adoc#createManageConversations[Create a conversation and ask follow-up questions]
+* xref:spotter-apis.adoc#_generate_a_single_answer[Generate a single Answer for a natural language query]
+* xref:spotter-apis.adoc#process_results[Process results generated from Spotter APIs]
+
+
+
+AI APIs enable agentic, conversational analytics by allowing users and systems to interact with data using natural language. Each API serves a specific function:
+
+- **/api/rest/2.0/ai/agent/conversation/create**: Starts a new AI-driven conversation session based on a specified data source (worksheet or model). This sets the context for subsequent conversational queries and responses [[8]]().
+
+- **/api/rest/2.0/ai/data-source-suggestions**: Returns a list of relevant data sources (worksheets, models) based on a user's natural language query, helping users or agents select the most appropriate data source for analysis [[12]](https://developers.thoughtspot.com/docs/rest-apiv2-reference).
+
+- **/api/rest/2.0/ai/relevant-questions/**: Provides a list of recommended or relevant questions for a given data source and/or conversation context, guiding users to explore their data further [[12]](https://developers.thoughtspot.com/docs/rest-apiv2-reference).
+
+- **/api/rest/2.0/ai/agent/conversation/converse**: Sends a follow-up message or question to an ongoing conversation session and returns the AI agent's response, including answers, tokens, and visualization details [[8]]().
+
+These APIs collectively enable natural language interaction, context-aware analytics, and guided data exploration in ThoughtSpot [[12]](https://developers.thoughtspot.com/docs/rest-apiv2-reference), [[8]]().
+
+
+
+
+
+The API used for MCP server integration and boundaryless implementation is /api/rest/2.0/ai/relevant-questions/ (and related agentic AI APIs such as converse and create conversation). These APIs are exposed as "tools" by the MCP server, enabling external AI hosts (like Claude or other MCP clients) to discover and interact with ThoughtSpot's capabilities in a boundaryless, agent-to-agent manner. The MCP server acts as a wrapper and discovery layer for these APIs, making them accessible for integration and orchestration in multi-agent or boundaryless environments [[3]](https://us-2221.app.gong.io/call?id=2530016458468742599), [[9]](https://us-2221.app.gong.io/call?id=1587975872956140153), [[1]](https://us-2221.app.gong.io/call?id=5202451020418925233), [[6]](https://us-2221.app.gong.io/call?id=4352048497015947624).
+
+The API used for MCP server integration and boundaryless implementation is /api/rest/2.0/ai/relevant-questions/ (and related agentic AI APIs such as converse and create conversation). These APIs are exposed as "tools" by the MCP server, enabling external AI hosts (like Claude or other MCP clients) to discover and interact with ThoughtSpot's capabilities in a boundaryless, agent-to-agent manner. The MCP server acts as a wrapper and discovery layer for these APIs, making them accessible for integration and orchestration in multi-agent or boundaryless environments [[3]](https://us-2221.app.gong.io/call?id=2530016458468742599), [[9]](https://us-2221.app.gong.io/call?id=1587975872956140153), [[1]](https://us-2221.app.gong.io/call?id=5202451020418925233), [[6]](https://us-2221.app.gong.io/call?id=4352048497015947624).
+
+
+
+== Get Relevant Questions
+
+POST /api/rest/2.0/ai/relevant-questions/
+
+Purpose::
+Return relevant questions for a given data source and/or conversation.
+
+.Parameters
+[cols="1,1,2,2"]
+|===
+|Name |Type |Required |Description
+
+|dataSource
+|string
+|Yes
+|GUID of the worksheet or model.
+
+|conversationId
+|string
+|No
+|Ongoing conversation session ID.
+
+|limit
+|integer
+|No
+|Maximum number of questions to return.
+|===
+
+.Limitations and Functional Impacts
+* Only questions relevant to the data source and user’s permissions are returned.
+* Relevance scoring may be less accurate if metadata is sparse or poorly indexed.
+* If ABAC is enabled, question suggestions may be less accurate.
+* If the data source is very large, response time may increase.
+
+.Example Request
+[source,json]
+----
+{
+  "dataSource": "12345678-aaaa-bbbb-cccc-1234567890ab",
+  "limit": 3
+}
+----
+
+.Example Response
+[source,json]
+----
+{
+  "questions": [
+    {
+      "question": "What are the top selling products by region?",
+      "score": 0.98
+    }
+  ]
+}
+----
+
+ *Overview*
+
+* *Purpose*:
+The API breaks down a user-submitted query into a structured set of analytical sub-questions, leveraging relevant contextual metadata to enhance accuracy and relevance.
+* *Target Consumers*:
+This API is designed for integration into agentic workflows and internal MCP servers, enabling customers to address complex business queries by resolving them through a series of focused, smaller questions.
+* *Authentication:*
+This endpoint requires https://rest-api-sdk-v2-0-dev.vercel.app/?auth_token=eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFMyNTYifQ.eyJiYXNlLXVybCI6ImxvY2FsaG9zdDo0NDMiLCJuYW1lIjoiT3dsYmVydCIsImFsbG93ZWRQcm9qZWN0cyI6WyJ0ZXN0LXRzLWpzbnRtIl0sImJlYXJlckF1dGgiOiJaR1Z0YjE5a1pYWjFjMlZ5T2twSVRtOWhXRXAyVFZOU1ZGTkZSWFJOYWxVeVNrUlZkMDFFUVhkTlExSk9XakJ2TUdSNlRqQlVSRlpNVFZaV1dscEZORFJUTTFaelZVaGtibEJVTUd0T2JXUnVWa2RPUkdSR1NsWmFTRlkyWlVSR00yVkVTVFZqYlRWWFlXMW9ZV016V1hoV01ITXlTekZPTkU5RVdrWlphbVJYVWtkSk1XUjZNQT09IiwidmVyc2lvbiI6MSwiZW1haWwiOiJvd2xiZXJ0QHJlYWRtZS5jb20ifQ.VxWcxbliJMiuSbaozoLDp0EVexv4smISkp4HtlwKK_w#/http/api-endpoints/ai/$h/__auth_BearerAuth[bearerAuth]
+* *Privilege Requirement:
+*The user must have view level access to requested metadata
+
+=== Request/Response
+
+==== Request
+
+* *Method*: POST
+* *Endpoint*: +/api/rest/2.0/v2/ai/relevant-questions/++
++
+* *Headers*:
+Authorization: Bearer <token>
+Content-Type: application/json
+
+* *Request Body Schema*:
+{
+"metadata": {
+"data_source_identifiers": [ "string" ] | null,
+"answer_identifiers": [ "string" ] | null,
+"conversation_identifier": "string" | null,
+"liveboard_identifiers": [ "string" ] | null
+"visualization_identifier"
+},
+"context": {
+"instructions": [ "string" ] | null,
+"content": [ "string" ] | null
+},
+"query": "string",
+"limit_relevant_questions": 5,
+"bypass_cache": false,
+}
+
+===== Required:
+
+* metadata (object)
+Provides contextual metadata to guide sub-question generation. Must include at least one identifier (e.g., data source, answer, conversation, or liveboard).
+* query (string)
+The main user query to be decomposed into smaller, analytical sub-questions for improved understanding and structured responses.
+===== Optional:
+
+* limit_relevant_questions (integer, default: 5)
+Sets a cap on the number of sub-questions returned in the response.
+* bypass_cache (boolean)
+If set to true, disables cache and forces fresh computation.
+* +context +
+** instructions (array of strings)
+Custom user instructions to influence how the AI interprets and processes the query.
+** content (array of strings)
+Additional input such as raw text or CSV-formatted data to enhance context and answer quality.
+
+==== Response
+
+* *Success Response*:
+{
+"relevant_questions": [
+{
+"query": "string" | null,
+"data_source_identifier": "string" | null,
+"data_source_name": "string" | null
+}
+]
+}
+
+The response object contains a single top-level field:
+
+* relevant_questions
+It contains the list of sub-questions that have been generated from the user’s original query. Each question in this list is tied to a specific data source and can be executed using a natural language search interface. This field is nullable, meaning it may be +null+ if no relevant sub-questions were identified during processing.
+Each object in the +relevant_questions+ array contains the following fields:
+
+* query
+A string containing the natural language (NL) sub-question.
+* data_source_identifier
+A string representing the unique identifier of the data source on which this sub-question is intended to be executed.
+* data_source_name
+name of the associated data source.
+
+
+
+=== Error Response
+
+
+Invalid Arguments
+
+{
+"error":{
+"message":{
+"debug":"Variable "$context" of required type "Context!" was not provided."
+}
+}
+}
+
+=== Sample Request & Response
+
+
+Request with context:data_source_indentifiers and query both required
+
+==== Request
+
+{
+"context": {
+"data_source_identifiers": [
+"3c020c5e-1c44-4ceb-a2d6-23ba1c53a3f4"
+]
+},
+"query": "sales by type"
+}
+----
+
+----
+==== Response
+
+
+{
+"relevant_questions": [
+{
+"query": "sales by item",
+"data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+"data_source_name": "(Sample) Retail - Apparel"
+}
+]
+}
+
+
+*Public Facing Documentation*
+
+
+Breaks down a user-submitted query into a series of analytical sub-questions using relevant contextual metadata.
+To use this API, the user must have at least view-level access to the referenced metadata objects.
+#### Usage guidelines
+
+To accurately generate relevant questions, the request must include at least one of the following metadata identifiers within `metadata` : `conversation_identifier`, `answer_identifiers`, `liveboard_identifiers`, or `data_source_identifiers`.
+
+You can further enhance the quality and precision of breakdown by providing additional `context` such as:
+
+- `content`: User provided content like text data, csv data as a string message to provide context & potentially improve the quality of the response.
+- `instructions`: User specific text instructions sent to AI system for processing the query.
+
+Additional optional parameters include:
+
+- `limit_relevant_questions`: Controls the maximum number of relevant questions returned. Defaults to 5 if not specified.
+- `bypass_cache`: If set to true, forces fresh computation instead of returning cached results.
+
+If the API request is successful, ThoughtSpot returns a list of relevant analytical queries, each aligned with the user's original question. Each returned question includes the query string, along with the identifier and name of the corresponding data source.
+
+> ###### Note:
+> * This endpoint is currently in Beta. Breaking changes may be introduced before the endpoint is made Generally Available.
+> * This endpoint requires Spotter - please contact ThoughtSpot support to enable Spotter on your cluster.
+
+Here is the asciidoc version of the API documentation, with detailed parameters, limitations, and functional impacts, based on the provided context:
+
+
+== Create Agent Conversation
+
+POST /api/rest/2.0/ai/agent/conversation/create
+
+Purpose::
+Create a new AI agent conversation session for a specified data source.
+
+.Parameters
+[cols="1,1,2,2"]
+|===
+|Name |Type |Required |Description
+
+|dataSource
+|string
+|Yes
+|GUID of the worksheet or model.
+
+|agentType
+|string
+|Yes
+|Agent type, e.g., "SPOTTER".
+
+|context
+|object
+|No
+|Additional context for the conversation.
+
+|context.tokens
+|array of string
+|No
+|Initial context tokens.
+
+|context.userQuery
+|string
+|No
+|Initial user query.
+|===
+
+.Limitations and Functional Impacts
+* Only supported agent types are accepted; using an unsupported type will fail.
+* User must have access to the data source.
+* Large or complex data sources may impact agent response time.
+* Spotter must be enabled; otherwise, the endpoint is non-functional.
+* Session limits may apply per user or tenant, impacting concurrent usage.
+
+.Example Request
+[source,json]
+----
+{
+  "dataSource": "12345678-aaaa-bbbb-cccc-1234567890ab",
+  "agentType": "SPOTTER",
+  "context": {
+    "tokens": ["[sales]", "[region]"],
+    "userQuery": "Show me sales by region"
+  }
+}
+----
+
+.Example Response
+[source,json]
+----
+{
+  "conversationId": "conv-abcdef123456"
+}
+----
+
+
+*Overview*
+
+* *Purpose*:
+The +createSpotterConversation+ API initializes a new conversation session within ThoughtSpot’s agentic offering, Spotter. This session enables users to engage in iterative, conversational exploration of data and insights. The session acts as a container for maintaining continuity across user inputs, system responses, and agent-driven clarifications.
+* *Target Consumers*:
+This API is intended for developers and system integrators embedding Spotter into agentic workflows, custom applications, or internal MCP (Managed Content Platform) servers. It is especially useful for enterprise teams seeking to empower business users with dynamic, dialogue-based data exploration
+* *Authentication:*
+This endpoint requires https://rest-api-sdk-v2-0-dev.vercel.app/?auth_token=eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFMyNTYifQ.eyJiYXNlLXVybCI6ImxvY2FsaG9zdDo0NDMiLCJuYW1lIjoiT3dsYmVydCIsImFsbG93ZWRQcm9qZWN0cyI6WyJ0ZXN0LXRzLWpzbnRtIl0sImJlYXJlckF1dGgiOiJaR1Z0YjE5a1pYWjFjMlZ5T2twSVRtOWhXRXAyVFZOU1ZGTkZSWFJOYWxVeVNrUlZkMDFFUVhkTlExSk9XakJ2TUdSNlRqQlVSRlpNVFZaV1dscEZORFJUTTFaelZVaGtibEJVTUd0T2JXUnVWa2RPUkdSR1NsWmFTRlkyWlVSR00yVkVTVFZqYlRWWFlXMW9ZV016V1hoV01ITXlTekZPTkU5RVdrWlphbVJYVWtkSk1XUjZNQT09IiwidmVyc2lvbiI6MSwiZW1haWwiOiJvd2xiZXJ0QHJlYWRtZS5jb20ifQ.VxWcxbliJMiuSbaozoLDp0EVexv4smISkp4HtlwKK_w#/http/api-endpoints/ai/$h/__auth_BearerAuth[bearerAuth]
+
+=== Request/Response
+
+==== Request
+
+* *Method*: POST
+* *Endpoint*:  +/api/rest/2.0/ai/agent/conversation/create++
++
+* *Headers*:
+Authorization: Bearer <token>
+Content-Type: application/json
+
+
+* *Request Body Schema*:
+{
+"context": {
+"type": "answer", // "liveboard" or "data_source"
+"answer_context": {
+"session_identifier": "string",
+"generation_number": number
+"answer_identifier"
+},
+"liveboard_context": {
+"liveboard_identifier": "string",
+"visualization_identifier": "string"
+},
+"data_source_context": {
+"guid": "string"
+}
+},
+"conversation_settings": {
+"enable_contextual_change_analysis": false,
+"enable_natural_language_answer_generation": true,
+"enable_reasoning": false
+}
+}
+
+
+===== Request Body Fields:
+
+* Context
+Defines the source or origin of the conversation. Only one subtype of context (answer_context, liveboard_context, or data_source_context) should be provided based on the value of type.
+* type (answer | liveboard | data_source):
+Indicates which type of context is being used.
+* answer_context (used when type = answer)
+Context related to a previously generated answer:
+** session_identifier (string): Unique ID representing the answer session.
+** generation_number (integer): Specific generation/version number of the answer within the session.
+* liveboard_context (used when type = liveboard)
+Context related to a visualization on a liveboard:
+** liveboard_identifier (string): Unique ID for the liveboard.
+** visualization_identifier (string): Unique ID for the specific visualization within the liveboard.
+* data_source_context (used when type = data_source)
+Context related to a specific data source:
+** guid (string): Unique identifier of the data source (globally unique).
+
+* conversation_settings
+Optional settings to customize the behavior of the Spotter conversation.
+* enable_contextual_change_analysis (boolean, default: false)
+If enabled, Spotter may analyze how context changes over time (e.g., comparing results from different queries).
+* enable_natural_language_answer_generation (boolean, default: true)
+If true, Spotter will attempt to generate answers from natural language query
+* enable_reasoning (boolean, default: false)
+Enables deeper reasoning capabilities (e.g., explaining why a result is what it is), possibly using more computational or AI-based analysis.
+==== Response
+
+* *Success Response*:
+{
+"conversation_id": "string"
+}
+
+* conversation_id (string)
+Returned on successful creation of a conversation. This is a unique identifier for the Spotter conversation session and can be used to refer back to it or continue the conversation later.
+
+
+=== Sample Request & Response
+
+==== Request
+
+{
+"context": {
+"type": "data_source",
+"data_source_context": {
+"guid": "ds_45678"
+}
+},
+"conversation_settings": {
+"enable_contextual_change_analysis": false,
+"enable_natural_language_answer_generation": false,
+"enable_reasoning": false
+}
+}
+
+==== Response
+
+
+{
+"conversation_id": "conv_12345"
+}
+
+
+*Error Response
+*
+{
+"code": str
+"message": str
+"metadata": dict
+}
+Reference  +
+*Public Facing Documentation*
+
+Creates a Conversation for spotter agent to start an AI-driven conversation based on provided context.
+
+Requires at least view access to the metadata object specified in the request.
+
+#### Usage guidelines
+
+This API requires the `context` parameter to specify the conversation context. The context can be one of the following types:
+
+- `answer` : Specify using `answer_context` with a `session_identifier` and `generation_number`.
+- `liveboard` : Specify using `liveboard_context` with `liveboard_identifier` and `visualization_identifier`.
+- `data_source` : Specify using `data_source_context` with a `guid`.
+
+Additionally, user can specify what tool can be included `conversation_settings` parameter, which supports:
+- `enable_contextual_change_analysis` (default: false)
+- `enable_natural_language_answer_generation` (default: true)
+- `enable_reasoning` (default: false)
+
+
+If the API request is successful, the response includes a unique `conversation_id` representing the started conversation.
+
+> ###### Note:
+> * This endpoint is currently in Beta. Breaking changes may be introduced before the endpoint is made Generally Available.
+> * This endpoint requires Spotter - please contact ThoughtSpot support to enable Spotter on your cluster.
+
+
+
+== Get data source suggestions
+
+POST /api/rest/2.0/ai/data-source-suggestions
+
+Purpose::
+Suggest relevant data sources for a user query.
+
+.Parameters
+[cols="1,1,2,2"]
+|===
+|Name |Type |Required |Description
+
+|query
+|string
+|Yes
+|User’s natural language query.
+
+|limit
+|integer
+|No
+|Maximum number of suggestions to return.
+|===
+
+.Limitations and Functional Impacts
+* Only data sources the user has access to are suggested.
+* Query length may be limited; excessively long queries may be truncated or rejected.
+* Suggestion quality depends on metadata completeness and indexing.
+* If ABAC is enabled, some features like auto-completion and search accuracy may be reduced.
+* If no relevant data sources are found, the response may be empty.
+
+.Example Request
+[source,json]
+----
+{
+  "query": "Show me sales by region",
+  "limit": 5
+}
+----
+
+.Example Response
+[source,json]
+----
+{
+  "dataSources": [
+    {
+      "id": "12345678-aaaa-bbbb-cccc-1234567890ab",
+      "name": "Sales Worksheet",
+      "description": "Sales data by region and product"
+    }
+  ]
+}
+----
+
+*Overview*
+
+* *Purpose*:
+The API provides relevant data source recommendations for a user-submitted natural language query.
+* *Target Consumers*:
+This API is designed for integration into agentic workflows and internal MCP servers, enabling customers to address complex business queries by resolving them through a series of focused, smaller questions.
+* *Authentication:*
+This endpoint requires https://rest-api-sdk-v2-0-dev.vercel.app/?auth_token=eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFMyNTYifQ.eyJiYXNlLXVybCI6ImxvY2FsaG9zdDo0NDMiLCJuYW1lIjoiT3dsYmVydCIsImFsbG93ZWRQcm9qZWN0cyI6WyJ0ZXN0LXRzLWpzbnRtIl0sImJlYXJlckF1dGgiOiJaR1Z0YjE5a1pYWjFjMlZ5T2twSVRtOWhXRXAyVFZOU1ZGTkZSWFJOYWxVeVNrUlZkMDFFUVhkTlExSk9XakJ2TUdSNlRqQlVSRlpNVFZaV1dscEZORFJUTTFaelZVaGtibEJVTUd0T2JXUnVWa2RPUkdSR1NsWmFTRlkyWlVSR00yVkVTVFZqYlRWWFlXMW9ZV016V1hoV01ITXlTekZPTkU5RVdrWlphbVJYVWtkSk1XUjZNQT09IiwidmVyc2lvbiI6MSwiZW1haWwiOiJvd2xiZXJ0QHJlYWRtZS5jb20ifQ.VxWcxbliJMiuSbaozoLDp0EVexv4smISkp4HtlwKK_w#/http/api-endpoints/ai/$h/__auth_BearerAuth[bearerAuth]
+
+=== Request/Response
+
+==== Request
+
+* *Method*: POST
+* *Endpoint*: +/api/rest/2.0/ai/data-source-suggestions/++
++
+* *Headers*:
+Authorization: Bearer <token>
+Content-Type: application/json
+
+
+* *Request Body Schema*:
+{
+"query": "string",
+//
+}
+
+
+===== Required:
+
+* query (string)
+User query used to suggest data sources.
+
+==== Response
+
+* *Success Response*:
+{
+"data_sources": [
+{
+"confidence": float,
+"details": {
+"description": "string",
+"data_source_name": "string",
+"data_source_identifier": "string"
+},
+"reasoning": "string"
+}
+]
+}
+
+// add type to suggestions
+
+The response object contains a single top-level field: +
+data_sources +
+List of data sources suggested.
++
+Each DataSource object includes:
+
+* confidence: Confidence score for the data source suggestion.
+* details
+** description
+Description of the data source.
+** data_source_name
+Display name of the data source.
+** data_source_identifier
+Unique identifier of the data source.
+* reasoning: LLM reasoning for the data source.
+
+
+
+=== Sample Request & Response
+
+==== Request
+
+{
+"query": "Show me sales performance by region for the last quarter"
+}
+----
+
+
+
+
+
+----
+==== Response
+
+
+{
+"data_sources": [
+{
+"confidence": 0.91,
+"details": {
+"description": "Sales metrics across regions and quarters",
+"data_source_name": "Regional Sales Performance",
+"data_source_identifier": "ds_regional_sales_2024"
+},
+"reasoning": "The query specifies sales performance by region and time period. This source includes regional breakdowns for recent quarters."
+},
+{
+"confidence": 0.83,
+"details": {
+"description": "Quarterly revenue data categorized by geography and product line",
+"data_source_name": "Quarterly Revenue Dashboard",
+"data_source_identifier": "ds_quarterly_revenue_geo"
+},
+"reasoning": "The user asked for sales by region and quarter, and this data source captures both geographic and temporal metrics."
+}
+]
+}
+
+
+*Public Facing Documentation*
+
+Provides relevant data source recommendations for a user-submitted natural language query.
+
+To use this API, the user must have at least view-level access to the underlying metadata entities referenced in the response.
+
+#### Usage guidelines
+
+The request must include a `query` string via the request body.
+
+The returned results include metadata such as:
+- `confidence`: a float indicating the model's confidence in the relevance of each recommendation
+- `details`: includes `data_source_identifier`, `data_source_name`, and `description` of each recommended data source
+- `reasoning`: rationale provided by the LLM to explain why each data source was recommended
+
+If the API request is successful, ThoughtSpot returns a ranked list of data sources, each annotated with relevant reasoning.
+
+> ###### Note:
+> * This endpoint is currently in Beta. Breaking changes may be introduced before it is made Generally Available.
+> * This endpoint requires Spotter — please contact ThoughtSpot Support to enable Spotter on your cluster.
+
+
+
+
+
+== Send message
+
+`POST /api/rest/2.0/ai/agent/conversation/converse`
+
+Purpose::
+Send a message to an ongoing agent conversation and receive a response.
+
+.Parameters
+[cols="1,1,2,2"]
+|===
+|Name |Type |Required |Description
+
+|conversationId
+|string
+|Yes
+|Conversation session ID.
+
+|message
+|string
+|Yes
+|User’s message.
+
+|context
+|object
+|No
+|Additional context for the message.
+
+|context.tokens
+|array of string
+|No
+|Context tokens.
+|===
+
+.Limitations and Functional Impacts
+* Only valid, active conversation IDs are accepted.
+* Message length may be limited; long messages may be truncated.
+* Visualization types and data returned depend on the data source and agent capabilities.
+* If Spotter is not enabled, the endpoint is non-functional.
+* High concurrency or large data sources may impact response latency.
+* If ABAC is enabled, some features may be restricted or less accurate.
+
+.Example Request
+[source,json]
+----
+{
+  "conversationId": "conv-abcdef123456",
+  "message": "Show me sales for last quarter",
+  "context": {
+    "tokens": ["[sales]", "[last quarter]"]
+  }
+}
+----
+
+.Example Response
+[source,json]
+----
+{
+  "conversationId": "conv-abcdef123456",
+  "answer": "Here are the sales for last quarter by region.",
+  "visualizationType": "bar_chart",
+  "visualizationData": { /* chart data */ },
+  "tokens": ["[sales]", "[last quarter]"]
+}
+----
+
+==== Overview
+
+ *Purpose*:
+The API allows users to initiate or continue an Spotter agent conversation by submitting one or more natural language messages.
+ *Authentication:*
+This endpoint requires https://rest-api-sdk-v2-0-dev.vercel.app/?auth_token=eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFMyNTYifQ.eyJiYXNlLXVybCI6ImxvY2FsaG9zdDo0NDMiLCJuYW1lIjoiT3dsYmVydCIsImFsbG93ZWRQcm9qZWN0cyI6WyJ0ZXN0LXRzLWpzbnRtIl0sImJlYXJlckF1dGgiOiJaR1Z0YjE5a1pYWjFjMlZ5T2twSVRtOWhXRXAyVFZOU1ZGTkZSWFJOYWxVeVNrUlZkMDFFUVhkTlExSk9XakJ2TUdSNlRqQlVSRlpNVFZaV1dscEZORFJUTTFaelZVaGtibEJVTUd0T2JXUnVWa2RPUkdSR1NsWmFTRlkyWlVSR00yVkVTVFZqYlRWWFlXMW9ZV016V1hoV01ITXlTekZPTkU5RVdrWlphbVJYVWtkSk1XUjZNQT09IiwidmVyc2lvbiI6MSwiZW1haWwiOiJvd2xiZXJ0QHJlYWRtZS5jb20ifQ.VxWcxbliJMiuSbaozoLDp0EVexv4smISkp4HtlwKK_w#/http/api-endpoints/ai/$h/__auth_BearerAuth[bearerAuth]
+
+=== Request/Response
+
+==== Request
+
+* *Method*: POST
+* *Endpoint*: +POST++ ++/api/rest/2.0/ai/agent/conversation/send_message++
++
+* *Headers*:
+Authorization: Bearer <token>
+Content-Type: application/json
+
+
+
+
+
+
+
+* *Request Body Schema*:
+{
+  "conversation_identifier": "string",
+  "messages": [
+    {
+      "value": "string",
+      "type": "text"
+    }
+  ],
+  "settings": {
+    "enable_contextual_change_analysis": false,
+    "enable_natural_language_answer_generation": true,
+    "enable_reasoning": false
+  },
+  "runtime_params": {
+	runtime_filter: [],
+	runtime_param: [],
+  }
+}
+
+
+===== Request Body Fields:
+
+
+* conversation_identifier: Unique ID representing the conversation session.
+* messages: List of user messages, each with content and a message type.
+* settings: Flags to enable or disable specific assistant response features.
+* runtime_params: Optional parameters to customize runtime behavior or model execution. (can be kept hidden for v1 as)
+
+==== Response
+
+* *Success Response*:
+[{
+	type: ack
+	node_id: str # response node id
+},
+{
+	type: text / text-chunk
+	id: str
+	group_id: str
+	content: str
+	metadata: {
+format: markdown / html
+       }
+},
+{
+	type: answer
+	id: str
+	group_id: str
+title:
+	description:
+	session_id:
+	gen_no:
+	sage_query:
+	formulas: []
+	metadata: {}
+
+},
+{
+	type: error
+	id: str
+	group_id: str
+	code: str
+	message: str
+	metadata: {}
+},
+{
+	type: notification
+	id: str
+	group_id: str
+	code: str
+	message: str
+	metadata: {}
+}]
+
+
+
+Each object in the response stream represents a distinct message type used to update the client progressively during a conversation or computation.
+
+
+==== Acknowledgement Message (type: "ack")
+
+
+{
+  "type": "ack",
+  "node_id": "string"
+}
+
+==== Text Message (type: "text" or "text-chunk")
+
+
+{
+  "type": "text",  // or "text-chunk"
+  "id": "string",
+  "group_id": "string",
+  "content": "string",
+  "metadata": {
+    "format": "markdown" // or "html"
+  }
+}
+
+==== Answer Message (type: "answer")
+
+
+{
+  "type": "answer",
+  "id": "string",
+  "group_id": "string",
+  "title": "string",
+  "description": "string",
+  "session_id": "string",
+  "gen_no": "integer",
+  "sage_query": "string",
+  "formulas": [],
+  "metadata": {}
+}
+
+==== Error Message (type: "error")
+
+
+{
+  "type": "error",
+  "id": "string",
+  "group_id": "string",
+  "code": "string",
+  "message": "string",
+  "metadata": {}
+}
+
+
+=== Sample Request & Response
+
+==== Request
+
+{
+  "conversation_identifier": "abc123-session-id",
+  "messages": [
+    {
+      "value": "compare this year's sales with last year",
+      "type": "text"
+    }
+  ],
+  "settings": {
+    "enable_contextual_change_analysis": false,
+    "enable_natural_language_answer_generation": true,
+    "enable_reasoning": false
+  },
+}
+
+==== Response
+
+[source,JSON]
+----
+data: [{"type": "ack", "node_id": "i9-dgf6QUx4z"}]
+
+data: [{"type": "notification", "group_id": "W_qnpv8K6z9j", "metadata": {"title": "Compare this year's sales with last year"}, "code": "nls_start"}]
+
+data: [{"type": "notification", "group_id": "W_qnpv8K6z9j", "code": "QH", "message": "Fetching Worksheet Data"}]
+
+data: [{"type": "notification", "group_id": "W_qnpv8K6z9j", "code": "TML_GEN", "message": "Translating your query with the Reasoning Engine"}]
+
+data: [{"type": "notification", "group_id": "W_qnpv8K6z9j", "code": "ANSWER_GEN", "message": "Verifying results with the Trust Layer"}]
+
+data: [{"id": "6JSiAI1C5OK5", "type": "answer", "group_id": "W_qnpv8K6z9j", "metadata": {"sage_query": "[Net Sales] [last_reorderdate] = 'this year' vs [last_reorderdate] = 'last year'", "session_id": "461863f9-38ca-45e3-beba-ec72ec3841d9", "gen_no": 2, "transaction_id": "24e983d4-4ae4-44ce-a9d6-b42cdf006257", "generation_number": 1, "warning_details": null, "formulas": [{"name": "DiffYears(last_reorderdate, Today(), bfa39848-ba4f-46d8-80fd-b695064e61b7) = 0 OR DiffYears(last_reorderdate, Today(), bfa39848-ba4f-46d8-80fd-b695064e61b7) = -1", "expression": "diff_years ( last_reorderdate , today ( ) , fiscal ) = 0 or diff_years ( last_reorderdate , today ( ) , fiscal ) = - 1"}, {"name": "Net Sales(last_reorderdate = this year)", "expression": "group_aggregate ( sum ( Net Sales ) , query_groups ( ) , query_filters ( ) + { diff_years ( last_reorderdate , today ( ) , fiscal ) = 0 } )"}, {"name": "Net Sales(last_reorderdate = last year)", "expression": "group_aggregate ( sum ( Net Sales ) , query_groups ( ) , query_filters ( ) + { diff_years ( last_reorderdate , today ( ) , fiscal ) = - 1 } )"}, {"name": "Net Sales(last_reorderdate = last year)", "expression": "group_aggregate ( sum ( Net Sales ) , query_groups ( ) , query_filters ( ) + { diff_years ( last_reorderdate , today ( ) , fiscal ) = -1 } )"}, {"name": "Net Sales(last_reorderdate = this year)", "expression": "group_aggregate ( sum ( Net Sales ) , query_groups ( ) , query_filters ( ) + { diff_years ( last_reorderdate , today ( ) , fiscal ) = 0 } )"}, {"name": "DiffYears(last_reorderdate, Today(), bfa39848-ba4f-46d8-80fd-b695064e61b7) = 0 OR DiffYears(last_reorderdate, Today(), bfa39848-ba4f-46d8-80fd-b695064e61b7) = -1", "expression": "diff_years ( last_reorderdate , today ( ) , fiscal ) = 0 or diff_years ( last_reorderdate , today ( ) , fiscal ) = -1"}], "ambiguous_phrases": null, "query_intent": null, "tml_phrases": ["[Net Sales]", "[last_reorderdate] = 'this year' vs [last_reorderdate] = 'last year'"], "cached": true, "sub_queries": null, "title": "Untitled", "worksheet_id": "bd1d48e0-a9ea-4497-bf16-1961c310a3d1"}, "title": "Untitled"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "The"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " comparison"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " of"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " between"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " this"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " year"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " and"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " last"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " year"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " shows"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": ":\n\n"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "-"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " **"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "Net"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " Sales"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " last"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " year"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "**"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": ":"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " "}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "15"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "650"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "609"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "63"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "\n"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "-"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " **"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "Net"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " Sales"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " this"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " year"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "**"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": ":"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " "}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "2"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "495"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "959"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "67"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "\n\n"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "This"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " indicates"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " a"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " significant"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " decrease"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " in"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " this"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " year"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " compared"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " to"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " last"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " year"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " If"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " you'd"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " like"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " I"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " can"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " analyze"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " reasons"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " behind"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " this"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " change"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " or"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " explore"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " specific"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " factors"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " contributing"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " to"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " decline"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " Let"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " me"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " know"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " how"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " you'd"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " like"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " to"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": " proceed"}]
+
+data: [{"id": "jbiuKHCalt70", "type": "text-chunk", "group_id": "BZ2RvghK4Zez", "metadata": {"format": "markdown"}, "content": "!"}]
+----
+
+* Public Facing Documentation*
+
+This API allows users to initiate or continue an Spotter agent conversation by submitting one or more natural language messages.
+To use this API, the user must have access to the relevant conversational session (via conversation_identifier) and submit at least one message.
+#### Usage guidelines
+To initiate or continue a conversation, the request must include:
+- `conversation_identifier`: a unique session ID for continuity and message tracking
+- `messages`: an array of one or more text messages, each with a value and type
+Additionally, user can specify what tool can be included `conversation_settings` parameter, which supports:
+- `enable_contextual_change_analysis` (default: false)
+- `enable_natural_language_answer_generation` (default: true)
+- `enable_reasoning` (default: false)
+If the request is valid, the API returns a stream of messages in real time, including:
+- `ack`: confirms receipt of the request
+- `text / text-chunk`: content chunks, optionally formatted (e.g., markdown)
+- `answer`: the final structured response with metadata and analytics
+- `error`: if a failure occurs
+- `notification`: notification messages for operation being performed
+> ###### Note:
+> * This endpoint is currently in Beta. Breaking changes may be introduced before the endpoint is made Generally Available.
+> * This endpoint requires Spotter - please contact ThoughtSpot support to enable Spotter on your cluster.
+> * The streaming protocol uses Server-Sent Events (SSE)
+
+
+
+==== API response
+
+If the API request is successful, ThoughtSpot returns the Answer data for the query string sent in the API request.
+
+////
+===== Response codes
+[width="100%" cols="2,4"]
+[options='header']
+|===
+|HTTP status code|Description
+|**200**| Successful operation
+|**400**| Invalid parameter
+|**401**| Unauthorized access
+|**401**| Forbidden request
+|**500**| Internal error
+|===
+////
