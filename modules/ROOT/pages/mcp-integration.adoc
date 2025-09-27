@@ -1,353 +1,188 @@
-= MCP integration
+= MCP server integration
 :toc: true
 :toclevels: 3
 
 :page-title: MCP integration
 :page-pageid: mcp-integration
-:page-description:
+:page-description: Learn how to use the ThoughtSpot Model Context Protocol (MCP) server to interact with ThoughtSpot data via MCP tools and AI APIs and get relevant questions and answers for a given query and create Liveboards at runtime.
 
-The APIs are integrated with the MCP (Multi-Channel Protocol) server to enable agentic, boundaryless analytics and agent-to-agent workflows. The MCP server acts as a wrapper and discovery layer over ThoughtSpot’s APIs, exposing them as “tools” that can be discovered and invoked by external AI hosts (such as Claude, OpenAI, or custom agents) in a standardized way. This allows for seamless orchestration, integration, and extensibility across different platforms and agents.
+ThoughtSpot’s Agentic (Multi-Client Protocol) Server allows integrating ThoughtSpot analytics directly into any AI agent, custom chatbot, or LLM-based systems and platforms that support MCP. It acts as a connector between the ThoughtSpot instance and external AI client, and provides a set of tools to interact with ThoughtSpot’s data and its analytics capabilities programmatically.
 
-== APIs Exposed via MCP Server
+The MCP tools of the Agentic (Multi-Client Protocol) Server support the following functions:
 
-The following ThoughtSpot APIs are typically exposed as MCP tools:
-- Get Relevant Questions
-- Get Answer (Send Agent Message/Streaming)
-- Create Agent Conversation
-- Create Liveboard
+* Ask natural language questions and get data in a structured format from ThoughtSpot
+* Retrieve relevant analytical questions based on user queries
+* Create a Liveboard with the answers generated from the queries
+* Get data source recommendations based on a user's query and intent
 
-These APIs allow external agents to:
-- Initiate and manage conversational sessions with Spotter
-- Retrieve relevant questions for a given data context
-- Send natural language queries and receive answers (including streaming responses)
-- Generate and manage visualizations and dashboards
+== Integration overview
 
-== Integration Process
+The ThoughtSpot MCP server integration requires the following core components and authentication framework:
 
-1. **MCP Server Setup**:
-Deploy the MCP server (often as a Python service or container) and configure it to connect to your ThoughtSpot cluster. This involves specifying cluster credentials and endpoint URLs in the MCP server’s config file. After configuration, restart the MCP server to register it as a tool provider for the host agent (e.g., Claude, OpenAI) [[10]](https://us-2221.app.gong.io/call?id=4139769687280683433).
+MCP server::
+The MCP server provides a tools wrapper with a discoverable interface for agentic analytics. It exposes a set of tools to external agents to interact with ThoughtSpot's resources, data, and analytical capabilities. The MCP server includes an orchestration layer that determines which tools to invoke based on the incoming queries and user intent. The MCP server can be hosted by ThoughtSpot or by customers in their own environment.
 
-2. **Tool Discovery**:
-The MCP server advertises the available APIs as tools. External AI hosts can discover these tools at runtime, enabling dynamic integration and orchestration [[4]](https://us-2221.app.gong.io/call?id=4352048497015947624), [[3]](https://us-2221.app.gong.io/call?id=1587975872956140153).
+MCP tools, resources, and AI APIs::
+MCP tools are the actions that the MCP server exposes to the agent for interaction with ThoughtSpot. Currently, the MCP server supports the following tools:
 
-3. **Agent-to-Agent Communication**:
-When an external agent (host) receives a user query, it can invoke the appropriate MCP tool (e.g., get relevant questions, send agent message) via the MCP protocol. The MCP server translates these calls into the corresponding ThoughtSpot API requests, manages authentication, and returns the results to the host agent [[1]](https://us-2221.app.gong.io/call?id=2530016458468742599), [[3]](https://us-2221.app.gong.io/call?id=1587975872956140153), [[5]](https://us-2221.app.gong.io/call?id=5202451020418925233).
+* `ping` to test connection to ThoughtSpot
+* `getRelevantQuestions` to get relevant analytical questions +
+The `getRelevantQuestions` tool calls `/api/rest/2.0/ai/relevant-questions/` API and gets relevant data questions for a given data context by breaking down a user's query.
+* `getAnswer` to execute the queries and fetch data +
+The `getAnswer` tool calls `/api/rest/2.0/ai/agent/conversation/converse` API and generates answers and insights for a given data context.
+* `createLiveboard` to create a Liveboard in ThoughtSpot +
+The `createLiveboard` tool calls the Liveboard creation workflow and creates a Liveboard with the answers generated from user's query.
+* `getDataSourceSuggestions` to get data source suggestions +
+Based on the type of data that users want to fetch, `getDataSourceSuggestions` gets a list of data source recommendations. Currently, `getDataSourceSuggestions` is not exposed as an MCP tool and is available as an MCP `resource`. To data source suggestions, the user or MCP client must have at least view access to ThoughtSpot data sources.
 
-4. **Session and Data Management**:
-The MCP server manages conversational context, session IDs, and data source references, ensuring that multi-turn conversations and data workflows are maintained across agent boundaries [[1]](https://us-2221.app.gong.io/call?id=2530016458468742599), [[2]](https://us-2221.app.gong.io/call?id=2179080495229328630).
+MCP host/client::
+The external system or application environment with AI Agent, Claude, OpenAI, or a custom chatbot that acts as a user interface, orchestrates interaction with ThoughtSpot MCP server, and enables agentic workflows.
 
-5. **Extensibility**:
-The MCP server can be extended to expose additional APIs or custom tools, and can be configured to connect to multiple data sources or external APIs, enabling complex, cross-system workflows [[3]](https://us-2221.app.gong.io/call?id=1587975872956140153), [[10]](https://us-2221.app.gong.io/call?id=4139769687280683433).
+Configuration settings to enable the integration::
+Integration requires configuration, typically via a config file, to specify server addresses, credentials, and other connection details.
 
-== Functional Impacts and Considerations
+Authentication and security settings::
+* Access to ThoughtSpot instance: +
+For MCP server connection, users require access to a ThoughtSpot instance. ThoughtSpot administrators can use the SSO framework with SAML or OAuth token-based authentication methods to authenticate and sign in the users. +
+To get answers to their data queries, your application users require at least view access to ThoughtSpot data sources. To generate an Answer or to create Liveboard, users
+* CSP and CORS settings: +
+To secure communication between the MCP client and the ThoughtSpot instance, administrators must add the MCP server URL to CSP (Content Security Policy) and CORS (Cross-Origin Resource Sharing) allowlists in ThoughtSpot.
+* SAML redirect settings: +
+For SAML SSO users, the SAML redirect domain configuration is required to ensure that users are redirected to an allowed and trusted domain after they are authenticated.
+* Client connection configuration: +
+MCP server integration also requires configuration on the client side, typically via a config file, to include the MCP server addresses, credentials, and other details.
 
-- The MCP server provides a standardized, discoverable interface for agentic analytics, reducing the need for custom integration logic in each host agent [[4]](https://us-2221.app.gong.io/call?id=4352048497015947624).
-- Direct API integration is possible for more control and flexibility, but using the MCP server simplifies discovery and orchestration, especially in multi-agent or boundaryless scenarios [[5]](https://us-2221.app.gong.io/call?id=5202451020418925233), [[4]](https://us-2221.app.gong.io/call?id=4352048497015947624).
-- Authentication and data access permissions must be managed at both the MCP server and ThoughtSpot cluster levels [[1]](https://us-2221.app.gong.io/call?id=2530016458468742599).
-- The MCP server can be run as an open-source solution and is not limited to ThoughtSpot APIs; it can also wrap other APIs or data sources as needed [[3]](https://us-2221.app.gong.io/call?id=1587975872956140153), [[10]](https://us-2221.app.gong.io/call?id=4139769687280683433).
-- For some use cases, such as deterministic, fixed workflows, direct API integration may be preferable to MCP server integration [[5]](https://us-2221.app.gong.io/call?id=5202451020418925233), [[4]](https://us-2221.app.gong.io/call?id=4352048497015947624).
+=== How it works
 
-== Summary
+When the MCP Server integration is enabled, your host app connects to ThoughtSpot and enables the following workflow:
 
-The MCP server integration process involves configuring the MCP server to wrap and expose ThoughtSpot APIs as discoverable tools, enabling agent-to-agent communication and orchestration with external AI hosts. This approach supports flexible, extensible, and boundaryless analytics workflows, allowing organizations to leverage Spotter’s agentic capabilities in a wide range of environments and use cases [[1]](https://us-2221.app.gong.io/call?id=2530016458468742599), [[2]](https://us-2221.app.gong.io/call?id=2179080495229328630), [[3]](https://us-2221.app.gong.io/call?id=1587975872956140153), [[5]](https://us-2221.app.gong.io/call?id=5202451020418925233), [[4]](https://us-2221.app.gong.io/call?id=4352048497015947624), [[10]](https://us-2221.app.gong.io/call?id=4139769687280683433).
+. User initiates a request +
+The user sends a query to get data from a specific ThoughtSpot data model or context.
+. AI agent receives the request and discovers MCP tools +
+The agent discovers MCP tools available in its environment and processes the request to the MCP server, specifying the data model or context and user's query.
+. MCP server receives the request and executes actions via tools +
+The MCP server executes tools and triggers API requests to ThoughtSpot to break down the user's query into relevant questions, get information for the specified data context, or create an artifact.
+. The MCP server sends the response to the MCP host.
+. The agent receives the response and constructs the output +
+The agent receives the response from the MCP host and presents it to the user
+. User receives the response
+The user can refine the analysis or choose a direction for further exploration. +
+For example, after receiving relevant questions and answer, the user can send follow-up questions or send a Liveboard creation request.
 
+The following figure illustrates the sequence of workflows in a typical MCP server integration setup:
 
+[.bordered]
+[.widthAuto]]
+image::./images/mcp-integration.png[MCP integration]
 
-== MCP Integration Overview
+== Get started with the integration
+To get started with the integration, complete the steps described in the following sections. In this article, we'll integrate ThoughtSpot MCP server with Claude and enable agentic interaction and workflows.
 
-MCP (Model Context Protocol) is a standard wrapper that exposes ThoughtSpot’s AI APIs as “tools” for agent-to-agent and boundaryless analytics. It allows external agents (e.g., Claude, OpenAI, custom bots) to discover and invoke ThoughtSpot’s capabilities without direct API integration, simplifying orchestration and extensibility [[5]](https://us-2221.app.gong.io/call?id=2235057751298976837), [[9]](https://us-2221.app.gong.io/call?id=2699894327354683157), [[2]](https://us-2221.app.gong.io/call?id=2179080495229328630), [[7]](https://us-2221.app.gong.io/call?id=8263592757781169030).
+=== Before you begin
 
-=== Layman Use Case Diagram
+Before you begin, verify if your application setup has the following:
 
-[ditaa]
-----
-+-------------------+         +-------------------+         +-------------------+
-|  User/External    |         |   MCP Server      |         |   ThoughtSpot     |
-|  Agent (Claude,   |<------->|  (Tool Wrapper)   |<------->|   AI APIs         |
-|  OpenAI, etc.)    |         |                   |         |                   |
-+-------------------+         +-------------------+         +-------------------+
-        |                            |                              |
-        | 1. Discovers tools         |                              |
-        |--------------------------->|                              |
-        |                            |                              |
-        | 2. Sends request           |                              |
-        |--------------------------->|                              |
-        |                            | 3. Calls AI API              |
-        |                            |----------------------------->|
-        |                            |                              |
-        |                            | 4. Receives response         |
-        |                            |<-----------------------------|
-        | 5. Gets response           |                              |
-        |<---------------------------|                              |
-----
+* Node.JS version 22 or later is installed on your system.
+* A ThoughtSpot instance with 10.11.0.cl or later release version. You'll need administrator credentials to configure security settings or setup token-based authentication for your application users.
+* Your application users require at least view access to the data source objects to query data and get answers.
+* Row-level and column-level security rules are configured for data security and access control.
 
-== Step-by-Step MCP Integration
+=== Configure security settings on ThoughtSpot
 
-. **MCP Server Setup**
-* Deploy the MCP server and configure it with ThoughtSpot cluster credentials and endpoint URLs [[2]](https://us-2221.app.gong.io/call?id=2179080495229328630), [[7]](https://us-2221.app.gong.io/call?id=8263592757781169030).
-* Start the MCP server; it will register available APIs as tools.
+To allow the secure communication between the MCP server and your ThoughtSpot instance, configure the following settings:
 
-. **Tool Discovery**
-* External agents (Claude, OpenAI, etc.) discover available tools (APIs) via the MCP protocol [[5]](https://us-2221.app.gong.io/call?id=2235057751298976837), [[9]](https://us-2221.app.gong.io/call?id=2699894327354683157).
+. On your ThoughtSpot instance, navigate to *Develop* > *Customizations* > *Security Settings*.
+. Add the MCP server domain to CSP and CORS allowlists.
+. If your setup uses SAML SSO logins, add the MCP server domain to the SAML redirect domain allowlist.
 
-. **Workflow Integration**
-* The agent invokes the required tool (API) for the user’s workflow.
-* MCP server translates the tool call into a ThoughtSpot API request, manages authentication, and returns the result [[2]](https://us-2221.app.gong.io/call?id=2179080495229328630), [[7]](https://us-2221.app.gong.io/call?id=8263592757781169030).
+=== Add MCP server to the MCP client's config
 
-. **Supported AI APIs in Workflow**
-* /api/rest/2.0/ai/agent/conversation/create
-* /api/rest/2.0/ai/data-source-suggestions
-* /api/rest/2.0/ai/relevant-questions/
-* /api/rest/2.0/ai/agent/conversation/converse
+If your MCP client supports remote MCP servers, add the MCP server URL to the client's config file.
 
-== Example Workflows and API Calls
+MCP clients such as Claude Desktop, Windsurf, Cursor do not support remote MCP servers. In such a case, add the URL with arguments shown in this example:
 
-=== 1. Create Agent Conversation
-
-_Request:_
-[source,json]
+[source,JSON]
 ----
 {
-  "dataSource": "12345678-aaaa-bbbb-cccc-1234567890ab",
-  "agentType": "SPOTTER",
-  "context": {
-    "tokens": ["[sales]", "[region]"],
-    "userQuery": "Show me sales by region"
+  "mcpServers": {
+    "ThoughtSpot": {
+      "command": "npx",
+      "args": [
+         "mcp-remote",
+         "https://agent.thoughtspot.app/mcp"
+      ]
+    }
   }
 }
+
 ----
 
-_Response:_
-[source,json]
-----
-{
-  "conversationId": "conv-abcdef123456"
-}
-----
+After updating the config file:
 
-=== 2. Get Data Source Suggestions
+. Connect to ThoughtSpot instance and complete authentication.
+. Restart your MCP client to load the new configuration.
++
+If the connection is successful, you'll see an option to add data context from ThoughtSpot. +
+For example, the Claude Desktop shows the *Add to ThoughtSpot* as shown in the following figure:
++
+[.bordered]
+[.widthAuto]
+image::./images/claudeDesktop.png[Claude Desktop]
 
-_Request:_
-[source,json]
-----
-{
-  "query": "Show me sales by region",
-  "limit": 5
-}
-----
+. Verify if the MCP tools are available. +
+For example, on Claude Desktop, click the Search and tools icon to view the MCP tools.
 
-_Response:_
-[source,json]
-----
-{
-  "dataSources": [
-    {
-      "id": "12345678-aaaa-bbbb-cccc-1234567890ab",
-      "name": "Sales Worksheet",
-      "description": "Sales data by region and product"
-    }
-  ]
-}
-----
++
+[.bordered]
+[.widthAuto]
+image::./images/datasource-selection.png[Claude Desktop]
 
-=== 3. Get Relevant Questions
+You can adjust tool access, resources, instructions to data models, object permissions and user privileges as needed. To get insights, the user requires view access to data source objects and data download privilege.
 
-_Request:_
-[source,json]
-----
-{
-  "dataSource": "12345678-aaaa-bbbb-cccc-1234567890ab",
-  "limit": 3
-}
-----
+=== Verify the query and response workflow
 
-_Response:_
-[source,json]
-----
-{
-  "questions": [
-    {
-      "question": "What are the top selling products by region?",
-      "score": 0.98
-    }
-  ]
-}
-----
+* Select a datasource to set the context of your query. +
+For example, on Claude Desktop, click the `+` icon and select a data source.
 
-=== 4. Send Agent Message (Streaming)
++
+[.bordered]
+[.widthAuto]
+image::./images/datasource-selection.png[Claude Desktop]
 
-_Request:_
-[source,json]
-----
-{
-  "conversationId": "conv-abcdef123456",
-  "message": "Show me sales for last quarter",
-  "context": {
-    "tokens": ["[sales]", "[last quarter]"]
-  }
-}
-----
+* Ask analytics question to trigger the query and response workflow.
+* Verify if the AI agent on your MCP client gets relevant data questions from ThoughtSpot and generates an Answer.
++
+[.bordered]
+[.widthAuto]
+image::./images/dquery-response-claude.png[Claude query response]
 
-_Response:_
-[source,json]
-----
-{
-  "conversationId": "conv-abcdef123456",
-  "answer": "Here are the sales for last quarter by region.",
-  "visualizationType": "bar_chart",
-  "visualizationData": { /* chart data */ },
-  "tokens": ["[sales]", "[last quarter]"]
-}
-----
++
+[.bordered]
+[.widthAuto]
+image::./images/query-response-claude2.png[Claude query response 2]
 
-== Summary
+* Try sending a query to create a Liveboard and verify if a Liveboard is created on your ThoughtSpot instance.
 
-- MCP server wraps and exposes ThoughtSpot AI APIs as tools for agentic, boundaryless analytics.
-- External agents discover and invoke these tools for conversational workflows.
-- The integration is flexible, supports multi-agent scenarios, and reduces custom engineering [[5]](https://us-2221.app.gong.io/call?id=2235057751298976837), [[9]](https://us-2221.app.gong.io/call?id=2699894327354683157), [[2]](https://us-2221.app.gong.io/call?id=2179080495229328630), [[7]](https://us-2221.app.gong.io/call?id=8263592757781169030).
++
+[.bordered]
+[.widthAuto]
+image::./images/create-lb-claude.png[Liveboard creation]
 
+=== Configuration considerations and best practices
 
-== MCP Integration with ThoughtSpot AI APIs: Detailed Guide for New Users
+* Streaming responses require client support for real-time updates.
+* Users must have access to the data source. If not, it will lead to empty results.
+* Ensure that data is modeled. Large or complex data sources may impact response time.
+* Use group-level sharing and avoid user-level overrides for easier management and transparency
+* Streaming responses require client support for real-time updates. Ensure that system is available for queries.
+* Each conversation is session-based. Ensure that session IDs are managed correctly in your integration.
 
-=== Overview
-MCP (Model Context Protocol) integration allows external agents (like Claude, OpenAI, or custom bots) to interact with ThoughtSpot’s AI APIs in a standardized, discoverable way. This enables agent-to-agent workflows and boundaryless analytics, making it possible to embed natural language analytics in any product or workflow.
+=== Additional resources
 
-=== Step-by-Step Integration
+* Check the link:https://github.com/thoughtspot/mcp-server[MCP Server GitHub repo, window=_blank] for implementation instructions.
+* Check your MCP client's documentation for instructions on how to connect MCP servers
+* To understand ThoughtSpot agentic analytics capbilities and AI APIs, refer to the following documentation:
 
-. **Preparation**
-* Ensure you have access to a ThoughtSpot cluster with Spotter and the relevant AI APIs enabled.
-* Identify your use case and data sources. Start with a single, well-modeled worksheet or model for best results [[15]](https://us-2221.app.gong.io/call?id=712371218397265344), [[11]](https://us-2221.app.gong.io/call?id=2416626357177773487).
-* Set up user groups and permissions. Use group-level sharing for transparency and easier management [[2]](https://us-2221.app.gong.io/call?id=8083705621207792382), [[8]](https://us-2221.app.gong.io/call?id=7009216958485283848).
-
-. **MCP Server Setup**
-* Deploy the MCP server and configure it with your ThoughtSpot cluster credentials and endpoint URLs.
-* Start the MCP server. It will register available APIs as “tools” for discovery by external agents.
-
-. **Tool Discovery**
-* External agents discover available tools (APIs) via the MCP protocol. This is automatic and requires no custom code.
-
-. **Workflow Integration**
-* The agent invokes the required tool (API) for the user’s workflow. The MCP server translates the tool call into a ThoughtSpot API request, manages authentication, and returns the result.
-
-=== Supported AI APIs and Example Workflows
-
-. **Create Agent Conversation**
-* Starts a new conversation session.
-* Request:
-```plaintext
-{
-"dataSource": "12345678-aaaa-bbbb-cccc-1234567890ab",
-"agentType": "SPOTTER",
-"context": {
-"tokens": ["[sales]", "[region]"],
-"userQuery": "Show me sales by region"
-}
-}
-```
-* Response:
-```plaintext
-{
-"conversationId": "conv-abcdef123456"
-}
-```
-
-. **Get Data Source Suggestions**
-* Suggests relevant data sources for a query.
-* Request:
-```plaintext
-{
-"query": "Show me sales by region",
-"limit": 5
-}
-```
-* Response:
-```plaintext
-{
-"dataSources": [
-{
-"id": "12345678-aaaa-bbbb-cccc-1234567890ab",
-"name": "Sales Worksheet",
-"description": "Sales data by region and product"
-}
-]
-}
-```
-
-. **Get Relevant Questions**
-* Returns relevant questions for a data source.
-* Request:
-```plaintext
-{
-"dataSource": "12345678-aaaa-bbbb-cccc-1234567890ab",
-"limit": 3
-}
-```
-* Response:
-```plaintext
-{
-"questions": [
-{
-"question": "What are the top selling products by region?",
-"score": 0.98
-}
-]
-}
-```
-
-. **Send Agent Message (Streaming)**
-* Sends a message to an ongoing conversation and receives a streamed response.
-* Request:
-```plaintext
-{
-"conversationId": "conv-abcdef123456",
-"message": "Show me sales for last quarter",
-"context": {
-"tokens": ["[sales]", "[last quarter]"]
-}
-}
-```
-* Response:
-```plaintext
-{
-"conversationId": "conv-abcdef123456",
-"answer": "Here are the sales for last quarter by region.",
-"visualizationType": "bar_chart",
-"visualizationData": { /* chart data */ },
-"tokens": ["[sales]", "[last quarter]"]
-}
-```
-
-=== Limitations and Caveats
-
-* **Permissions:** Users must have access to the data source. If not, errors or empty results will occur [[3]](https://us-2221.app.gong.io/call?id=8996676042393967073), [[16]](https://us-2221.app.gong.io/call?id=6389004457001172551), [[8]](https://us-2221.app.gong.io/call?id=7009216958485283848).
-* **Data Modeling:** Poorly modeled or undocumented data will reduce the quality of AI responses and suggestions [[15]](https://us-2221.app.gong.io/call?id=712371218397265344), [[11]](https://us-2221.app.gong.io/call?id=2416626357177773487), [[4]](https://us-2221.app.gong.io/call?id=3659814258539275821).
-* **Security:** Use group-level sharing and avoid user-level overrides for easier management and transparency [[2]](https://us-2221.app.gong.io/call?id=8083705621207792382), [[8]](https://us-2221.app.gong.io/call?id=7009216958485283848).
-* **Performance:** Large or complex data sources may impact response time. Start with a focused use case and scale up [[15]](https://us-2221.app.gong.io/call?id=712371218397265344), [[1]](https://us-2221.app.gong.io/call?id=5527830523456742641).
-* **Streaming:** Streaming responses require client support for real-time updates.
-* **Session Management:** Each conversation is session-based. Ensure session IDs are managed correctly in your integration.
-* **Feature Availability:** Some features may be limited by your cluster configuration or licensing [[2]](https://us-2221.app.gong.io/call?id=8083705621207792382).
-
-=== Best Practices and Recommendations
-
-* **Start with Power Users:** Begin rollout with a small group of trained power users. Gather feedback before broad deployment [[2]](https://us-2221.app.gong.io/call?id=8083705621207792382).
-* **Onboarding:** Provide onboarding materials, walkthroughs, and a “welcome” Liveboard for new users [[10]](https://us-2221.app.gong.io/call?id=4477897387125223173), [[9]](https://us-2221.app.gong.io/call?id=2502767256743457275).
-* **Documentation:** Maintain up-to-date documentation and data dictionaries for your data sources [[9]](https://us-2221.app.gong.io/call?id=2502767256743457275).
-* **Iterative Rollout:** Test with one use case and dataset before expanding. Use feedback to refine data models and permissions [[15]](https://us-2221.app.gong.io/call?id=712371218397265344), [[1]](https://us-2221.app.gong.io/call?id=5527830523456742641).
-* **Enablement:** Use persona-based enablement and training to match user skills and needs [[10]](https://us-2221.app.gong.io/call?id=4477897387125223173).
-* **Monitor Usage:** Track adoption and usage to identify issues and training needs.
-* **Security:** Regularly review and update permissions, especially when onboarding new users or data sources [[16]](https://us-2221.app.gong.io/call?id=6389004457001172551), [[8]](https://us-2221.app.gong.io/call?id=7009216958485283848).
-
-=== Summary
-
-MCP integration with ThoughtSpot AI APIs enables flexible, scalable, and secure agentic analytics. Focus on data modeling, permissions, and phased rollout for best results. Use group-level sharing, provide onboarding resources, and iterate based on user feedback for a successful deployment [[15]](https://us-2221.app.gong.io/call?id=712371218397265344), [[11]](https://us-2221.app.gong.io/call?id=2416626357177773487), [[3]](https://us-2221.app.gong.io/call?id=8996676042393967073), [[16]](https://us-2221.app.gong.io/call?id=6389004457001172551), [[2]](https://us-2221.app.gong.io/call?id=8083705621207792382), [[4]](https://us-2221.app.gong.io/call?id=3659814258539275821), [[8]](https://us-2221.app.gong.io/call?id=7009216958485283848), [[1]](https://us-2221.app.gong.io/call?id=5527830523456742641), [[10]](https://us-2221.app.gong.io/call?id=4477897387125223173), [[9]](https://us-2221.app.gong.io/call?id=2502767256743457275).
-
-
-
-
-
-
-
-
-== Additional resources
-* link:https://docs.thoughtspot.com/cloud/latest/spotter[Spotter Documentation]
-* link:https://docs.thoughtspot.com/cloud/latest/spotter-agent[Spotter Agent Documentation]
+** link:https://docs.thoughtspot.com/cloud/latest/spotter[Spotter Documentation]
+** link:https://docs.thoughtspot.com/cloud/latest/spotter-agent[Spotter Agent Documentation]
+** xref:ai-apis-spotter.adoc[Spotter AI APIs]

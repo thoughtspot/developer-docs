@@ -6,46 +6,389 @@
 :page-pageid: ai-apis
 :page-description: You can use Spotter REST APIs to receive Answers for your analytical queries sent  through the conversational experience with ThoughtSpot.
 
-ThoughtSpot provides a set of Spotter AI APIs [beta betaBackground]^Beta^ to create a conversation session with Spotter, ask follow-up questions, and generate Answers for their analytic queries.
+The AI APIs [beta betaBackground]^Beta^  enable agentic conversational analytics by allowing users and systems to interact with data using natural language. These APIs collectively enable natural language interaction, context-aware analytics, and guided data analysis.
 
-This article describes how to use ThoughtSpot REST APIs for the following operations:
+Each of these APIs serves a specific function:
 
-* xref:spotter-apis.adoc#createManageConversations[Create a conversation and ask follow-up questions]
-* xref:spotter-apis.adoc#_generate_a_single_answer[Generate a single Answer for a natural language query]
-* xref:spotter-apis.adoc#process_results[Process results generated from Spotter APIs]
+*  `POST /api/rest/2.0/ai/agent/conversation/create` +
+Creates a new AI-driven conversation session based on a specified data source. The resulting session sets the context for subsequent queries and responses.  +
+__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 
+* `POST /api/rest/2.0/ai/data-source-suggestions` +
+Returns a list of relevant data sources, such as Models, based on a query and thus helping users and agents choose the most appropriate data source for analytics. +
+__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 
+* `POST /api/rest/2.0/ai/relevant-questions/` +
+Breaks down a user-submitted query into a series of analytical sub-questions using relevant contextual metadata. Provides a list of recommended or relevant questions for a given data source and conversation context to allow users to explore their data further.  +
+__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 
-AI APIs enable agentic, conversational analytics by allowing users and systems to interact with data using natural language. Each API serves a specific function:
+* `POST /api/rest/2.0/ai/agent/conversation/converse` +
+Allows sending a follow-up message or question to an ongoing conversation session and returns the AI agent's response, including answers, tokens, and visualization details.  +
+__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 
-- **/api/rest/2.0/ai/agent/conversation/create**: Starts a new AI-driven conversation session based on a specified data source (worksheet or model). This sets the context for subsequent conversational queries and responses [[8]]().
-
-- **/api/rest/2.0/ai/data-source-suggestions**: Returns a list of relevant data sources (worksheets, models) based on a user's natural language query, helping users or agents select the most appropriate data source for analysis [[12]](https://developers.thoughtspot.com/docs/rest-apiv2-reference).
-
-- **/api/rest/2.0/ai/relevant-questions/**: Provides a list of recommended or relevant questions for a given data source and/or conversation context, guiding users to explore their data further [[12]](https://developers.thoughtspot.com/docs/rest-apiv2-reference).
-
-- **/api/rest/2.0/ai/agent/conversation/converse**: Sends a follow-up message or question to an ongoing conversation session and returns the AI agent's response, including answers, tokens, and visualization details [[8]]().
-
-These APIs collectively enable natural language interaction, context-aware analytics, and guided data exploration in ThoughtSpot [[12]](https://developers.thoughtspot.com/docs/rest-apiv2-reference), [[8]]().
-
-
-
-
-
-The API used for MCP server integration and boundaryless implementation is /api/rest/2.0/ai/relevant-questions/ (and related agentic AI APIs such as converse and create conversation). These APIs are exposed as "tools" by the MCP server, enabling external AI hosts (like Claude or other MCP clients) to discover and interact with ThoughtSpot's capabilities in a boundaryless, agent-to-agent manner. The MCP server acts as a wrapper and discovery layer for these APIs, making them accessible for integration and orchestration in multi-agent or boundaryless environments [[3]](https://us-2221.app.gong.io/call?id=2530016458468742599), [[9]](https://us-2221.app.gong.io/call?id=1587975872956140153), [[1]](https://us-2221.app.gong.io/call?id=5202451020418925233), [[6]](https://us-2221.app.gong.io/call?id=4352048497015947624).
-
-The API used for MCP server integration and boundaryless implementation is /api/rest/2.0/ai/relevant-questions/ (and related agentic AI APIs such as converse and create conversation). These APIs are exposed as "tools" by the MCP server, enabling external AI hosts (like Claude or other MCP clients) to discover and interact with ThoughtSpot's capabilities in a boundaryless, agent-to-agent manner. The MCP server acts as a wrapper and discovery layer for these APIs, making them accessible for integration and orchestration in multi-agent or boundaryless environments [[3]](https://us-2221.app.gong.io/call?id=2530016458468742599), [[9]](https://us-2221.app.gong.io/call?id=1587975872956140153), [[1]](https://us-2221.app.gong.io/call?id=5202451020418925233), [[6]](https://us-2221.app.gong.io/call?id=4352048497015947624).
+* `POST /api/rest/2.0/ai/answer/create` +
+Allows users to submit a natural language search query and returns a AI-generated chart or table in response. +
+__Available on ThoughtSpot Cloud instances from 10.4.0.cl onwards__.
+ It requires at least view access to the relevant metadata object and is available in ThoughtSpot Cloud version 10.4.0.cl or later.
 
 
+[IMPORTANT]
+====
+The `/api/rest/2.0/ai/conversation/create`, `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse`, and `/api/rest/2.0/ai/analytical-questions` are deprecated and will be removed from the REST API Playground in an upcoming release. When your instance is upgraded to 10.13.0.cl, use the new API endpoints.
 
-== Get Relevant Questions
+* To create a conversation session, use `/api/rest/2.0/ai/agent/conversation/create` instead of `/api/rest/2.0/ai/conversation/create`.
+* To send a follow-up question to an ongoing conversation session, use `/api/rest/2.0/ai/agent/conversation/converse` instead of `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse`.
+* To breakdown user-submitted query and generate relevant questions, use `POST /api/rest/2.0/ai/relevant-questions/` instead of `POST /api/rest/2.0/ai/analytical-questions`.
+====
 
-POST /api/rest/2.0/ai/relevant-questions/
+== Create a conversation session
 
-Purpose::
-Return relevant questions for a given data source and/or conversation.
+The `/api/rest/2.0/ai/agent/conversation/create` API endpoint allows you to initiate a new conversation session with the ThoughtSpot AI analyst, Spotter. The conversation session acts as a container for maintaining continuity across user inputs and system responses, and agent-driven clarifications. Once created, users can send follow-up questions to this conversation session to explore data and get further insights.
 
-.Parameters
+Developers and system integrators embedding Spotter into agentic workflows, custom applications, or internal MCP (Managed Content Platform) servers, can use this API.
+
+[NOTE]
+====
+You must have at least view access to the objects specified in the API request to create a conversation context and use it for subsequent queries.
+====
+
+=== Request parameters
+To set the context for the conversation session, you must specify the metadata type and context in the `POST1 request body. Optionally, you can also define additional parameters to fine tune the context and generate accurate and precise responses.
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter| Description
+|`metadata_context` a| Defines the data context for the conversation. Specify the following values:
+
+* `type` +
+Metadata type. Valid values are:
+** `answer`  - To use an existing Spotter-generated Answer as the object
+** `liveboard` - To use an existing Liveboard as data object
+** `data_source` - To create a new conversation session using data objects such as Model.
++
+
+* `answer_context` +
+If the metadata type is set as `answer`, specify the following attributes:
+** `session_identifier`: __string__, Unique ID representing the answer session.
+** `generation_number`: __Integer__. Specific generation/version number of the answer within a conversation session.
++
+The session identifier and generation numbers are generated when an Answer object is created from a Spotter query. These properties are returned in the API response when you generate an Answer from a Spotter query via `/api/rest/2.0/ai/answer/create` API call.
+
+* `liveboard_context` +
+If the metadata type is set as `liveboard`, specify the GUID of the Liveboard and visualization.
+* `data_source_context` +
+If the metadata type is set as `data_source`, specify the GUID of the data source object.
+
+|`conversation_settings` |__Optional__.  Defines additional parameters for the conversation context. You can set any of the following attributes as needed:
+
+* `enable_contextual_change_analysis` +
+__Boolean__. When enabled, Spotter analyzes how context changes over time, that is comparing results from different queries.
+* `enable_natural_language_answer_generation` +
+__Boolean__. Allows sending natural language queries to the conversation session.
+* `enable_reasoning` +
+__Boolean__. Allows Spotter to use reasoning for deep analysis and precise responses.
+|=====
+
+=== Example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_context": {
+    "type": "data_source",
+    "data_source_context": {
+      "guid": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    }
+  },
+  "conversation_settings": {
+    "enable_contextual_change_analysis": false,
+    "enable_natural_language_answer_generation": true,
+    "enable_reasoning": false
+  }
+}'
+----
+
+=== Example response
+
+If the API request is successful, the API returns the conversation ID. You can use this ID to send follow-up questions to the conversation session.
+
+[source,JSON]
+----
+{"conversation_id":"q9tZYf_6WnFC"}
+----
+
+=== Send queries to a conversation session
+
+To send queries to an ongoing conversation, send `POST` request body with conversation ID and the query string to the `POST /api/rest/2.0/ai/agent/conversation/conversee` API endpoint.
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter| Description
+|`conversation_identifier` |__String__. Specify the GUID of the conversation received from the xref:ai-apis-spotter.adoc#_create_a_conversation_session[create conversation API call].
+|`message`|_Array of Strings_. Specify the queries in natural language. For example, `Sales data for Jackets`, `Top performing products in the west coast`.
+|`settings` |__Optional__.  Defines additional parameters for the conversation context. You can set any of the following attributes as needed:
+
+* `enable_contextual_change_analysis` +
+__Boolean__. When enabled, Spotter analyzes how the context changes over time, that is comparing results from different queries.
+* `enable_natural_language_answer_generation` +
+__Boolean__. Allows sending natural language queries to the conversation session.
+* `enable_reasoning` +
+__Boolean__. Allows Spotter to use reasoning for deep analysis and precise responses.
+
+|=====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/converse'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+    "input": {
+      "conversation_identifier": "q9tZYf_6WnFC",
+      "messages": [
+        "Net sales for this year compared to last year based on the last reorder date"
+      ],
+    "settings": {
+      "enable_contextual_change_analysis": false,
+      "enable_natural_language_answer_generation": false,
+      "enable_reasoning": false
+    }
+  }
+}'
+----
+
+==== API response
+
+If the API request is successful, the API returns a stream of messages:
+
+* `ack` +
+Confirms receipt of the request
+* `text / text-chunk` +
+Content chunks, optionally formatted (for example, markdown)
+- `answer` +
+The final structured response with metadata and analytics
+- `error` +
+Indicates failure.
+- `notification` +
+Notification messages for operation being performed
+
+The following example shows the API response returned for a Spotter query:
+
+[source,JSON]
+----
+[
+  {
+    "id": "6JSiAI1C5OK5",
+    "type": "answer",
+    "group_id": "W_qnpv8K6z9j",
+    "metadata": {
+      "sage_query": "[Net Sales] [last_reorderdate] = 'this year' vs [last_reorderdate] = 'last year'",
+      "session_id": "461863f9-38ca-45e3-beba-ec72ec3841d9",
+      "gen_no": 2,
+      "transaction_id": "24e983d4-4ae4-44ce-a9d6-b42cdf006257",
+      "generation_number": 1,
+      "warning_details": null,
+      "ambiguous_phrases": null,
+      "query_intent": null,
+      "tml_phrases": [
+        "[Net Sales]",
+        "[last_reorderdate] = 'this year' vs [last_reorderdate] = 'last year'"
+      ],
+      "cached": true,
+      "sub_queries": null,
+      "title": "Untitled",
+      "worksheet_id": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    },
+    "title": "Untitled"
+  }
+]
+----
+
+The API response returns the session ID, generation number, tokens for search query, and TML phrases for the following information when the query generates an Answer. This information can be used to generate a chart or table via `POST /api/rest/2.0/ai/answer/create` API call.
+
+////
+* `type` +
+Type of the response. For Spotter-generated Answers, the type is set as `answer`.
+* `session_id` +
+GUID of the Answer session.
+* `generation_number` +
+Number assigned to the Answer session.
+* `message_type`
+Type of response received for the query. For example, `TSAnswer` (ThoughtSpot Answer).
+* `visualization_type`
+The data format of the generated Answer; for example, chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
+* `sage_query` +
+Tokens generated from the natural language search query string specified in the API request. You can use these tokens as input for `query_string` in your API request to `/api/rest/2.0/searchdata` and  export the raw data of the query.  or as input to `POST /api/rest/2.0/ai/conversation/create` to initiate a new conversation with a new context.
+* tml_phrases
+
+
+[NOTE]
+====
+Note the session ID and generation number. To export the Answer generated from this conversation, send these attributes in the `POST` request body to the `/api/rest/2.0/report/answer` endpoint.
+====
+
+[source,JSON]
+----
+[
+  {
+    "session_identifier": "1290f8bc-415a-4ecb-ae3b-e1daa593eb24",
+    "generation_number": 3,
+    "message_type": "TSAnswer",
+    "visualization_type": "Chart",
+    "tokens": "[sales], [state], [item type], [region] = [region].'west', sort by [sales] descending"
+  }
+]
+----
+////
+
+==== Ask follow-up questions
+
+You can send another API request with a follow-up question to the same conversation ID. The API retains the context of previous queries when you send follow-up questions.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/conversation/03f48527-b973-4efa-81fd-a8568a4f9e78/converse'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+  "message": "which city has the better sales of jackets here?"
+}'
+
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/converse'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+    "input": {
+      "conversation_identifier": "q9tZYf_6WnFC",
+      "messages": [
+        "Net sales of Jackets for this year compared to last year"
+      ],
+    "settings": {
+      "enable_contextual_change_analysis": false,
+      "enable_natural_language_answer_generation": false,
+      "enable_reasoning": false
+    }
+  }
+}'
+----
+
+The API retrains the context of the initial question and returns a response accordingly:
+
+////
+[source,JSON]
+----
+[
+  {
+    "session_identifier": "ee077665-08e1-4a9d-bfdf-7b2fe0ca5c79",
+    "generation_number": 3,
+    "message_type": "TSAnswer",
+    "visualization_type": "Table",
+    "tokens": "[sales], by [city], [state], [item type] = [item type].'jackets', [region] = [region].'west', sort by [sales] descending"
+  }
+]
+----
+===== Response codes
+[width="100%" cols="2,4"]
+[options='header']
+|===
+|HTTP status code|Description
+|**200**| Successful operation
+|**400**| Invalid parameter
+|**401**| Unauthorized access
+|**500**| Internal error
+|===
+////
+
+== Get data source suggestions
+
+The `POST /api/rest/2.0/ai/data-source-suggestions` API provides relevant data source recommendations for a user-submitted natural language query. To use this API, you must have at least view access to the underlying metadata source referenced in the response.
+
+=== Example request
+
+[source,JSON]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/data-source-suggestions'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "query": "Total sales by region"
+}'
+----
+
+=== Example response
+If the API request is successful, ThoughtSpot returns a ranked list of data sources, each annotated with relevant reasoning.
+
+[source,JSON]
+----
+{
+  "data_sources": [
+    {
+      "confidence": 0.95,
+      "details": {
+        "description": "",
+        "data_source_name": "(Sample) Retail - Apparel",
+        "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+      },
+      "reasoning": ""
+    },
+    {
+      "confidence": 0.93,
+      "details": {
+        "description": "",
+        "data_source_name": "X-Store-model",
+        "data_source_identifier": "4ba38739-d905-4dd2-9184-8771d5245044"
+      },
+      "reasoning": ""
+    },
+    {
+      "confidence": 0.91,
+      "details": {
+        "description": "",
+        "data_source_name": "Sales_WS",
+        "data_source_identifier": "bd1d48e0-a9ea-4497-bf16-1961c310a3d1"
+      },
+      "reasoning": ""
+    }
+  ]
+}
+----
+
+The returned results include metadata such as:
+
+* `confidence` +
+A float indicating the model's confidence in the relevance of each recommendation
+* `details` +
+Includes `data_source_identifier`, `data_source_name`, and description of each recommended data
+source
+* `reasoning` +
+Rationale provided by the LLM to explain why each data source was recommended
+
+== Get relevant questions
+
+The API breaks down a user-submitted query into a structured set of analytical sub-questions, leveraging relevant contextual metadata to enhance accuracy and relevance.
+
+
+=== Request parameters
 [cols="1,1,2,2"]
 |===
 |Name |Type |Required |Description
@@ -64,86 +407,12 @@ Return relevant questions for a given data source and/or conversation.
 |integer
 |No
 |Maximum number of questions to return.
+
 |===
 
-.Limitations and Functional Impacts
-* Only questions relevant to the data source and user’s permissions are returned.
-* Relevance scoring may be less accurate if metadata is sparse or poorly indexed.
-* If ABAC is enabled, question suggestions may be less accurate.
-* If the data source is very large, response time may increase.
-
-.Example Request
-[source,json]
-----
-{
-  "dataSource": "12345678-aaaa-bbbb-cccc-1234567890ab",
-  "limit": 3
-}
-----
-
-.Example Response
-[source,json]
-----
-{
-  "questions": [
-    {
-      "question": "What are the top selling products by region?",
-      "score": 0.98
-    }
-  ]
-}
-----
-
- *Overview*
-
-* *Purpose*:
-The API breaks down a user-submitted query into a structured set of analytical sub-questions, leveraging relevant contextual metadata to enhance accuracy and relevance.
-* *Target Consumers*:
-This API is designed for integration into agentic workflows and internal MCP servers, enabling customers to address complex business queries by resolving them through a series of focused, smaller questions.
-* *Authentication:*
-This endpoint requires https://rest-api-sdk-v2-0-dev.vercel.app/?auth_token=eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFMyNTYifQ.eyJiYXNlLXVybCI6ImxvY2FsaG9zdDo0NDMiLCJuYW1lIjoiT3dsYmVydCIsImFsbG93ZWRQcm9qZWN0cyI6WyJ0ZXN0LXRzLWpzbnRtIl0sImJlYXJlckF1dGgiOiJaR1Z0YjE5a1pYWjFjMlZ5T2twSVRtOWhXRXAyVFZOU1ZGTkZSWFJOYWxVeVNrUlZkMDFFUVhkTlExSk9XakJ2TUdSNlRqQlVSRlpNVFZaV1dscEZORFJUTTFaelZVaGtibEJVTUd0T2JXUnVWa2RPUkdSR1NsWmFTRlkyWlVSR00yVkVTVFZqYlRWWFlXMW9ZV016V1hoV01ITXlTekZPTkU5RVdrWlphbVJYVWtkSk1XUjZNQT09IiwidmVyc2lvbiI6MSwiZW1haWwiOiJvd2xiZXJ0QHJlYWRtZS5jb20ifQ.VxWcxbliJMiuSbaozoLDp0EVexv4smISkp4HtlwKK_w#/http/api-endpoints/ai/$h/__auth_BearerAuth[bearerAuth]
-* *Privilege Requirement:
-*The user must have view level access to requested metadata
-
-=== Request/Response
-
-==== Request
-
-* *Method*: POST
-* *Endpoint*: +/api/rest/2.0/v2/ai/relevant-questions/++
-+
-* *Headers*:
-Authorization: Bearer <token>
-Content-Type: application/json
-
-* *Request Body Schema*:
-{
-"metadata": {
-"data_source_identifiers": [ "string" ] | null,
-"answer_identifiers": [ "string" ] | null,
-"conversation_identifier": "string" | null,
-"liveboard_identifiers": [ "string" ] | null
-"visualization_identifier"
-},
-"context": {
-"instructions": [ "string" ] | null,
-"content": [ "string" ] | null
-},
-"query": "string",
-"limit_relevant_questions": 5,
-"bypass_cache": false,
-}
-
-===== Required:
-
-* metadata (object)
-Provides contextual metadata to guide sub-question generation. Must include at least one identifier (e.g., data source, answer, conversation, or liveboard).
-* query (string)
-The main user query to be decomposed into smaller, analytical sub-questions for improved understanding and structured responses.
-===== Optional:
 
 * limit_relevant_questions (integer, default: 5)
-Sets a cap on the number of sub-questions returned in the response.
+ Controls the maximum number of relevant questions returned. Sets a cap on the number of sub-questions returned in the response. Defaults to 5 if not specified.
 * bypass_cache (boolean)
 If set to true, disables cache and forces fresh computation.
 * +context +
@@ -152,9 +421,23 @@ Custom user instructions to influence how the AI interprets and processes the qu
 ** content (array of strings)
 Additional input such as raw text or CSV-formatted data to enhance context and answer quality.
 
-==== Response
+=== Example request
+[source,json]
+----
+{
+  "dataSource": "12345678-aaaa-bbbb-cccc-1234567890ab",
+  "limit": 3
+}
+----
+* metadata (object)
+Provides contextual metadata to guide sub-question generation. Must include at least one identifier (e.g., data source, answer, conversation, or liveboard).
+* query (string)
+The main user query to be decomposed into smaller, analytical sub-questions for improved understanding and structured responses.
 
-* *Success Response*:
+=== Example response
+
+[source,JSON]
+----
 {
 "relevant_questions": [
 {
@@ -164,11 +447,13 @@ Additional input such as raw text or CSV-formatted data to enhance context and a
 }
 ]
 }
+----
 
 The response object contains a single top-level field:
 
 * relevant_questions
 It contains the list of sub-questions that have been generated from the user’s original query. Each question in this list is tied to a specific data source and can be executed using a natural language search interface. This field is nullable, meaning it may be +null+ if no relevant sub-questions were identified during processing.
+
 Each object in the +relevant_questions+ array contains the following fields:
 
 * query
@@ -178,483 +463,15 @@ A string representing the unique identifier of the data source on which this sub
 * data_source_name
 name of the associated data source.
 
-
-
-=== Error Response
-
-
-Invalid Arguments
-
-{
-"error":{
-"message":{
-"debug":"Variable "$context" of required type "Context!" was not provided."
-}
-}
-}
-
-=== Sample Request & Response
-
-
-Request with context:data_source_indentifiers and query both required
-
-==== Request
-
-{
-"context": {
-"data_source_identifiers": [
-"3c020c5e-1c44-4ceb-a2d6-23ba1c53a3f4"
-]
-},
-"query": "sales by type"
-}
-----
-
-----
-==== Response
-
-
-{
-"relevant_questions": [
-{
-"query": "sales by item",
-"data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-"data_source_name": "(Sample) Retail - Apparel"
-}
-]
-}
-
-
-*Public Facing Documentation*
-
-
-Breaks down a user-submitted query into a series of analytical sub-questions using relevant contextual metadata.
-To use this API, the user must have at least view-level access to the referenced metadata objects.
-#### Usage guidelines
-
-To accurately generate relevant questions, the request must include at least one of the following metadata identifiers within `metadata` : `conversation_identifier`, `answer_identifiers`, `liveboard_identifiers`, or `data_source_identifiers`.
-
-You can further enhance the quality and precision of breakdown by providing additional `context` such as:
-
-- `content`: User provided content like text data, csv data as a string message to provide context & potentially improve the quality of the response.
-- `instructions`: User specific text instructions sent to AI system for processing the query.
-
-Additional optional parameters include:
-
-- `limit_relevant_questions`: Controls the maximum number of relevant questions returned. Defaults to 5 if not specified.
-- `bypass_cache`: If set to true, forces fresh computation instead of returning cached results.
-
-If the API request is successful, ThoughtSpot returns a list of relevant analytical queries, each aligned with the user's original question. Each returned question includes the query string, along with the identifier and name of the corresponding data source.
-
-> ###### Note:
-> * This endpoint is currently in Beta. Breaking changes may be introduced before the endpoint is made Generally Available.
-> * This endpoint requires Spotter - please contact ThoughtSpot support to enable Spotter on your cluster.
-
-Here is the asciidoc version of the API documentation, with detailed parameters, limitations, and functional impacts, based on the provided context:
-
-
-== Create Agent Conversation
-
-POST /api/rest/2.0/ai/agent/conversation/create
-
-Purpose::
-Create a new AI agent conversation session for a specified data source.
-
-.Parameters
-[cols="1,1,2,2"]
-|===
-|Name |Type |Required |Description
-
-|dataSource
-|string
-|Yes
-|GUID of the worksheet or model.
-
-|agentType
-|string
-|Yes
-|Agent type, e.g., "SPOTTER".
-
-|context
-|object
-|No
-|Additional context for the conversation.
-
-|context.tokens
-|array of string
-|No
-|Initial context tokens.
-
-|context.userQuery
-|string
-|No
-|Initial user query.
-|===
-
-.Limitations and Functional Impacts
-* Only supported agent types are accepted; using an unsupported type will fail.
-* User must have access to the data source.
-* Large or complex data sources may impact agent response time.
-* Spotter must be enabled; otherwise, the endpoint is non-functional.
-* Session limits may apply per user or tenant, impacting concurrent usage.
-
-.Example Request
-[source,json]
-----
-{
-  "dataSource": "12345678-aaaa-bbbb-cccc-1234567890ab",
-  "agentType": "SPOTTER",
-  "context": {
-    "tokens": ["[sales]", "[region]"],
-    "userQuery": "Show me sales by region"
-  }
-}
-----
-
-.Example Response
-[source,json]
-----
-{
-  "conversationId": "conv-abcdef123456"
-}
-----
-
-
-*Overview*
-
-* *Purpose*:
-The +createSpotterConversation+ API initializes a new conversation session within ThoughtSpot’s agentic offering, Spotter. This session enables users to engage in iterative, conversational exploration of data and insights. The session acts as a container for maintaining continuity across user inputs, system responses, and agent-driven clarifications.
-* *Target Consumers*:
-This API is intended for developers and system integrators embedding Spotter into agentic workflows, custom applications, or internal MCP (Managed Content Platform) servers. It is especially useful for enterprise teams seeking to empower business users with dynamic, dialogue-based data exploration
-* *Authentication:*
-This endpoint requires https://rest-api-sdk-v2-0-dev.vercel.app/?auth_token=eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFMyNTYifQ.eyJiYXNlLXVybCI6ImxvY2FsaG9zdDo0NDMiLCJuYW1lIjoiT3dsYmVydCIsImFsbG93ZWRQcm9qZWN0cyI6WyJ0ZXN0LXRzLWpzbnRtIl0sImJlYXJlckF1dGgiOiJaR1Z0YjE5a1pYWjFjMlZ5T2twSVRtOWhXRXAyVFZOU1ZGTkZSWFJOYWxVeVNrUlZkMDFFUVhkTlExSk9XakJ2TUdSNlRqQlVSRlpNVFZaV1dscEZORFJUTTFaelZVaGtibEJVTUd0T2JXUnVWa2RPUkdSR1NsWmFTRlkyWlVSR00yVkVTVFZqYlRWWFlXMW9ZV016V1hoV01ITXlTekZPTkU5RVdrWlphbVJYVWtkSk1XUjZNQT09IiwidmVyc2lvbiI6MSwiZW1haWwiOiJvd2xiZXJ0QHJlYWRtZS5jb20ifQ.VxWcxbliJMiuSbaozoLDp0EVexv4smISkp4HtlwKK_w#/http/api-endpoints/ai/$h/__auth_BearerAuth[bearerAuth]
-
-=== Request/Response
-
-==== Request
-
-* *Method*: POST
-* *Endpoint*:  +/api/rest/2.0/ai/agent/conversation/create++
-+
-* *Headers*:
-Authorization: Bearer <token>
-Content-Type: application/json
-
-
-* *Request Body Schema*:
-{
-"context": {
-"type": "answer", // "liveboard" or "data_source"
-"answer_context": {
-"session_identifier": "string",
-"generation_number": number
-"answer_identifier"
-},
-"liveboard_context": {
-"liveboard_identifier": "string",
-"visualization_identifier": "string"
-},
-"data_source_context": {
-"guid": "string"
-}
-},
-"conversation_settings": {
-"enable_contextual_change_analysis": false,
-"enable_natural_language_answer_generation": true,
-"enable_reasoning": false
-}
-}
-
-
-===== Request Body Fields:
-
-* Context
-Defines the source or origin of the conversation. Only one subtype of context (answer_context, liveboard_context, or data_source_context) should be provided based on the value of type.
-* type (answer | liveboard | data_source):
-Indicates which type of context is being used.
-* answer_context (used when type = answer)
-Context related to a previously generated answer:
-** session_identifier (string): Unique ID representing the answer session.
-** generation_number (integer): Specific generation/version number of the answer within the session.
-* liveboard_context (used when type = liveboard)
-Context related to a visualization on a liveboard:
-** liveboard_identifier (string): Unique ID for the liveboard.
-** visualization_identifier (string): Unique ID for the specific visualization within the liveboard.
-* data_source_context (used when type = data_source)
-Context related to a specific data source:
-** guid (string): Unique identifier of the data source (globally unique).
-
-* conversation_settings
-Optional settings to customize the behavior of the Spotter conversation.
-* enable_contextual_change_analysis (boolean, default: false)
-If enabled, Spotter may analyze how context changes over time (e.g., comparing results from different queries).
-* enable_natural_language_answer_generation (boolean, default: true)
-If true, Spotter will attempt to generate answers from natural language query
-* enable_reasoning (boolean, default: false)
-Enables deeper reasoning capabilities (e.g., explaining why a result is what it is), possibly using more computational or AI-based analysis.
-==== Response
-
-* *Success Response*:
-{
-"conversation_id": "string"
-}
-
-* conversation_id (string)
-Returned on successful creation of a conversation. This is a unique identifier for the Spotter conversation session and can be used to refer back to it or continue the conversation later.
-
-
-=== Sample Request & Response
-
-==== Request
-
-{
-"context": {
-"type": "data_source",
-"data_source_context": {
-"guid": "ds_45678"
-}
-},
-"conversation_settings": {
-"enable_contextual_change_analysis": false,
-"enable_natural_language_answer_generation": false,
-"enable_reasoning": false
-}
-}
-
-==== Response
-
-
-{
-"conversation_id": "conv_12345"
-}
-
-
-*Error Response
-*
-{
-"code": str
-"message": str
-"metadata": dict
-}
-Reference  +
-*Public Facing Documentation*
-
-Creates a Conversation for spotter agent to start an AI-driven conversation based on provided context.
-
-Requires at least view access to the metadata object specified in the request.
-
-#### Usage guidelines
-
-This API requires the `context` parameter to specify the conversation context. The context can be one of the following types:
-
-- `answer` : Specify using `answer_context` with a `session_identifier` and `generation_number`.
-- `liveboard` : Specify using `liveboard_context` with `liveboard_identifier` and `visualization_identifier`.
-- `data_source` : Specify using `data_source_context` with a `guid`.
-
-Additionally, user can specify what tool can be included `conversation_settings` parameter, which supports:
-- `enable_contextual_change_analysis` (default: false)
-- `enable_natural_language_answer_generation` (default: true)
-- `enable_reasoning` (default: false)
-
-
-If the API request is successful, the response includes a unique `conversation_id` representing the started conversation.
-
-> ###### Note:
-> * This endpoint is currently in Beta. Breaking changes may be introduced before the endpoint is made Generally Available.
-> * This endpoint requires Spotter - please contact ThoughtSpot support to enable Spotter on your cluster.
-
-
-
+////
 == Get data source suggestions
-
-POST /api/rest/2.0/ai/data-source-suggestions
-
-Purpose::
-Suggest relevant data sources for a user query.
-
-.Parameters
-[cols="1,1,2,2"]
-|===
-|Name |Type |Required |Description
-
-|query
-|string
-|Yes
-|User’s natural language query.
-
-|limit
-|integer
-|No
-|Maximum number of suggestions to return.
-|===
-
-.Limitations and Functional Impacts
-* Only data sources the user has access to are suggested.
-* Query length may be limited; excessively long queries may be truncated or rejected.
-* Suggestion quality depends on metadata completeness and indexing.
-* If ABAC is enabled, some features like auto-completion and search accuracy may be reduced.
-* If no relevant data sources are found, the response may be empty.
-
-.Example Request
-[source,json]
-----
-{
-  "query": "Show me sales by region",
-  "limit": 5
-}
-----
-
-.Example Response
-[source,json]
-----
-{
-  "dataSources": [
-    {
-      "id": "12345678-aaaa-bbbb-cccc-1234567890ab",
-      "name": "Sales Worksheet",
-      "description": "Sales data by region and product"
-    }
-  ]
-}
-----
-
-*Overview*
-
-* *Purpose*:
-The API provides relevant data source recommendations for a user-submitted natural language query.
-* *Target Consumers*:
-This API is designed for integration into agentic workflows and internal MCP servers, enabling customers to address complex business queries by resolving them through a series of focused, smaller questions.
-* *Authentication:*
-This endpoint requires https://rest-api-sdk-v2-0-dev.vercel.app/?auth_token=eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFMyNTYifQ.eyJiYXNlLXVybCI6ImxvY2FsaG9zdDo0NDMiLCJuYW1lIjoiT3dsYmVydCIsImFsbG93ZWRQcm9qZWN0cyI6WyJ0ZXN0LXRzLWpzbnRtIl0sImJlYXJlckF1dGgiOiJaR1Z0YjE5a1pYWjFjMlZ5T2twSVRtOWhXRXAyVFZOU1ZGTkZSWFJOYWxVeVNrUlZkMDFFUVhkTlExSk9XakJ2TUdSNlRqQlVSRlpNVFZaV1dscEZORFJUTTFaelZVaGtibEJVTUd0T2JXUnVWa2RPUkdSR1NsWmFTRlkyWlVSR00yVkVTVFZqYlRWWFlXMW9ZV016V1hoV01ITXlTekZPTkU5RVdrWlphbVJYVWtkSk1XUjZNQT09IiwidmVyc2lvbiI6MSwiZW1haWwiOiJvd2xiZXJ0QHJlYWRtZS5jb20ifQ.VxWcxbliJMiuSbaozoLDp0EVexv4smISkp4HtlwKK_w#/http/api-endpoints/ai/$h/__auth_BearerAuth[bearerAuth]
-
-=== Request/Response
-
-==== Request
-
-* *Method*: POST
-* *Endpoint*: +/api/rest/2.0/ai/data-source-suggestions/++
-+
-* *Headers*:
-Authorization: Bearer <token>
-Content-Type: application/json
-
-
-* *Request Body Schema*:
-{
-"query": "string",
-//
-}
-
-
-===== Required:
-
-* query (string)
-User query used to suggest data sources.
-
-==== Response
-
-* *Success Response*:
-{
-"data_sources": [
-{
-"confidence": float,
-"details": {
-"description": "string",
-"data_source_name": "string",
-"data_source_identifier": "string"
-},
-"reasoning": "string"
-}
-]
-}
-
-// add type to suggestions
-
-The response object contains a single top-level field: +
-data_sources +
-List of data sources suggested.
-+
-Each DataSource object includes:
-
-* confidence: Confidence score for the data source suggestion.
-* details
-** description
-Description of the data source.
-** data_source_name
-Display name of the data source.
-** data_source_identifier
-Unique identifier of the data source.
-* reasoning: LLM reasoning for the data source.
-
-
-
-=== Sample Request & Response
-
-==== Request
-
-{
-"query": "Show me sales performance by region for the last quarter"
-}
-----
+///
 
 
 
 
 
-----
-==== Response
-
-
-{
-"data_sources": [
-{
-"confidence": 0.91,
-"details": {
-"description": "Sales metrics across regions and quarters",
-"data_source_name": "Regional Sales Performance",
-"data_source_identifier": "ds_regional_sales_2024"
-},
-"reasoning": "The query specifies sales performance by region and time period. This source includes regional breakdowns for recent quarters."
-},
-{
-"confidence": 0.83,
-"details": {
-"description": "Quarterly revenue data categorized by geography and product line",
-"data_source_name": "Quarterly Revenue Dashboard",
-"data_source_identifier": "ds_quarterly_revenue_geo"
-},
-"reasoning": "The user asked for sales by region and quarter, and this data source captures both geographic and temporal metrics."
-}
-]
-}
-
-
-*Public Facing Documentation*
-
-Provides relevant data source recommendations for a user-submitted natural language query.
-
-To use this API, the user must have at least view-level access to the underlying metadata entities referenced in the response.
-
-#### Usage guidelines
-
-The request must include a `query` string via the request body.
-
-The returned results include metadata such as:
-- `confidence`: a float indicating the model's confidence in the relevance of each recommendation
-- `details`: includes `data_source_identifier`, `data_source_name`, and `description` of each recommended data source
-- `reasoning`: rationale provided by the LLM to explain why each data source was recommended
-
-If the API request is successful, ThoughtSpot returns a ranked list of data sources, each annotated with relevant reasoning.
-
-> ###### Note:
-> * This endpoint is currently in Beta. Breaking changes may be introduced before it is made Generally Available.
-> * This endpoint requires Spotter — please contact ThoughtSpot Support to enable Spotter on your cluster.
-
-
-
-
-
-== Send message
+=== Send message
 
 `POST /api/rest/2.0/ai/agent/conversation/converse`
 
@@ -1117,12 +934,11 @@ If the request is valid, the API returns a stream of messages in real time, incl
 > * The streaming protocol uses Server-Sent Events (SSE)
 
 
-
 ==== API response
 
 If the API request is successful, ThoughtSpot returns the Answer data for the query string sent in the API request.
 
-////
+
 ===== Response codes
 [width="100%" cols="2,4"]
 [options='header']
@@ -1135,3 +951,62 @@ If the API request is successful, ThoughtSpot returns the Answer data for the qu
 |**500**| Internal error
 |===
 ////
+
+== Generate a single Answer
+To generate an Answer from a natural language search query, send a `POST` request to the `/api/rest/2.0/ai/answer/create` API endpoint. In the request body, include the query and the data source ID.
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Form parameter| Description
+|`query`|__String__. Required. Specify the string as a natural language query. For example, `Top performing products in the west coast`.
+|`metadata_identifier`|_String_. Required. Specify the GUID of the ThoughtSpot Worksheet or Model. The metadata object specified in the API request will be used as a data source for the follow-up conversation.
+|=====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/answer/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN} \
+  --data-raw '{
+  "query": "Top performing products in the west coast",
+  "metadata_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+}'
+----
+
+==== API response
+
+If the API request is successful, the following data is sent in the API response:
+
+* `session_identifier` +
+GUID of the Answer session.
+* `generation_number` +
+Number assigned to the Answer session.
+* `message_type`
+Type of response received for the query. For example, `TSAnswer` (ThoughtSpot Answer).
+* `visualization_type`
+The data format of the generated Answer; for example, chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
+* `tokens` +
+Tokens generated from the natural language search query string specified in the API request. You can use these tokens as input for `query_string` in your API request to `/api/rest/2.0/searchdata` and  export the raw data of the query, or as input to `POST /api/rest/2.0/ai/conversation/create` to initiate a new conversation with a new context.
+
+[NOTE]
+====
+Note the session ID and generation number. To export the result generated from this API call, send these attributes in the `POST` request body to the `/api/rest/2.0/report/answer` endpoint.
+====
+
+[source,JSON]
+----
+[{
+  "session_identifier": "57784fa1-10fa-431d-8d82-a1657d627bbe",
+  "generation_number": 2,
+  "message_type": "TSAnswer",
+  "visualization_type": "Undefined",
+  "tokens": "[product], [region] = [region].'west', sort by [sales] descending"
+}]
+----
