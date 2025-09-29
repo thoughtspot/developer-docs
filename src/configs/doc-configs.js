@@ -51,6 +51,18 @@ module.exports = {
             subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-10-10-0-cl.vercel.app/docs/',
         },
+        {
+            label: '10.10.0.sw',
+            link: '10.10.0.sw',
+            subLabel: 'Software (Latest)',
+            iframeUrl: 'https://visual-embed-sdk-10-10.vercel.app/docs/',
+        },
+        {
+            label: '10.1.0.sw',
+            link: '10.1.0.sw',
+            subLabel: 'Software',
+            iframeUrl: 'https://visual-embed-sdk-10-1.vercel.app/docs/',
+        },
         //{
         //     label: '10.9.0.cl',
         //     link: '10.9.0.cl',
