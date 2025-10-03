@@ -52,12 +52,6 @@ module.exports = {
             iframeUrl: 'https://developer-docs-10-11-0-cl.vercel.app/docs/',
         },
         {
-            label: '10.10.0.cl',
-            link: '10.10.0.cl',
-            subLabel: 'Cloud',
-            iframeUrl: 'https://developer-docs-10-10-0-cl.vercel.app/docs/',
-        },
-        {
             label: '10.10.0.sw',
             link: '10.10.0.sw',
             subLabel: 'Software (Latest)',
@@ -69,6 +63,12 @@ module.exports = {
             subLabel: 'Software',
             iframeUrl: 'https://visual-embed-sdk-10-1.vercel.app/docs/',
         },
+        //{
+        //    label: '10.10.0.cl',
+        //     link: '10.10.0.cl',
+        //    subLabel: 'Cloud',
+        //    iframeUrl: 'https://developer-docs-10-10-0-cl.vercel.app/docs/',
+        //},
         //{
         //     label: '10.9.0.cl',
         //     link: '10.9.0.cl',
