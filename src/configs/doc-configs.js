@@ -35,21 +35,21 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '10.12.0.cl',
+            label: '10.13.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
+        },
+        {
+            label: '10.12.0.cl',
+            link: '10.12.0.cl',
+            subLabel: 'Cloud',
+            iframeUrl: 'https://developer-docs-10-12-0-cl.vercel.app/docs/',
         },
         {
             label: '10.11.0.cl',
             link: '10.11.0.cl',
             subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-10-11-0-cl.vercel.app/docs/',
-        },
-        {
-            label: '10.10.0.cl',
-            link: '10.10.0.cl',
-            subLabel: 'Cloud',
-            iframeUrl: 'https://developer-docs-10-10-0-cl.vercel.app/docs/',
         },
         {
             label: '10.10.0.sw',
@@ -63,6 +63,12 @@ module.exports = {
             subLabel: 'Software',
             iframeUrl: 'https://visual-embed-sdk-10-1.vercel.app/docs/',
         },
+        //{
+        //    label: '10.10.0.cl',
+        //     link: '10.10.0.cl',
+        //    subLabel: 'Cloud',
+        //    iframeUrl: 'https://developer-docs-10-10-0-cl.vercel.app/docs/',
+        //},
         //{
         //     label: '10.9.0.cl',
         //     link: '10.9.0.cl',
