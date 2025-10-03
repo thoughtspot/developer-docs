@@ -20,33 +20,33 @@ The AI APIs [beta betaBackground]^Beta^ enable agentic conversational analytics 
 [options='header']
 |=====
 |Purpose| API endpoints
-|xref:spotter-apis.adoc#_get_data_source_suggestions[Get data source suggestions] a|  `POST /api/rest/2.0/ai/data-source-suggestions` +
-Returns a list of relevant data sources, such as Models, based on a query and thus helping users and agents choose the most appropriate data source for analytics. +
-__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
-
-|xref:spotter-apis.adoc#_create_a_conversation_session[Create a conversation session] a| * `POST /api/rest/2.0/ai/agent/conversation/create`  (Recommended) +
+|xref:spotter-apis.adoc#_create_a_conversation_session[Create a conversation session] a| * xref:spotter-apis.adoc#_create_a_conversation_session_with_spotter_agent[`POST /api/rest/2.0/ai/agent/conversation/create`]  +
 Creates a new AI-driven conversation session based on a specified data source. The resulting session sets the context for subsequent queries and responses. +
 __Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 
-* `POST /api/rest/2.0/ai/conversation/create` +
+* xref:spotter-apis.adoc#_create_a_conversation_session_legacy_api_endpoint[`POST /api/rest/2.0/ai/conversation/create`] +
 Creates a conversation session. +
 __This is a legacy API and will be deprecated in an upcoming release version__. +
 
-|xref:spotter-apis.adoc#_get_relevant_questions[Get relevant questions] a| `POST /api/rest/2.0/ai/relevant-questions/` +
+|xref:spotter-apis.adoc#_get_relevant_questions[Get relevant questions] a| * `POST /api/rest/2.0/ai/relevant-questions/` +
 Breaks down a user-submitted query into a series of analytical sub-questions using relevant contextual metadata. Provides a list of recommended or relevant questions for a given data source and conversation context to allow users to explore their data further. +
 __Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 
-|xref:spotter-apis.adoc#_send_a_question_to_a_conversation_session[Send queries to a conversation session] a| * `POST /api/rest/2.0/ai/agent/converse/sse` (Recommended for agentic workflows)
+|xref:spotter-apis.adoc#_send_a_question_to_a_conversation_session[Send queries to a conversation session] a|
+* xref:spotter-apis.adoc#_send_a_question_and_generate_streaming_responses[`POST /api/rest/2.0/ai/agent/converse/sse`] (Recommended for agentic workflows) +
 Allows sending a natural language query or a follow-up question to an ongoing conversation session and returns the AI agent's response, including answers, tokens, and visualization details. +
 __Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 
-* `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse` +
+* xref:spotter-apis.adoc#_send_a_question_to_generate_answer[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] +
 Allows sending a follow-up message to an ongoing conversation within the context of the metadata model.
-Available on ThoughtSpot Cloud instances from 10.4.0.cl onwards. This is a legacy API and will be deprecated in an upcoming release version. +
 __This is a legacy API and will be deprecated in an upcoming release version__.
 
-|xref:spotter-apis.adoc#_generate_a_single_answer[Generate a single answer] a|  `POST /api/rest/2.0/ai/answer/create` +
+|xref:spotter-apis.adoc#_generate_a_single_answer[Generate a single answer] a| * `POST /api/rest/2.0/ai/answer/create` +
 Allows users to submit a natural language search query and fetch an AI-generated response.
+
+|xref:spotter-apis.adoc#_get_data_source_suggestions[Get data source suggestions] a| * `POST /api/rest/2.0/ai/data-source-suggestions` +
+Returns a list of relevant data sources, such as Models, based on a query and thus helping users and agents choose the most appropriate data source for analytics. +
+__Limited availability on ThoughtSpot Cloud instances from 10.13.0.cl onwards. Please contact ThoughtSpot Support to enable this feature on your instance__.
 |=====
 
 ////
@@ -58,87 +58,12 @@ Allows users to submit a natural language search query and fetch an AI-generated
 ////
 
 
-== Get data source suggestions
-
-The `POST /api/rest/2.0/ai/data-source-suggestions` API provides relevant data source recommendations for a user-submitted natural language query. To use this API, you must have at least view access to the underlying metadata source referenced in the response.
-
-=== Request parameters
-
-[width="100%" cols="2,4"]
-[options='header']
-|=====
-|Parameter| Description
-|`query`|_String_. Required. Specify a natural language query string. For example, `Sales data for Jackets`.
-|=====
-
-=== Example request
-
-[source,JSON]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/data-source-suggestions'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "query": "Sales data for Jackets"
-}'
-
-----
-
-=== API response
-If the API request is successful, ThoughtSpot returns a ranked list of data sources, each annotated with relevant reasoning.
-
-[source,JSON]
-----
-{
-  "data_sources": [
-    {
-      "confidence": 0.97,
-      "details": {
-        "description": "",
-        "data_source_name": "(Sample) Retail - Apparel",
-        "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
-      },
-      "reasoning": "Following similar NL queries were asked earlier on this worksheet - \"show sales of jackets quarter on quarter\", \"show sales of jackets last quarter in east\", \"jacket sales for february. (ignore previous context\""
-    },
-    {
-      "confidence": 0.62,
-      "details": {
-        "description": "",
-        "data_source_name": "Dunder Mifflin Sales",
-        "data_source_identifier": "0e4406c7-d978-4be7-abd7-c34e8f7da835"
-      },
-      "reasoning": ""
-    },
-    {
-      "confidence": 0.45,
-      "details": {
-        "description": "",
-        "data_source_name": "Copy of Dunder Mifflin Sales-SSD",
-        "data_source_identifier": "c8305843-d31f-468a-ab1b-2636f64c83e5"
-      },
-      "reasoning": "Columns include 'Product', 'Category', 'Quantity', and 'Amount', which could support sales analysis for jackets if present, but no direct NLQ or answer matches."
-    }
-  ]
-}
-----
-
-The returned results include metadata such as:
-
-* `confidence` +
-A float indicating the Model's confidence in the relevance of each recommendation.
-* `details` +
-The data source ID, name, and description for each recommended data source.
-* `reasoning` +
-Reason provided by the LLM to explain why each data source was recommended.
-
 == Create a conversation session
 A conversation session acts as a container for maintaining continuity across user inputs, system responses, and agent-driven clarifications. Once created, users can send queries or ask follow-up questions to the  conversation session to explore data and get further insights.
 
-The following AI API endpoints allow you to initiate a conversation with Spotter:
+The following AI API endpoints allow you to initiate a conversation session with Spotter:
 
-* xref:spotter-apis.adoc#_create_a_conversation_session_with_spotter_agent[`POST /api/rest/2.0/ai/agent/conversation/create`] (Recommended) +
+* xref:spotter-apis.adoc#_create_a_conversation_session_with_spotter_agent[`POST /api/rest/2.0/ai/agent/conversation/create`]
 * xref:spotter-apis.adoc#_create_a_conversation_session_legacy_api_endpoint[`POST /api/rest/2.0/ai/conversation/create`] +
 __This is a legacy API endpoint and will be deprecated in an upcoming release version__.
 
@@ -171,7 +96,7 @@ If the metadata type is set as `answer`, specify the following attributes:
 ** `session_identifier`: __string__, Unique ID representing the answer session.
 ** `generation_number`: __Integer__. Specific generation/version number of the answer within a conversation session.
 +
-The session identifier and generation numbers are generated when an Answer object is created from a Spotter query via `POST /api/rest/2.0/ai/agent/converse/sse`, `/api/rest/2.0/ai/answer/create`, or `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse` API call.
+The session identifier and generation numbers are assigned to the Answers generated from the Spotter AI REST APIs. These properties serve as the ID of the AI-generated Answer within the ThoughtSpot system.
 
 * `liveboard_context` +
 If the metadata type is set as `liveboard`, specify the GUID of the Liveboard and visualization.
@@ -338,9 +263,9 @@ If the request is successful, the API returns a set of questions related to the 
 
 * `query` +
 A string containing the natural language (NL) sub-question.
-* `data_source_identifier`
+* `data_source_identifier` +
 GUID of the data source object that can be used as data context for the sub-question.
-* `data_source_name`
+* `data_source_name` +
 Name of the associated data source object.
 
 [source,JSON]
@@ -366,17 +291,19 @@ Name of the associated data source object.
 }
 ----
 
-
 == Send a question to a conversation session
 The following AI API endpoints allow you to send a follow-up query to an ongoing conversation:
 
-* `POST /api/rest/2.0/ai/agent/converse/sse` +
-Allows a client to send queries to an ongoing conversation session with the AI agent (Spotter) and uses the Server-Sent Events (SSE) protocol to stream responses for a real-time conversational experience. It returns a streaming response (using SSE) with the AI agent's replies, allowing clients to receive incremental updates as the AI agent processes and generates its response.
+* xref:spotter-apis.adoc#_send_a_question_and_generate_streaming_responses[`POST /api/rest/2.0/ai/agent/converse/sse`] +
+Allows a client to send queries to an ongoing conversation session with the AI agent (Spotter) and uses the Server-Sent Events (SSE) protocol to stream responses for a real-time conversational experience. It returns a streaming response (using SSE) with the AI agent's replies, allowing clients to receive incremental updates as the AI agent processes and generates its response. +
+The `POST /api/rest/2.0/ai/agent/converse/sse` API call supports only the agent sessions created via `/api/rest/2.0/ai/agent/conversation/create` API call.
 
-* `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse` +
+* xref:spotter-apis.adoc#_send_a_question_to_generate_answer[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] +
+Sends query to an ongoing conversation session and generates Answer. +
+The `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse` API call supports only the conversation sessions created using the `POST /api/rest/2.0/ai/conversation/create` API call. +
 __This is a legacy API endpoint and will be deprecated in an upcoming release version__.
 
-=== Send a question and stream responses
+=== Send a question and generate streaming responses
 
 To send queries to an ongoing conversation session and receive streaming responses, ThoughtSpot provides the `/api/rest/2.0/ai/agent/converse/sse` API endpoint. This API endpoint uses the SSE protocol to deliver data incrementally as it becomes available, rather than waiting for the entire response to be generated before sending it to the client. This enables immediate feedback and a more interactive user experience for AI-generated responses.
 
@@ -789,7 +716,7 @@ To send a question to an ongoing conversation session or ask follow-up questions
 [options='header']
 |=====
 |Parameter|Type| Description
-|`conversation_identifier`|Path parameter|__String__. Required. Specify the GUID of the conversation received from the xref:spotter-apis.adoc#_create_a_conversation_session[create conversation API call].
+|`conversation_identifier`|Path parameter|__String__. Required. Specify the GUID of the conversation received from the xref:spotter-apis.adoc#_create_a_conversation_session_legacy_api_endpoint[create conversation API call].
 |`metadata_identifier`|Form parameter|_String_. Required. Specify the GUID of the ThoughtSpot Worksheet or Model. The metadata object specified in the API request will be used as a data source for the follow-up conversation.
 |`message`|Form parameter|_String_. Required. Specify a natural language query string. For example, `Sales data for Jackets`.
 |=====
@@ -956,6 +883,85 @@ To generate an Answer using the data returned from the Spotter APIs, use the fol
 * Download the generated Answer using the session ID and generation number via xref:data-report-v2-api.adoc#exportSpotterData[api/rest/2.0/report/answer] API endpoint.
 * Use tokens generated from Spotter API requests as raw data in query strings and generate an Answer via xref:data-report-v2-api.adoc#_using_tokens_generated_from_spotter_apis_as_raw_data[/api/rest/2.0/searchdata] API endpoint.
 
+== Get data source suggestions
+
+The `POST /api/rest/2.0/ai/data-source-suggestions` API provides relevant data source recommendations for a user-submitted natural language query. To use this API, you must have at least view access to the underlying metadata source referenced in the response.
+
+[NOTE]
+====
+The Get data source suggestions feature is not by default on all ThoughtSpot instances. To enable this API on your instance, contact ThoughtSpot Support.
+====
+
+=== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter| Description
+|`query`|_String_. Required. Specify a natural language query string. For example, `Sales data for Jackets`.
+|=====
+
+=== Example request
+
+[source,JSON]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/data-source-suggestions'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "query": "Sales data for Jackets"
+}'
+
+----
+
+=== API response
+If the API request is successful, ThoughtSpot returns a ranked list of data sources, each annotated with relevant reasoning.
+
+[source,JSON]
+----
+{
+  "data_sources": [
+    {
+      "confidence": 0.97,
+      "details": {
+        "description": "",
+        "data_source_name": "(Sample) Retail - Apparel",
+        "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+      },
+      "reasoning": "Following similar NL queries were asked earlier on this worksheet - \"show sales of jackets quarter on quarter\", \"show sales of jackets last quarter in east\", \"jacket sales for february. (ignore previous context\""
+    },
+    {
+      "confidence": 0.62,
+      "details": {
+        "description": "",
+        "data_source_name": "Dunder Mifflin Sales",
+        "data_source_identifier": "0e4406c7-d978-4be7-abd7-c34e8f7da835"
+      },
+      "reasoning": ""
+    },
+    {
+      "confidence": 0.45,
+      "details": {
+        "description": "",
+        "data_source_name": "Copy of Dunder Mifflin Sales-SSD",
+        "data_source_identifier": "c8305843-d31f-468a-ab1b-2636f64c83e5"
+      },
+      "reasoning": "Columns include 'Product', 'Category', 'Quantity', and 'Amount', which could support sales analysis for jackets if present, but no direct NLQ or answer matches."
+    }
+  ]
+}
+----
+
+The returned results include metadata such as:
+
+* `confidence` +
+A float indicating the Model's confidence in the relevance of each recommendation.
+* `details` +
+The data source ID, name, and description for each recommended data source.
+* `reasoning` +
+Reason provided by the LLM to explain why each data source was recommended.
 
 == Additional resources
 
