@@ -2,7 +2,7 @@ import * as React from 'react';
 import BackButton from '../../BackButton';
 
 export const ThemeBuilder: React.FC<ThemeBuilderProps> = (props) => {
-    const playgroundUrl = 'https://thoughtspot-theme-builder-five.vercel.app/';
+    const playgroundUrl = 'https://theme-builder-embed-prod.vercel.app/';
 
     return (
         <div className="restApiWrapper">
