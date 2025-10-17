@@ -6,51 +6,64 @@
 :page-pageid: mcp-integration
 :page-description: Learn how to use the ThoughtSpot Model Context Protocol (MCP) server to interact with ThoughtSpot data via MCP tools and AI APIs and get relevant questions and answers for a given query and create Liveboards at runtime.
 
-ThoughtSpot’s Agentic Model Context Protocol (MCP) Server enables integrating ThoughtSpot analytics directly into any AI agent, custom chatbot, or LLM-based systems and platforms that support MCP. It acts as a connector between the ThoughtSpot instance and external AI client, and provides a set of tools for interacting with ThoughtSpot’s data and its analytics capabilities programmatically.
+ThoughtSpot’s Agentic Model Context Protocol (MCP) Server allows you to integrate ThoughtSpot analytics directly into any AI agent, custom chatbot, or LLM-based platforms that support MCP. It acts as a connector between the ThoughtSpot instance and external AI client, and provides a set of tools for interacting with ThoughtSpot’s data and its analytics capabilities programmatically.
 
-The MCP tools of the Agentic MCP Server support the following functions:
+The ThoughtSpot MCP Server is an add-on feature available with the link:https://www.thoughtspot.com/pricing[ThoughtSpot Analytics and ThoughtSpot Embedded offerings, window=_blank]. To purchase the MCP Server subscription and enable the MCP Server in your environment, you must have an active subscription to one of the following ThoughtSpot licenses:
 
-* Ask natural language questions and get data in a structured format from ThoughtSpot
-* Retrieve relevant analytical questions based on user queries
-* Create a Liveboard with the answers generated from the queries
-* Get data source recommendations based on a user's query and intent
+* Enterprise Edition of ThoughtSpot Analytics
+* ThoughtSpot Embedded subscription
+
+To learn about our available subscription options and to et started, please contact your ThoughtSpot Sales representative
 
 == Integration overview
 
 The Agentic MCP Server integration requires the following core components and authentication framework:
 
 MCP Server::
-The MCP Server provides a tools wrapper with a discoverable interface for agentic analytics. It exposes a set of tools to external agents to interact with ThoughtSpot's resources, data, and analytical capabilities. The MCP Server includes an orchestration layer that determines which tools to invoke based on the incoming queries and user intent. The MCP Server can be hosted by ThoughtSpot or by customers in their own environment.
+The MCP Server exposes a set of tools that can be invoked by an LLM or external AI. ThoughtSpot's MCP Server acts as a bridge between the LLM/agent and ThoughtSpot application backend.
 
-MCP tools, resources, and AI APIs::
-MCP tools are the actions that the MCP Server exposes to the agent for interaction with ThoughtSpot. Currently, the MCP Server supports the following tools:
+MCP tools and resources::
+MCP tools are the actions that the MCP Server exposes to the agent for interaction with ThoughtSpot.
 
+* Ask natural language questions and get data in a structured format from ThoughtSpot
+* Retrieve relevant analytical questions based on user queries
+* Create a Liveboard with the answers generated from the queries
+* Get data source recommendations based on a user's query and intent
++
+Currently, the MCP Server supports the following tools:
++
 * `ping` to test connection to ThoughtSpot
 * `getRelevantQuestions` to get relevant analytical questions +
-The `getRelevantQuestions` tool calls xref:spotter-apis.adoc#_get_relevant_questions[/api/rest/2.0/ai/relevant-questions/] API and gets relevant data questions for a given data context by breaking down a user's query.
+The `getRelevantQuestions` tool to fetch relevant data questions for a given data context by breaking down a user's query.
 * `getAnswer` to execute the queries and fetch data +
-The `getAnswer` tool calls xref:spotter-apis.adoc#_send_a_question_and_generate_streaming_responses[/api/rest/2.0/ai/agent/converse/sse] API and generates answers and insights for a given data context.
+The `getAnswer` tool generates answers and insights for a given data context.
 * `createLiveboard` to create a Liveboard in ThoughtSpot +
 The `createLiveboard` tool calls the Liveboard creation workflow and creates a Liveboard with the answers generated from user's query.
 * `getDataSourceSuggestions` to get data source suggestions +
 Based on the type of data that users want to fetch, `getDataSourceSuggestions` gets a list of data source recommendations. Currently, `getDataSourceSuggestions` is not exposed as an MCP tool and is available as an MCP `resource`. To get data source suggestions, the user or MCP client must have at least view access to ThoughtSpot data sources.
 
-MCP host/client::
-The external system or application environment with AI Agent, Claude, OpenAI, or a custom chatbot that acts as a user interface, orchestrates interaction with ThoughtSpot MCP Server, and enables agentic workflows.
+MCP client/ LLM agent::
+The external system or application environment with AI Agent, Claude, OpenAI, or a custom chatbot that acts as a user interface and  orchestrates interaction with ThoughtSpot MCP Server
+This is the model or system that processes the user’s natural language input, determines which tool to call, and integrates the tool results into its final output.
 
+////
 Configuration settings to enable the integration::
 Integration requires configuration, typically via a config file, to specify server addresses, credentials, and other connection details.
+////
 
 Authentication and security settings::
+
 * Access to ThoughtSpot instance: +
-For MCP Server connection, users require access to a ThoughtSpot instance. ThoughtSpot administrators can use the SSO framework with SAML or OAuth token-based authentication methods to authenticate and sign in the users. +
-To get answers to their data queries, your application users require at least view access to ThoughtSpot data sources. To generate an Answer or to create Liveboard, users
+For MCP Server connection, users require access to a ThoughtSpot instance. For tool invocation, the MCP server must accept authenticated requests and the LLM tool specification must carry those credentials or headers. +
+ThoughtSpot administrators can use the SSO framework with SAML or OAuth token-based authentication methods to authenticate and sign in the users. +
+* SAML redirect settings: +
+For SAML SSO users, the SAML redirect domain configuration is required to ensure that users are redirected to an allowed and trusted domain after they are authenticated. +
+* To get answers to their data queries, your application users require at least view access to ThoughtSpot data sources. To generate an Answer or to create Liveboard, users require data download privilege.
 * CSP and CORS settings: +
 To secure communication between the MCP client and the ThoughtSpot instance, administrators must add the MCP Server URL to CSP (Content Security Policy) and CORS (Cross-Origin Resource Sharing) allowlists in ThoughtSpot.
-* SAML redirect settings: +
-For SAML SSO users, the SAML redirect domain configuration is required to ensure that users are redirected to an allowed and trusted domain after they are authenticated.
 * Client connection configuration: +
 MCP Server integration also requires configuration on the client side, typically via a config file, to include the MCP Server addresses, credentials, and other details.
+
 
 === How it works
 
@@ -86,6 +99,13 @@ Before you begin, verify if your application setup has the following:
 * Your application users have at least view access to the data source objects to query data and get answers.
 * Row-level and column-level security rules are configured for data security and access control.
 
+To allow the secure communication between the MCP Server and your ThoughtSpot instance, configure the following settings:
+
+. On your ThoughtSpot instance, navigate to *Develop* > *Customizations* > *Security Settings*.
+. Add the MCP Server domain to CSP and CORS allowlists.
+. If your setup uses SAML SSO logins, add the MCP Server domain to the SAML redirect domain allowlist.
+
+////
 === Configure security settings on ThoughtSpot
 
 To allow the secure communication between the MCP Server and your ThoughtSpot instance, configure the following settings:
@@ -93,12 +113,170 @@ To allow the secure communication between the MCP Server and your ThoughtSpot in
 . On your ThoughtSpot instance, navigate to *Develop* > *Customizations* > *Security Settings*.
 . Add the MCP Server domain to CSP and CORS allowlists.
 . If your setup uses SAML SSO logins, add the MCP Server domain to the SAML redirect domain allowlist.
+////
 
-=== Add MCP Server to the MCP client's config
+=== Connect your client to MCP server
 
-If your MCP client supports remote MCP Servers, add the MCP Server URL to the client's config file.
+If using a client that supports remote MCPs natively such as Claude AI, use the following MCP server URL:
+----
+https://agent.thoughtspot.app/mcp
+----
 
-MCP clients such as Claude Desktop, Windsurf, and Cursor do not support remote MCP Servers. In such a case, add the URL with arguments shown in this example:
+For OpenAI ChatGPT Deep Research, use the following URL:
+----
+https://agent.thoughtspot.app/openai/mcp
+----
+
+=== Call MCP tools via LLM APIs
+
+ThoughtSpot remote MCP server exposes a set of tools that can be invoked by an LLM. To call an MCP tool, you can use the LLM APIs and methods:
+
+* OpenAI: via responses API
+* Claude AI: via messages API
+* Gemini AI: via Gemini Python/Typescript SDK
+
+==== ClaudeAI
+
+Claude’s MCP connector feature enables you to connect to remote MCP servers directly from the Messages API.
+
+To connect to a remote MCP server, specify the model and include the following properties in the  `mcp_servers` and messages arrays:
+
+* In the ``mcp_servers` array, include these parameters:
+
+** `type` +
+__String__. Type. Currently only `url` is supported.
+** `url` +
+__String__. The URL of the remote MCP Server endpoint. Must start with `https://`.
+** `name`
+__String__. A unique identifier/label for the MCP Server. It will be used in MCP tool call blocks to identify the server and to disambiguate tools to the LLM.
+** `authorization_token` +
+__String__. OAuth authorization token (TS_AUTH_TOKEN) along with the ThoughtSpot application instance URL. In the above example, authorization token is prefixed and the ThoughtSpot host URL is added with the `@` symbol.
+
+* `model` +
+Claude’s model to use. For example, claude-sonnet-4-20250514, which will determine whether to invoke the MCP tools from ThoughtSpot remote MCP server context specified in the request.
+* `messages`
+In the messages array, specify a natural language question and the user role.
+
+[source,cURL]
+----
+curl https://api.anthropic.com/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: mcp-client-2025-04-04" \
+  -d '{
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "messages": [{
+      "role": "user",
+      "content": "How do I increase my sales ?"
+    }],
+    "mcp_servers": [
+      {
+        "type": "url",
+        "url": "https://agent.thoughtspot.app/bearer/mcp",
+        "name": "thoughtspot",
+        "authorization_token": "$TS_AUTH_TOKEN@my-thoughtspot-instance.thoughtspot.cloud"
+      }
+    ]
+  }'
+----
+
+When invoked, Claude’s internal tool-calling mechanism calls the MCP endpoint with the provided token, retrieves analytics data, and then continues generating its answer including that result.
+
+==== OpenAI
+To enable tool calling and retrieve live analytics data from ThoughtSpot via OpenAI, you can use the Responses API endpoint. For Remote MCP server tool calling, you'll need the MCP server URL and an OAuth access token.
+
+The following cURL request calls the OpenAI Responses API endpoint `https://api.openai.com/v1/responses` with a JSON payload that contains the following properties and information in the `tools` array:
+
+* `server_url` +
+The URL of the ThoughtSpot MCP Server.
+* `server_label` +
+Label of the ThoughtSpot MCP Server
+* `type` +
+Type of tool. For example, MCP.
+* `headers` +
+Additional headers needed for authentication, for example, authentication token and the URL of the ThoughtSpot host.
+
+Additionally, you can also include the natural language query string as `input` in the request.
+
+[source,cURL]
+----
+curl https://api.openai.com/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+  "model": "gpt-4.1",
+  "tools": [
+    {
+      "type": "mcp",
+      "server_label": "thoughtspot",
+      "server_url": "https://agent.thoughtspot.app/bearer/mcp",
+      "headers": {
+        "Authorization": "Bearer $TS_AUTH_TOKEN",
+        "x-ts-host": "my-thoughtspot-instance.thoughtspot.cloud"
+      }
+    }
+  ],
+  "input": "How can I increase my sales ?"
+}'
+----
+
+==== Gemini
+For Gemini, you can use the standard function calling mechanism provided in Gemini Python/Typescript SDK. The Gemini SDK supports MCP natively and can pass tool definitions and call tools.
+
+When using the Gemini SDK, you can pass a session linked to the remote MCP server, so that the SDK can handle tool calling.
+
+[source,TypeScript]
+----
+import { GoogleGenAI, FunctionCallingConfigMode , mcpToTool} from '@google/genai';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+
+// Create server parameters for stdio connection
+const serverParams = new StreamableHTTPClientTransport(new URL("https://agent.thoughtspot.app/bearer/mcp"), {
+    requestInit: {
+        headers: {
+            "Authorization": "Bearer $TS_AUTH_TOKEN", // Read below how to get the $TS_AUTH_TOKEN
+            "x-ts-host": "my-thoughtspot-instance.thoughtspot.cloud"
+        },
+    }
+});
+
+const client = new Client(
+  {
+    name: "example-client",
+    version: "1.0.0"
+  }
+);
+
+// Configure the client
+const ai = new GoogleGenAI({});
+
+// Initialize the connection between client and server
+await client.connect(serverParams);
+
+// Send request to the model with MCP tools
+const response = await ai.models.generateContent({
+  model: "gemini-2.5-flash",
+  contents: `What is the weather in London in ${new Date().toLocaleDateString()}?`,
+  config: {
+    tools: [mcpToTool(client)],  // uses the session, will automatically call the tool
+    // Uncomment if you **don't** want the sdk to automatically call the tool
+    // automaticFunctionCalling: {
+    //   disable: true,
+    // },
+  },
+});
+console.log(response.text)
+
+// Close the connection
+await client.close();
+----
+
+=== MCP clients (Claude Desktop)
+
+For clients such as Claude Desktop, Windsurf, Cursor, which do not support remote MCP servers, add the following configuration to your MCP client settings:
 
 [source,JSON]
 ----
@@ -113,7 +291,6 @@ MCP clients such as Claude Desktop, Windsurf, and Cursor do not support remote M
     }
   }
 }
-
 ----
 
 After updating the config file:
@@ -122,6 +299,7 @@ After updating the config file:
 . Restart your MCP client to load the new configuration.
 +
 If the connection is successful, you'll see an option to connect to ThoughtSpot and choose the data context. +
++
 For example, the Claude Desktop shows the *Add to ThoughtSpot* as shown in the following figure:
 +
 [.bordered]
@@ -135,21 +313,19 @@ For example, on Claude Desktop, click the Search and tools icon to view the MCP 
 [.bordered]
 [.widthAuto]
 image::./images/mcp-tools-claude.png[Claude Desktop]
-
++
 You can adjust tool access, resources, instructions to data models, object permissions, and user privileges as needed. To get insights, the user requires view access to the data source objects and data download privilege.
 
-=== Verify the query and response workflow
-
-* Select a data source to set the context of your query. +
-For example, on Claude Desktop, click the `+` icon and select a data source.
+. Select a data source to set the context of your query. +
+Click the `+` icon in Claude Desktop and select a data source.
 
 +
 [.bordered]
 [.widthAuto]
 image::./images/datasource-selection.png[Claude Desktop]
 
-* Ask an analytics question to trigger the query and response workflow.
-* Verify if the AI agent on your MCP client gets relevant data questions from ThoughtSpot and generates an Answer.
+. Ask an analytics question to trigger the query and response workflow.
+. Verify if the AI agent on your MCP client gets relevant data questions from ThoughtSpot and generates an Answer.
 +
 [.bordered]
 [.widthAuto]
@@ -160,13 +336,12 @@ image::./images/query-response-claude.png[Claude query response]
 [.widthAuto]
 image::./images/query-response-claude2.png[Claude query response 2]
 
-* Try sending a query to create a Liveboard and verify if a Liveboard is created on your ThoughtSpot instance.
+. Try sending a query to create a Liveboard and verify if a Liveboard is created on your ThoughtSpot instance.
 
 +
 [.bordered]
 [.widthAuto]
 image::./images/create-lb-claude.png[Liveboard creation]
-
 
 == Configuration considerations and best practices
 
