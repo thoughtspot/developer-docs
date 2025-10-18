@@ -57,6 +57,14 @@ __Limited availability on ThoughtSpot Cloud instances from 10.13.0.cl onwards. P
 ====
 ////
 
+=== Locale setting in API requests
+
+When using the xref:spotter-apis.adoc#_generate_a_single_answer[Single Answer] and xref:spotter-apis.adoc#_send_a_question_to_generate_answer[Send message] APIs, the locale used for API requests depends on your application's locale settings:
+
+* If your application is set to "Use browser language," the API will not apply the default locale. In this case, you must explicitly include the desired locale code in the `Accept-Language` header of your API request. If you do not specify the locale, the API may not return responses in the expected language or format.
+* If you have set a specific locale in your ThoughtSpot instance or user profile, the API will use this locale to generate responses, overriding the browser or OS locale
+
+To ensure consistent localization, set the `Accept-Language` header in your API requests when relying on browser language detection, or configure the locale explicitly in the user profile settings in ThoughtSpot.
 
 == Create a conversation session
 A conversation session acts as a container for maintaining continuity across user inputs, system responses, and agent-driven clarifications. Once created, users can send queries or ask follow-up questions to the  conversation session to explore data and get further insights.
@@ -82,17 +90,21 @@ To set the context for the conversation session, you must specify the metadata t
 [options='header']
 |=====
 |Form parameter| Description
-|`metadata_context` a| Defines the data context for the conversation. Specify the following values:
+|`metadata_context` a| Defines the data context for the conversation. The context type is mandatory.
+
+Specify the following values:
 
 * `type` +
 Metadata type. Valid values are:
-** `answer`  - To use an existing Spotter-generated Answer as the object
-** `liveboard` - To use an existing Liveboard as data object
-** `data_source` - To create a new conversation session using data objects such as Model.
-+
+** `data_source` - To set a data source context for the conversation session. +
+If the context type is `data_source`, you must define the `data_source_context` in the request payload.
+** `answer` - To use an existing Spotter-generated Answer as the object. +
+If the context type is `answer`, the user must provide both `data_source_context` and `answer_context` in the request payload.
+** `liveboard` - To use an existing Liveboard as context. +
+If the context type is `liveboard`, the user must provide  `data_source_context`, `liveboard_context`, and `answer_context` in the request payload.
 
 * `answer_context` +
-If the metadata type is set as `answer`, specify the following attributes:
+If the metadata type is set as `answer` or `liveboard`, specify the following attributes:
 ** `session_identifier`: __string__, Unique ID representing the answer session.
 ** `generation_number`: __Integer__. Specific generation/version number of the answer within a conversation session.
 +
@@ -101,7 +113,7 @@ The session identifier and generation numbers are assigned to the Answers genera
 * `liveboard_context` +
 If the metadata type is set as `liveboard`, specify the GUID of the Liveboard and visualization.
 * `data_source_context` +
-If the metadata type is set as `data_source`, specify the GUID of the data source object.
+Specify the GUID of the data source object.
 
 |`conversation_settings` a|__Optional__. Defines additional parameters for the conversation context. You can set any of the following attributes as needed:
 
@@ -114,6 +126,8 @@ __Boolean__. Allows Spotter to use reasoning for deep analysis and precise respo
 |=====
 
 ==== Example request
+
+The following example shows the request payload for the `data_source` context type:
 
 [source,cURL]
 ----
@@ -137,6 +151,63 @@ curl -X POST \
 }'
 ----
 
+The following example shows the request payload for the `liveboard` context type:
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_context": {
+    "type": "liveboard",
+    "answer_context": {
+      "session_identifier": "c3a00fa7-fd01-4d58-8c84-0704df986d9d",
+      "generation_number": 2
+    },
+    "liveboard_context": {
+      "liveboard_identifier": "cffdc614-0214-42ba-9f57-cb6e8312fe5a",
+      "visualization_identifier": "da0ed3da-ce1f-4071-8876-74d551b05faf"
+    },
+    "data_source_context": {
+      "guid": "54beb173-d755-42e0-8f73-4d4ec768114f"
+    }
+  },
+  "conversation_settings": {
+    "enable_contextual_change_analysis": false,
+    "enable_natural_language_answer_generation": true,
+    "enable_reasoning": false
+  }
+}'
+----
+
+The following example shows the request payload for the `answer` context type:
+
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_context": {
+    "type": "answer",
+    "answer_context": {
+      "session_identifier": "f131ca07-47e9-4f56-9e21-454120912ae1",
+      "generation_number": 1
+    },
+    "data_source_context": {
+      "guid": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    }
+  },
+  "conversation_settings": {
+    "enable_contextual_change_analysis": false,
+    "enable_natural_language_answer_generation": true,
+    "enable_reasoning": false
+  }
+}'
+----
+
 ==== API response
 
 If the API request is successful, the API returns the conversation ID. You can use this ID to send follow-up questions to the conversation session.
@@ -146,7 +217,7 @@ If the API request is successful, the API returns the conversation ID. You can u
 {"conversation_id":"q9tZYf_6WnFC"}
 ----
 
-Note the conversation ID for further agentic interactions and API calls.
+Note the conversation ID for subsequent agentic interactions and API calls.
 
 === Create a conversation session (legacy API endpoint)
 To create a conversation session, send a `POST` request body with the data source ID and search token string to the `/api/rest/2.0/ai/conversation/create` API endpoint.
@@ -728,6 +799,7 @@ To send a question to an ongoing conversation session or ask follow-up questions
 curl -X POST \
   --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/conversation/03f48527-b973-4efa-81fd-a8568a4f9e78/converse'  \
   -H 'Accept: application/json' \
+  -H 'accept-language: en-US', \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
@@ -815,7 +887,6 @@ The API retrains the context of the initial question and returns a response:
 |===
 ////
 
-
 == Generate a single Answer
 To generate an Answer from a natural language search query, send a `POST` request to the `/api/rest/2.0/ai/answer/create` API endpoint. In the request body, include the query and the data source ID.
 
@@ -836,6 +907,7 @@ To generate an Answer from a natural language search query, send a `POST` reques
 curl -X POST \
   --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/answer/create'  \
   -H 'Accept: application/json' \
+  -H 'accept-language: en-US', \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN} \
   --data-raw '{
@@ -874,7 +946,6 @@ Note the session ID and generation number. To export the result generated from t
   "tokens": "[product], [region] = [region].'west', sort by [sales] descending"
 }]
 ----
-
 
 [#process_results]
 == Process results generated from Spotter APIs
