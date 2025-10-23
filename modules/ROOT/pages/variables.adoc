@@ -6,8 +6,7 @@
 :page-pageid: variables
 :page-description: Use the variables REST API to create and update variables for publishing content across Orgs
 
-Variables allow you to define dynamic placeholders for specific properties of metadata objects such as Connections and Tables. By using variables, you can dynamically assign different values to the object properties for each Org and yet use a single source with a consistent data structure across different Orgs. Before publishing an object to other Orgs, define variables for each Org and assign these variables to the metadata object properties.
-
+Variables allow you to define dynamic placeholders for specific properties of metadata objects, such as Connections and Tables. By using variables, you can dynamically assign different values to the object properties for each Org and yet use a single source with a consistent data structure across different Orgs. Before publishing an object to other Orgs, define variables for each Org and assign these variables to the metadata object properties.
 
 [IMPORTANT]
 ====
@@ -17,11 +16,11 @@ Note the following enhancements and breaking changes introduced in ThoughtSpot C
 **  You can now create formula variables. To create a formula variable, use the `FORMULA_VARIABLE` type in the API request to the `/api/rest/2.0/template/variables/create` API endpoint .
 ** The variable creation endpoint `/api/rest/2.0/template/variables/create` doesn't support assigning values to a variable. To assign values to a variable, use the  `POST /api/rest/2.0/template/variables/update-values` API endpoint.
 
-* Variables update +
+* Variables update and value assignement +
 ** The `/api/rest/2.0/template/variables/update` is deprecated and replaced with `/api/rest/2.0/template/variables/{identifier}/update`. To update a variable, use the `POST /api/rest/2.0/template/variables/update` API endpoint.
 **  The resource path for updating multiple variable values has changed from `POST /api/rest/2.0/template/variables/{identifier}/update` to `/api/rest/2.0/template/variables/update-values`. To assign values to one or several variables, the  `POST /api/rest/2.0/template/variables/update-values` API endpoint.
 
-* Variables search +
+* Variable search+
 
 ** Filtering API response by `EDITABLE_METADATA_AND_VALUES` output format is no longer supported.
 
@@ -56,19 +55,19 @@ To define variables for connection properties per user or user group. This varia
 Formula variables.
 |`name`| __String__. Name of the variable. For example, `schema_var`.  Note that the name must be unique across all Orgs within the instance.
 |`sensitive` __Optional__ |__Boolean__. Indicates if the variable contains sensitive values such as passwords.
-|`data_type`|__String__. Variable data type. Required parameter for formula variables. Supported data types are:
+|`data_type` a|__String__. Variable data type. Required parameter for formula variables. Supported data types are:
 
 * `VARCHAR` +
 String. For example, "East", "Administrator", "Secure", "2025-10-23"
-* `INT32`
+* `INT32` +
 32-bit integer data type. For example, 100,-42
-* `INT64`
+* `INT64` +
 32-bit integer data type. For example, 0, 2147483647
 * `DOUBLE` +
 The Double data type refers to a floating point numeric type that is recommended for storing decimal values. For example, 3.14, -0.001, 100.0, 1.7E+308. In ThoughtSpot, DOUBLE  is used for columns that require floating point arithmetic or need to store decimal numbers, such as latitude and longitude or financial amounts.
-* `DATE`
+* `DATE` +
 Date format. For example, 2025-10-20.
-* `DATE_TIME`
+* `DATE_TIME` +
 Date with time stamp. For example, 2025-10-20 14:30:00.
 |=====
 ////
@@ -129,7 +128,7 @@ Note the variable ID.
 
 To update a variable or properties of a variable, use the following REST APIs:
 
-* `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable">POST /api/rest/2.0/template/variables/{identifier}/update</a>+++`
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable">POST /api/rest/2.0/template/variables/{identifier}/update</a>+++
 +
 Allows updating the properties of a variable.
 
@@ -203,7 +202,7 @@ The API endpoint allows:
 
 * Adding new values to variables
 * Replacing existing values
-* Deleting values from variables
+* Resetting values
 
 === Request parameters
 
@@ -213,29 +212,33 @@ In your `POST` request body, you can include the following parameters:
 [options='header']
 |=====
 |Parameter|Properties|Description
-.3+|`variable_assignment` 2+| Properties for assigning values to variables.
+.4+|`variable_assignment` 2+| Properties for setting values for a variable at a specific entity level such as Org, user, or user-group. This allows the same variable to have different values depending on which entity is being referenced.
 |`variable_identifier` a| __Array of strings__. Specify the variables to which you want to assign values.
 |`variable_values` a|__Array of strings__. Specify the values to assign. For example, `staging1`.
 |`operation` a| Specify the update operation type. The following values are available:
 
 * `ADD` +
-Adds new values if it's a list type. Use this operation type if you want to add new attributes to the variable.
+Adds new values. Use this operation type if you want to add new attributes to the variable.
 * `REPLACE` +
 Replaces the existing attributes with new values.
 * `REMOVE` +
-Removes the values assigned to the variable specified in the API request. Only list type variable values are removed.
-* `CLEAR` +
-Removes the current conditions assigned to a variable.
+Removes the values assigned to the variable. For example, you can remove the values assigned to a formula variable configured for an Org.
+* `RESET +
+Resets all values at the variable level. For example, if a variable is assigned to multiple entities such as Org, user, or user group, the reset operation clears the values assigned to the variable for all entities.
 
-.6+|`variable_value_scope` 2+| Set the scope for variable values.
+.5+|`variable_value_scope` 2+| Set the scope for variable values.
 | `org_identifier` a|__String__ +
 ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0.
 |`principal_type` and `principal_identifier` +
-__Optional__  a|__String__. Principal attributes such as user and user group. These attributes are applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.|
+__Optional__  a|__String__. Principal attributes such as user and user group. These attributes are applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
 |`model_identifier` a| ID or name of the Model.
 | `priority` +
 __Optional__ a|
-The priority assigned to this value. Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
+The priority assigned to this value. Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type. +
+Priority refers to the order of precedence when updating variable values for multiple entities in a single operation. If more than one entity matches the conditions during variable resolution, based on the value assigned to the priority, the system determines which entity’s value takes effect.
+For example, if both a user and their group have a value for the same variable, the system uses the priority to decide which value to apply.
+||
+|=====
 
 === Request example
 
@@ -272,7 +275,7 @@ To get a list of variables or the details of a specific variable, send a `POST` 
 To search for a variable, specify the following parameters in your API request:
 
 * variable details +
-Details such as variable type, ID, and name pattern. For name pattern search, specify partial name of the variable. For wildcard search, use `%`.
+Details such as variable type, ID, and name pattern. For name pattern search, specify the partial name of the variable. For wildcard search, use `%`.
 * variable value +
 Variable parameters such as Org ID, Model ID, ID and type of Principal object.
 * output format for response content +
