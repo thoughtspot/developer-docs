@@ -6,9 +6,9 @@
 :page-pageid: code-based-custom-action
 :page-description: You can add custom buttons or menu items in your ThoughtSpot code to the ThoughtSpot UI to let your application users to analyze insights and trigger an action on the data.
 
-Code-based custom actions are custom menu items that you define within the application's code through the Visual Embed SDK. Unlike the custom actions through
-the UI, this allows users to define custom actions using a few lines of code, specifying exactly where (target object) and how (placement in the UI) they should appear.
-Defining custom action through code make them easier to implement across Orgs, and also support advanced customization.
+Code-based custom actions are custom menu items that you define within the application's code through the Visual Embed SDK. These actions are executed when the user clicks on them.
+Unlike the custom actions through the UI, this allows users to define custom actions using a few lines of code, specifying exactly where (target object) and how (placement in the UI) they should appear.
+This makes it easier to implement these actions across Orgs, and also supports advanced customization.
 
 These custom actions add a new menu item to one of the following UI elements in an Answer, Liveboard, visualization, or in the Spotter interface:
 
@@ -16,6 +16,21 @@ These custom actions add a new menu item to one of the following UI elements in 
 * the **More** options menu image:./images/icon-more-10px.png[the more options menu]
 * the contextual menu that appears when a user right-clicks on an Answer or visualization (except for Liveboard)
 
+[NOTE]
+If a custom action for the primary menu bar is defined from the ThoughtSpot UI and also the application code, only the action created through the UI is shown.
+
+
+=== Implementation of custom actions through the Visual Embed SDK
+
+Custom Actions can be embedded through the Visual Embed SDK in the following two ways:
+
+**Via the init function**
+* Custom actions can be registered globally during SDK initialization.
+* This allows the action to be reused across multiple embedded objects.
+
+**Via individual embed functions**
+* Custom actions can be defined at the time of embedding a specific component like a Liveboard (LiveboardEmbed).
+* This provides more granular control over where and how these actions are shown.
 
 
 === Components of a code based custom action interface
@@ -42,15 +57,30 @@ These custom actions add a new menu item to one of the following UI elements in 
 
 |`metadataIds` a|_Optional_. Metadata-based filtering for actions. Valid values include: +
 
-* `answerIds`: Applicable Answer GUIDs
-* `liveboardIds`: Applicable Liveboard GUIDs
-* `vizIds`: Applicable Viz GUIDs
-* `dataModelIds`: Data model GUIDs, Column names from data models
-|`orgIds`| Restrict visibility to specific orgs. Unique identifier for the org(s).
+* `answerIds`: Applicable Answer ids
+* `liveboardIds`: Applicable Liveboard ids
+* `vizIds`: Applicable Viz ids
+|`dataModelIds` a|Data model ids, Column names
+|`orgIds`| Restrict visibility to specific Orgs. Unique identifier for the org(s).
 |`groupIds`| Restrict visibility to specific groups. Unique identifier for the group(s).
 |===
 
 === Code based custom action for Liveboards
+
+The custom action is applied to all Liveboards.
+
+[source,javascript]
+----
+const customActions = [
+    {
+        name: 'CA1',
+        id: 'ca1',
+        position: CustomActionPosition.PRIMARY,
+        target: CustomActionTarget.LIVEBOARD,
+    },
+];
+
+----
 
 The custom action is applied on a specific Liveboard, the `liveboardIds` is passed in the `metadataIds`.
 
@@ -90,6 +120,20 @@ const customActions = [
 ----
 
 === Code based custom action for Visualizations
+
+The custom action is applied to all Visualizations.
+
+[source,javascript]
+----
+const customActions = [
+    {
+        name: 'CA1',
+        id: 'ca1',
+        position:CustomActionPosition.PRIMARY,
+        target: CustomActionTarget.VIZ,
+    },
+];
+----
 
 The custom action is applied on all visualizations on a specific Liveboard, the `liveboardIds` is passed in the `metadataIds`. This custom action will also be visible to all new users who have access to the Liveboard.
 
@@ -179,7 +223,7 @@ const customActions = [
 
 When the answerId parameter is provided, the system displays custom actions only on the visualization(s) that use the specified underlying answerId.
 
-For example, consider a Liveboard (lb1) with three visualizations: viz1 (based on ans1), viz2 (based on ans2), and viz3 (based on ans3).
+In this example, consider a Liveboard (lb1) with three visualizations: viz1 (based on ans1), viz2 (based on ans2), and viz3 (based on ans3).
 
 * The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
 
@@ -202,13 +246,13 @@ const customActions = [
 
 ----
 
-When `worksheetId` is passed in the `dataModelIds`, then the custom action is show for all visualization which are using the columns of the specified worksheet.
+When `worksheetId` is passed in the `dataModelIds`, then the custom action is show for all visualization which are using the columns of the specified model.
 
-In this example,
+In this example:
 
 * The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
 
-* The custom action will also be shown for all visualizations built using the column(s) of worksheet1.
+* The custom action will also be shown for all visualizations built using the column(s) of model1.
 
 [source,javascript]
 ----
@@ -222,7 +266,7 @@ const customActions = [
             liveboardIds: ['lb2'],
         },
         dataModelIds: {
-            modelIds: ['worksheet1']
+            modelIds: ['model1']
 	  }
     },
 ];
@@ -231,11 +275,11 @@ const customActions = [
 
 When columnIds are provided, the custom action will be displayed only on visualizations that are created using the specified columnIds.
 
-In this example,
+In this example:
 
 * The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
 
-* The custom action will also be shown for all visualizations built using the col1 of worksheet1.
+* The custom action will also be shown for all visualizations built using the col1 of model1.
 
 
 [source,javascript]
@@ -250,20 +294,17 @@ const customActions = [
             liveboardIds: ['lb2'],
         },
         dataModelIds: {
-            modelColumnNames: ["worksheet1::col1"]
+            modelColumnNames: ["model1::col1"]
     },
 ];
 
 ----
 
 
-////
-In this example,
+In this example:
 
-* If the column is a part of the specified worksheet, the custom action will be shown for visualizations or answers built using col1 of worksheet1.
-* If the column is not a part of the specified worksheet,
-** The custom action will be shown for all visualizations or answers built using worksheet1, irrespective of the column.
-** The custom action will be shown for all visualizations or answers built using worksheet1, irrespective of the column.
+* The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
+* The custom action will also be shown for visualizations or answers built using col1 of model1.
 
 [source,javascript]
 ----
@@ -277,16 +318,55 @@ const customActions = [
             liveboardIds: ['lb2'],
         },
         dataModelIds: {
-            modelIds: ["worksheet1"],
-            modelColumnNames: ["col1"]
+            modelIds: ["model1" :: "col1"],
+
     },
 ];
 
 ----
-////
 
+
+In this example:
+
+* The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
+* If there is model1 which has col1, col2, and a model2 which has col2, the custom action will be shown for visualizations or answers built using col2 of model1.
+* If model2 does not have a col2, this will result in an error.
+
+[source,javascript]
+----
+const customActions = [
+    {
+        name: 'CA1',
+        id: 'ca1',
+        position: 'CustomActionPosition.PRIMARY,
+	    target: CustomActionTarget.VIZ,
+        metadataIds: {
+            liveboardIds: ['lb2'],
+        },
+        dataModelIds: {
+            modelIds: ["model1" :: "col2"],
+
+    },
+];
+
+----
 
 === Code based custom action for Answers
+
+The custom action is applied to all Answers.
+[source,javascript]
+----
+const customActions = [
+    {
+        name: 'CA1',
+        id: 'ca1',
+        position: CustomActionsPosition.PRIMARY,
+        target: CustomActionTarget.ANSWER,
+    },
+];
+
+----
+
 
 The custom action is applied on a specific Answer, the `answerIds` is passed in the `metadataIds`.
 
@@ -306,12 +386,12 @@ const customActions = [
 
 ----
 
-When a worksheetId or columnNames are specified, the custom action will be displayed for all answers which use the specified worksheet.
+When a worksheetId or columnNames are specified, the custom action will be displayed for all answers which use the specified model.
 In this example,
 
 * The custom action will be displayed for ans1, since the answerId is present.
 
-* The custom action will also be shown for all answers using worksheet1.
+* The custom action will also be shown for all answers using model1.
 
 [source,javascript]
 ----
@@ -325,7 +405,7 @@ const customActions = [
             answerIds: ['ans1'],
         },
         dataModelIds: {
-            worksheetIds: [worksheet1],
+            worksheetIds: [model1],
         },
     },
 ];
