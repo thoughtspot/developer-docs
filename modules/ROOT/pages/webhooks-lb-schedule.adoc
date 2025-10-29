@@ -1,4 +1,4 @@
-= Webhooks for Liveboard schedule events[beta betaBackground]^Beta^
+= Webhooks for Liveboard schedule events [beta betaBackground]^Beta^
 :toc: true
 :toclevels: 3
 
@@ -6,19 +6,17 @@
 :page-pageid: webhooks-lb-schedule
 :page-description: Configure Webhooks and send alerts to specific communication channels
 
-
-
 To provide flexibility and programmatic control for users who want to customize notifications and automate workflows based on Liveboard scheduling events, ThoughtSpot provides the ability to configure a webhook communication channel. By configuring a webhook, users can send notifications automatically to a target application whenever a scheduled Liveboard job is triggered in ThoughtSpot.
 
-Webhook support for Liveboard schedule events is available only on ThoughtSpot Cloud instances running 10.14.0.cl or later. This feature is currently in beta, and is not enabled by default. To enable this feature on your instance, contact ThoughtSpot Support.
+Webhook support for Liveboard schedule events is available only on ThoughtSpot Cloud instances running 10.14.0.cl or later. This feature is currently in beta and is not enabled by default. To enable this feature on your instance, contact ThoughtSpot Support.
 
 == Overview
 
-If you have scheduled a Liveboard job to receive a daily report via email, you can configure ThoughtSpot to send the report directly to the webhook endpoint such as your internal marketing or incident management app. With webhooks, you no longer need to manually handle the data received in email notifications from ThoughtSpot.
+If you have scheduled a Liveboard job to receive a daily report via email, you can configure ThoughtSpot to send the report directly to a webhook endpoint and create your own custom emails or workflow.
 
-To automate sending scheduled Liveboard notifications to a webhook endpoint, ThoughtSpot administrators must configure the following:
+To automate sending scheduled Liveboard notifications to a webhook endpoint, the following configuration is required:
 
-* A webhook communication channel. +
+* Ensure that "webhook" is selected as a communication channel for your Org or at the cluster level for all Orgs on your instance.  Ensure that “webhook” is selected as the communication channel for your Org, or at the cluster level for all Orgs in your instance.+
 Use the following REST APIs to set and view communication channel preferences:
 ** `POST /api/rest/2.0/system/preferences/communication-channels/configure`
 ** `POST /api/rest/2.0/system/preferences/communication-channels/search`
@@ -50,15 +48,13 @@ Check your application environment for the following prerequisites:
 
 * Ensure that you have access to a ThoughtSpot instance with the required permissions to set communication channel preferences, create and manage webhooks, and schedule Liveboard jobs. +
 If your instance has Role-based Access Control (RBAC) enabled, you must have the `CAN_MANAGE_WEBHOOKS` privilege to create and manage webhooks.
-* Ensure that the REST APIs for setting communication channel preference and configuring webhooks are enabled on your instance.
+* Ensure that the REST APIs for setting communication channel preference and configuring webhooks are enabled on your instance. If the APIs are not available on your instance, contact ThoughtSpot Support.
 * To allow outbound traffic from the ThoughtSpot to the webhook endpoint, add the webhook destination URL to the xref:security-settings.adoc#csp-connect-src[CSP connect-src] allowlist in ThoughtSpot.
 * Add the ThoughtSpot application URL as a trusted host in your Webhook destination endpoint/app.
 
-=== Configure a webhook communication channel for the Liveboard Schedule event
+=== Configure a webhook communication channel
 
-To create a webhook communication channel, use the system REST APIs.
-
-In the current release, ThoughtSpot supports configuring a communication channel only for Liveboard schedule events.
+To create a webhook communication channel for the Liveboard Schedule event, use the channel preference REST API.
 
 ==== Create a webhook communication channel
 
@@ -79,7 +75,8 @@ a|__String__. Type of the event for which communication channels are configured.
 __Array of strings__. Communication channel for the event type specified in the request. Valid values are: +
 
 * `EMAIL`
-* `WEBHOOK` +
+* `WEBHOOK`
+
 To create a webhook channel for the Liveboard schedule event, specify `WEBHOOK`.
 
 .5+| `org_preferences`  2+|__Array of strings__. By default, preferences configured at the cluster level will apply to all Orgs in the instance. To override the default preferences for your Org, set the Org-specific preferences:
@@ -93,20 +90,20 @@ __Array of strings__. Define the following parameters to set communication chann
 __String__. Type of the event for which communication channels are configured. For Liveboard schedule event, set the parameter value as `LIVEBOARD_SCHEDULE`.
 * `channels` +
 __Array of strings__. Communication channel for the event type specified in the request. Valid values are: +
-+
 ** `EMAIL`
-** `WEBHOOK` +
+** `WEBHOOK`
+
++
 To set up a webhook channel for the Liveboard schedule event, specify `WEBHOOK`.
 
 | `operation` a|__String__. Type of operation. The following options are available:
 
 ** `REPLACE` - To replace default preferences.
-** ``RESET` - To restore default preferences. For reset operation, you'll also need to specify the event type. Note that this operation will remove any Org-specific overrides and restores the default preferences configured at the cluster level.
+** `RESET` - To restore default preferences. For reset operation, you'll also need to specify the event type. Note that this operation will remove any Org-specific overrides and restores the default preferences configured at the cluster level.
 
 |`reset_events` a|__Array of strings__. For RESET operations, specify the event type to reset. Note that the reset operation removes  Org-specific configuration for the events specified in `reset_events`.
 |||
 |=====
-
 
 ===== Example request
 
@@ -130,7 +127,7 @@ curl -X POST \
 }'
 ----
 
-The following example shows the sample request for setting communication channel preference at the Org level.
+The following example shows the request body for setting a communication channel preference at the Org level.
 
 [source,cURL]
 ----
@@ -141,7 +138,7 @@ curl -X POST \
   --data-raw '{
   "org_preferences": [
     {
-      "org_identifier": "docstest",
+      "org_identifier": "testOrg1",
       "operation": "REPLACE",
       "preferences": [
         {
@@ -157,13 +154,11 @@ curl -X POST \
 ----
 
 ===== API response
-If the request is successful, the API returns a 204 response indicating successful operation.
+If the request is successful, the API returns a 204 response.
 
 ==== View the communication channel preferences
 
-To review and audit the communication channel preferences set on your instance, send a `POST` request to the `POST /api/rest/2.0/system/preferences/communication-channels/search` API endpoint.
-
-to audit, review, or display the current communication channel settings, ensuring compliance or troubleshooting notification issues.
+To review and audit the communication channel preferences set on your instance, send a `POST` request to the `/api/rest/2.0/system/preferences/communication-channels/search` API endpoint.
 
 ===== Request parameters
 
@@ -177,10 +172,10 @@ __Optional__ a|__Array of strings__. To filter API response by event type, speci
 | `org_preferences` +
 __Optional__ a|__Array of strings__. To filter API response by Org-specific overrides, specify the following parameters:
 
-* `org_identifier` __-String__. +
-Name or ID of the Org.
-* `event_types` __Array of strings__ +
-Event types to search for. To get channel preferences for Liveboard schedule events, specify `LIVEBOARD_SCHEDULE`.
+* `org_identifier`  +
+__String__. Name or ID of the Org.
+* `event_types` +
+__Array of strings__. Event types to search for. To get channel preferences for Liveboard schedule events, specify `LIVEBOARD_SCHEDULE`.
 |=====
 
 ===== Example request
@@ -213,7 +208,7 @@ curl -X POST \
   --data-raw '{
   "org_preferences": [
     {
-      "org_identifier": "docstest",
+      "org_identifier": "testOrg1",
       "event_types": [
         "LIVEBOARD_SCHEDULE"
       ]
@@ -258,7 +253,7 @@ The following example shows the communication preferences configured for the spe
     {
       "org": {
         "id": "2100019165",
-        "name": "docstest"
+        "name": "testOrg1"
       },
       "preferences": [
         {
@@ -283,7 +278,7 @@ The following example shows the preferences returned for a specific Org:
     {
       "org": {
         "id": "2100019165",
-        "name": "docstest"
+        "name": "testOrg1"
       },
       "preferences": [
         {
@@ -298,7 +293,7 @@ The following example shows the preferences returned for a specific Org:
 }
 ----
 
-=== Configure a webhook for the Liveboard Schedule event
+=== Configure a webhook
 
 To configure webhooks for the Liveboard schedule event, use the webhook REST API.
 
@@ -320,7 +315,7 @@ __Optional__ a|__String__. Description text for the webhook
 | `events` a|__Array of strings__. List of events to subscribe to. Specify the event as `LIVEBOARD_SCHEDULE`.
 |`authentication` a|
 
-Defines authentication method and credentials that ThoughtSpot will use when sending making HTTP requests to the webhook endpoint.
+Defines authentication method and credentials that ThoughtSpot will use when sending HTTP requests to the webhook endpoint.
 
 Specify the authentication type.
 
@@ -384,7 +379,7 @@ If the webhook creation is successful, the API returns the following response:
   "description": "Webhook for Liveboard schedule",
   "org": {
     "id": "2100019165",
-    "name": "docstest"
+    "name": "testOrg1"
   },
   "url": "https://webhook.site/6643eba5-9d3e-42a1-85e0-bb686ba1524d",
   "url_params": null,
@@ -446,7 +441,7 @@ curl -X POST \
   --data-raw '{
   "record_offset": 0,
   "record_size": 50,
-  "org_identifier": "docstest",
+  "org_identifier": "testOrg1",
   "event_type": "LIVEBOARD_SCHEDULE"
 }'
 ----
@@ -465,7 +460,7 @@ If the API request is successful, ThoughtSpot returns the webhook configuration 
       "description": "Webhook for Liveboard schedule",
       "org": {
         "id": "2100019165",
-        "name": "docstest"
+        "name": "testOrg1"
       },
       "url": "https://webhook.site/view/6643eba5-9d3e-42a1-85e0-bb686ba1524d/29c02fc2-c1c6-4b20-8d62-e8d51cf8dfb3",
       "url_params": null,
@@ -497,7 +492,7 @@ If the API request is successful, ThoughtSpot returns the webhook configuration 
 
 ==== Update the properties of a webhook
 
-To update the properties of a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/{webhook_identifier}/update` API endpoint.
+To update the name, description text, endpoint URL, or the authentication settings of a webhook object, send a `POST` request to the `/api/rest/2.0/webhooks/{webhook_identifier}/update` API endpoint.
 
 ===== Request parameters
 
@@ -512,6 +507,7 @@ Description text of the webhook.
 * `url` +
 The URL of the webhook endpoint.
 * `url_params` +
+Query parameters to append to the endpoint URL.
 * `events` +
 Events subscribed to the webhook. In the current release, ThoughtSpot supports only the `LIVEBOARD_SCHEDULE` event.
 * `authentication` +
@@ -521,7 +517,7 @@ Signature verification parameters for the webhook endpoint to verify the authent
 
 ===== Example request
 
-The following example shows the request body for updating the properties of a webhook:
+The following example shows the request body for updating the name, description text, and endpoint URL of a webhook object:
 
 [source,cURL]
 ----
@@ -548,11 +544,14 @@ If the API request is successful, the API returns a 204 response code indicating
 To delete a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/delete` endpoint.
 
 ===== Request parameters
+Specify the name or ID of the webhook to delete.
 
 [width="100%" cols="2,4"]
 [options='header']
 |=====
+|Parameter|Description
 |`webhook_identifiers` |__Array of strings__. ID of name of the webhooks to delete.
+||
 |=====
 
 ===== Example request
@@ -573,7 +572,7 @@ curl -X POST \
 
 ===== Example response
 
-If the API request is successful, ThoughtSpot details of the deleted webhook.
+If the API request is successful, the webhook is deleted, and the API returns the details of the deleted webhook in the response body.
 
 [source,JSON]
 ----
@@ -611,94 +610,275 @@ If the API request is successful, ThoughtSpot details of the deleted webhook.
 
 === Verify the webhook payload
 
-If the webhook channel is configured for Liveboard schedule events and a webhook is created for the event, it can be applied to all Liveboard schedules in an Org.
+After a webhook channel is configured for Liveboard schedule events and a webhook is created for these events at the Org level, it's applied to all Liveboard schedules in an Org.
 
-For testing purposes, you can use a URL from the link:https://webhook.site/[Webhook site, window=_blank] and check the payload when the Liveboard schedule event is triggered. You can also monitor the incoming requests on the link:https://webhook-test-server-263n.onrender.com/[Webhooks test site, window=_blank].
+When a Liveboard schedule event is triggered based on the conditions defined in the schedule, the webhook sends the payload with the following schema to the configured endpoint. Based on the Liveboard job settings, the payload includes metadata properties such as webhook communication channel ID, recipient details, Liveboard schedule details, event properties, and a link to the Liveboard.
 
-When a Liveboard schedule event is triggered based on the conditions defined in the schedule, the webhook sends the payload to the configured endpoint. Depending upon the Liveboard job settings, the payload includes metadata such as webhook communication channel ID, recipient details, Liveboard schedule details, event properties, and a link to the Liveboard.
+For testing purposes, you can use a URL from the link:https://webhook.site/[Webhook site, window=_blank] as a webhook endpoint and check the payload when the Liveboard schedule event is triggered.
+
+==== Contents of the webhook playload
+
+The Webhook payload uses a specific schema structure that determines the contents of the payload delivered to the webhook endpoint. The payload contains metadata about the event, the source, the actor, the target object, and event-specific data. The payload is typically sent as a form field named `payload` in a `multipart/form-data` request, with optional file attachments.
+
+For more information about the schema structure, refer to the following sections.
+
+===== WebhookResponse
+The `WebhookResponse` schema defines the standard response from webhook endpoints, confirming the webhook receipt and processing status.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type | Description | Required?
+| `status` | string | Status of the webhook payload processing.  | Yes
+| `message` | string | Message text about the result. For example, `Webhook received successfully`. | Yes
+| `time` | string | Timestamp when the response was generated. | Yes
+||||
+|=====
+
+===== WebhookPayload
+
+The `WebhookPayload` schema defines the structure for webhook event notifications, including event metadata, source, actor, target object, and event-specific data.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type | Description   | Required?
+
+| `eventId`  | string  | ID of each webhook event. For example, `n.820c00f9-d7ef-48e9-ab08-2ec1a48de0ab`. | Yes
+| `timestamp`  | string  | Timestamp of when the event occurred.   | Yes
+| `eventType`   | string  | Type of event that triggered the webhook payload. For example, `LIVEBOARD_SCHEDULE`.  | Yes
+| `schemaVersion` | string  | Schema version. | Yes
+| `source`  | object |Source endpoint that triggered the event. Includes the parameters defined in the  xref:webhooks-lb-schedule.adoc#_webhooksourceinfo[WebhookSourceInfo] schema.  | Yes
+| `actor`  | object  | Actor that initiated the event. For more information, see xref:webhooks-lb-schedule.adoc#_webhookactorinfo[WebhookActorInfo].   | Yes
+| `metadataObject` | object | Metadata object details. For more information, see xref:webhooks-lb-schedule.adoc#_webhooktargetobjectinfo[WebhookTargetObjectInfo]. | Yes
+| `data`  | object  |Data specific to the Liveboard schedule event. For more information, see xref:webhooks-lb-schedule.adoc#_liveboardscheduledata[LiveboardScheduleData]. | Yes
+||||
+|=====
+
+===== WebhookSourceInfo
+
+The `WebhookSourceInfo` schema defines the properties of source application instance that triggered the webhook event.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type | Description | Required?
+
+| `applicationName` | string | Application name. For example, ThoughtSpot. | Yes
+| `applicationUrl`  | string | The URL of the ThoughtSpot application instance.  | Yes
+| `instanceId` | string | ID of the ThoughtSpot instance that triggered the payload.              | Yes
+| `orgId` | string | ID of the Org context in ThoughtSpot from which the event payload is triggered.| Yes
+||||
+|=====
+
+===== WebhookActorInfo
+
+The `WebhookActorInfo` schema defines the properties of the entity that initiated the event.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type  | Description  | Required?
+
+| `actorType` | string | Initiator of the event such as the API client or user. The default actor type is `SYSTEM`. | Yes
+| `id`  | string a| Unique identifier such as GUID or object ID).For system-generated responses, the `id`  will be set as `null`.   | No
+| `name` | string a| Name of the actor that initiated the event. For system-generated responses, the `name` will be set as `null`.  | No
+| `email` | string a| Email of the actor that initiated the event. For system-generated responses, the `name` will be set as `null`.  | No
+||||
+|=====
+
+===== WebhookTargetObjectInfo
+
+The `WebhookTargetObjectInfo` schema defines the object for which the event is generated.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type  | Description   | Required?
+
+| `objectType` | string | Type of object. For Liveboard schedule events, the object will be `LIVEBOARD`.  | Yes
+| `id`  | string | Unique identifier of the Liveboard. | Yes
+| `name` | string | Name of the Liveboard. | Yes
+| `url`   | string | Link to the object in the ThoughtSpot application.  | No
+||||
+|=====
+
+===== LiveboardScheduleData
+
+The `WebhookTargetObjectInfo` schema defines event-specific data for Liveboard schedule events, including schedule details, recipients, and additional context.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field   | Type    | Description                        | Required
+
+| `scheduleDetails`  | object  | Details of the Liveboard schedule that triggered the event. This includes the schedule ID, object type, and output format. For more information, see xref:webhooks-lb-schedule.adoc#_scheduledetails[ScheduleDetails]. | Yes
+| `recipients` | array   | Details of the ThoughtSpot users, groups, and email addresses of the external users who are configured as subscribers of the Liveboard schedule notifications and recipients of the webhook payload. For more information, xref:webhooks-lb-schedule.adoc#_recipientinfo[RecipientInfo]. | Yes
+| `viewInfo`   | object  | Information about the Liveboard view. Applicable if the Liveboard Schedule event is triggered for a personalized view of the Liveboard. For more information, xref:webhooks-lb-schedule.adoc#_viewinfo[ViewInfo].  | No
+| `aiHighlights`  | string  | AI Highlights information. Applicable if AI highlights feature is enabled for the visualizations on the Liveboard.   | No
+| `msgUniqueId`   | string  | Unique message identifier. Unique ID of the webhook payload message. This ID can be used for traceability and deduplication on the receiving end.   | No
+| `channelID` | string  | The communication channel ID used for event dissemination. | No
+| `channelType` | string  | Type of the communication channel. The channel type used for webhook payloads is `webhook`.  | No
+| `communicationType`  | string  | Type of the messaging event. For Liveboard schedule events, the communication type will be `LiveboardSchedules`. | No
+||||
+|=====
+
+===== ScheduleDetails
+
+The `ScheduleDetails` schema defines the properties of the schedule that triggered the event, metadata, author, and export request.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|====
+| Field         | Type    | Description    | Required?
+| `scheduleId`    | string  | ID of the Liveboard schedule. | Yes
+| `name`          | string  | Name of the Liveboard schedule. | Yes
+| `creationTime`  | string  | Timestamp of when the schedule was created. | No
+| `description`   | string  | Description of the schedule.  | No
+| `authorId`      | string  | ID of the user that scheduled the Liveboard job. | No
+| `viewInfo`      | object  | Information about the Liveboard view. Applicable if the Liveboard Schedule event is triggered for a personalized view of the Liveboard. For more information, xref:webhooks-lb-schedule.adoc#_viewinfo[ViewInfo].  | No
+| `userIds`    | array   | IDs of the ThoughtSpot users that are subscribed to the scheduled Liveboard notifications.  | No
+| `groupIds`   | array   | IDs of the ThoughtSpot groups that are subscribed to the scheduled Liveboard notifications.| No
+| `runId`      | string  | Schedule run ID of the Liveboard job.  | No
+| `exportRequest` | object  | Details of the file export request. If the scheduled notification includes PDF attachment, the `exportRequest`  includes details of the Liveboard and PDF page attributes.  | No
+| `fileFormat`  | string  | File format for export. The schedule notification generally include PDF attachments. | No
+| `status`   | string  | Status of the schedule. | No
+| `emailIds`  | array   | Email IDs of users subscribed to Liveboard job schedule. | No
+||||
+|====
+
+===== RecipientInfo
+
+The `RecipientInfo` schema defines the object properties of the recipients of the scheduled notifications.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field   | Type   | Description | Required?
+
+|`type`  | string  a| Type of recipient. Valid types are:
+
+* `USER`  - For ThoughtSpot users
+* `EXTERNAL_EMAIL` - For external recipients | Yes
+
+| `id` | string | IDs of the ThoughtSpot user and groups that are subscribed to the Liveboard schedule. | No
+| `name` | string | Name of the recipient.  | No
+| `email` | string | Email address of the recipient. | Yes
+| `locale`| string | Locale of the recipient. For example, `en_US`. | No
+||||
+|=====
+
+
+===== ViewInfo
+
+The `ViewInfo` schema defines properties of the Liveboard view for which the event is generated.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|======
+| Field    | Type   | Description  | Required?
+
+| `viewId`   | string | ID of the Liveboard personalized view. | Yes
+| `viewName` | string | Name of the Liveboard personalized view. | Yes
+||||
+|======
+
+==== JSON payload example
 
 [source,JSON]
 ----
 {
+  "eventId": "n.18bd8bd5-dee3-4d5c-918e-aec3ba1a090f",
+  "timestamp": "2025-08-29T09:25:32Z",
+  "eventType": "LIVEBOARD_SCHEDULE",
+  "schemaVersion": "1.0",
+  "source": {
+    "applicationName": "ThoughtSpot",
+    "applicationUrl": "https://my.thoughtspot.cloud",
+    "instanceId": "3d85f2fe-8489-11f0-bdf8-5ba90",
+    "orgId": "2100019165"
+  },
   "actor": {
     "actorType": "SYSTEM"
   },
+  "metadataObject": {
+    "objectType": "LIVEBOARD",
+    "id": "c30a0d49-5747-475d-8985-e975b1c2cf6d",
+    "name": "Sample Liveboard (View: sample view name)",
+    "url": "https://my.thoughtspot.cloud/?utm_source=scheduled-pinboard&utm_medium=email#/pinboard/c30a0d49-5747-475d-8985-e975b1c2cf6d?view=a8118b21-4581-4315-8833-39b2aa5be542"
+  },
   "data": {
-    "aiHighlights": "",
-    "channelID": "873dd4e2-6493-490d-a649-ba9ea66b11f5",
-    "channelType": "webhook",
-    "communicationType": "LiveboardSchedules",
-    "msgUniqueId": "881fd036-5b2e-4e34-928c-e3839b2e5765",
-    "recipients": [
-      {
-        "email": "UserA@thoughtspot.com",
-        "id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-        "locale": "en_GB",
-        "name": "UserA",
-        "type": "USER"
-      }
-    ],
     "scheduleDetails": {
-      "authorId": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-      "creationTime": "2025-10-21T12:51:01Z",
-      "description": "",
-      "emailIds": [],
+      "scheduleId": "cffddca8-d4fc-4575-b8ec-a50e696ccdfc",
+      "name": "Sample Liveboard",
+      "creationTime": "2025-08-29T07:52:23Z",
+      "description": "Daily sales performance report",
+      "authorId": "59481331-ee53-42be-a548-bd87be6ddd4a",
+      "viewInfo": {
+        "viewId": "a8118b21-4581-4315-8833-39b2aa5be542",
+        "viewName": "sample view name"
+      },
+      "userIds": ["59481331-ee53-42be-a548-bd87be6ddd4a"],
+      "groupIds": [],
+      "runId": "29001ffd-6a84-45cd-a957-621fce89afc6",
       "exportRequest": {
+        "object_type": "LIVEBOARD",
+        "pdf_params": {
+          "orientation": "LANDSCAPE",
+          "page_size": "A4"
+        },
         "liveboard_params": {
-          "layout_type": "LIVEBOARD",
+          "layout_type": "VISUALIZATION",
+          "personalised_view_id": "a8118b21-4581-4315-8833-39b2aa5be542",
           "liveboard_viz_selection": {
-            "complete_liveboard": true
+            "complete_liveboard": false,
+            "included_viz_id": [
+              "efe80e30-ca82-4b83-a9c0-7371be45d3e6",
+              "957c9e37-0352-40ca-8d07-fb056a91332d"
+            ]
           },
-          "personalised_view_id": "",
           "print_document_params": {
-            "include_cover_page": false,
-            "include_filter_page": false,
+            "include_cover_page": true,
+            "include_filter_page": true,
             "pageFooterParams": {
               "include_logo": true,
               "include_page_number": true,
-              "text": ""
+              "text": "footer"
             }
           },
           "visualization_format_options": {
             "truncate_tables": true
           }
         },
-        "object_type": "LIVEBOARD",
-        "output_type": "PDF",
-        "pdf_params": {
-          "orientation": "LANDSCAPE",
-          "page_size": "A4"
-        },
         "request_type": "SCHEDULE"
       },
       "fileFormat": "pdf",
-      "groupIds": [],
-      "name": "Sales-LB - Custom",
-      "runId": "dc232f76-064f-4f40-a771-7c4a6f6a2906",
-      "scheduleId": "e4bd8b30-dfad-490a-b09a-a50e969f7d32",
       "status": "SCHEDULED",
-      "userIds": [],
-      "viewInfo": null
-    }
-  },
-  "eventId": "n.820c00f9-d7ef-48e9-ab08-2ec1a48de0ab",
-  "eventType": "LIVEBOARD_SCHEDULE",
-  "metadataObject": {
-    "id": "daeef525-926a-44fc-9dbf-7dfa993d913a",
-    "name": "Sales-LB",
-    "objectType": "LIVEBOARD",
-    "url": "https://my.thoughtspot.cloud/?utm_source=scheduled-pinboard&utm_medium=email&orgId=2100019165#/pinboard/daeef525-926a-44fc-9dbf-7dfa993d913a"
-  },
-  "schemaVersion": "1.0",
-  "source": {
-    "applicationName": "ThoughtSpot",
-    "applicationUrl": "hhttps://my.thoughtspot.cloud",
-    "instanceId": "672764c0-dc60-11ee-a6bf-13c83",
-    "orgId": "2100019165"
-  },
-  "timestamp": "2025-10-21T13:05:31Z"
+      "emailIds": []
+    },
+    "recipients": [
+      {
+        "type": "USER",
+        "id": "user-123",
+        "name": "John Doe",
+        "email": "john@company.com",
+        "locale": "en_US"
+      }
+    ],
+    "viewInfo": {
+      "viewId": "a8118b21-4581-4315-8833-39b2aa5be542",
+      "viewName": "sample view name"
+    },
+    "aiHighlights": "Sales increased by 15% compared to last quarter",
+    "msgUniqueId": "2f31df6a-2623-4953-a9bb-5af9b2922474",
+    "channelID": "6dfa4d82-fdc8-4d5b-8294-a5de0dd5ede1",
+    "channelType": "webhook",
+    "communicationType": "LiveboardSchedules"
+  }
 }
 ----
+
+////
 
 As shown in the preceding example, the JSON payload includes the following content:
 
@@ -728,6 +908,106 @@ Timestamp of when the event occurred.
 Source of the webhook payload trigger. This includes the ThoughtSpot application name, URL, instance ID, and the ID of the Org context in ThoughtSpot.
 
 Along with the JSON payload, if the Liveboard schedule is configured to send a PDF version of the Liveboard, a PDF attachment will be included in the payload.
+
+
+===== Example WebhookPayload
+
+[source,json]
+----
+{
+  "eventId": "n.18bd8bd5-dee3-4d5c-918e-aec3ba1a090f",
+  "timestamp": "2025-08-29T09:25:32Z",
+  "eventType": "LIVEBOARD_SCHEDULE",
+  "schemaVersion": "1.0",
+  "source": {
+    "applicationName": "ThoughtSpot",
+    "applicationUrl": "https://my.thoughtspot.cloud",
+    "instanceId": "3d85f2fe-8489-11f0-bdf8-5ba90",
+    "orgId": "0"
+  },
+  "actor": {
+    "actorType": "SYSTEM"
+  },
+  "metadataObject": {
+    "objectType": "LIVEBOARD",
+    "id": "c30a0d49-5747-475d-8985-e975b1c2cf6d",
+    "name": "Sample Liveboard (View: sample view name)",
+    "url": "https://my.thoughtspot.cloud/?utm_source=scheduled-pinboard&utm_medium=email#/pinboard/c30a0d49-5747-475d-8985-e975b1c2cf6d?view=a8118b21-4581-4315-8833-39b2aa5be542"
+  },
+  "data": {
+    "scheduleDetails": {
+      "scheduleId": "cffddca8-d4fc-4575-b8ec-a50e696ccdfc",
+      "name": "Sample Liveboard",
+      "creationTime": "2025-08-29T07:52:23Z",
+      "description": "Daily sales performance report",
+      "authorId": "59481331-ee53-42be-a548-bd87be6ddd4a",
+      "viewInfo": {
+        "viewId": "a8118b21-4581-4315-8833-39b2aa5be542",
+        "viewName": "sample view name"
+      },
+      "userIds": ["59481331-ee53-42be-a548-bd87be6ddd4a"],
+      "groupIds": [],
+      "runId": "29001ffd-6a84-45cd-a957-621fce89afc6",
+      "exportRequest": {
+        "object_type": "LIVEBOARD",
+        "pdf_params": {
+          "orientation": "LANDSCAPE",
+          "page_size": "A4"
+        },
+        "liveboard_params": {
+          "layout_type": "VISUALIZATION",
+          "personalised_view_id": "a8118b21-4581-4315-8833-39b2aa5be542",
+          "liveboard_viz_selection": {
+            "complete_liveboard": false,
+            "included_viz_id": [
+              "efe80e30-ca82-4b83-a9c0-7371be45d3e6",
+              "957c9e37-0352-40ca-8d07-fb056a91332d"
+            ]
+          },
+          "print_document_params": {
+            "include_cover_page": true,
+            "include_filter_page": true,
+            "pageFooterParams": {
+              "include_logo": true,
+              "include_page_number": true,
+              "text": "footer"
+            }
+          },
+          "visualization_format_options": {
+            "truncate_tables": true
+          }
+        },
+        "request_type": "SCHEDULE"
+      },
+      "fileFormat": "pdf",
+      "status": "SCHEDULED",
+      "emailIds": []
+    },
+    "recipients": [
+      {
+        "type": "USER",
+        "id": "user-123",
+        "name": "John Doe",
+        "email": "john@company.com",
+        "locale": "en_US"
+      }
+    ],
+    "viewInfo": {
+      "viewId": "a8118b21-4581-4315-8833-39b2aa5be542",
+      "viewName": "sample view name"
+    },
+    "aiHighlights": "Sales increased by 15% compared to last quarter",
+    "msgUniqueId": "2f31df6a-2623-4953-a9bb-5af9b2922474",
+    "channelID": "6dfa4d82-fdc8-4d5b-8294-a5de0dd5ede1",
+    "channelType": "webhook",
+    "communicationType": "LiveboardSchedules"
+  }
+}
+----
+////
+==== File attachments
+
+The payload also includes file attachments in the file format specified in the Liveboard schedule. The file format can be PDF, CSV, or XLSX.
 
 == Additional resources
 
