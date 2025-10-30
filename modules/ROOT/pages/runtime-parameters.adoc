@@ -97,23 +97,20 @@ Note the following behavior in Spotter embedding:
 * Users can see the Parameter value in formulas in edit mode, but only the value set for them will be visible.
 * Parameter values cannot be changed during a conversation session and may result in unintended effects.
 * If a user adds a Parameter to an answer through the edit flow, Spotter may drop this Parameter and any formulas using it in follow-up interactions. This means Parameters added in this way are not guaranteed to persist in subsequent conversational steps.
+* In Spotter embed, updating Parameters via host and embed events may not work as desired.
 
-=== Adjust Parameter values using SDK events
-After loading the embedded object, Parameters can be adjusted using the link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updateparameters[HostEvent.UpdateParameters] event as shown in these examples:
+=== Adjust Parameter values using a host event
+After loading the embedded object, Parameters can be adjusted using the link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updateparameters[HostEvent.UpdateParameters] event. +
+Developers can also set the Parameter chip visibility using the `isVisibleToUser` attribute in the `HostEvent.UpdateParameters` event payload.
 
 [source,JavaScript]
 ----
 liveboardEmbed.trigger(HostEvent.UpdateParameters, [{
         name: "Date List Param",
-        value: 1656914873
-        isVisibleToUser: true
-    }
-])
-----
-
-[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateParameters, [{
+        value: 1656914873,
+        isVisibleToUser: false
+    },
+    {
         name: "Integer Range Param",
         value: 10,
         isVisibleToUser: false
@@ -121,68 +118,41 @@ liveboardEmbed.trigger(HostEvent.UpdateParameters, [{
 ])
 ----
 
-[NOTE]
+[IMPORTANT]
 ====
-In Spotter embed, updating Parameters via host and embed events may not work.
+Although the SDK allows setting `isVisibleToUser` for multiple Parameters in a single `HostEvent.UpdateParameters` request, we do not recommend passing different values of `isVisibleToUser` in a single `HostEvent.UpdateParameters` request. If you need to set different `isVisibleToUser` values for different Parameters, make separate `HostEvent.UpdateParameters` requests for each distinct override.
 ====
 
 === Show or hide Parameter chips in embedded sessions
 
 Parameter values can be set or overridden using the following methods:
 
-* Using the `runtimeParameters` property in ThoughtSpot's Visual Embed SDK.
-* By triggering the `HostEvent.UpdateParameters` event in the SDK. To do this, load the page with parameters applied to the Liveboard or Answer, then override the parameter value using `HostEvent.UpdateParameters`.
-* By applying a Parameter override directly in the URL (if you are not using the Visual Embed SDK).
+* The `runtimeParameters` property in ThoughtSpot's Visual Embed SDK. +
+Hides Parameter chips by default, but the Parameter values are applied to visualizations.
+* The `HostEvent.UpdateParameters` event in the Visual Embed SDK. +
+Allows overriding Parameter values and setting `isVisibleToUser` to show or hide the chip. By default, `isVisibleToUser` is set to `false`, so the chip is hidden, but the Parameter value is applied to visualizations.
+* URL Parameter override (without SDK)  +
+Hides Parameter chips by default, but the value is applied to visualizations.
 
-When a parameter is set or its value is overridden, the parameter chip is hidden from the embedded page view by default.
+The following table describes parameter chip behavior in the embedded view:
 
-In some cases, you may want the Parameter chips to show in the ThoughtSpot UI after they are set or modified. To support such use cases, the Visual Embed SDK allows you to set the `isVisibleToUser` attribute in the `HostEvent.UpdateParameters` event payload.
-
-The following table describes parameter chip behavior in common configuration scenarios:
-
-==== Parameter chip behavior
-[width="100%" cols="5,7,8,8"]
+[width="100%" cols="5,6,8,8"]
 [options='header']
 |=====
-| How Parameter is set/updated
-| Parameter chip behaviour (default)
-| Update via `HostEvent.UpdateParameters`?
-| Can make the chip visible via `isVisibleToUser`?
-
-| Via `runtimeParameters` in the Visual Embed SDK
-| Hidden
-| Possible
-| No.
-
-
-| Via URL parameter override
-| Hidden
-| Possible
-| No.
-
-| Via `HostEvent.UpdateParameters`
-| Hidden
-| Possible
-| Yes. The chip visibility can be overridden by setting `isVisibleToUser` to `true`.
-
-| Set initially via `runtimeParameters` in the SDK, and then updated via `HostEvent.UpdateParameters`
-| Hidden
-| Possible
-| No. The chip visibility cannot be overridden by setting `isVisibleToUser` to `true`.
+|Parameter chip state|Initialization method| Update via `HostEvent.UpdateParameters`? | Can change chip visibility?
+|Visible a| No overrides applied | Possible a|Yes. By default, the chip will be hidden after an update via `HostEvent.UpdateParameters`.
+To retain chip visibility after an override, you must explicitly set `isVisibleToUser` to `true` in your `HostEvent.UpdateParameters` request.
+|Hidden a| Overrides applied via `runtimeParameters`  in the Visual Embed SDK | Possible | No
+|Hidden | Overrides applied via URL parameters| Possible| No
 |=====
 
-[NOTE]
-====
-If a Parameter chip is hidden, you cannot make it visible by changing the `isVisibleToUser` setting.
-====
-
 ==== Hide Parameter chips
-To hide the parameter chip in ThoughtSpot's UI, initialize a Parameter override before loading the ThoughtSpot page using one of the following methods:
+To hide the parameter chip, initialize a Parameter override before loading the ThoughtSpot page using one of the following methods:
 
-* Via `runtimeParameters` in Visual Embed SDK.
-* By applying a Parameter override directly in the URL (if you are not using the Visual Embed SDK).
+* The `runtimeParameters` object in the Visual Embed SDK
+* By applying a Parameter override directly in the URL
 
-Additionally, setting the `isVisibleToUser` attribute to `false` in the `HostEvent.UpdateParameters` code in the SDK will hide the chip for the modified parameter.
+You can also set the `isVisibleToUser` attribute to `false` in the `HostEvent.UpdateParameters` event payload to hide the chip after the Parameter update.
 
 [source,JavaScript]
 ----
@@ -193,8 +163,13 @@ liveboardEmbed.trigger(HostEvent.UpdateParameters, [{
 }])
 ----
 
-==== Show Parameter chip in ThoughtSpot UI
-To show the parameter chip in the ThoughtSpot UI, set the `isVisibleToUser` attribute to `true` in the `HostEvent.UpdateParameters` code and trigger the event after the page has loaded. The Parameter chip will then be displayed and updated with each new value passed via the event.
+==== Show Parameter chips
+
+To show a Parameter chip, update the Parameter value using `HostEvent.UpdateParameters` after the page has loaded. +
+
+Note that if a Parameter chip was hidden during initialization via `runtimeParameters` in the Visual Embed SDK or URL query parameters, its visibility cannot be modified. The chip will remain hidden in the embedded session regardless of the `isVisibleToUser` setting in the `HostEvent.UpdateParameters` payload.
+
+However, if a Parameter chip is visible after initialization, you can retain its state by setting `isVisibleToUser` to `true`:
 
 [source,JavaScript]
 ----
@@ -204,18 +179,6 @@ liveboardEmbed.trigger(HostEvent.UpdateParameters, [{
     isVisibleToUser: true
 }])
 ----
-////
-[width="100%" cols="5,5,8"]
-[options='header']
-|=====
-
-|Parameter chip behavior|Initialized via `runtimeParameters` or URL parameter? |Update via `HostEvent.UpdateParameters`
-|Hidden|Yes| Possible
-|Shown| No| Possible
-|=====
-
-////
-
 
 == Apply Parameter overrides via REST API
 
