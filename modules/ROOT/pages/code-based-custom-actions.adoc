@@ -1,0 +1,448 @@
+= Code based custom actions
+:toc: true
+:toclevels: 2
+
+:page-title: Code based custom actions
+:page-pageid: code-based-custom-action
+:page-description: You can add custom buttons or menu items in your ThoughtSpot code to the ThoughtSpot UI to let your application users to analyze insights and trigger an action on the data.
+
+Code-based custom actions are custom menu items that you define within the application's code through the Visual Embed SDK. These actions are executed when the user clicks on them.
+Unlike the custom actions through the UI, this allows users to define custom actions entirely within their code base, specifying exactly where (target object) and how (placement in the UI) they should appear.
+This makes it easier to implement these actions across Orgs, and also supports advanced customization.
+
+These custom actions add a new menu item to one of the following UI elements in an Answer, Liveboard, visualization, or in the Spotter interface:
+
+* the primary menu bar (except for Spotter)
+* the **More** options menu image:./images/icon-more-10px.png[the more options menu]
+* the contextual menu that appears when a user right-clicks on an Answer or visualization (except for Liveboard)
+
+[NOTE]
+If a custom action for the primary menu bar is defined both in the ThoughtSpot UI and in the application code, only the action created through the UI will be shown.
+
+
+=== Implementation of custom actions through the Visual Embed SDK
+
+Custom Actions can be embedded through the Visual Embed SDK in the following two ways:
+
+**Via the init function**
+
+* Custom actions can be registered globally during SDK initialization.
+* This allows the action to be reused across multiple embedded objects.
+
+**Via individual embed functions**
+
+* Custom actions can be defined at the time of embedding a specific component like a Liveboard (LiveboardEmbed).
+* This provides more granular control over where and how these actions are shown.
+
+
+=== Components of a code based custom action interface
+
+[width="100%" cols="4,5"]
+[options='header']
+|===
+|parameter|description
+
+|`name`|_String._ Display name for the custom action.
+|`id`|_String._ Unique identifier for the action.
+|`position` a|Position where the action should be rendered. Valid values include: +
+
+* `CustomActionsPosition.MENU`
+* `CustomActionsPosition.PRIMARY`
+* `CustomActionsPosition.CONTEXTMENU`
+
+|`target` a|The target object type where the action applies. Valid values include: +
+
+* `CustomActionTarget.LIVEBOARD`
+* `CustomActionTarget.VIZ`
+* `CustomActionTarget.ANSWER`
+* `CustomActionTarget.SPOTTER`
+
+|`metadataIds` a|_Optional_. Metadata-based filtering for actions. Valid values include: +
+
+* `answerIds`:__Array of Strings.__ Applicable Answer ids. Unique identifier (GUID) for the Answer.
+* `liveboardIds`: __Array of Strings.__ Applicable Liveboard ids. Unique identifier (GUID) for the Liveboard.
+* `vizIds`: __Array of Strings.__ Applicable Viz ids. Unique identifier (GUID) for the Visualization.
+|`dataModelIds` a|__Array of Strings.__ Unique identifier (GUID) for the data Model `modelIds` or column names `modelColumnNames`. Column names are represented in the array as : [`modelIds::columnName`].
+|`orgIds`|__Array of Strings.__ Restrict visibility to specific Orgs. Unique identifier for the org(s).
+|`groupIds`|__Array of Strings.__ Restrict visibility to specific groups. Unique identifier for the group(s).
+|===
+
+=== Code based custom action for Liveboards
+
+The custom action is applied to all Liveboards.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.LIVEBOARD,
+}, ];
+----
+
+The custom action is applied on a specific Liveboard, the `liveboardIds` is passed in the `metadataIds`.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.LIVEBOARD,
+    metadataIds: {
+        liveboardIds: ['lb1'],
+    },
+}, ];
+----
+
+The custom action is applied on a specific Liveboard with restricted visibility for a group of users in a particular Org. The `liveboardIds` is passed in the `metadataIds` along with the `groupId` and the `orgId`.
+
+[source,javascript]
+----
+const customActions = [{
+    name: "CA1",
+    id: "ca1",
+    position: CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.LIVEBOARD,
+    metadataIds: {
+        liveboardId: ['lb1'],
+    },
+    groupId: ['grp1'],
+    orgId: ['org1'],
+}, ];
+----
+
+=== Code based custom action for Visualizations
+
+The custom action is applied to all Visualizations.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.VIZ,
+}, ];
+----
+
+The custom action is applied on all visualizations on a specific Liveboard, the `liveboardIds` is passed in the `metadataIds`. This custom action will also be visible to all new users who have access to the Liveboard.
+
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.VIZ,
+    metadataIds: {
+        liveboardIds: ['lb1']
+    },
+}, ];
+----
+
+The custom action is applied on a specific visualization, the `vizIds` is passed in the `metadataIds`. In this example, the custom action
+will be shown on viz1 everywhere its pinned.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.VIZ,
+    metadataIds: {
+        vizIds: ['viz1']
+    },
+}, ];
+----
+
+
+When both `liveboardIds` and `vizIds` parameters are provided, the system will perform a union of all visualizations associated with the specified `liveboardIds` and the visualizations explicitly referenced by the provided `vizIds` values.
+
+In this example, Liveboard lb1 contains visualizations viz11 and viz12. Another Liveboard, lb2, contains visualizations viz21 and viz22.
+
+* For Liveboard lb2, a custom action will be displayed on all visualizations, since the liveboardId is present.
+
+* The custom action will also be shown only on the visualization with the id viz11 for Liveboard lb1.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.VIZ,
+    metadataIds: {
+        liveboardIds: ['lb2'],
+        vizIds: ['viz21', 'viz11']
+    },
+}, ];
+----
+
+When either `groupId`, `orgId`, or both are provided, custom actions will be displayed only for the visualization for the members of the specified groupId within the specified orgId.
+
+In this example, Liveboard lb1 contains visualizations viz11 and viz12. Another Liveboard, lb2, contains visualizations viz21 and viz22. For a user who is part of org1 and grp1,
+
+* The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
+
+* The custom action will also be shown for visualization viz11.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.VIZ,
+    metadataIds: {
+        liveboardIds: ['lb2'],
+        vizIds: ['viz21', 'viz11']
+    },
+    groupId: ['grp1'],
+    orgId: ['org1']
+}, ];
+----
+
+When the answerId parameter is provided, the system displays custom actions only on the visualization(s) that use the specified underlying answerId.
+
+In this example, consider a Liveboard (lb1) with three visualizations: viz1 (based on ans1), viz2 (based on ans2), and viz3 (based on ans3).
+
+* The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
+
+* The custom action will also be shown for viz1 and viz 3, as viz1 is explicitly included by vizId, and viz3 uses the specified answerId (ans3) as its underlying data source.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: 'CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.VIZ,
+    metadataIds: {
+        liveboardIds: ['lb2'],
+        vizIds: ['viz1'],
+        answerIds: ['ans3']
+    },
+}, ];
+
+----
+
+When `modelIds` is passed in the `dataModelIds`, then the custom action is show for all visualization which are using the columns of the specified model.
+
+In this example:
+
+* The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
+
+* The custom action will also be shown for all visualizations built using the column(s) of model1.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: 'CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.VIZ,
+    metadataIds: {
+        liveboardIds: ['lb2'],
+    },
+    dataModelIds: {
+        modelIds: ['model1']
+    }
+}, ];
+
+----
+
+
+When `modelColumnNames` are provided, the custom action will be displayed only on visualizations that are created using the specified `modelColumnNames`.
+
+In this example:
+
+* The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
+
+* The custom action will also be shown for all visualizations built using the col1 of model1.
+
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: 'CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.VIZ,
+    metadataIds: {
+        liveboardIds: ['lb2'],
+    },
+    dataModelIds: {
+        modelColumnNames: ["model1::col1"]
+    },
+}, ];
+----
+
+
+
+
+
+In this example:
+
+* The custom action will be displayed on all visualizations of Liveboard lb2, since the liveboardId is present.
+* If there is a model1 which has col1, col2, and a model2 which has col2, the custom action will be shown for visualizations or answers built using col2 of model1.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: 'CustomActionPosition.PRIMARY,
+    target: CustomActionTarget.VIZ,
+    metadataIds: {
+        liveboardIds: ['lb2'],
+    },
+    dataModelIds: {
+        modelIds: ["model1"::"col2"],
+    },
+}, ];
+
+----
+
+=== Code based custom action for Answers
+
+The custom action is applied to all Answers.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionsPosition.PRIMARY,
+    target: CustomActionTarget.ANSWER,
+}, ];
+----
+
+
+The custom action is applied on a specific Answer, the `answerIds` is passed in the `metadataIds`.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionsPosition.PRIMARY,
+    target: CustomActionTarget.ANSWER,
+    metadataIds: {
+        answerIds: ['ans1'],
+    },
+}, ];
+
+----
+
+When a `modelIds` is specified, the custom action will be displayed for all answers which use the specified model.
+
+In this example:
+
+* The custom action will be displayed for ans1, since the answerId is present.
+
+* The custom action will also be shown for all answers using model1.
+
+[source,javascript]
+----
+const customActions = [{
+    name: "CA1",
+    id: 'ca1',
+    position: CustomActionsPosition.PRIMARY,
+    target: CustomActionTarget.ANSWER,
+    metadataIds: {
+        answerIds: ['ans1'],
+    },
+    dataModelIds: {
+        modelIds: [model1],
+    },
+}, ];
+----
+
+When a `modelColumnNames` is specified, the custom action will be displayed for all answers which use the specified model.
+
+In this example:
+
+* The custom action will be displayed for ans1, since the answerId is present.
+
+* The custom action will also be shown for all answers using col1 from model1.
+
+[source,javascript]
+----
+const customActions = [{
+    name: "CA1",
+    id: 'ca1',
+    position: CustomActionsPosition.PRIMARY,
+    target: CustomActionTarget.ANSWER,
+    metadataIds: {
+        answerIds: ['ans1'],
+    },
+    dataModelIds: {
+        modelColumnNames: ["model1::col1"],
+    },
+}, ];
+----
+
+When either `groupId`, `orgId`, or both are provided, custom actions will be displayed only for the members of the specified groupId within the specified orgId, on the answers with the given answerId.
+
+In this example, the custom action will be displayed on ans1 for users who are a part of org1, and also a member grp1.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionsPosition.PRIMARY,
+    target: CustomActionTarget.ANSWER,
+    metadataIds: {
+        answerIds: ['ans1'],
+    },
+    groupId: ['grp1'],
+    orgId: ['org1'],
+}, ];
+
+----
+
+=== Code based custom action for Spotter
+
+When a `modelIds` is specified, custom actions will be displayed on all answers and visualizations generated from that model, as well as in any Liveboard where these answers have been pinned.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionPosition.MENU,
+    target: CustomActionTarget.SPOTTER,
+    dataModelIds: {
+        modelIds: ['model1']
+    },
+}, ];
+----
+
+
+When either `groupId`, `orgId`, or both are provided, custom actions will be displayed on all answers and visualizations generated from that model, as well as in any Liveboard where these answers have been pinned. This will be shown only for the members with the specific groupId within the specified orgId.
+
+In this example, for a user who is part of org1 and grp1,
+
+* The custom action will be displayed for answers and visualizations generated from model1.
+
+* The custom action will also be shown in any Liveboard where these answers have been pinned.
+
+[source,javascript]
+----
+const customActions = [{
+    name: 'CA1',
+    id: 'ca1',
+    position: CustomActionPosition.MENU,
+    target: CustomActionTarget.SPOTTER,
+    dataModelIds: {
+        modelIds: ['model1']
+    },
+    groupId: ['grp1'],
+    orgId: ['org1']
+}, ];
+----
