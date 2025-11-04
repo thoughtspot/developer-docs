@@ -6,24 +6,44 @@
 :page-pageid: runtime-filters
 :page-description: Apply filters to visualizations at runtime and pass them as URL parameters
 
-Runtime filters provide the ability to apply filters to a Liveboard or Answer by passing filter properties as query parameters in a Liveboard or visualization URL. You can also apply runtime filters in REST API requests when querying data from a Liveboard, Answer, or a visualization object. On embedded instances, you can use the Visual Embed SDK to apply filters to an embedded Liveboard or Answer object, and also update filters using events.
+Runtime filters allow you to apply filters on a Liveboard, Answer, visualization, or conversation session with Spotter. These filters are not persistent filters saved in the object, but are applied dynamically at runtime. You can use runtime filters to pre-filter content for your application users based on context and embedding app's requirements.
 
-== How runtime filters work
+== Overview
 
-The runtime filters can be specified in the ThoughtSpot object URL as query parameters. When you apply a runtime filter to a Liveboard, ThoughtSpot will try to find a matching column in the Liveboard visualizations to filter data. The runtime filter requires the following attribute-value pairs.
+Runtime filters can be applied using one of the following options:
+
+* Via Visual Embed SDK +
+Use the `runtimeFilters` property in the Visual Embed SDK for embedded objects. +
+The SDK also provides host events to update filters.
+* Via REST APIs
+Use REST API requests to apply runtime overrides on Liveboard, Answer, or visualization data.
+* Via URL query parameters +
+Pass filter properties as query parameters in the URL.
+
+[IMPORTANT]
+====
+* The runtime filters operation returns an error if the URL exceeds 2000 characters.
+* Attempting to override existing filter values with runtime filters while exporting a Liveboard will result in an error.
+* If a Model has a column alias, do not use the alias in runtime filters. Instead, use the underlying base column name.
+====
+
+=== Runtime filter properties
+
+A runtime filter consists of the following attributes:
 
 column name::
-__String__. Name of the column to filter by. For example, `item type` or `product`. This attribute is defined as `col1`, `col2`, `col3` in the object URLs and REST API requests, and as `columnName` in the `runtimeFilters` array in the Visual Embed SDK.
+__String__. Name of the column to filter on. For example, `item type` or `product`. This attribute is defined as `col1`, `col2`, `col3` in the object URLs and REST API requests, and as `columnName` in the `runtimeFilters` array in the Visual Embed SDK.
 
 operator::
 __String__. The xref:runtime-filters.adoc#rtOperator[runtime filter operator]. For example, `EQ` or `IN`. In the Visual Embed SDK, operators are specified as xref:runtime-filters.adoc#runtimeFilterOp[`operator`] in the `runtimeFilters` array, whereas in the object URLs and REST API requests, you can define the operator as `op1`, `op2`, and `op3`.
 
 values::
-__String, Integer, or Boolean__. The list of operands. For example, if the column name is defined as `State`, the value can be the name of the state like `Michigan`.
+__String, Integer, or Boolean__. The values to filter by. For example, if the column name is defined as `State`, the value can be the name of the state like `Michigan`.
 +
 This attribute is defined as `val1`, `val2`, `val3` in the object URLs and REST API requests, and as `values` in the `runtimeFilters` array in the Visual Embed SDK.
 +
 Some operators like `EQ` and `LE` accept a single operand, whereas `BW_INC_MAX`, `BW_INC_MIN`, `BW_INC`, `BW`, and `IN` accept multiple operands.
+
 
 === Supported data types
 
@@ -118,44 +138,56 @@ new Date('2020-05-22').getTime() / 1000
 |multiple
 |===
 
-== Apply runtime filters on embedded objects
 
-If you are xref:embed-without-sdk.adoc[embedding a Liveboard or visualization without using the Visual Embed SDK], you can append the filters in the embedded object URL as shown in these examples:
+== Runtime filters in Visual Embed SDK
 
-----
-https://{ThoughtSpot-Host}/?embedApp=true&col1=State&op1=EQ&val1=michigan#/embed/viz/{Liveboard_id}/{visualization_id}
-----
-
-----
-https://{ThoughtSpot-Host}/?embedApp=true&col1=State&op1=EQ&val1=michigan&col2=product&op2=BEGINS_WITH&val2=Travel#/embed/viz/{Liveboard_id}/{visualization_id}
-----
-
-=== Runtime filters in Visual Embed SDK
-
-If you are embedding a Liveboard, visualization, or Answer using xref:VisualEmbedSdk.adoc[Visual Embed SDK], you can apply filters using the `runtimeFilters` property. In the full app embed mode, ThoughtSpot applies runtime filters on all Liveboard, visualization, and Answer objects in the embedded app.
+If you are embedding Spotter, Liveboard, visualization or the full application using Visual Embed SDK, you can apply filters using the `runtimeFilters` property. In the full app embed mode, ThoughtSpot applies runtime filters on all Liveboard, visualization, and Answer objects in the embedded app.
 
 The following example shows how to apply runtime filters on an embedded visualization in the SDK. Here, the runtime filter is operating on the `Revenue` column to filter the data matching `100000`.
 
+[source,JavaScript]
 ----
-liveboardEmbed.render({
+const liveboardEmbed = new LiveboardEmbed('#tsEmbed', {
+    ... // other embed view config
     liveboardId: '133e6c5f-e522-41a0-b0ad-b9c3b066e276',
     vizId: '28b73b4a-1341-4535-ab71-f76b6fe7bf92',
-      runtimeFilters: [{
-      columnName: 'Revenue',
-      operator: RuntimeFilterOp.EQ,
-      values: ['100000' ]
-      }]
-  });
+    runtimeFilters: [{
+        columnName: 'Revenue',
+        operator: RuntimeFilterOp.EQ,
+        values: ['100000']
+    }]
+});
 ----
 
-==== Apply multiple runtime filters in the SDK
+In the following example, runtime filters are applied on a Spotter conversation session with a pre-defined search query string:
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed('#tsEmbed', {
+    ... // other embed view config
+    worksheetId: "cd252e5c-b552-49a8-821d-3eadaa049cca",
+    searchOptions: {
+        searchQuery: 'sales data for west coast',
+    },
+    runtimeFilters: [{
+        columnName: 'Item type',
+        operator: RuntimeFilterOp.EQ,
+        values: ['jackets']
+    }]
+});
+----
+
+Spotter applies the specified filters to the data and returns an answer for the initial query passed in the embed code. Unless the filters are explicitly overridden, runtime filters will continue to be applied to all answers generated for subsequent queries within the same conversation session.
+
+=== Applying multiple runtime filters
 
 The following examples show how to apply multiple runtime filters on Liveboard visualizations using the SDK:
 
 [#multiRuntimeFilters]
 [source,JavaScript]
 ----
-liveboardEmbed.render({
+const liveboardEmbed = new LiveboardEmbed('#tsEmbed', {
+    ... // other embed view config
     liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
     runtimeFilters: [{
             columnName: 'item type', // eg: color
@@ -209,7 +241,6 @@ runtimeFilters: [{
 ]
 ----
 
-
 [#runtimeFilterOp]
 === Runtime filter operator examples
 
@@ -226,14 +257,11 @@ a|
 
 [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'state',
-        operator: RuntimeFilterOp.EQ,
-        values: ['california']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'state',
+     operator: RuntimeFilterOp.EQ,
+     values: ['california']
+ }]
 ----
 
 | `NE` +
@@ -241,14 +269,11 @@ Not exactly or Not equal to +
 Number of values allowed: 1
 a| [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'item type',
-        operator: RuntimeFilterOp.NE,
-        values: ['jackets']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'item type',
+     operator: RuntimeFilterOp.NE,
+     values: ['jackets']
+ }]
 ----
 
 | `LT` +
@@ -258,14 +283,11 @@ Number of values allowed: 1
 a|
 [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'revenue',
-        operator: RuntimeFilterOp.LT,
-        values: ['1000000']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'revenue',
+     operator: RuntimeFilterOp.LT,
+     values: ['1000000']
+ }]
 ----
 
 | `LE` +
@@ -274,14 +296,11 @@ Number of values allowed: 1
 a|
 [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'revenue',
-        operator: RuntimeFilterOp.LE,
-        values: ['5000000']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'revenue',
+     operator: RuntimeFilterOp.LE,
+     values: ['5000000']
+ }]
 ----
 
 | `GT` +
@@ -290,14 +309,11 @@ Number of values allowed: 1 +
 a|
 [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'revenue',
-        operator: RuntimeFilterOp.GT,
-        values: ['1000000']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'revenue',
+     operator: RuntimeFilterOp.GT,
+     values: ['1000000']
+ }]
 ----
 | `GE` +
 greater than or equal to +
@@ -305,14 +321,11 @@ Number of values allowed: 1 +
 a|
 [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'revenue',
-        operator: RuntimeFilterOp.GE,
-        values: ['5000000']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'revenue',
+     operator: RuntimeFilterOp.GE,
+     values: ['5000000']
+ }]
 ----
 
 | `CONTAINS` +
@@ -321,14 +334,11 @@ Number of values allowed: 2 +
 a|
 [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'item type',
-        operator: RuntimeFilterOp.CONTAINS,
-        values: ['Bags']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'item type',
+     operator: RuntimeFilterOp.CONTAINS,
+     values: ['Bags']
+ }]
 ----
 
 See also, xref:runtime-filters.adoc#_and_and_or_conditions_in_filters[AND/OR conditions in filters],  for information about the AND and OR condition for filters.
@@ -339,15 +349,11 @@ Number of values allowed: 1 +
 a|
 [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-     runtimeFilters: [{
-          columnName: 'product',
-          operator: RuntimeFilterOp.BEGINS_WITH,
-          values: ['travel']
-     }],
-
-});
+ runtimeFilters: [{
+     columnName: 'product',
+     operator: RuntimeFilterOp.BEGINS_WITH,
+     values: ['travel']
+ }],
 ----
 
 | `ENDS_WITH` +
@@ -355,14 +361,11 @@ ends with +
 Number of values allowed: 1 +
 a| [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'item type',
-        operator: RuntimeFilterOp.ENDS_WITH,
-        values: ['shirts']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'item type',
+     operator: RuntimeFilterOp.ENDS_WITH,
+     values: ['shirts']
+ }]
 ----
 
 | `BW_INC_MAX` +
@@ -370,14 +373,11 @@ between inclusive of the higher value +
 Number of values allowed: 2 +
 a| [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'revenue',
-        operator: RuntimeFilterOp.BW_INC_MAX,
-        values: ['25','30']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'revenue',
+     operator: RuntimeFilterOp.BW_INC_MAX,
+     values: ['25', '30']
+ }]
 ----
 
 | `BW_INC_MIN` +
@@ -385,14 +385,11 @@ between inclusive of the lower value +
 Number of values allowed: 2 +
 a| [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'revenue',
-        operator: RuntimeFilterOp.BW_INC_MIN,
-        values: ['25','50']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'revenue',
+     operator: RuntimeFilterOp.BW_INC_MIN,
+     values: ['25', '50']
+ }]
 ----
 
 | `BW_INC` +
@@ -401,14 +398,11 @@ Number of values allowed: 2 +
 a|
 [source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'sales',
-        operator: RuntimeFilterOp.BW_INC,
-        values: ['10','50']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'sales',
+     operator: RuntimeFilterOp.BW_INC,
+     values: ['10', '50']
+ }]
 ----
 
 | `BW` +
@@ -416,14 +410,11 @@ between non-inclusive +
 Number of values allowed: 2 +
 a|[source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'sales',
-        operator: RuntimeFilterOp.BW,
-        values: ['25','50']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'sales',
+     operator: RuntimeFilterOp.BW,
+     values: ['25', '50']
+ }]
 ----
 
 |`IN` +
@@ -431,33 +422,25 @@ is included in this list of values +
 Number of values allowed: multiple
 a|[source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'item type',
-        operator: RuntimeFilterOp.IN,
-        values: ['jackets', 'bags', 'shirts']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'item type',
+     operator: RuntimeFilterOp.IN,
+     values: ['jackets', 'bags', 'shirts']
+ }]
 ----
 |`NOT_IN` +
 is not included in this list of values
 a|[source,JavaScript]
 ----
-liveboardEmbed.render({
-    liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
-    runtimeFilters: [{
-        columnName: 'item type',
-        operator: RuntimeFilterOp.NOT_IN,
-        values: ['skirts', 'bags']
-    }]
-});
+ runtimeFilters: [{
+     columnName: 'item type',
+     operator: RuntimeFilterOp.NOT_IN,
+     values: ['skirts', 'bags']
+ }]
 ----
-
-
 |=====
 
-==== Example video
+==== Example
 
 The following video shows how to apply multiple runtime filters on a Liveboard.
 
@@ -472,21 +455,21 @@ video::./images/runtime-filters.mp4[width=100%,options="autoplay,loop"]
 --
 
 === Adjust runtime filters using SDK events
-Runtime filters can be set prior to the load within the link:https://developers.thoughtspot.com/docs/Interface_LiveboardViewConfig#_runtimefilters[configuration object] of the loaded embed component:
+Runtime filters can be set prior to the load within the xref:LiveboardViewConfig.adoc#_runtimefilters[configuration object] of the loaded embed component:
 
 [source,JavaScript]
 ----
- const embed = new LiveboardEmbed('#embed-container', {
+ const liveboardEmbed = new LiveboardEmbed('#embed-container', {
      ... // other options
      runtimeFilters: [{
-         columnName: 'value',
+         columnName: 'state',
          operator: RuntimeFilterOp.EQ,
-         values: ['string' | 123 | true],
+         values: ['california'],
      }, ],
  })
 ----
 
-After loading the embedded object, runtime filters can be adjusted using the `HostEvent.UpdateRuntimeFilters` event:
+After loading the embedded object, runtime filters can be adjusted using the xref:HostEvent.adoc#_updateruntimefilters[`HostEvent.UpdateRuntimeFilters`] event:
 
 [source,JavaScript]
 ----
@@ -503,9 +486,24 @@ liveboardEmbed.trigger(HostEvent.UpdateRuntimeFilters, [{
 ])
 ----
 
-For more information, see xref:HostEvent.adoc#_updateruntimefilters[UpdateRuntimeFilters] and xref:embed-events.adoc#_filters_in_embedded_ui[Filters in embedded UI].
+[NOTE]
+====
+Spotter embed does not support updating filters via host and embed events.
+====
 
-=== URL format when embedding without SDK
+=== Apply runtime filters on embedded objects without the SDK
+
+If you are xref:embed-without-sdk.adoc[embedding a Liveboard or visualization without using the Visual Embed SDK], you can append the filters in the embedded object URL as shown in these examples:
+
+----
+https://{ThoughtSpot-Host}/?embedApp=true&col1=State&op1=EQ&val1=michigan#/embed/viz/{Liveboard_id}/{visualization_id}
+----
+
+----
+https://{ThoughtSpot-Host}/?embedApp=true&col1=State&op1=EQ&val1=michigan&col2=product&op2=BEGINS_WITH&val2=Travel#/embed/viz/{Liveboard_id}/{visualization_id}
+----
+
+==== URL format when embedding without SDK
 
 If embedding a ThoughtSpot Liveboard without the SDK, ensure that add the runtime filters before `#/path` in the URL as shown in the following example:
 ----
@@ -514,61 +512,8 @@ https://{ThoughtSpot-Host}/?embedApp=true&col1=State&op1=EQ&val1=michigan#/embed
 
 For more information, see xref:embed-without-sdk.adoc[Embed without SDK].
 
-== Apply runtime filters via REST APIs
 
-=== REST API v1 endpoints
-
-To apply runtime filters on a Liveboard object in a REST API request, add the runtime filters to the API request URL as shown here:
-
-.URL format
-----
-https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?id={Liveboard_id}&col1={column-name}&op1={operator}&val1={value}
-----
-
-.Example
-----
-https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?id=e36ee65e-64be-436b-a29a-22d8998c4fae&col1=State&op1=EQ&val1=California
-----
-
-The following example shows how to apply a runtime filter on a visualization object of a Liveboard:
-
-.URL format
-----
-https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?id={Liveboard_id}&vizid={visualization_id}&col1={column-name}&op1={operator}&val1={value}
-----
-
-.Example
-----
-https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?id=543619d6-0015-4667-b257-eff547d13a12&vizid=%5B%224ff5b939-453d-40ff-8fc2-a1d972047c86%22%5D&col1=State&op1=EQ&val1=California
-----
-
-The following is another example of a REST API request URL with a filter. Here the runtime filter is operating on the column `Category` and returning values that are equal to `mfgr%2324`.
-
-----
-https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?
-id=e36ee65e-64be-436b-a29a-22d8998c4fae&col1=Category
-&op1=EQ&val1=mfgr%2324
-----
-
-==== Apply additional filters
-
-You can add additional filters by incrementing the number at the end of each parameter in the runtime filter for each filter you add, for example, col2, op2, val2, and so on. To add additional filters on a particular column, you can specify multiple values by separating them with an ampersand (&) as shown in the example here:
-
-----
-val1=foo&val1=bar
-----
-
-You can also use the `IN` operator for multiple values, as shown in this example:
-
-----
-col1=<column_name>&op1=IN&val1=<value>&val1=<value>
-----
-
-The following example passes multiple variables to a single column as well as multiple columns. It shows that the data values are returned as epochs.
-
-----
-col1=region&op1=IN&val1=midwest&val1=south&val1=northeast&col2=date&op2=BET&val2=<epoch_start>&val2=<epoch_end>
-----
+== Runtime filters via REST APIs
 
 === REST API v2.0 endpoints
 
@@ -714,6 +659,60 @@ curl -X POST \
 }'
 ----
 
+=== REST API v1 endpoints
+
+To apply runtime filters on a Liveboard object in a REST API request, add the runtime filters to the API request URL as shown here:
+
+.URL format
+----
+https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?id={Liveboard_id}&col1={column-name}&op1={operator}&val1={value}
+----
+
+.Example
+----
+https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?id=e36ee65e-64be-436b-a29a-22d8998c4fae&col1=State&op1=EQ&val1=California
+----
+
+The following example shows how to apply a runtime filter on a visualization object of a Liveboard:
+
+.URL format
+----
+https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?id={Liveboard_id}&vizid={visualization_id}&col1={column-name}&op1={operator}&val1={value}
+----
+
+.Example
+----
+https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?id=543619d6-0015-4667-b257-eff547d13a12&vizid=%5B%224ff5b939-453d-40ff-8fc2-a1d972047c86%22%5D&col1=State&op1=EQ&val1=California
+----
+
+The following is another example of a REST API request URL with a filter. Here the runtime filter is operating on the column `Category` and returning values that are equal to `mfgr%2324`.
+
+----
+https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/pinboarddata?
+id=e36ee65e-64be-436b-a29a-22d8998c4fae&col1=Category
+&op1=EQ&val1=mfgr%2324
+----
+
+==== Apply additional filters
+
+You can add additional filters by incrementing the number at the end of each parameter in the runtime filter for each filter you add, for example, col2, op2, val2, and so on. To add additional filters on a particular column, you can specify multiple values by separating them with an ampersand (&) as shown in the example here:
+
+----
+val1=foo&val1=bar
+----
+
+You can also use the `IN` operator for multiple values, as shown in this example:
+
+----
+col1=<column_name>&op1=IN&val1=<value>&val1=<value>
+----
+
+The following example passes multiple variables to a single column as well as multiple columns. It shows that the data values are returned as epochs.
+
+----
+col1=region&op1=IN&val1=midwest&val1=south&val1=northeast&col2=date&op2=BET&val2=<epoch_start>&val2=<epoch_end>
+----
+
 == Apply runtime filters on a Liveboard or visualization URL
 
 The following examples show the runtime filter query string in a Liveboard URL:
@@ -722,12 +721,12 @@ The following examples show the runtime filter query string in a Liveboard URL:
 https://{ThoughtSpot-Host}/?col1=State&op1=EQ&val1=California#/pinboard/d084c256-e284-4fc4-b80c-111cb606449a
 ----
 
-You can apply multiple filters in the same URL as shown in this example:
+You can apply multiple filters in the same URL, as shown in this example:
 ----
 https://{ThoughtSpot-Host}/?col1=State&op1=EQ&val1=California&col2=product&op2=BEGINS_WITH&val2=Travel#/pinboard/d084c256-e284-4fc4-b80c-111cb606449a
 ----
 
-You can also apply multiple filters with multiple values as shown in this example:
+You can also apply multiple filters with multiple values, as shown in this example:
 ----
 https://<thoughtspot-host>/?col1=State&op1=IN&val1=California&val1=Michigan&col2=item%20type&op2=EQ&val2=Jackets#/pinboard/d084c256-e284-4fc4-b80c-111cb606449a
 ----
@@ -738,27 +737,16 @@ https://{ThoughtSpot-Host}/?col1=State&op1=EQ&val1=California&col2=product&op2=B
 ----
 ////
 
-
-[IMPORTANT]
-====
-* The runtime filters operation returns an error if the URL exceeds 2000 characters.
-* Ensure that you add the runtime filter parameters in the URL before `#/<path>` in the URL, so that the parameters persist.
-* Attempting to override existing filter values with runtime filters while exporting a Liveboard will result in an error.
-====
-
-
 == Limitations of runtime filters
 
 * The `DATE` and `DATE_TIME` data types must be specified as EPOCH time (Unix or POSIX time) in runtime filters.
-* Runtime filters work only on Answers and Liveboard visualizations built from Worksheets. Runtime filters on visualizations and Answers built directly from Tables, Views, and SQL Views do not work because the possibility of multiple join paths and join path choice is not supported as input in runtime filters.
+* Runtime filters work only on Answers and Liveboard visualizations built from Models. Runtime filters on visualizations and Answers built directly from Tables, Views, and SQL Views do not work because the possibility of multiple join paths and join path choice is not supported as input in runtime filters.
 * Runtime filters do not allow you to apply `HAVING` filters in the URL parameters.
 
 ////
-* You cannot apply a runtime filter on a Liveboard or visualization built from tables and worksheets that have chasm traps.
+* You cannot apply a runtime filter on a Liveboard or visualization built from Tables and Models that have chasm traps.
 
-* Runtime filters do not work directly on top of tables. You must create a Worksheet if you want to use runtime filters. This means that the Liveboard or visualization on which you apply a runtime filter must be created on top of a Worksheet.
+* Runtime filters do not work directly on top of tables. You must create a Model if you want to use runtime filters. This means that the Liveboard or visualization on which you apply a runtime filter must be created on top of a Model.
 
-* If the Worksheet was created from an Answer (it is an aggregated Worksheet), runtime filters will only work if the Answer was formed using a single Worksheet. If the Answer from which the Worksheet was created includes raw tables or joins multiple worksheets, you won't be able to use runtime filters on it. This is because of the join path ambiguity that could result.
+* If the Model was created from an Answer (it is an aggregated Model), runtime filters will only work if the Answer was formed using a single Model. If the Answer from which the Model was created includes raw tables or joins multiple Models, you won't be able to use runtime filters on it. This is because of the join path ambiguity that could result.
 ////
-
-

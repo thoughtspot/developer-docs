@@ -6,9 +6,28 @@
 :page-pageid: variables
 :page-description: Use the variables REST API to create and update variables for publishing content across Orgs
 
-Variables allow you to define dynamic placeholders for specific properties of metadata objects such as Connections and Tables. By using variables, you can dynamically assign different values to the object properties for each Org and yet use a single source with a consistent data structure across different Orgs.
+Variables allow you to define dynamic placeholders for specific properties of metadata objects, such as Connections and Tables. By using variables, you can dynamically assign different values to the object properties for each Org and yet use a single source with a consistent data structure across different Orgs. Before publishing an object to other Orgs, define variables for each Org and assign these variables to the metadata object properties.
 
-Before publishing an object to other Orgs, define variables for each Org and assign these variables to the metadata object properties.
+[IMPORTANT]
+====
+Note the following enhancements and breaking changes introduced in ThoughtSpot Cloud 10.14.l0.cl release:
+
+* Variable creation +
+
+** The variable creation endpoint `/api/rest/2.0/template/variables/create` doesn't support assigning values to a variable. To assign values to a variable, use the `/api/rest/2.0/template/variables/update-values` endpoint.
+** The `sensitive` parameter is renamed as `is_sensitive`.
+
+* Variables update and value assignment +
+** The `/api/rest/2.0/template/variables/update` endpoint is deprecated and replaced with `/api/rest/2.0/template/variables/{identifier}/update`. To update a variable, use the `POST /api/rest/2.0/template/variables/update` endpoint.
+** The resource path for updating multiple variable values has changed from `/api/rest/2.0/template/variables/{identifier}/update` to `/api/rest/2.0/template/variables/update-values`. To assign values to one or several variables, use the  `POST /api/rest/2.0/template/variables/update-values` endpoint.
+
+* Variable search +
+
+** The variables search API endpoint `/api/rest/2.0/template/variables/search` now includes the `value_scope` parameter that allows you to filter the API response by the objects to which the variable is mapped.
+** Filtering API response by `EDITABLE_METADATA_AND_VALUES` output format is no longer supported.
+
+ThoughtSpot recommends updating your application setup and workflows to avoid operational issues in your environment.
+====
 
 == Before you begin
 
@@ -19,7 +38,7 @@ Before publishing an object to other Orgs, define variables for each Org and ass
 To create a variable, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fcreate-variable">/api/rest/2.0/template/variables/create </a>+++ API endpoint, with the following parameters in the request body.
 
 === Request parameters
-In your `POST` request body, you can include the following parameters:
+In your `POST` request body, include the following parameters:
 
 [width="100%" cols="1,4"]
 [options='header']
@@ -33,13 +52,35 @@ To map Tables properties to variables.
 * `CONNECTION_PROPERTY` +
 To define variables for connection properties. This variable allows editing connection properties such as `accountName`, `warehouse`, `user`, `password`, `role` and so on.
 * `CONNECTION_PROPERTY_PER_PRINCIPAL` +
-To define variables for connection properties per user or user group. This variable allows modifying connection properties such as `warehouse`, `role`, `user`, `password`. The `CONNECTION_PROPERTY_PER_PRINCIPLE` variables d not support modifying core connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration and cannot be set per user or user group.
+To define variables for connection properties per user or user group. This variable allows modifying connection properties such as `warehouse`, `role`, `user`, `password`. The `CONNECTION_PROPERTY_PER_PRINCIPLE` variable does not support modifying core connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration and cannot be set per user or user group.
+//* `FORMULA_VARIABLE` +
+//Formula variables.
+|`name`| __String__. Name of the variable. For example, `schema_var`.  Note that the name must be unique across all Orgs within the instance.
+|`is_sensitive` __Optional__ |__Boolean__. Indicates if the variable contains sensitive values such as passwords.
+|`data_type` +
+Available from 10.15.0.cl onwards a|__String__. Variable data type.
+
+Supported data types are:
+//Required parameter for formula variables.
+
+* `VARCHAR` +
+String. For example, "East", "Administrator", "Secure", "2025-10-23"
+* `INT32` +
+32-bit integer data type. For example, 100,-42
+* `INT64` +
+32-bit integer data type. For example, 0, 2147483647
+* `DOUBLE` +
+The Double data type refers to a floating point numeric type that is recommended for storing decimal values. For example, 3.14, -0.001, 100.0, 1.7E+308. In ThoughtSpot, DOUBLE  is used for columns that require floating point arithmetic or need to store decimal numbers, such as latitude and longitude or financial amounts.
+* `DATE` +
+Date format. For example, 2025-10-20.
+* `DATE_TIME` +
+Date with time stamp. For example, 2025-10-20 14:30:00.
 
 [NOTE]
-This feature is disabled by default. To enable this option, contact ThoughtSpot Support.
+The API doesn't support setting data type for the `TABLE_MAPPING`, `CONNECTION_PROPERTY`, and `CONNECTION_PROPERTY_PER_PRINCIPAL` variable types.
 
-|`name`| __String__. Name of the variable. For example, `schema_var`.  Note that the name must be unique across all Orgs within the instance.
-|`sensitive` __Optional__ |__Boolean__. Indicates if the variable contains sensitive values such as passwords.
+|=====
+////
 |`values` __Optional__ a|__Array of strings__. Define the variable attributes. Although it's optional, make sure that you set the value for an Org before publishing content to that Org.
 
 The `values` array includes the following attributes:
@@ -56,6 +97,8 @@ Applicable if the variable type is set as `CONNECTION_PROPERTY_PER_PRINCIPAL`. S
 Applicable if the variable type is set as `CONNECTION_PROPERTY_PER_PRINCIPAL`. The priority assigned to this value. If there are two matching values, the one with a higher priority will be used.
 |=====
 
+////
+
 === Example request
 
 [source,cURL]
@@ -65,24 +108,11 @@ curl -X POST \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
+ --data-raw '{
   "type": "TABLE_MAPPING",
-  "name": "schema_var",
-  "sensitive": false,
-  "values": [
-    {
-      "value": "primary",
-      "org_identifier": "primaryOrg"
-    },
-    {
-      "value": "TargetOrg1",
-      "org_identifier": "MyOrg1"
-    },
-    {
-      "value": "TargetOrg2",
-      "org_identifier": "MyOrg2"
-    }
-  ]
+  "name": "TableVar",
+  "is_sensitive": true,
+  "data_type": "VARCHAR"
 }'
 ----
 
@@ -93,35 +123,31 @@ If the API request is successful, the following response is returned:
 [source,JSON]
 ----
 {
-  "id": "180a9cd3-8605-445b-8b70-aa0bcef5dfb0",
-  "name": "schema_var",
+  "id": "3242b54c-69bc-4ff0-97cf-f99a2216b616",
+  "name": "TableVar",
   "variable_type": "TABLE_MAPPING",
-  "sensitive": false,
-  "values": [
-    {
-      "value": "primaryOrg",
-      "org_identifier": "Primary",
-      "principal_type": null,
-      "principal_identifier": null,
-      "priority": null
-    }
-  ]
+  "sensitive": true,
+  "values": []
 }
 ----
 
 Note the variable ID.
 
+
 == Update variable values
 
-To update a variable, the following APIs are available:
+To update a variable or properties of a variable, use the following REST APIs:
 
-* `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable-values">POST /api/rest/2.0/template/variables/update</a>+++`
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable">POST /api/rest/2.0/template/variables/{identifier}/update</a>+++
 +
-Allows adding, removing, and replacing values for multiple variables in a single API call.
+Allows updating the properties of a variable.
 
-* `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable">POST /api/rest/2.0/template/variables/{identifier}/update</a>+++`
+//* `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable">POST /api/rest/2.0/template/variables/{identifier}/update</a>+++`
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable-values">POST /api/rest/2.0/template/variables/update-values</a>+++
 +
-Allows adding, removing, and replacing values of a specific variable.
+Allows adding, removing, and replacing values of one or several variables configured in ThoughtSpot.
+
 
 === Update properties of a variable
 
@@ -134,7 +160,12 @@ In your `POST` request body, you can include the following parameters:
 [width="100%" cols="1,4"]
 [options='header']
 |=====
-|Parameter|Description
+|Parameter|Type|Description
+|`identifier` |Path |__String__. Name or ID of the variable to update.
+|`name`|Form parameter|__String__. Name of the variable.
+|=====
+
+////
 |`identifier` __String__| ID or name of the variable. Include the variable ID as a path parameter in the request body.
 |`name` __String__ | New name for the variable. Specify a name if you want to rename the variable.
 |`Operation` __String__ a| Specify the update operation type. The following options are available:
@@ -157,24 +188,17 @@ Principal attributes such as user and user group. These attributes are applicabl
 * `priority` __Optional__ +
 The priority assigned to this value. Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
 |=====
-
+////
 === Example request
 
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/a1b2c3d4-e5f6-7890-abcd-ef1234567890/update'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/3242b54c-69bc-4ff0-97cf-f99a2216b616/update'  \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
-  "operation": "REPLACE",
-  "name": "TableVar",
-  "values": [
-    {
-      "value": "MyOrg`",
-      "org_identifier": "MyOrg1"
-    }
-  ]
+  "name": "TableVar"
 }'
 ----
 
@@ -182,40 +206,48 @@ If the update operation is successful, the API returns a 204 response to indicat
 
 === Update properties of multiple variables
 
-To update properties of multiple variables in a single call, send a `POST` request to the `/api/rest/2.0/template/variables/update` API endpoint with the following parameters in the request body.
+To update properties of multiple variables in a single API call, send a `POST` request to the `POST /api/rest/2.0/template/variables/update-values` API endpoint.
 
+The API endpoint allows:
+
+* Adding new values to variables
+* Replacing existing values
+* Resetting values
 
 === Request parameters
 
 In your `POST` request body, you can include the following parameters:
 
-[width="100%" cols="1,4"]
+[width="100%" cols="1,2,5"]
 [options='header']
 |=====
-|Parameter|Description
-|`variable_updates` a|Array of inputs for the variable update. Allows updating the following properties for each variable ID in the array:
-
-* `identifier` __String__. +
-ID or name of the variable to update.
-* `variable_values` __Optional__ +
-__Array of strings__. Assign new values for the variable attributes.
-
-** `value` __String__ +
-The new value for the variable. for example, `staging1`.
-** `org_identifier` __String__ +
-ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0.
-** `principal_type` and `principal_identifier`  __Optional__ +
-Principal attributes such as user and user group. These attributes are applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
-** `priority` __Optional__ +
-The priority assigned to this value. Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
-|`Operation` __String__ a| Specify the update operation type. The following values are available:
+|Parameter|Properties|Description
+.4+|`variable_assignment` 2+| Properties for setting values for a variable at a specific entity level such as Org, user, or user-group. This allows the same variable to have different values depending on which entity is being referenced.
+|`variable_identifier` a| __Array of strings__. Specify the variables to which you want to assign values.
+|`variable_values` a|__Array of strings__. Specify the values to assign. For example, `staging1`.
+|`operation` a| Specify the update operation type. The following values are available:
 
 * `ADD` +
 Adds new values. Use this operation type if you want to add new attributes to the variable.
-* `REMOVE` +
-Removes the values assigned to the variable specified in the API request.
 * `REPLACE` +
 Replaces the existing attributes with new values.
+* `REMOVE` +
+Removes the values assigned to the variable. For example, you can remove the values assigned to a variable configured for an Org.
+* `RESET +
+Resets all values at the variable level. For example, if a variable is assigned to multiple entities such as Org, user, or user group, the reset operation clears the values assigned to the variable for all entities.
+
+.5+|`variable_value_scope` 2+| Set the scope for variable values.
+| `org_identifier` a|__String__ +
+ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0.
+|`principal_type` and `principal_identifier` +
+__Optional__  a|__String__. Principal attributes such as user and user group. These attributes are applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
+|`model_identifier` a| ID or name of the Model.
+| `priority` +
+__Optional__ a|
+The priority assigned to this value. Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type. +
+Priority refers to the order of precedence when updating variable values for multiple entities in a single operation. If more than one entity matches the conditions during variable resolution, based on the value assigned to the priority, the system determines which entity’s value takes effect.
+For example, if both a user and their group have a value for the same variable, the system uses the priority to decide which value to apply.
+||
 |=====
 
 === Request example
@@ -223,26 +255,25 @@ Replaces the existing attributes with new values.
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/update'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/update-values'  \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
-  "variable_updates": [
+  "variable_assignment": [
     {
       "variable_identifier": "e61ace04-6651-4725-9174-90ce33423ef9",
       "variable_values": [
-        {
-          "value": "prod1",
-          "org_identifier": "ProdOrg1"
-        },
-        {
-          "value": "devOrg1",
-          "org_identifier": "devOrg"
-        }
-      ]
+        "prod1"
+      ],
+      "operation": "REPLACE"
     }
   ],
-  "operation": "REPLACE"
+  "variable_value_scope": [
+    {
+      "org_identifier": "prodOrg",
+      "model_identifier": "Sampel retail sales"
+    }
+  ]
 }'
 ----
 
@@ -253,18 +284,21 @@ To get a list of variables or the details of a specific variable, send a `POST` 
 
 To search for a variable, specify the following parameters in your API request:
 
-* variable type
-* variable ID
-* Name pattern +
-Specify partial name of the variable. For wildcard search, use `%`.
-* output format +
+* variable details +
+Details such as variable type, ID, and name pattern. For name pattern search, specify the partial name of the variable. For wildcard search, use `%`.
+* variable value +
+Variable parameters such as Org ID, Model ID, ID and type of Principal object.
+* output format for response content +
 Specify one of the following values for output format:
 ** `METADATA_ONLY` (default) +
 Returns only the variable metadata
 ** `METADATA_AND_VALUES` +
 Returns variable metadata and values
+
+////
 ** `EDITABLE_METADATA_AND_VALUES` +
 Returns metadata details, such as name, type, default value, and whether the variable is editable, and the current values of variables that can be edited.
+////
 
 [source,cURL]
 ----
@@ -276,7 +310,7 @@ curl -X POST \
   --data-raw '{
   "record_offset": 0,
   "record_size": 10,
-  "output_format": "EDITABLE_METADATA_AND_VALUES",
+  "output_format": "METADATA_AND_VALUES",
   "variable_details": [
     {
       "type": "TABLE_MAPPING"
@@ -290,34 +324,36 @@ If the request is successful, the API returns the variable data in the response:
 [source,JSON]
 ----
 [
-  {
-    "id": "180a9cd3-8605-445b-8b70-aa0bcef5dfb0",
-    "name": "schema_var",
-    "variable_type": null,
-    "sensitive": null,
-    "values": [
-      {
-        "value": "primaryOrg",
-        "org_identifier": "Primary",
-        "principal_type": null,
-        "principal_identifier": null,
-        "priority": null
-      },
-      {
-        "value": "MyOrg1",
-        "org_identifier": "MyOrg1",
-        "principal_type": null,
-        "principal_identifier": null,
-        "priority": null
-      },
-      {
-        "value": "MyOrg2",
-        "org_identifier": "MyOrg2",
-        "principal_type": null,
-        "principal_identifier": null,
-        "priority": null
-      },
-    ]
+   {
+      "id":"180a9cd3-8605-445b-8b70-aa0bcef5dfb0",
+      "name":"schema_var",
+      "variable_type":null,
+      "sensitive":null,
+      "values":[
+         {
+            "value":"primaryOrg",
+            "org_identifier":"Primary",
+            "principal_type":null,
+            "principal_identifier":null,
+            "priority":null
+         },
+         {
+            "value":"MyOrg1",
+            "org_identifier":"MyOrg1",
+            "principal_type":null,
+            "principal_identifier":null,
+            "priority":null
+         },
+         {
+            "value":"MyOrg2",
+            "org_identifier":"MyOrg2",
+            "principal_type":null,
+            "principal_identifier":null,
+            "priority":null
+         }
+      ]
+   }
+]
 ----
 
 == Delete a variable
@@ -336,4 +372,6 @@ curl -X POST \
 ----
 
 If the API request is successful, ThoughtSpot returns a 204 response code.
+
+
 

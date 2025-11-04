@@ -6,25 +6,26 @@
 :page-pageid: runtime-params
 :page-description: Use Parameters to run multiple scenarios with adjustable values, without changing your answer.
 
-ThoughtSpot lets you create Parameters in a Worksheet and integrate them into formulas, filters, data queries, and Liveboards.
+Parameters in ThoughtSpot are typically used for "what-if" analysis, scenario planning, or to personalize data views without modifying the underlying data object. You can link:https://docs.thoughtspot.com/cloud/latest/parameters-create[create Parameters^] in a Model and integrate them into formulas, filters, data queries, and Liveboards. You can also link:https://docs.thoughtspot.com/cloud/latest/parameters-use[use Parameters^] within formulas when querying your data via Search, Liveboards, Answers, or Spotter sessions.
 
-== About Parameters
-Parameters are useful for "what-if" analysis, financial planning, cohort analysis, and so on. Parameters allow users to visualize data by running different scenarios with adjustable values. With Parameters, business users can use a single report and adjust the values dynamically to fit the scenario they want to analyze.
+== Overview
+Runtime parameters in ThoughtSpot are dynamic values that can be set or overridden at the time of accessing a Liveboard, Answer, visualization, or Spotter session.
 
-You can use Parameters within formulas when querying your data via Search, Liveboards, or Answers. For more information about creating and using Parameters, see the following articles in ThoughtSpot product documentation.
+Runtime parameters can be applied using one of the following options:
 
-* link:https://docs.thoughtspot.com/cloud/latest/parameters-use[Using Parameters, window=_blank]
-* link:https://docs.thoughtspot.com/cloud/latest/parameters-create[Creating Parameters, window=_blank]
+* Via Visual Embed SDK +
+Use the `runtimeParameters` property in the Visual Embed SDK for embedded objects. +
+The SDK also provides host events to update Parameters.
+* Via REST APIs +
+Use REST API requests to apply runtime overrides on Liveboard, Answer, or visualization data.
+* Via URL query parameters +
+Pass Parameter name and values as query parameters in the URL.
 
-
-[NOTE]
-====
-Applying Parameter overrides on a Liveboard or Answer via URL, Visual Embed SDK, or REST API hides the filter chips on the Liveboard or Answer page. However, the overrides will be applied to charts and tables.
-====
+When applied, runtime parameters override the default or saved Parameter values for the user session or API call, and the changes are reflected in the resulting data and visualizations, but not saved to the object itself.
 
 === Supported data types
 
-You can apply runtime Parameters on these data types:
+You can apply runtime Parameters on the following data types:
 
 * VARCHAR
 * BIGINT
@@ -49,13 +50,14 @@ new Date('2020-05-22').getTime() / 1000
 
 == Apply Parameter overrides in Visual Embed SDK
 
-The Visual Embed SDK v1.25.0 and later support Parameter overrides on embedded Liveboards and Answers. Before applying a Parameter override on an Answer or Liveboard object, make sure the Parameters and associated formulas are configured in the Worksheet used for generating charts and tables.
+The Visual Embed SDK supports runtime Parameter overrides on embedded Liveboards, Answers, and Spotter-generated answers. Before applying a Parameter override on any object, make sure the Parameters and associated formulas are configured in the data Model used for generating charts and tables.
 
-The following example shows how to apply multiple runtime filters on a Liveboard embedded using the SDK:
+The following examples show how to apply multiple runtime filters in the embed code:
 
 [source,JavaScript]
 ----
-liveboardEmbed.render({
+const liveboardEmbed = new LiveboardEmbed('#tsEmbed', {
+    ... // other embed view config
     liveboardId: '543619d6-0015-4667-b257-eff547d13a12',
     runtimeParameters:[{
         name: "Date List Param",
@@ -68,121 +70,120 @@ liveboardEmbed.render({
 });
 ----
 
-After loading the embedded object, Parameters can be adjusted using the link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updateparameters[HostEvent.UpdateParameters] event:
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed('#tsEmbed', {
+    ... // other embed view config
+    worksheetId: "cd252e5c-b552-49a8-821d-3eadaa049cca",
+    searchOptions: {
+        searchQuery: 'sales data for west coast',
+    },
+    runtimeParameters: [{
+            name: "Date List Param",
+            value: 1662361200
+        },
+        {
+            name: "Integer Range Param",
+            value: 5
+        }
+    ]
+});
+----
+
+Note the following behavior in Spotter embedding:
+
+* Saving or pinning an answer does not retain the Parameter. Instead, only the Parameter value is stored.
+* In future releases, saved chats will also not retain the Parameter.
+* Users can see the Parameter value in formulas in edit mode, but only the value set for them will be visible.
+* Parameter values cannot be changed during a conversation session and may result in unintended effects.
+* If a user adds a Parameter to an answer through the edit flow, Spotter may drop this Parameter and any formulas using it in follow-up interactions. This means Parameters added in this way are not guaranteed to persist in subsequent conversational steps.
+* In Spotter embed, updating Parameters via host and embed events may not work as desired.
+
+=== Adjust Parameter values using a host event
+After loading the embedded object, Parameters can be adjusted using the link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updateparameters[HostEvent.UpdateParameters] event. +
+Developers can also set the Parameter chip visibility using the `isVisibleToUser` attribute in the `HostEvent.UpdateParameters` event payload.
 
 [source,JavaScript]
 ----
 liveboardEmbed.trigger(HostEvent.UpdateParameters, [{
         name: "Date List Param",
-        value: 1656914873
+        value: 1656914873,
+        isVisibleToUser: false
     },
     {
         name: "Integer Range Param",
-        value: 10
+        value: 10,
+        isVisibleToUser: false
     }
 ])
 ----
 
-== Runtime parameters in object URLs
-
-You can apply overrides to Parameter values at runtime and visualize data with the adjusted values. Like runtime filters, you can append the Parameter attribute to the object URLs and modify the resulting output.
-
-For example, if you want to override the value of the inflation Parameter on a Liveboard or Answer, add the Parameters to the object URL as shown in these examples:
-
-.Liveboard
-----
-https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/pinboard/d084c256-e284-4fc4-b80c-111cb606449a
-----
-
-.Saved Answer
-----
-https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/saved-answer/3e84d95c-986e-4154-8362-3807906dad50
-----
-
-.Search data
-----
-https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/answer/
-----
-
-
 [IMPORTANT]
 ====
-ThoughtSpot returns an error if an object URL with Parameter attributes exceeds 2000 characters.
+Although the SDK allows setting `isVisibleToUser` for multiple Parameters in a single `HostEvent.UpdateParameters` request, we do not recommend passing different values of `isVisibleToUser` in a single `HostEvent.UpdateParameters` request. If you need to set different `isVisibleToUser` values for different Parameters, make separate `HostEvent.UpdateParameters` requests for each distinct override.
 ====
+
+=== Show or hide Parameter chips in embedded sessions
+
+Parameter values can be set or overridden using the following methods:
+
+* The `runtimeParameters` property in ThoughtSpot's Visual Embed SDK. +
+Hides Parameter chips by default, but the Parameter values are applied to visualizations.
+* The `HostEvent.UpdateParameters` event in the Visual Embed SDK. +
+Allows overriding Parameter values and setting `isVisibleToUser` to show or hide the chip. By default, `isVisibleToUser` is set to `false`, so the chip is hidden, but the Parameter value is applied to visualizations.
+* URL Parameter override (without SDK)  +
+Hides Parameter chips by default, but the value is applied to visualizations.
+
+The following table describes parameter chip behavior in the embedded view:
+
+[width="100%" cols="5,6,8,8"]
+[options='header']
+|=====
+|Parameter chip state|Initialization method| Update via `HostEvent.UpdateParameters`? | Can change chip visibility?
+|Visible a| No overrides applied | Possible a|Yes. By default, the chip will be hidden after an update via `HostEvent.UpdateParameters`.
+To retain chip visibility after an override, you must explicitly set `isVisibleToUser` to `true` in your `HostEvent.UpdateParameters` request.
+|Hidden a| Overrides applied via `runtimeParameters`  in the Visual Embed SDK | Possible | No
+|Hidden | Overrides applied via URL parameters| Possible| No
+|=====
+
+==== Hide Parameter chips
+To hide the parameter chip, initialize a Parameter override before loading the ThoughtSpot page using one of the following methods:
+
+* The `runtimeParameters` object in the Visual Embed SDK
+* By applying a Parameter override directly in the URL
+
+You can also set the `isVisibleToUser` attribute to `false` in the `HostEvent.UpdateParameters` event payload to hide the chip after the Parameter update.
+
+[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateParameters, [{
+    name: "Integer Range Param",
+    value: 10,
+    isVisibleToUser: false
+}])
+----
+
+==== Show Parameter chips
+
+To show a Parameter chip, update the Parameter value using `HostEvent.UpdateParameters` after the page has loaded. +
+
+Note that if a Parameter chip was hidden during initialization via `runtimeParameters` in the Visual Embed SDK or via URL query parameters, or if it was hidden by setting `isVisibleToUser` to `false` in a previous `HostEvent.UpdateParameters` request, then it will remain permanently hidden for the lifetime of the embed. Once hidden, a parameter cannot be made visible again unless you create a new embed object.
+
+However, if a Parameter chip is visible after initialization, you can retain its state by setting `isVisibleToUser` to `true`:
+
+[source,JavaScript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateParameters, [{
+    name: "Integer Range Param",
+    value: 10,
+    isVisibleToUser: true
+}])
+----
 
 == Apply Parameter overrides via REST API
 
 You can apply Parameter overrides to a Liveboard or Answer using REST v1 and v2 API endpoints.
-Before applying a Parameter override on a Liveboard or Answer object, ensure that the Parameters are configured in the source Worksheet.
-
-=== REST API v1
-You can apply runtime Parameters when sending an API request to the following v1 Data API endpoints:
-
-* `/tspublic/v1/pinboarddata` (Liveboard data API)
-* `/tspublic/v1/searchdata` (Search data API)
-
-==== Liveboard data
-
-To apply overrides to a Liveboard via REST API, add Parameters to the xref:pinboarddata.adoc[Liveboard data API] request URL as shown in the example here:
-
-----
-https://{ThoughtSpot-host}/callosum/v1/tspublic/v1/pinboarddata?id=86bedf72-c718-49cc-9f49-6e8870233f35&batchsize=-1&pagenumber=-1&offset=-1&formattype=COMPACT&param1=Double%20list%20param&paramVal1=0
-----
-
-If the API request is valid, overrides are applied to the Liveboard data, and ThoughtSpot returns the requested data in the API response.
-
-[source,JSON]
-----
-{
-    "adfaa348-755b-4b95-94ff-220c94c0c8b6": {
-        "columnNames": [
-            "Ship Mode",
-            "Total Tax",
-            "Adjusted Tax"
-        ],
-        "data": [
-            [
-                "fob",
-                7,
-                0.0
-            ],
-            [
-                "mail",
-                2,
-                0.0
-            ]
-        ],
-        "samplingRatio": 1.0,
-        "totalRowCount": 2,
-        "rowCount": 2,
-        "pageSize": 100000,
-        "offset": 0,
-        "name": "Parameters Answer"
-    }
-}
-----
-
-==== Search data
-
-To apply overrides on an Answer obtained from a new search query, append the Parameter attributes to the xref:search-data-api.adoc[search data API] request URL as shown here:
-
-----
-https://{ThoughtSpot-host}/callosum/v1/tspublic/v1/searchdata?query_string=%20%5BTax%5D%5BShip%20Mode%5D&data_source_guid=540c4503-5bc7-4727-897b-f7f4d78dd2ff&batchsize=-1&pagenumber=-1&offset=-1&formattype=COMPACT&param1=Double%20list%20param&paramVal1=0
-----
-
-==== Add additional Parameters
-
-You can add additional Parameters in the URL by incrementing the number for each Parameter attribute; for example, param1, param2, paramVal1, paramVal2, and so on. To add additional overrides, specify the values by separating them with an ampersand (&) as shown in the examples here:
-
-.URL
-----
-https://{ThoughtSpot-host}/?param1=double%20list%20param&paramVal1=0&param2=double%20param&paramVal2=0#/pinboard/d084c256-e284-4fc4-b80c-111cb606449a
-----
-
-.REST API request
-----
-https://{ThoughtSpot-host}/callosum/v1/tspublic/v1/pinboarddata?id=e36ee65e-64be-436b-a29a-22d8998c4fae&batchsize=-1&pagenumber=-1&offset=-1&formattype=COMPACT&param1=double%20list%20param&paramVal1=0&param2=double%20param&paramVal2=0
-----
+Before applying a Parameter override on a Liveboard or Answer object, ensure that the Parameters are configured in the source Model.
 
 === REST API v2
 
@@ -301,27 +302,100 @@ curl -X POST \
 }'
 ----
 
-== Show or hide Parameter chips in embedded sessions
-Parameter values can be set or overridden using multiple methods. In some use cases, you may want to hide the Parameter chips from ThoughtSpot's UI, while in other cases you may want to show the chips.
+=== REST API v1
+You can apply runtime Parameters when sending an API request to the following v1 Data API endpoints:
 
-=== Hide Parameter chips
-To hide the parameter chip in ThoughtSpot's UI, initialize a Parameter override before loading ThoughtSpot's page by using one of the following methods:
+* `/tspublic/v1/pinboarddata` (Liveboard data API)
+* `/tspublic/v1/searchdata` (Search data API)
 
-* Use the `runtimeParameters` option in ThoughtSpot's Visual Embed SDK (Recommended)
-* Apply a Parameter override directly in the URL (if you are not using Visual Embed SDK)
+==== Liveboard data
 
-To update the parameter's value once the page is loaded, use `HostEvent.UpdateParameters`. The Parameter chip will remain hidden, however its value in ThoughtSpot's visualizations will be updated accordingly.
+To apply overrides to a Liveboard via REST API, add Parameters to the xref:pinboarddata.adoc[Liveboard data API] request URL as shown in the example here:
 
-== Show Parameter chip in ThoughtSpot UI
-To show the parameter chip from ThoughtSpot's user interface, update the Parameter's value with `HostEvent.UpdateParameters` after the page has loaded. The Parameter chip will then be shown and updated with each new value passed via the event.
+----
+https://{ThoughtSpot-host}/callosum/v1/tspublic/v1/pinboarddata?id=86bedf72-c718-49cc-9f49-6e8870233f35&batchsize=-1&pagenumber=-1&offset=-1&formattype=COMPACT&param1=Double%20list%20param&paramVal1=0
+----
 
-[width="100%" cols="5,5,8"]
-[options='header']
-|=====
-|Parameter chip|Initialized via `runtimeParameters` or URL parameter? |Update via `HostEvent.UpdateParameters`
-|Hidden|Yes| Possible
-|Shown| No| Possible
-|=====
+If the API request is valid, overrides are applied to the Liveboard data, and ThoughtSpot returns the requested data in the API response.
+
+[source,JSON]
+----
+{
+    "adfaa348-755b-4b95-94ff-220c94c0c8b6": {
+        "columnNames": [
+            "Ship Mode",
+            "Total Tax",
+            "Adjusted Tax"
+        ],
+        "data": [
+            [
+                "fob",
+                7,
+                0.0
+            ],
+            [
+                "mail",
+                2,
+                0.0
+            ]
+        ],
+        "samplingRatio": 1.0,
+        "totalRowCount": 2,
+        "rowCount": 2,
+        "pageSize": 100000,
+        "offset": 0,
+        "name": "Parameters Answer"
+    }
+}
+----
+
+==== Search data
+
+To apply overrides on an Answer obtained from a new search query, append the Parameter attributes to the xref:search-data-api.adoc[search data API] request URL as shown here:
+
+----
+https://{ThoughtSpot-host}/callosum/v1/tspublic/v1/searchdata?query_string=%20%5BTax%5D%5BShip%20Mode%5D&data_source_guid=540c4503-5bc7-4727-897b-f7f4d78dd2ff&batchsize=-1&pagenumber=-1&offset=-1&formattype=COMPACT&param1=Double%20list%20param&paramVal1=0
+----
+
+==== Add additional Parameters
+
+You can add additional Parameters in the URL by incrementing the number for each Parameter attribute; for example, param1, param2, paramVal1, paramVal2, and so on. To add additional overrides, specify the values by separating them with an ampersand (&) as shown in the examples here:
+
+.URL
+----
+https://{ThoughtSpot-host}/?param1=double%20list%20param&paramVal1=0&param2=double%20param&paramVal2=0#/pinboard/d084c256-e284-4fc4-b80c-111cb606449a
+----
+
+.REST API request
+----
+https://{ThoughtSpot-host}/callosum/v1/tspublic/v1/pinboarddata?id=e36ee65e-64be-436b-a29a-22d8998c4fae&batchsize=-1&pagenumber=-1&offset=-1&formattype=COMPACT&param1=double%20list%20param&paramVal1=0&param2=double%20param&paramVal2=0
+----
+
+== Apply runtime overrides via URL query parameters
+
+You can apply overrides to Parameter values at runtime and visualize data with the adjusted values. Like runtime filters, you can append the Parameter attribute to the object URLs and modify the resulting output.
+
+For example, if you want to override the value of the inflation Parameter on a Liveboard or Answer, add the Parameters to the object URL as shown in these examples:
+
+.Liveboard
+----
+https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/pinboard/d084c256-e284-4fc4-b80c-111cb606449a
+----
+
+.Saved Answer
+----
+https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/saved-answer/3e84d95c-986e-4154-8362-3807906dad50
+----
+
+.Search data
+----
+https://{ThoughtSpot-host}/?param1=Discount&paramVal1=0.25#/answer/
+----
+
+[IMPORTANT]
+====
+ThoughtSpot returns an error if an object URL with Parameter attributes exceeds 2000 characters.
+====
 
 == Parameters and JWT tokens
 Parameters work differently when used in JWT tokens to secure values for users.
@@ -329,7 +403,7 @@ Setting a Parameter value via a JWT token will not hide the Parameter value by d
 
 Regardless of the user's interaction with the Parameter chip, Parameter values initiated via the JWT token cannot be overridden through the UI, to guarantee its use for security purposes only.
 
-ThoughtSpot recommends hiding the Parameter chip while using a JWT token to minimize confusion. To do so, set the `is_hidden` flag to `true` in the Worksheet TML for all Parameter columns that you wish to hide from ThoughtSpot's user interface:
+ThoughtSpot recommends hiding the Parameter chip while using a JWT token to minimize confusion. To do so, set the `is_hidden` flag to `true` in the Model TML for all Parameter columns that you wish to hide from ThoughtSpot's user interface:
 
 [.widthAuto]
 image:./images/parameter_hidden.png[Parameter hidden]
@@ -338,11 +412,13 @@ image:./images/parameter_hidden.png[Parameter hidden]
 [options='header']
 |=====
 |Is the Parameter value passed via a JWT?|
-Is the `is_hidden` property enabled for the Parameter in the Worksheet/Model? |Parameter chip behavior
+Is the `is_hidden` property enabled for the Parameter in the Model? |Parameter chip behavior
 |Yes|No| The Parameter chip is visible and shows the parameter's default value. It uses the
  Parameter value defined in the JWT in the data.
 User interactions with the filter chip will be ignored due to Parameter value defined via JWT token being locked.
 |Yes|Yes| The Parameter chip will be hidden. Uses the Parameter value defined in the JWT token.
 |=====
+
+
 
 
