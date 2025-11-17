@@ -37,9 +37,8 @@ __Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 Allows sending a natural language query or a follow-up question to an ongoing conversation session and returns the AI agent's response, including answers, tokens, and visualization details. +
 __Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 
-* xref:spotter-apis.adoc#_send_a_question_to_generate_answer[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] +
-Allows sending a follow-up message to an ongoing conversation within the context of the metadata model.
-__This is a legacy API and will be deprecated in an upcoming release version__.
+* xref:spotter-apis.adoc#_send_a_question_to_generate_answer_metadata[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] +
+Allows sending a follow-up message to an ongoing conversation session within the context of the metadata model.
 
 |xref:spotter-apis.adoc#_generate_a_single_answer[Generate a single answer] a| * `POST /api/rest/2.0/ai/answer/create` +
 Allows users to submit a natural language search query and fetch an AI-generated response.
@@ -49,14 +48,14 @@ Allows users to submit a natural language search query and fetch an AI-generated
 //__Limited availability on ThoughtSpot Cloud instances from 10.15.0.cl onwards. Please contact ThoughtSpot Support to enable this feature on your instance__.
 |=====
 
-////
-[NOTE]
-====
-* The `/api/rest/2.0/ai/conversation/create` and `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse` API endpoints will be deprecated in an upcoming release version. Therefore, ThoughtSpot recommends updating your implementation to use the `/api/rest/2.0/ai/agent/conversation/create` and `POST /api/rest/2.0/ai/agent/converse/sse` API endpoints.
-* To process results generated from a Spotter query, you can use the `/api/rest/2.0/report/answer` API endpoint. You can also use the tokens obtained from the API response as search inputs in the search data API request.
-====
-////
+=== Locale settings for API requests
 
+When using the xref:spotter-apis.adoc#_generate_a_single_answer[Single Answer] and xref:spotter-apis.adoc#_send_a_question_to_generate_answer[Send message] APIs, the locale used for API requests depends on your application's locale settings:
+
+* If your application is set to "Use browser language," the API will not apply the default locale. In this case, you must explicitly include the desired locale code in the `Accept-Language` header of your API request. If you do not specify the locale, the API may not return responses in the expected language or format.
+* If you have set a specific locale in your ThoughtSpot instance or user profile, the API will use this locale to generate responses, overriding the browser or OS locale
+
+To ensure consistent localization, set the `Accept-Language` header in your API requests when relying on browser language detection, or configure the locale explicitly in the user profile settings in ThoughtSpot.
 
 == Create a conversation session
 A conversation session acts as a container for maintaining continuity across user inputs, system responses, and agent-driven clarifications. Once created, users can send queries or ask follow-up questions to the  conversation session to explore data and get further insights.
@@ -240,7 +239,7 @@ __Array of strings__. Custom user instructions to influence how the AI interpret
 __Array of strings__. Additional input such as raw text or CSV-formatted data to enhance context and answer quality.
 |=====
 
-
+[source,cURL]
 ----
 curl -X POST \
   --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/relevant-questions/'  \
@@ -291,14 +290,14 @@ Name of the associated data source object.
 }
 ----
 
-== Send a question to a conversation session
+== Send a query to a conversation session
 The following AI API endpoints allow you to send a follow-up query to an ongoing conversation:
 
 * xref:spotter-apis.adoc#_send_a_question_and_generate_streaming_responses[`POST /api/rest/2.0/ai/agent/converse/sse`] +
 Allows a client to send queries to an ongoing conversation session with the AI agent (Spotter) and uses the Server-Sent Events (SSE) protocol to stream responses for a real-time conversational experience. It returns a streaming response (using SSE) with the AI agent's replies, allowing clients to receive incremental updates as the AI agent processes and generates its response. +
 The `POST /api/rest/2.0/ai/agent/converse/sse` API call supports only the agent sessions created via `/api/rest/2.0/ai/agent/conversation/create` API call.
 
-* xref:spotter-apis.adoc#_send_a_question_to_generate_answer[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] +
+* xref:spotter-apis.adoc#_send_a_question_to_generate_answer_metadata[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] +
 Sends query to an ongoing conversation session and generates Answer. +
 The `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse` API call supports only the conversation sessions created using the `POST /api/rest/2.0/ai/conversation/create` API call. +
 __This is a legacy API endpoint and will be deprecated in an upcoming release version__.
@@ -307,9 +306,7 @@ __This is a legacy API endpoint and will be deprecated in an upcoming release ve
 
 To send queries to an ongoing conversation session and receive streaming responses, ThoughtSpot provides the `/api/rest/2.0/ai/agent/converse/sse` API endpoint. This API endpoint uses the SSE protocol to deliver data incrementally as it becomes available, rather than waiting for the entire response to be generated before sending it to the client. This enables immediate feedback and a more interactive user experience for AI-generated responses.
 
-This API can be called directly, either through the Multi-Component Protocol (MCP) server or by integrating it into your own agentic workflow. In the MCP context, the `/api/rest/2.0/ai/agent/converse/sse` API is used as a "tool" for real-time, streaming of conversational interactions between agents and the ThoughtSpot backend. It enables AI agents to send user queries and receive incremental, streamed responses, which can be processed and displayed to the users.
-
-REST clients can also send a `POST` request with a conversation ID and query string to fetch streaming responses.
+The `/api/rest/2.0/ai/agent/converse/sse` API is used as an integrated tool" for real-time, streaming of conversational interactions between agents and the ThoughtSpot backend. It enables AI agents to send user queries and receive incremental, streamed responses, which can be processed and displayed to the users. REST clients can also send a `POST` request with a conversation ID and query string to fetch streaming responses.
 
 ==== Request parameters
 
@@ -704,10 +701,13 @@ The following example shows the response text contents for the `answer` message 
 ]
 ----
 
-* The session ID and generation number serve as the context data for Answer. You can use this information to create a new conversation session using `/api/rest/2.0/ai/agent/conversation/create`  or download the answer via  `/api/rest/2.0/report/answer` operations.
-* The tokens and TML phrases returned in the response can be used as inputs for the search data API call to get an Answer.
+The session ID and generation number serve as the context data for Answer. You can use this information to create a new conversation session using `/api/rest/2.0/ai/agent/conversation/create` or download the answer via  `/api/rest/2.0/report/answer` operations.
 
-=== Send a question to generate answer
+////
+* The tokens and TML phrases returned in the response can be used as inputs for the search data API call to get an Answer.
+////
+
+=== Send a question to generate answer metadata
 To send a question to an ongoing conversation session or ask follow-up questions, send a `POST` request body with conversation ID and query text to the `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse` API endpoint.
 
 ==== Request parameters
@@ -749,7 +749,7 @@ Type of response received for the query. For example, `TSAnswer` (ThoughtSpot An
 * `visualization_type` +
 The data format of the generated Answer, for example, chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
 * `tokens` +
-Tokens generated from the natural language search query string specified in the API request. You can use these tokens as input for `query_string` in your API request to `/api/rest/2.0/searchdata` and  export the raw data of the query, or as input to `POST /api/rest/2.0/ai/conversation/create` to initiate a new conversation with a new context.
+Tokens generated from the natural language search query specified in the API request. These tokens can be used as input to the `/api/rest/2.0/ai/conversation/create` API endpoint to set the context for a conversation session.
 
 [NOTE]
 ====
@@ -857,7 +857,7 @@ Type of response received for the query. For example, `TSAnswer` (ThoughtSpot An
 * `visualization_type` +
 The data format of the generated Answer; for example, chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
 * `tokens` +
-Tokens generated from the natural language search query string specified in the API request. You can use these tokens as input for `query_string` in your API request to `/api/rest/2.0/searchdata` and  export the raw data of the query, or as input to `POST /api/rest/2.0/ai/conversation/create` to initiate a new conversation with a new context.
+Tokens generated from the natural language search query specified in the API request. These tokens can be used as input to the `/api/rest/2.0/ai/conversation/create` endpoint to set the context for a conversation session.
 
 [NOTE]
 ====
@@ -877,10 +877,12 @@ Note the session ID and generation number. To export the result generated from t
 
 [#process_results]
 == Process results generated from Spotter APIs
-To generate an Answer using the data returned from the Spotter APIs, use the following options:
+To export or download the Answer data generated by the Spotter APIs, use the xref:data-report-v2-api.adoc#exportSpotterData[Answer report] API.
 
-* Download the generated Answer using the session ID and generation number via xref:data-report-v2-api.adoc#exportSpotterData[api/rest/2.0/report/answer] API endpoint.
-* Use tokens generated from Spotter API requests as raw data in query strings and generate an Answer via xref:data-report-v2-api.adoc#_using_tokens_generated_from_spotter_apis_as_raw_data[/api/rest/2.0/searchdata] API endpoint.
+[NOTE]
+====
+Using tokens generated by the Spotter API in a xref:data-report-v2-api.adoc#_search_data_api[Search Data API] request can return invalid column errors, because these tokens may reference formulas or columns not present in the data model. Instead, use the xref:data-report-v2-api.adoc#exportSpotterData[Answer report] API and include the session ID and generation number obtained from the Spotter API in your API request to retrieve the data.
+====
 
 ////
 == Get data source suggestions
