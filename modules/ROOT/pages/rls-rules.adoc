@@ -6,26 +6,30 @@
 :page-pageid: rls-rules
 :page-description: RLS rules define data security directly on ThoughtSpot table objects
 
-ThoughtSpot link:https://docs.thoughtspot.com/cloud/latest/security-rls[Row Level Security Rules, window=_blank] define how the user's username or the names of the groups they belong into WHERE clauses on the SQL queries generated.
+In ThoughtSpot, the link:https://docs.thoughtspot.com/cloud/latest/security-rls[Row Level Security Rules, window=_blank] are applied on Tables to restrict access to specific rows of data based on user or user group context. These rules ensure users only see the data they are permitted to access.
 
-The two basic patterns for RLS Rules are *direct RLS rules* that reference a column on the table the rule is placed on and *ACL table rules* that reference a separate table of entitlements within the same database.
+== Overview
 
-If neither of these patterns is easily implemented, please consider the xref:abac-user-parameters.adoc[ABAC via tokens] method of RLS, available starting in ThoughtSpot 9.11.
+RLS rules are link:https://docs.thoughtspot.com/cloud/latest/security-rls-implement[defined within ThoughtSpot, target=_blank] on table objects, and automatically extend to all Models, saved answers, and Liveboards based on that table, every time.
 
-== RLS rules overview
-*RLS rules* are link:https://docs.thoughtspot.com/cloud/latest/security-rls-implement[defined within ThoughtSpot, target=_blank] on table objects, and automatically extend to all Models, saved answers, and Liveboards based on that table, every time.
+The two basic patterns for RLS Rules are:
 
-RLS rules are defined using either the *ts_username* variable or *ts_groups* variable. The RLS rules translate into WHERE clauses in any SQL query generated from that table object, with the variables expanding into the details of the signed-in user. *ts_groups* turns into the set of *group name* properties of the ThoughtSpot groups the user belongs to.
+* xref:rls-rules.adoc#_direct_rls_rules[Direct RLS rules] that reference a column on the table the rule is placed on.
+* xref:rls-rules.adoc#_acl_table_rules[Access control list (ACL) table rules] that reference a separate table of entitlements within the same database.
 
-The `ts_username` special value translates to `t1.fieldName = 'users-username'` within the generated queries.
+If neither of these patterns can be implemented or if you want to implement fine-grained access control, consider using xref:rls-rules.adoc#_formula_variables[formula variables] and the xref:abac-user-parameters.adoc[ABAC via tokens] method.
 
-The `ts_groups` special value translates to `t1.fieldName IN ('group a', 'group b', ...)`. The name property of every ThoughtSpot group that a user belongs to will be added to the list after the `IN`.
+=== Variables in RLS rules
+Rules are typically written using the system variables such as *ts_username* and *ts_groups* to specify how the user's username or group memberships are translated into WHERE clauses in the SQL queries generated from the Table.
 
-Both *ts_username* and *ts_groups* are string values, so the RLS rule may require using casting functions on the columns within the database if those columns are not also string types. The xref:abac-user-parameters.adoc[ABAC via tokens] method allows for specifying the data type of the attributes sent in.
+* *ts_username* - To apply rules to the user that's currently signed-in. +
+The *ts_username* special value translates to `t1.fieldName = 'users-username'` within the generated queries. The variable is replaced with the signed-in user's username.
+* *ts_groups* - To apply rules to the groups that the user belongs to.  The `ts_groups` special value translates to `t1.fieldName IN ('group a', 'group b', ...)`. The name property of every ThoughtSpot group that a user belongs to will be added to the list after the `IN`. The variable is replaced with the list of group names the user belongs to, ensuring that only permitted rows are returned in query results.
 
-The username or ThoughtSpot group name property must be an exact match to the values within the database column. ThoughtSpot usernames and group names cannot be changed once they have been created, but their values can be any valid string.
+The username or ThoughtSpot group name property must be an exact match to the values within the database column. ThoughtSpot usernames and group names cannot be changed once they have been created, but their values can be any valid string. To programmatically create and assign the appropriate groups to be used within RLS rules, you can use the user and group creation REST APIs.
 
-The user and group creation REST APIs can be utilized to programmatically create and assign the appropriate groups to be used within RLS rules
+=== Supported data types
+Both *ts_username* and *ts_groups* are string values, so the RLS rule may require using casting functions on the columns within the database if those columns are not also string types. To implement rules for different data types and attributes, use the xref:formula-variables.adoc[formula variables]. You can also use a combination of formula variables and ABAC token attributes xref:abac-user-parameters.adoc[ABAC via tokens] for granular access control and additional security filters.
 
 === RLS groups
 Many different features tie into ThoughtSpot groups: access control, roles, permissions, and row-level security.
@@ -86,7 +90,7 @@ This will filter the table down to the following rows, after which all other agg
 
 |===
 
-== Access control list (ACL) table rules
+== ACL table rules
 Rules that reference a separate Access Control List (ACL) table of 'entitlements' for that user or the groups they belong to, which is then JOINed to other tables. 
 
 RLS rules on one table object can reference other table objects that are joined within a given connection. This allows  a more complex RLS pattern to be used, where an "access control list" or "entitlements" table (*ACL table*) exists in the database, with a JOIN in ThoughtSpot to the fact or dimension tables.
@@ -164,6 +168,9 @@ This will cause queries that reference the fact or dimension to include the INNE
 In the ACL table pattern, the embedding web application must define a process for updating the ACL table in the data warehouse with the correct entitlement rows for each user. This is a separate process that does not involve ThoughtSpot, although it can be combined with the xref:trusted-authentication#authenticator-service-back-end[authenticator service] used for Trusted Authentication.
 
 == Additional resources
-A link:https://community.thoughtspot.com/customers/s/article/How-to-secure-your-data-in-ThoughtSpot[comprehensive examples and best practices guide to RLS, window=_blank] data model setup is available on the ThoughtSpot Community.
- 
+
+* A link:https://community.thoughtspot.com/customers/s/article/How-to-secure-your-data-in-ThoughtSpot[comprehensive examples and best practices guide to RLS, window=_blank] data model setup is available on the ThoughtSpot Community.
+* xref:formula-variables.adoc[Formula variables]
+* xref:variables.adoc[Variable APIs]
+
 
