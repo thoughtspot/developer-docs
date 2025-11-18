@@ -1,4 +1,4 @@
-= Define variables
+= Configure template variables
 :toc: true
 :toclevels: 2
 
@@ -20,42 +20,46 @@ ThoughtSpot provides predefined system variables such as `ts_username` and `ts_g
 ThoughtSpot supports creating the following types of variables via APIs:
 
 * `TABLE_MAPPING` +
-Can be used for table mapping properties such as schema name, database name, table name.
+Can be used for table mapping properties such as schema name, database name, and table name.
 * `CONNECTION_PROPERTY` +
 Can be used for data connection properties such as `accountName`, `warehouse`, `user`, `password`, `role`, and so on.
 * `CONNECTION_PROPERTY_PER_PRINCIPLE` +
-Can be used for modifying connection properties for a specific principal object such as a user or user group. This means you can set different values for connection properties, such as `warehouse`, `role`, `user`, and `password`,depending on the user or group accessing the connection. +
-The `CONNECTION_PROPERTY_PER_PRINCIPLE` variable does not allow parameterizing core connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration and cannot be set per user or user group.
+Can be used for modifying connection properties for a specific principal object, such as a user or user group. This means you can set different values for connection properties, such as `warehouse`, `role`, `user`, and `password`, depending on the user or group accessing the connection. The `CONNECTION_PROPERTY_PER_PRINCIPLE` variable does not allow parameterizing core connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration and cannot be set per user or user group.
 +
 [NOTE]
 ====
 This feature is disabled by default. To enable this option, contact ThoughtSpot Support.
 ====
-* Formula variables +
-These variables can be set for an Org, user, or Model and used in formulas as `ts_var`function  when implementing Row Level Security (RLS) rules. The Variable API allows administrators to define formula variables for the `VARCHAR`, `BIGINT`, `INT`, `FLOAT`, `DOUBLE`, `BOOLEAN`, `DATE`, `DATE_TIME`, and `TIME` data types.
+* `FORMULA_VARIABLE` +
+Formula variables can be set for an Org, user, or Model and used in formulas with the `ts_var` function for RLS rule definitions. However, the variables won't impact security rules unless they are included in RLS rules or security filters applied via ABAC tokens.
+The Variable API allows administrators to define formula variables for the `VARCHAR`, `BIGINT`, `INT`, `FLOAT`, `DOUBLE`, `BOOLEAN`, `DATE`, `DATE_TIME`, and `TIME` data types. +
+
 
 === APIs for Variable creation and management
 The following REST API endpoints are available for variable creation and management:
 
 * `POST /api/rest/2.0/template/variables/create` +
-Allows xref:variables.adoc#_create_a_variable[creating a variable]S.
+Allows xref:variables.adoc#_create_a_variable[creating a variable].
 * `POST /api/rest/2.0/template/variables/update` +
 Allows xref:variables.adoc#_update_properties_of_a_variable[updating the properties of a specific variable].
-* `POST /api/rest/2.0/template/variables/update-values`
+* `POST /api/rest/2.0/template/variables/update-values` +
 Allows xref:variables.adoc#_update_variable_values[assigning values to one or several variables].
-* `POST /api/rest/2.0/template/variables/search`
+* `POST /api/rest/2.0/template/variables/search` +
 xref:variables.adoc#_get_details_of_variables[Retrieves details of the user-created template variables].
-* `POST /api/rest/2.0/template/variables/{identifier}/delete`
+* `POST /api/rest/2.0/template/variables/{identifier}/delete` +
 xref:variables.adoc#_delete_a_variable[Removes the variable] specified in the API request.
+
+To include variable values in RLS rules for ABAC implementation, use the `/api/rest/2.0/auth/token/custom` API endpoint. For more information, see xref:abac-user-parameters.adoc[ABAC via tokens].
 
 == Before you begin
 
 * Ensure that you have edit access to the metadata objects to which you want to assign variables.
-* Ensure that you have administration privileges to create, edit, assign values, or delete a variable.
+* Ensure that you have administration privileges to create, edit, assign values, or delete a variable at the All Orgs or Primary Org level. If creating variables within a specific Org context, ensure your ThoughtSpot account has Org administration permissions or the `CAN_MANAGE_VARIABLES` (*Can manage variables*) role privilege to create and manage variables.
 
 == Create a variable
 To create a variable, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fcreate-variable">/api/rest/2.0/template/variables/create </a>+++ API endpoint, with the following parameters in the request body.
 
+[#data_type]
 === Request parameters
 In your `POST` request body, include the following parameters:
 
@@ -69,29 +73,30 @@ In your `POST` request body, include the following parameters:
 To create variables for Table properties such as `databaseName`, `schemaName`, and `tableName`.
 
 * `CONNECTION_PROPERTY` +
-To define variables for connection properties. This variable allows editing connection properties such as `accountName`, `warehouse`, `user`, `password`, `role` and so on.
+To define variables for connection properties. This variable allows editing connection properties such as `accountName`, `warehouse`, `user`, `password`, `role`, and so on.
 * `CONNECTION_PROPERTY_PER_PRINCIPAL` +
-To define variables for connection properties per user or user group. This variable allows modifying connection properties such as `warehouse`, `role`, `user`, `password`. The `CONNECTION_PROPERTY_PER_PRINCIPLE` variable does not support modifying core connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration and cannot be set per user or user group.
+To define variables for connection properties per user or user group. This variable allows modifying connection properties such as `warehouse`, `role`, `user`, and `password`. The `CONNECTION_PROPERTY_PER_PRINCIPLE` variable does not support modifying core connection properties such as `accountName`, `host`, or `port`. These properties must be derived from the connection configuration and cannot be set per user or user group.
 * `FORMULA_VARIABLE` +
 For formula variables. For formula variables, you must specify the data type.
 |`name`| __String__. Name of the variable. For example, `schema_var`.  Note that the name must be unique across all Orgs within the instance.
 |`is_sensitive` __Optional__ |__Boolean__. Indicates if the variable contains sensitive values such as passwords.
-|`data_type` a|__String__. Variable data type. It's a required parameter for formula variables. The data type defined during variable creation determines the format of the variable values. For example, if you specify the `data_type` as `DATE`, the value for this variable must be in the YYYY-MM-DD or epoch format.
+|
+`data_type` a|__String__. Variable data type. It's a required parameter for formula variables. The data type defined during variable creation determines the format of the variable values. For example, if you specify the `data_type` as `DATE`, the value for this variable must be in the YYYY-MM-DD or epoch format.
 
 Supported data types for formula variable values are:
 
 * `VARCHAR` +
-String. For example, if you are creating formula variables for region, set the data type as `VARCHAR` to allow using strings such as "EAST", "WEST", and so on during variable value assignment.
+String. For example, if you are creating variables for different regions, set the data type as `VARCHAR` to allow using strings such as `EAST`, `WEST`, and so on during variable value assignment.
 * `INT32` +
-32-bit integer data type. If you are creating a formula variable the quantity of the products purchased, or for columns such as customer or product IDs, set the type as `INT32` to allow numbers within the 32-bit range numbers as variable values. For example, 100, 123456, 3005.
+32-bit integer. If you are creating a formula variable to specify a threshold for the quantity of the products purchased, or for columns such as customer or product IDs, set the type as `INT32` to allow numbers within the 32-bit range. For example, 100, 123456, 3005.
 * `INT64` +
-32-bit integer data type. For variable values that exceed INT32 range, set the data type as `INT64`.  For example, formula variables such as transaction numbers, sales IDs, or discount values.
+64-bit integer. For variable values that exceed the 32-bit range, set the data type as `INT64`.  For example, formula variables such as transaction numbers, sales IDs, or discount values.
 * `DOUBLE` +
-The Double data type refers to a floating point numeric type that is recommended for storing decimal values. In ThoughtSpot, the DOUBLE data type is used for columns that require floating point arithmetic or need to store decimal numbers such as latitude, longitude, percentages, monetary values, margin threshold, measurements, and so on.
+The Double data type refers to a floating-point numeric type that is recommended for storing decimal values. In ThoughtSpot, the DOUBLE data type is used for columns that require floating-point arithmetic or need to store numbers such as latitude, longitude, percentages, monetary values, margin threshold, measurements, and so on.
 * `DATE` +
-Date in the epoch format. If you are creating a formula variable for start date, specify the data type as `DATE` and configure the date value in epoch format. For example, 1711933200 to set the start date as 1 April 2024 (GMT).
+Date in the epoch format. If you are creating a formula variable for a specific start date, set the data type as `DATE` and configure the date value in epoch format. For example, 1711933200 to set the start date as 1 April 2024 (GMT).
 * `DATE_TIME` +
-Date with time stamp. If you are creating a formula variable for date time event with the timestamp, specify the data type as `DATE_TIME` and assign the timestamp values in epoch format to the variable. For example, 1711933200000 to set the date time to 1 April 2024 01:00:00 (GMT).
+Date with time stamp. If you are creating a formula variable for specific timestamp, specify the data type as `DATE_TIME` and assign the timestamp values in epoch format to the variable. For example, 1711933200000 to set the date and time to 1 April 2024 01:00:00 (GMT).
 +
 [NOTE]
 The API doesn't support setting data type for the `TABLE_MAPPING`, `CONNECTION_PROPERTY`, and `CONNECTION_PROPERTY_PER_PRINCIPAL` variable types.
@@ -120,7 +125,7 @@ Applicable if the variable type is set as `CONNECTION_PROPERTY_PER_PRINCIPAL`. T
 
 === Example request
 
-The following example shows the request body for table mapping variable:
+The following example shows the request body for the table mapping variable type:
 
 [source,cURL]
 ----
@@ -209,14 +214,9 @@ If the API request is successful, ThoughtSpot returns the variable details in th
 Note the variable ID and name for variable edits.
 The API returns an empty array for values because the values are not assigned to the variable. To assign values, use the `POST  /api/rest/2.0/template/variables/update-values` API endpoint.
 
-== Update variable properties
+== Update properties of a variable
 
-* To update the properties of a variable object, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable">/api/rest/2.0/template/variables/{identifier}/update</a>+++ API endpoint.
-* To assign values to one of several variables, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable-values">/api/rest/2.0/template/variables/update-values</a>+++ API endpoint.
-
-=== Update properties of a variable
-
-To update the properties of a variable, send a `POST` request to `/api/rest/2.0/template/variables/{identifier}/update` with the following parameters in the request body. Specify the variable ID in the `{identifier}` path parameter.
+To update the properties of a variable, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable">/api/rest/2.0/template/variables/{identifier}/update</a>+++ API endpoint with the following parameters in the request body. In your API request, specify the variable ID in the `{identifier}` path parameter.
 
 === Request parameters
 
@@ -270,13 +270,18 @@ curl -X POST \
 
 If the update operation is successful, the API returns a 204 response to indicate that the variable was updated successfully.
 
-=== Assign values and update properties of multiple variables
+== Define values and scope for variables
 
-To assign values to one or several variables, or to reset or replace the values assigned to a variable, use the `/api/rest/2.0/template/variables/update-values` API endpoint.
+To assign values to one or several variables, or to reset or replace the values assigned to a variable, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fupdate-variable-values">/api/rest/2.0/template/variables/update-values</a>+++ API endpoint.
 
-The API allows you to configure variable properties based on the type of the variable you are trying to edit. For example, you can set formula variables per Org, Model, or user. Similarly, for the `CONNECTION_PROPERTY_PER_PRINCIPLE` variable type, you can specify the principal type as user or user group and the ID of the principal object.
+The API allows you to configure variable properties based on the type of variable you are trying to edit. For example, you can assign formula variables for a specific Org, Model, or user context. Similarly, for the `CONNECTION_PROPERTY_PER_PRINCIPLE` variable type, you can specify the principal type as user or user group and the ID of the principal object.
 
 The API also allows you to edit, replace, or reset the values and scope assigned to a variable.
+
+[NOTE]
+====
+If you are ABAC tokens for RLS rules and security entitlements, you can specify the variable value in your token generation request to the custom token endpoint. If the values are already defined using variable update API, make sure you check the variable properties before assigning a value and configure only the relevant properties.
+====
 
 === Request parameters
 
@@ -315,7 +320,7 @@ For example, if a variable is configured for both the user and their group, the 
 |=====
 
 === Example request
-The following sections show the examples for assigning values to different types of variables and configuring the Org scope.
+The following sections show the examples for assigning values to different types of variables and configuring the Org scope. Note that the variable values and Org identifiers are case-sensitive.
 
 ==== Table mapping variables
 The following example shows the request parameters to assign values to `TABLE_MAPPING` variables and set the variable scope to specific Orgs:
@@ -353,9 +358,6 @@ curl -X POST \
   "variable_value_scope": [
     {
       "org_identifier": "OrgA"
-    },
-    {
-      "org_identifier": "Org_Demo"
     }
   ]
 }'
@@ -364,7 +366,7 @@ curl -X POST \
 If the variable update operation is successful, you can use these variables in the Table TML or to xref:metadata-parameterization.adoc[parameterize Table properties].
 
 ==== Connection property variables
-The following example shows the request parameters to assign values to the `CONNECTION_PROPERTY` variables and set the variable scope specific Orgs:
+The following example shows the request parameters to assign values to the `CONNECTION_PROPERTY` variables and set the variable scope to a specific Org:
 
 [source,cURL]
 ----
@@ -399,9 +401,6 @@ curl -X POST \
   "variable_value_scope": [
     {
       "org_identifier": "OrgA"
-    },
-    {
-      "org_identifier": "Org_Demo"
     }
   ]
 }'
@@ -423,21 +422,29 @@ curl -X POST \
     {
       "variable_identifier": "region_var",
       "variable_values": [
-        "North America"
+        "West"
+      ],
+      "operation": "ADD"
+    },
+    {
+      "variable_identifier": "state_var",
+      "variable_values": [
+        "california",
+        "nevada
       ],
       "operation": "ADD"
     },
     {
       "variable_identifier": "category_var",
       "variable_values": [
-        "Apparel",
+        "all",
       ],
       "operation": "ADD"
     },
     {
       "variable_identifier": "min_quantity_var",
       "variable_values": [
-        "100",
+        "10",
       ],
       "operation": "ADD"
     },
@@ -451,35 +458,40 @@ curl -X POST \
     {
       "variable_identifier": "end_date_var",
       "variable_values": [
-        "2025-04-01"
+        "1743469200"
       ],
       "operation": "ADD"
     },
   ],
   "variable_value_scope": [
     {
-      "org_identifier": "OrgA",
+      "org_identifier": "Org_NA",
       "model_identifier": "80c969e7-3a36-48b7-923e-e2fb5c3fe88f"
+      "principal_type": "USER",
+      "principal_identifier": "tsuser"
+
     },
     {
-      "org_identifier": "Org_Demo",
+      "org_identifier": "Org_Sales",
       "model_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+      "principal_type": "USER",
+      "principal_identifier": "tsuser"
     }
   ]
 }'
 ----
 
-To avoid invalid data type errors, ensure that the values you assign to formula variables match the data type configured during variable creation.
+If no value is To avoid invalid data type errors, ensure that the values you assign to formula variables match the data type configured during variable creation.
 
 Formula variables assigned to Primary Org can be used across all Orgs.
 
-If the formula variable update is successful, you can use these variables in RLS rules. For more information, see xref:rls-rules.adoc[RLS rules].
+If the formula variable update is successful, you can use these variables in RLS rules. For more information, see xref:formula-variables.adoc[Formula variables] and xref:rls-rules.adoc[RLS rules].
 
 === Example response
 
 If the update operation is successful, the API returns a 204 response to indicate that the variable was updated successfully.
 
-== Get details of variables
+== Get variables
 To get a list of variables or the details of a specific variable, send a `POST` request to the `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fsearch-variables">/api/rest/2.0/template/variables/search</a>+++` API endpoint.
 
 To search for a variable, specify the following parameters in your API request:
@@ -487,7 +499,7 @@ To search for a variable, specify the following parameters in your API request:
 * variable details +
 Details such as variable type, ID, and name pattern. For name pattern search, specify the partial name of the variable. For wildcard search, use `%`.
 * variable value +
-Variable parameters such as Org ID, Model ID, ID and type of Principal object.
+Variable parameters such as Org ID, Model ID, and ID and type of Principal object.
 * output format for response content +
 Specify one of the following values for output format:
 ** `METADATA_ONLY` (default) +
@@ -500,6 +512,7 @@ Returns variable metadata and values
 Returns metadata details, such as name, type, default value, and whether the variable is editable, and the current values of variables that can be edited.
 ////
 
+=== Example request
 [source,cURL]
 ----
 curl -X POST \
@@ -509,8 +522,8 @@ curl -X POST \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "record_offset": 0,
-  "record_size": 10,
-  "output_format": "METADATA_AND_VALUES",
+  "record_size": -10,
+  "output_format": "METADATA",
   "variable_details": [
     {
       "type": "TABLE_MAPPING"
@@ -519,40 +532,27 @@ curl -X POST \
 }'
 ----
 
+=== Example response
+
 If the request is successful, the API returns the variable data in the response:
 
 [source,JSON]
 ----
 [
-   {
-      "id":"180a9cd3-8605-445b-8b70-aa0bcef5dfb0",
-      "name":"schema_var",
-      "variable_type":null,
-      "sensitive":null,
-      "values":[
-         {
-            "value":"primaryOrg",
-            "org_identifier":"Primary",
-            "principal_type":null,
-            "principal_identifier":null,
-            "priority":null
-         },
-         {
-            "value":"MyOrg1",
-            "org_identifier":"MyOrg1",
-            "principal_type":null,
-            "principal_identifier":null,
-            "priority":null
-         },
-         {
-            "value":"MyOrg2",
-            "org_identifier":"MyOrg2",
-            "principal_type":null,
-            "principal_identifier":null,
-            "priority":null
-         }
-      ]
-   }
+  {
+    "id": "f658cfd5-fa6f-4c33-a12f-ea46fa799666",
+    "name": "Table_var",
+    "variable_type": "TABLE_MAPPING",
+    "sensitive": false,
+    "values": null
+  },
+  {
+    "id": "7f52d7b1-38f1-4127-ad5a-a2a7f58064df",
+    "name": "Schema_var",
+    "variable_type": "TABLE_MAPPING",
+    "sensitive": false,
+    "values": null
+  }
 ]
 ----
 
@@ -562,8 +562,9 @@ To delete a variable, send a `POST` request to the `+++<a href="{{navprefix}}/re
 
 Note that you can delete only one variable at a time.
 
-The API does not allow deleting formula variables if they are used in Models, user data, or JWT tokens assigned for ABAC implementation. If the variables is used by other objects, make sure to remove the variable assignments and references before deleting it.
+The API does not allow deleting formula variables if they are used in Models, RLS rules, user properties, or ABAC tokens. If the variable is used by an object in ThoughtSpot, make sure to remove the variable assignments and references before deleting it from ThoughtSpot.
 
+=== Example request
 [source,cURL]
 ----
 curl -X POST \
@@ -573,5 +574,8 @@ curl -X POST \
 
 If the API request is successful, ThoughtSpot returns a 204 response code.
 
+== Additional resources
 
-
+* For more information about formula variables, see xref:formula-variables.adoc[Formula variables].
+* For information about RLS rules, see link:https://docs.thoughtspot.com/cloud/latest/security-rls[RLS rules documentation, window=_blank].
+* For information about assigning security entitlements via ABAC tokens, see xref:abac-user-parameters.adoc[ABAC via tokens].
