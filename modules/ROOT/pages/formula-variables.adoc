@@ -6,15 +6,14 @@
 :page-pageid: formula-variables
 :page-description: Formula variables in ThoughtSpot are custom template variables that enable dynamic, context-aware logic in formulas, especially for Row Level Security (RLS) rules.
 
-Formula variables are a type of template variable in ThoughtSpot that enable dynamic and context-aware logic Row Level Security (RLS) rules.
+Formula variables are a type of template variable in ThoughtSpot that enable dynamic and context-aware logic in Row Level Security (RLS) rules.
 
 == Overview
 Formula variables can be configured at the Org, user, and data model levels to implement clear rule definitions for data security, dynamic assignment at runtime, and a more efficient SQL query generation.
 
 You can use the formula variables in the following scenarios:
 
-* In the xref:rls-rules.adoc[RLS rules] to dynamically restrict access to data. For example, to filter data by region, department, or entitlement, with the value determined by the Org or user context.
-* In Attribute-Based Access Control (ABAC) implementation to configure security entitlements for a user via JWT tokens.
+* In Attribute-Based Access Control (ABAC) implementation and the xref:rls-rules.adoc[RLS rules] to dynamically restrict access to data. For example, to filter data by region, department, or entitlement, with the value determined by the Org or user context.
 * For personalized analytics with user-specific filtering and calculations without duplicating objects or hardcoding values.
 
 Formula variables are available on ThoughtSpot application instances with 10.15.0.cl or later, and can be configured by administrators via REST APIs.
@@ -80,6 +79,49 @@ curl -X POST \
 }'
 ----
 
+=== Include formula variable rules in ABAC tokens
+Formula variables in the JWT token or ABAC context are used as parameters whose values are set via the JWT token at session creation. You can include the variable name and values in your token generation request and apply rules to the authenticated user sessions.
+
+For example, when the JWT token is generated with formula variables for region, country, or department-specific control, these values are used by data model filters and RLS rules to apply security entitlements to the user session.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/custom'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "UserA",
+  "validity_time_in_sec": 300,
+  "persist_option": "APPEND",
+  "auto_create": true,
+  "password": "{password}",
+  "secret_key": "6c523cf9-c5c7-4cb2-a70b-9c5be2d7c0fe",
+  "org_identifier": "Primary",
+  "variable_values": [
+    {
+      "name": "department_var",
+      "values": [
+        "Sales",
+        "Marketing"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "type": "LOGICAL_TABLE",
+      "identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    }
+  ],
+  "email": "UserA@testOrg.com",
+  "display_name": "User A",
+  "groups": [
+  ],
+}'
+----
+
+The values can be set via  `POST /api/rest/2.0/auth/token/custom` API calls and included in the access control properties for the user for whom the token is generated. The variable values defined in the ABAC tokens cannot be overridden in the UI or reset using the `"persist_option": "RESET"` option. However, administrators can replace or append, or reset values via a new API request.
+
 ==== Setting variable value to TS_WILDCARD_ALL
 
 If a variable value is set to `TS_WILDCARD_ALL`, all values are returned during SQL query generation,  and the SQL removes the filters from the WHERE clause.
@@ -140,48 +182,6 @@ Similarly, you can apply rules for a specific date range:
 if(date_column >= ts_var('start_date_var') and date_column <= ts_var('end_date_var')) then value else 0
 ----
 
-=== Include formula variable rules in ABAC tokens
-Formula variables in the JWT token or ABAC context are used as parameters whose values are set via the JWT token at session creation. You can include the variable name and values in your token generation request and apply rules to the authenticated user sessions.
-
-For example, when the JWT token is generated with formula variables for region, country, or department-specific control, these values are used by data model filters and RLS rules to apply security entitlements to the user session.
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/custom'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "username": "UserA",
-  "validity_time_in_sec": 300,
-  "persist_option": "APPEND",
-  "auto_create": true,
-  "password": "{password}",
-  "secret_key": "6c523cf9-c5c7-4cb2-a70b-9c5be2d7c0fe",
-  "org_identifier": "Primary",
-  "variable_values": [
-    {
-      "name": "department_var",
-      "values": [
-        "Sales",
-        "Marketing"
-      ]
-    }
-  ],
-  "objects": [
-    {
-      "type": "LOGICAL_TABLE",
-      "identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
-    }
-  ],
-  "email": "UserA@testOrg.com",
-  "display_name": "User A",
-  "groups": [
-  ],
-}'
-----
-
-The values can be set via  `POST /api/rest/2.0/auth/token/custom` API calls and included in the access control properties for the user for whom the token is generated. The variable values defined in the ABAC tokens cannot be overridden in the UI or reset using the `"persist_option": "RESET"` option. However, administrators can replace or append, or reset values via a new API request.
 
 == Additional resources
 
