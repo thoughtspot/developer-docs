@@ -8,32 +8,50 @@
 
 Formula variables are a type of template variable in ThoughtSpot that enable dynamic and context-aware logic in Row Level Security (RLS) rules.
 
+[NOTE]
+====
+Formula variables are available on ThoughtSpot application instances with 10.15.0.cl or later. To enable this feature on your instance, contact Support.
+====
+
 == Overview
-Formula variables can be configured at the Org, user, and data model levels to implement clear rule definitions for data security, dynamic assignment at runtime, and a more efficient SQL query generation.
+Formula variables can be configured at the Org, user, and data Model levels to implement clear rule definitions for data security, dynamic assignment at runtime, and a more efficient SQL query generation.
 
 You can use the formula variables in the following scenarios:
 
-* In Attribute-Based Access Control (ABAC) implementation and the xref:rls-rules.adoc[RLS rules] to dynamically restrict access to data. For example, to filter data by region, department, or entitlement, with the value determined by the Org or user context.
+* In Attribute-Based Access Control (ABAC) implementation with xref:rls-rules.adoc[RLS rules] to dynamically restrict user access to data. For example, you can reference the variable in an RLS rule to filter data by region, country, or department, with its value determined by the Org or user context.
 * For personalized analytics with user-specific filtering and calculations without duplicating objects or hardcoding values.
 
-Formula variables are available on ThoughtSpot application instances with 10.15.0.cl or later, and can be configured by administrators via REST APIs.
+=== Variable scope
+Administrators can restrict the scope of formula variables to Orgs, users, and Models. They can also implement a combination of Org, user, and Model-specific rules to enforce access control. For example, you can set the scope of a variable to a specific data model in an Org, and also create a JWT token for a specific user in that Org and assign security attributes via RLS rules.
 
-Administrators can restrict the scope of formula variables to Orgs, users, and Models. They can also implement a combination of Org, user, and Model-specific rules to enforce access control. For example, you can set rules to restrict access to columns in a data model for users from a specific Org. Variables defined in a primary Org are propagated to all Orgs, unless Org-specific overrides are configured by the Org administrators.
+Variables defined in a primary Org are propagated to all Orgs, unless Org-specific overrides are configured by the Org administrators.
 
 [IMPORTANT]
 ====
-* Currently, the formula variables can be added and managed only via REST APIs.
-* To configure formula variables for all Orgs on your instance or the Primary Org, cluster administration privileges are required. Org administrators can configure formula variables for their respective Orgs. Users with the `CAN_MANAGE_VARIABLES` (*Can manage variables*) role privilege can also create and manage variables for their Org context.
+* The formula variables can be created and assigned values and scope only via REST APIs. To assign values to a variable or define its scope, use the variable update API or the ABAC token generation API request.
 * The variable values are case-sensitive.
+* Formula variable won't impact security rules unless they are included in the RLS rules assigned to a Table. When referencing formula variables in RLS rules, use the `ts_var` function.
 ====
 
-=== Configure formula variables
+== Configure formula variables
+To use the formula variables in RLS rules or formulas, the variables must be available on ThoughtSpot.
 
-To create formula variables and assign values, use the xref:variables.adoc#_create_a_variable[variable creation] and xref:variables.adoc#_assign_values_and_update_properties_of_multiple_variables[update REST APIs].
+To configure formula variables for all Orgs on your instance or the Primary Org, cluster administration privileges are required. Org administrators can configure formula variables for their respective Orgs.
 
-The `/api/rest/2.0/template/variables/create` API endpoint allows creating formula variables with string, integer, decimal, and epoch values for date and date and time. During variable creation, you must specify the xref:variables.adoc#data_type [`data_type`]. When assigning values, you must ensure the assigned values match the data type configured for that variable.
+Users with the `CAN_MANAGE_VARIABLES` (*Can manage variables*) role privilege can also create and manage variables for their Org context.
 
-The following example shows the API request body for creating a variable that allows string values:
+=== Variable creation
+To create a formula variable, use the xref:variables.adoc#_create_a_variable[variable creation] API.
+The `/api/rest/2.0/template/variables/create` API endpoint allows creating formula variables for the following data types:
+
+* `VARCHAR`
+* `INT32`
+* `INT64`
+* `DOUBLE`
+* `DATE`
+* `DATE_TIME`
+
+During variable creation, you must specify the xref:variables.adoc#data_type [`data_type`] as shown in this example:
 
 [source,cURL]
 ----
@@ -44,16 +62,24 @@ curl -X POST \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "type": "FORMULA_VARIABLE",
-  "name": "region_var",
+  "name": "country_var",
   "is_sensitive": false,
   "data_type": "VARCHAR"
 }'
 ----
 
-After creating variables, you must assign values. If you are using formula variables to implement ABAC via RLS, you can assign values via xref:abac-user-parameters.adoc#_abac_via_rls_with_formula_variables[ABAC token generation request].
+=== Variable values and scope
 
-You can also add or update variable values and set the scope using the xref:variables.adoc#_define_values_and_scope_for_variables[variable update] API endpoint.
+After creating a variable, you can assign values to the variable and set its scope by using one of the following options:
 
+* Via the `/api/rest/2.0/auth/token/custom` API endpoint +
+If you are using formula variables to implement ABAC via RLS, use the `variable_values` parameter in your xref:abac-user-parameters.adoc#_abac_via_rls_with_formula_variables[ABAC token generation request]. For more information and examples, see xref:formula-variables.adoc#_include_formula_variable_rules_in_abac_tokens[Include formula variable attributes in an ABAC token].
+
+* Via  the xref:variables.adoc#_define_values_and_scope_for_variables[variable update] API endpoint.
++
+The following example shows the API request parameters for assigning values to variables using the xref:variables.adoc#_define_values_and_scope_for_variables[variable update] API endpoint.
+
++
 [source,cURL]
 ----
 curl -X POST \
@@ -81,10 +107,10 @@ curl -X POST \
 }'
 ----
 
-=== Include formula variable rules in ABAC tokens
-Formula variables in the JWT token or ABAC context are used as parameters whose values are set via the JWT token at session creation. You can include the variable name and values in your token generation request and apply rules to the authenticated user sessions.
+When assigning values, ensure that the assigned values match the data type configured for that variable.
 
-For example, when the JWT token is generated with formula variables for region, country, or department-specific control, these values are used by data model filters and RLS rules to apply security entitlements to the user session.
+== Include formula variable rules in ABAC tokens
+Formula variables in the JWT token or ABAC context are used as parameters whose values are set via the JWT token at session creation. You can include the variable name and values in your token generation request and apply rules to the authenticated user sessions.
 
 [source,cURL]
 ----
@@ -122,22 +148,25 @@ curl -X POST \
 }'
 ----
 
-The values can be set via  `POST /api/rest/2.0/auth/token/custom` API calls and included in the access control properties for the user for whom the token is generated. The variable values defined in the ABAC tokens cannot be overridden in the UI or reset using the `"persist_option": "RESET"` option. However, administrators can replace or append, or reset values via a new API request.
-
-==== Setting variable value to TS_WILDCARD_ALL
-
 If a variable value is set to `TS_WILDCARD_ALL`, all values are returned during SQL query generation, and the SQL removes the filters from the WHERE clause.
 
-=== Add variable references in RLS rules
-Before adding variable references in the formulas, make sure the variables are available in your Org context, with values assigned according to the data type configured during variable creation. To get a list of formula variables available in ThoughtSpot, use the `/api/rest/2.0/template/variables/search` API endpoint.
+The values can be set via  `POST /api/rest/2.0/auth/token/custom` API calls and included in the access control properties for the user for whom the token is generated.
 
-To add a variable reference:
+The variable values defined in the ABAC tokens cannot be overridden in the UI or reset using the `"persist_option": "RESET"` option. However, administrators can replace or append values via a new API request.
+
+Although the variable values, their scope, and persistence criteria for user sessions can be defined during token generation, these attributes only take effect if they are referenced in an RLS rule applied on the underlying Table of the objects to which the JWT token provides access.
+
+== Include variables in RLS rules
+Before adding variable references in the formulas, ensure the variables are available in your Org context:
+
+* To get a list of formula variables available on ThoughtSpot, use the `/api/rest/2.0/template/variables/search` API endpoint.
+* If the variables are assigned as ABAC attributes in a JWT token generated for a user, use the `/api/rest/2.0/users/search` API endpoint to verify the user entitlements.
+
+To set RLS rules with formula variables:
 
 . Navigate to the Data workspace and click the Table for which to define the RLS rules.
 . Click *Row security* and then click *+ Add row security*.
-. In the row security editor window, define the formulas with variable references. You must include the formula variable reference with the `ts_var` function.
-
-==== Examples
+. In the *Row Security Editor*, define the rules. To reference the formula variable in the rule, use the `ts_var` function.
 
 The following examples show how to reference formula variables in RLS rules:
 
@@ -184,11 +213,10 @@ Similarly, you can apply rules for a specific date range:
 if(date_column >= ts_var('start_date_var') and date_column <= ts_var('end_date_var')) then value else 0
 ----
 
-=== Verify the rules
-To verify the rules, inspect the generated SQL for your query or visualization.
+To verify the security entitlements, start a user session using the JWT token and inspect the generated SQL for your query or visualization.
 
 == Additional resources
 
-* For information about RLS rule definitions, see link:https://docs.thoughtspot.com/cloud/latest/security-rls[RLS rules documentation, window=_blank].
 * For information about variable APIs, see xref:variables.adoc[Variable APIs].
 * For information about assigning security entitlements via ABAC tokens, see xref:abac-user-parameters.adoc[ABAC via tokens].
+* For information about RLS rule definitions, see link:https://docs.thoughtspot.com/cloud/latest/security-rls[RLS rules documentation, window=_blank].
