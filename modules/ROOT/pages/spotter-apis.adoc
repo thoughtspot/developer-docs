@@ -1,12 +1,12 @@
 = Spotter AI APIs
 :toc: true
-:toclevels: 3
+:toclevels: 2
 
 :page-title: Spotter APIs
 :page-pageid: spotter-api
 :page-description: You can use Spotter REST APIs to receive Answers for your analytical queries sent  through the conversational experience with ThoughtSpot.
 
-ThoughtSpot provides a set of Spotter AI APIs [beta betaBackground]^Beta^ to create a conversation session with Spotter, ask follow-up questions, and generate Answers for their analytic queries. These APIs collectively enable natural language interaction, context-aware analytics, and guided data analysis.
+ThoughtSpot provides a set of Spotter AI APIs [beta betaBackground]^Beta^ that allow you to create a conversation session with Spotter, ask follow-up questions, and generate Answers for their analytic queries. These APIs collectively enable natural language interaction, context-aware analytics, and guided data analysis.
 
 [NOTE]
 ====
@@ -28,10 +28,6 @@ __Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
 Creates a conversation session. +
 __This is a legacy API and will be deprecated in an upcoming release version__. +
 
-|xref:spotter-apis.adoc#_get_relevant_questions[Get relevant questions] a| * `POST /api/rest/2.0/ai/relevant-questions/` +
-Breaks down a user-submitted query into a series of analytical sub-questions using relevant contextual metadata. Provides a list of recommended or relevant questions for a given data source and conversation context to allow users to explore their data further. +
-__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
-
 |xref:spotter-apis.adoc#_send_a_question_to_a_conversation_session[Send queries to a conversation session] a|
 * xref:spotter-apis.adoc#_send_a_question_and_generate_streaming_responses[`POST /api/rest/2.0/ai/agent/converse/sse`] (Recommended for agentic workflows) +
 Allows sending a natural language query or a follow-up question to an ongoing conversation session and returns the AI agent's response, including answers, tokens, and visualization details. +
@@ -43,9 +39,23 @@ Allows sending a follow-up message to an ongoing conversation session within the
 |xref:spotter-apis.adoc#_generate_a_single_answer[Generate a single answer] a| * `POST /api/rest/2.0/ai/answer/create` +
 Allows users to submit a natural language search query and fetch an AI-generated response.
 
-//|xref:spotter-apis.adoc#_get_data_source_suggestions[Get data source suggestions] a| * `POST /api/rest/2.0/ai/data-source-suggestions` +
-//Returns a list of relevant data sources, such as Models, based on a query and thus helping users and agents choose the most appropriate data source for analytics. +
-//__Available on ThoughtSpot Cloud instances from 10.15.0.cl onwards. Please contact ThoughtSpot Support to enable this feature on your instance__.
+|xref:spotter-apis.adoc#_get_data_source_suggestions[Get data source suggestions] a| * `POST /api/rest/2.0/ai/data-source-suggestions` +
+Returns a list of relevant data sources, such as Models, based on a query and thus helping users and agents choose the most appropriate data source for analytics. +
+__Available on ThoughtSpot Cloud instances from 10.15.0.cl onwards. Contact ThoughtSpot Support to enable this feature on your instance__.
+
+|xref:spotter-apis.adoc#_get_relevant_questions[Get relevant questions] a| * `POST /api/rest/2.0/ai/relevant-questions/` +
+Breaks down a user-submitted query into a series of analytical sub-questions using relevant contextual metadata. Provides a list of recommended or relevant questions for a given data source and conversation context to allow users to explore their data further. +
+__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
+
+|xref:spotter-apis.adoc#_set_rules_for_spotter_responses[Set Natural Language (NL) instructions on a Model] a|
+* `POST /api/rest/2.0/ai/instructions/set` +
+Allows setting instructions in natural language to define rules for Spotter queries and responses.
+__Available on ThoughtSpot Cloud instances from 10.15.0.cl onwards. Contact ThoughtSpot Support to enable this feature on your instance__.
+
+|xref:spotter-apis.adoc#_retrieve_nl_instructions_assigned_to_a_model[Get NL instructions assigned to a Model] a|
+* `POST /api/rest/2.0/ai/instructions/get`
+__Available on ThoughtSpot Cloud instances from 10.15.0.cl onwards. Contact ThoughtSpot Support to enable this feature on your instance__.
+
 |=====
 
 === Locale settings for API requests
@@ -259,96 +269,6 @@ If the API request is successful, a conversation identifier is created. Note the
 [source,JSON]
 ----
 {"conversation_identifier":"98f9b8b0-6224-4f9d-b61c-f41307bb6a89"}
-----
-
-== Get relevant questions
-
-To discover follow-up or related questions that can be asked of a data model, ThoughtSpot provides the  `/api/rest/2.0/ai/relevant-questions/` REST API endpoint. This API endpoint supports both agentic workflows and direct user interaction, and generates contextually relevant questions for a given data context and user query.
-
-The `/api/rest/2.0/ai/relevant-questions/` API is exposed as the `getRelevantQuestions` tool in ThoughtSpot's MCP server implementation. The MCP server can call this API directly to fetch relevant questions, which can then be used to generate reports or for further analysis and interactions. For more information, see xref:mcp-integration.adoc[MCP server integration].
-
-You can also call this API directly from your REST client to fetch relevant questions by making a `POST` request. The API breaks the user-submitted query into a structured set of analytical sub-questions and returns these in the API response.
-
-=== Request parameters
-
-[width="100%" cols="2,4"]
-[options='header']
-|=====
-|Parameter| Description
-|`metadata_context`  a| Required. Specify one of the following attributes to set the metadata context:
-
-* `data_source_identifiers` +
-__Array of strings__. IDs of the data source object such as Models.
-* `answer_identifiers` +
-__Array of strings__. GUIDs of the Answer objects that you want to use as metadata.
-* `conversation_identifier` +
-__String__. ID of the conversation session.
-* `liveboard_identifiers` +
-__Array of strings__. GUIDs of the Liveboards that you want to use as metadata.
-
-| `query` |__String__. Required parameter. Specify the query string that needs to be decomposed into smaller, analytical sub-questions.
-|`limit_relevant_questions` +
-__Optional__ | __Integer__. Sets a limit on the number of sub-questions to return in the response. Default is 5.
-|`bypass_cache` +
-__Optional__| __Boolean__. When set to `true`, disables cache and forces fresh computation.
-|`ai_context` +
-__Optional__. a| Additional context to guide the response. Define the following attributes as needed:
-
-* `instructions` +
-__Array of strings__. Custom user instructions to influence how the AI interprets and processes the query.
-* `content` +
-__Array of strings__. Additional input such as raw text or CSV-formatted data to enhance context and answer quality.
-|=====
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/relevant-questions/'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}'
-  --data-raw '{
-  "metadata_context": {
-    "data_source_identifiers": [
-      "cd252e5c-b552-49a8-821d-3eadaa049cca"
-    ]
-  },
-  "query": "Net sales of Jackets in west coast",
-  "limit_relevant_questions": 3
-}'
-----
-
-=== Example response
-If the request is successful, the API returns a set of questions related to the query and metadata context in the `relevant_questions` array. Each object in the `relevant_questions` array contains the following fields:
-
-* `query` +
-A string containing the natural language (NL) sub-question.
-* `data_source_identifier` +
-GUID of the data source object that can be used as data context for the sub-question.
-* `data_source_name` +
-Name of the associated data source object.
-
-[source,JSON]
-----
-{
-  "relevant_questions": [
-    {
-      "query": "What is the trend of sales by type over time?",
-      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-      "data_source_name": "(Sample) Retail - Apparel"
-    },
-    {
-      "query": "Sales by item",
-      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-      "data_source_name": "(Sample) Retail - Apparel"
-    },
-    {
-      "query": "Sales across regions",
-      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-      "data_source_name": "(Sample) Retail - Apparel"
-    }
-  ]
-}
 ----
 
 == Send a query to a conversation session
@@ -937,24 +857,10 @@ Note the session ID and generation number. To export the result generated from t
 }]
 ----
 
-[#process_results]
-== Process results generated from Spotter APIs
-To export or download the Answer data generated by the Spotter APIs, use the xref:data-report-v2-api.adoc#exportSpotterData[Answer report] API.
 
-[NOTE]
-====
-Using tokens generated by the Spotter API in a xref:data-report-v2-api.adoc#_search_data_api[Search Data API] request can return invalid column errors, because these tokens may reference formulas or columns not present in the data model. Instead, use the xref:data-report-v2-api.adoc#exportSpotterData[Answer report] API and include the session ID and generation number obtained from the Spotter API in your API request to retrieve the data.
-====
-
-////
 == Get data source suggestions
 
 The `POST /api/rest/2.0/ai/data-source-suggestions` API provides relevant data source recommendations for a user-submitted natural language query. To use this API, you must have at least view access to the underlying metadata source referenced in the response.
-
-[NOTE]
-====
-The Get data source suggestions feature is available from 10.15.0.cl onwards. To enable this API on your instance, contact ThoughtSpot Support.
-====
 
 === Request parameters
 
@@ -1026,7 +932,208 @@ A float indicating the Model's confidence in the relevance of each recommendatio
 The data source ID, name, and description for each recommended data source.
 * `reasoning` +
 Reason provided by the LLM to explain why each data source was recommended.
-////
+
+== Get relevant questions
+
+To discover follow-up or related questions that can be asked of a data model, ThoughtSpot provides the  `/api/rest/2.0/ai/relevant-questions/` REST API endpoint. This API endpoint supports both agentic workflows and direct user interaction, and generates contextually relevant questions for a given data context and user query.
+
+The `/api/rest/2.0/ai/relevant-questions/` API is exposed as the `getRelevantQuestions` tool in ThoughtSpot's MCP server implementation. The MCP server can call this API directly to fetch relevant questions, which can then be used to generate reports or for further analysis and interactions. For more information, see xref:mcp-integration.adoc[MCP server integration].
+
+You can also call this API directly from your REST client to fetch relevant questions by making a `POST` request. The API breaks the user-submitted query into a structured set of analytical sub-questions and returns these in the API response.
+
+=== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter| Description
+|`metadata_context`  a| Required. Specify one of the following attributes to set the metadata context:
+
+* `data_source_identifiers` +
+__Array of strings__. IDs of the data source object such as Models.
+* `answer_identifiers` +
+__Array of strings__. GUIDs of the Answer objects that you want to use as metadata.
+* `conversation_identifier` +
+__String__. ID of the conversation session.
+* `liveboard_identifiers` +
+__Array of strings__. GUIDs of the Liveboards that you want to use as metadata.
+
+| `query` |__String__. Required parameter. Specify the query string that needs to be decomposed into smaller, analytical sub-questions.
+|`limit_relevant_questions` +
+__Optional__ | __Integer__. Sets a limit on the number of sub-questions to return in the response. Default is 5.
+|`bypass_cache` +
+__Optional__| __Boolean__. When set to `true`, disables cache and forces fresh computation.
+|`ai_context` +
+__Optional__. a| Additional context to guide the response. Define the following attributes as needed:
+
+* `instructions` +
+__Array of strings__. Custom user instructions to influence how the AI interprets and processes the query.
+* `content` +
+__Array of strings__. Additional input such as raw text or CSV-formatted data to enhance context and answer quality.
+|=====
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/relevant-questions/'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+  --data-raw '{
+  "metadata_context": {
+    "data_source_identifiers": [
+      "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    ]
+  },
+  "query": "Net sales of Jackets in west coast",
+  "limit_relevant_questions": 3
+}'
+----
+
+=== Example response
+If the request is successful, the API returns a set of questions related to the query and metadata context in the `relevant_questions` array. Each object in the `relevant_questions` array contains the following fields:
+
+* `query` +
+A string containing the natural language (NL) sub-question.
+* `data_source_identifier` +
+GUID of the data source object that can be used as data context for the sub-question.
+* `data_source_name` +
+Name of the associated data source object.
+
+[source,JSON]
+----
+{
+  "relevant_questions": [
+    {
+      "query": "What is the trend of sales by type over time?",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
+    },
+    {
+      "query": "Sales by item",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
+    },
+    {
+      "query": "Sales across regions",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
+    }
+  ]
+}
+----
+
+[#process_results]
+== Process results generated from Spotter APIs
+To export or download the Answer data generated by the Spotter APIs, use the xref:data-report-v2-api.adoc#exportSpotterData[Answer report] API.
+
+[NOTE]
+====
+Using tokens generated by the Spotter API in a xref:data-report-v2-api.adoc#_search_data_api[Search Data API] request can return invalid column errors, because these tokens may reference formulas or columns not present in the data model. Instead, use the xref:data-report-v2-api.adoc#exportSpotterData[Answer report] API and include the session ID and generation number obtained from the Spotter API in your API request to retrieve the data.
+====
+
+== Set instructions on a Model
+
+To coach and instruct the Spotter system on how to interpret queries, apply filters, select columns, handle data nuances, and present answers using the data from a specific model, you can set global rules in natural language format. Setting instructions helps Spotter generate a more accurate and consistent response to user queries.
+
+To set instructions for a Model, send a `POST` request to the `/api/rest/2.0/ai/instructions/set` API endpoint.
+
+[NOTE]
+====
+To set NL instructions, the Spotter coaching feature must be enabled on your instance. For the API request, you'll need administration privileges or at least edit access to the data Model.
+====
+
+=== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Form parameter| Description
+|`data_source_identifier`|__String__. ID or name of the Model.
+|`nl_instructions_info`|Instructions in the natural language format.
+
+* `instructions` +
+_Array of strings_. Include the rules that you want to add in the `ìnstructions` array. Ensure that the instructions do not exceed 3000 characters.
+* `scope`
+Sets the scope for the rules. By default, the rules are applied globally for all Spotter users who can access the Model specified in the request.
+|=====
+
+=== Example request
+
+The following example defines instructions to coach Spotter on how to interpret the query:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/set'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN} \
+  --data-raw '{
+  "data_source_identifier": "71311827-31bb-48b2-8465-9a215adbc05d",
+  "nl_instructions_info": [
+    {
+      "instructions": [
+        "When I ask for last month, use ‘last 30 days’ as a filter.",
+        "Exclude orders where order_status = '\''CANCELLED-USER'\'' when calculating total revenue"
+      ],
+      "scope": "GLOBAL"
+    }
+  ]
+}'
+----
+
+=== Example response
+If the API request is successful, ThoughtSpot returns the `{"success":true}` response.
+
+== Get the NL instructions assigned to a Model
+
+To view the NL instructions assigned for a Model, send a `POST` request to the `/api/rest/2.0/ai/instructions/get` API endpoint.
+
+Only Spotter users with view access to the data Model can retrieve instructions via API requests.
+
+=== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Form parameter| Description
+|`data_source_identifier`|__String__. ID or name of the Model from which you want to fetch instructions.
+|=====
+
+=== Example request
+The following example shows the request body for retrieving NL instructions configured on a Model:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/set'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN} \
+    --data-raw '{
+  "data_source_identifier": "3bbeac16-a723-4886-9eba-c4779d07fd83"
+}'
+----
+
+=== Example response
+If the instructions are configured on the Model specified in the API request, ThoughtSpot returns an array of instructions in the API response.
+
+[source,JSON]
+----
+{
+  "nl_instructions_info": [
+    {
+      "instructions": [
+        "When I ask for last month, use ‘last 30 days’ as a filter.",
+        "Exclude orders where order_status = 'CANCELLED-USER' when calculating total revenue"
+      ],
+      "scope": "GLOBAL"
+    }
+  ]
+}
+----
+
 
 == Additional resources
 
