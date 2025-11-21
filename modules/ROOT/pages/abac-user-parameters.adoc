@@ -12,52 +12,64 @@ ThoughtSpot's Attribute-Based Access Control (ABAC) implementation allows admini
 
 The ABAC implementation allows sending user-specific data security rules and is typically used in embedded analytics scenarios where each user may need different data access. To generate JWT tokens for ABAC implementation, you must use the `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token"> /api/rest/2.0/auth/token/custom </a>+++` REST API endpoint.
 
-The legacy ABAC implementation allows passing runtime filters and Parameters as attributes in security entitlements in the token. Starting with 10.15.0.cl, ThoughtSpot introduces a new approach to ABAC implementation that leverages (Row Level Security) RLS with formula variables. If you want to implement a more robust and secure access control for your application users, ThoughtSpot recommends migrating to the new ABAC method that uses RLS with formula variables. To enable this feature and for additional assistance with migration, contact ThoughtSpot Support.
+The legacy ABAC implementation allows passing runtime filters and Parameters as attributes in security entitlements in the token.
+
+Starting with 10.15.0.cl, ThoughtSpot introduces a new approach to ABAC implementation that leverages (Row Level Security) RLS with xref:formula-variables.adoc[formula variables]. If you want to implement a more robust and secure access control for your application users, ThoughtSpot recommends using RLS rules or migrating to the new ABAC method that uses RLS with formula variables.
+
+[NOTE]
+====
+* Use runtime filters / parameters to apply a filter that controls the user experience and applies relevant context from the host application.
+
+* Runtime filters and runtime parameters are not security features. For data security and to limit access to the overall dataset, ThoughtSpot recommends using link:https://developers.thoughtspot.com/docs/data-security#_row_level_security_rls [Row-level security (RLS rules)].
+====
 
 === ABAC attributes
 
-The attributes for ABAC tokens vary based on the type of implementation you choose.
-The following options are available:
+The attributes for ABAC tokens vary based on the type of implementation you choose. The following options are available:
 
 * ABAC via RLS with formula variables (Recommended for robust security controls) +
-In this method, you'll be using formula variables (`variable_values`) and RLS rules to define security entitlements. You can create a formula variable of any data type at the Org level or for all Orgs on your instance.
+In this method, you'll be using formula variables (`variable_values`) and the RLS rules to define security entitlements. You can create a formula variable of any data type at the Org level or for all Orgs on your instance.
 +
-If the formula variables are available in ThoughtSpot, administrators can assign values to these variables and define RLS rules on the underlying Table with variable references in the formula. These RLS rules will apply to the Models, Liveboards, and other objects derived from that Table. Administrators can also set the scope of these variables to a specific Model derived from the Table on which the RLS rules are applied.
+If the formula variables are available in ThoughtSpot, administrators can assign values to these variables during token generation and then define the RLS rules on the underlying Table with variable references in the formula. The RLS rules will apply to the Models, Liveboards, and other objects derived from that Table. Administrators can also set the scope of these variables to a specific Model derived from the Table on which the RLS rules will be applied.
 
++
 [NOTE]
 ====
 Formula variables are supported only on ThoughtSpot 10.15.0.cl or later versions. To enable this feature on your instance, contact ThoughtSpot Support.
 ====
 
-* ABAC with runtime filters  (Legacy) +
-This method uses xref:runtime-filters.adoc[runtime filters] (`filter_rules`) in the token to create data security rules. It can filter multiple values of any data type and binds to any Column in any Model with a matching column name in ThoughtSpot (and not the underlying database table column name).
+* ABAC with runtime filters (Legacy implementation) +
+This method uses xref:runtime-filters.adoc[runtime filters] (`filter_rules`) in the token to create data security rules. It can filter multiple values of any data type and binds to any Column in any Model with a matching column name in ThoughtSpot.
 
-* ABAC with runtime  Parameters (Legacy) +
+* ABAC with runtime Parameters (Legacy) +
 This method uses xref:runtime-parameters.adoc[runtime Parameters] (`parameter_values`) in the token to create data security rules. It binds a single value to any Parameter in any Model by Parameter Name and Type match. Parameters can be used in *Formulas* and then as *Filters* in  Models.
 
 [NOTE]
 ====
-If you want to migrate your implementation from the legacy methods to the new approach with formula variables and RLS rules, contact ThoughtSpot Support.
+If you want to migrate your implementation from the legacy method to the new approach with formula variables and RLS rules, contact ThoughtSpot Support.
 ====
 
 === Session-based rules
 
-In the ABAC implementation with only filter attributes and Parameters, administrators can configure the token properties to apply the attributes only to the current session or save the attributes in the user’s profile, so that the filter attributes persist for all future sessions and scheduled reports.
-
-If the persist option is set `NONE` in the token, the filter rules and parameter values apply only to that specific session and are not saved to the user profile.  If `persist_option` to `APPEND`, `REPLACE`, or `RESET`, the API updates the user's properties in the user profile immediately upon a successful request, even if the generated token is never used. The user’s stored properties are updated as soon as the token request succeeds, not when the token is first used.
-
-==== RLS rules with formula Variables
 The ABAC implementation with formula variables and RLS does not support session-based ABAC rules, so we do not recommend setting the `persist_option` attribute to `NONE`. You can append or replace the attributes by setting the `persist_option` to `APPEND` or `REPLACE`.
+
 This ABAC method also does not support resetting the variable attributes via `"persist_option": "RESET`. If you don't want to append or replace any attributes, do not pass any variable values in the token update request.
+
+==== Persist options in the legacy ABAC method
+
+In the ABAC implementation with only filter attributes and Parameters, administrators can configure the token properties to apply security attributes only to the current session or save the attributes in the user’s profile, so that the filter attributes persist for all future sessions and scheduled reports.
+
+If the persist option is set `NONE` in the token, the filter rules and parameter values apply only to that specific session and are not saved to the user profile.  If `persist_option` is set to `APPEND`, `REPLACE`, or `RESET`, the API updates the user's properties in the user profile immediately upon a successful request, even if the generated token is never used. The user’s stored properties are updated as soon as the token request succeeds, not when the token is first used.
 
 === Mandatory token filters
 
-The `is_mandatory_token_filter: true` setting in object TML enforces that a filter rule must be provided for a specific column. When this attribute is set on a column in a Model, ThoughtSpot will deny all data access for users who do not have a corresponding filter rule for that column in their ABAC token. If a required filter is missing, no data is returned to ensure that there is no accidental data leak. +
+The `is_mandatory_token_filter: true` setting in object TML enforces that a filter rule must be provided for a specific column. When this attribute is set on a column in a Model, ThoughtSpot will deny all data access for users who do not have a corresponding filter rule for that column in their ABAC token.
+
 When setting filter rules within the token, you must place the `is_mandatory_token_filter: true` property on every column in a Model where a filter rule is expected. This setting will deny any access to data if a user has not been assigned values for the expected set of fields.
 
 [#column-name-warning]
 The filter rules require passing the *exact* column name as defined in the Model. Otherwise, the values will not bind to any column. You must coordinate between the team that maintains the data objects and the team that builds the xref:trusted-auth-token-request-service.adoc[token request service] to know if any changes will be made to a Model and to ensure column names remain consistent. +
-For this reason, end users of an embedded app must not be granted edit access to any Model using ABAC rules via tokens. Setting the `is_mandatory_token_filter: true` property on every column where a filter rule is expected ensures that no data gets returned for users when column names change.
+For this reason, end users of an embedded app must not be granted edit access to any Model using ABAC rules via tokens. Setting the `is_mandatory_token_filter: true` property on every column where a filter rule is expected ensures that no data is returned for users when column names change.
 
 [NOTE]
 ====
@@ -65,13 +77,13 @@ If a column is set with both `is_hidden: true` and `is_mandatory_token_filter: t
 ====
 
 === Indexing
-Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in *Explore* mode, use ThoughtSpot indexing.  Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token. This means indexed columns may expose values in search suggestions or autocompletion that a user should not see, even if ABAC filters would block access to the underlying data. To prevent this, you can do one of the following:
+Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in *Explore* mode, use ThoughtSpot indexing. Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token. This means the indexed columns may expose values in search suggestions or autocompletion that a user should not see, even if ABAC filters would block access to the underlying data. To prevent this, you can do one of the following:
 
-- Disable indexing for columns and fields that need to be restricted by ABAC. You may also want to disable indexing on all sensitive columns.
+- Disable indexing for columns and fields that must be restricted by ABAC. You may also want to disable indexing on all sensitive columns.
 - Define an RLS rule on those fields, since RLS is enforced at the indexing layer and will secure suggestions and sample values.
 
 === ABAC tokens
-The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format. This token can be used as a bearer token for Cookieless trusted authentication or REST API access. You can also use it as a sign-in token to create a session, in which case, we recommend that the ABAC user properties be  *persisted*, to ensure scheduled exports remain secure after the session ends.
+The ABAC message to ThoughtSpot is encoded in JSON Web Token (JWT) format. This token can be used as a bearer token for Cookieless trusted authentication or REST API access. You can also use it as a sign-in token to create a session, in which case, ThoughtSpot recommends that the ABAC user properties be *persisted* to ensure scheduled exports remain secure after the session ends.
 
 [NOTE]
 ====
@@ -79,21 +91,25 @@ ThoughtSpot compresses the size of the JWT token by default to ensure that large
 ====
 
 === Limitations
-The ABAC via tokens method requires the trusted authentication setup.
-For indexing recommendations, see xref:abac-user-parameters.adoc#_indexing.
+
+The ABAC via tokens method requires xref:trusted-authentication.adoc[trusted authentication] setup.
+
+For indexing recommendations, see xref:abac-user-parameters.adoc#_indexing[Indexing].
 
 == ABAC via RLS with formula variables
-Formula variables are template variables in that allow you to implement dynamic and context-aware logic in RLS rules for user access control.
-
 The ABAC implementation with formula variables and RLS rules involves the following steps:
 
 * xref:abac-user-parameters.adoc#_create_formula_variables[Creating formula variables]
-* xref:abac-user-parameters.adoc_define_values_and_scope_for_variables[Assign values and scope for variables and generate ABAC token]
+* xref:abac-user-parameters.adoc_define_values_and_scope_for_variables[Assigning values and scope for variables and generating an ABAC token]
 * xref:abac-user-parameters.adoc#_define_rls_rules_with_formula_variable[Adding RLS rules with formula variables]
 * xref:abac-user-parameters.adoc#_verify_entitlements[#Verifying entitlements]
 
 === Create formula variables
-To create formula variables, use the xref:variables.adoc#_create_a_variable[Variable REST API]. Although you can assign values to these variables through the xref:variables.adoc#_define_values_and_scope_for_variables[variable update-values API], for ABAC implementation, define the value and set the scope of variables in the ABAC token request. If variable values are defined using both these methods, ensure to check the assignment and variable scope before making a token request.
+To create formula variables, use the xref:variables.adoc#_create_a_variable[Variable REST API].
+
+Before generating the token request, verify if the variables are available on your instance and Org context using the `POST /api/rest/2.0/template/variables/search` API call.
+
+You can assign variable values and set the scope in the `variable_values` and `objects` properties in your API request to the `/api/rest/2.0/auth/token/custom` endpoint.
 
 === Create an ABAC token request with formula variables
 
@@ -238,7 +254,7 @@ To verify the assignment, use the `/api/rest/2.0/users/search` REST API endpoint
 ----
 
 === Define RLS rules with formula variable
-Although the variable values and their scope are assigned in the token request, these attributes only take effect if they are referenced in an RLS rule. If the variables are not used in any formula or RLS rule, they will have no impact on data access. Therefore, you must xref:formula-variables.adoc#_add_variable_references_in_rls_rules[add RLS rules on the Table].
+Although the variable values and their scope are assigned in the token request, these attributes only take effect if they are referenced in an RLS rule. If the variables are not used in any formula or RLS rule, they will have no impact on data access. Therefore, you must xref:formula-variables.adoc#_add_variable_references_in_rls_rules[add RLS rules to the Table].
 
 If you want to set the scope of variable attributes to a Model, ensure that the RLS rules are defined on the underlying Table from which the Model is derived.
 
@@ -413,7 +429,7 @@ The requested token can still be used for ABAC if you included `filter_rules` or
 === Token request test page
 A downloadable, customizable web page for testing all of the ABAC and trusted authentication capabilities is link:https://github.com/thoughtspot/ts_everywhere_resources/tree/master/examples/abac_with_token_auth[available on GitHub^].
 
-The username specified in the test page must have Administrator privilege, or you can supply the *secret_key* for the ThoughtSpot instance to request a token for any user along with setting their ABAC properties.
+The username specified in the test page must have Administrator privilege, or you can supply the *secret_key* for the ThoughtSpot instance to request a token for any user,  along with setting their ABAC properties.
 
 See the xref:trusted-authentication.adoc[trusted authentication] documentation for full details on proper setup to allow trusted authentication.
 
@@ -462,7 +478,7 @@ You must follow xref:development-and-deployment.adoc[proper development and depl
 
 As mentioned in the preceding section, the format for filter rules within the token matches with xref:runtime-filters.adoc[runtime filters] in the Visual Embed SDK. In general, RLS entitlements are lists of values using the `IN` operator, but you can pass in filters on numeric and time columns using the full set of operators.
 
-All values are passed into the token as *arrays of strings*, even if the column is a numeric, boolean, or date type in ThoughtSpot and the database. The column data type will be respected in the query issued to the database.
+All values are passed into the token as __arrays of strings__, even if the column is a numeric, boolean, or date type in ThoughtSpot and the database. The column data type will be respected in the query issued to the database.
 
 For example, let's assume three attributes that are needed to filter down a user on a multi-tenanted database: `Customer ID`, `Region`, and `Product Type`.
 
@@ -521,15 +537,15 @@ The basic pattern for using a Parameter to filter a Model includes these steps:
 
 . Create link:https://docs.thoughtspot.com/cloud/latest/parameters-create[Parameters, window=_blank] in Worksheet
 . Create a link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, window=_blank] that evaluates the Parameter's default value and the expected values from the token.
-. Create link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[filter, window=_blank] based on the formula, set to `true`.
+. Create a link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[filter, window=_blank] based on the formula, set to `true`.
 
 link:https://docs.thoughtspot.com/cloud/latest/parameters-create[Parameters, target=_blank] are defined at the Worksheet level within ThoughtSpot. Parameters have a data type and a default value set by the Worksheet author.
 
 You can also add `is_hidden: true` to a Parameter definition using TML, which allows the flexibility to use as many parameters as desired for any type of formula to be used as a Worksheet filter, without cluttering the visible UI.
 
-To use a Parameter, you'll create a link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, window=_blank] on the Worksheet or Model. link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[filters, window=_blank] can reference Worksheet formulas once they have been created, which creates the security layer out of the result derived from the formula.
+To use a Parameter, you'll create a link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, window=_blank] on the Model. link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[Filters, window=_blank] can reference formulas once they have been created, which creates the security layer out of the result derived from the formula.
 
-All of these Worksheet-level features are set by clicking *Edit* on the Worksheet, then expanding the menu on the left sidebar:
+All of these features are available in the edit mode of the Model.
 
 ////
 [.bordered]
@@ -618,7 +634,7 @@ The basic form of the sub-query formula is:
 
 `sql_bool_op('{0} IN (SELECT DatabaseField FROM FullyQualifiedTable WHERE OtherField = {1})', WorksheetField , Param)`
 
-The SQL when expanded out looks like:
+The SQL, when expanded, will look like:
 
 [,sql]
 ----
@@ -642,21 +658,8 @@ An example workflow might be:
 3. The "entitlement_session_id" is sent as an ABAC parameter as part of the ThoughtSpot token request for the user.
 4. Worksheets that need these entitlements use the combination of pass-through function with parameter + formula + filter so that all queries in ThoughtSpot include a WHERE clause with the sub-select.
 
+== Additional resources
 
-////
-* Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in *Explore* mode, use ThoughtSpot indexing. Due to the runtime nature of ABAC via tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token.
-+
-You must turn off indexing for any field that needs to be restricted by RLS when using ABAC via tokens for RLS, or also include an RLS Rule on fields that must also be filtered for the Indexing system.
-
-
-// * Schedules created with JWT using ABAC will not follow the same security rules as schedules created with standard RLS set up in ThoughtSpot. +
-// Schedules created by users in a session secured via RLS using ABAC currently do not follow any data security rules, that is, all data will be shown in schedules. ThoughtSpot recommends removing the ability to create schedules for your end users. The improvements in the upcoming versions include:
-// .. The security rules applied to the schedule will be those of the schedule creator
-// .. Using `persist:true` in the JWT for security rules will ensure that the schedule is run using the filter rules persisted on the user.
-//* Runtime filter conditions must match the column names in your worksheet to avoid data leakage.
-
-//+
-//The `runtime_filters` must include the exact ThoughtSpot worksheet column name, or they will not apply to the data set. If a worksheet is changed, you must coordinate between the team that maintains it and the team that builds the token request service, or the filters will no longer be applied. For the same reasons, the end users of an embedded app cannot have edit access to any worksheet using ABAC RLS via tokens. +
-// +
-
-// You can pass in runtime filters and Parameters for a user via their login token. Both features work like the runtime filters and Parameters available within the Visual Embed SDK, but values set via token cannot be overridden by any user action within the ThoughtSpot UI.
+* For information about variable APIs, see xref:variables.adoc[Variable APIs].
+* For information about assigning security entitlements via ABAC tokens, see xref:abac-user-parameters.adoc[ABAC via tokens].
+* For information about RLS rule definitions, see link:https://docs.thoughtspot.com/cloud/latest/security-rls[RLS rules documentation, window=_blank].
