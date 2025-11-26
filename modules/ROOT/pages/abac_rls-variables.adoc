@@ -28,12 +28,12 @@ The ABAC implementation with formula variables and RLS rules includes the follow
 
 * xref:abac_rls-variables.adoc#_create_formula_variables[Creating formula variables] +
 To generate tokens with variable attributes, the variables must be available in ThoughtSpot. To create variables, use the xref:variables.adoc#_create_a_variable[Variable REST API].
-* xref:abac_rls-variables.adoc#_define_rls_rules_with_formula_variable[Adding RLS rules with formula variables to Tables] +
+* xref:abac_rls-variables.adoc#_define_rls_rules_with_formula_variable[Adding RLS rules with formula variables] +
 When defining an RLS rule with variables, use the `ts_var` function. These RLS rules will apply to the Models, Liveboards, and other objects derived from that Table.
 * xref:abac_rls-variables.adoc#_define_values_and_scope_for_variables[Creating a token request with variable attributes] +
 To generate a JWT token, use the `/api/rest/2.0/auth/token/custom` REST API endpoint. The token generation request must include the variable attributes, which will be used for RLS evaluation to enable per‑user entitlements and data filters across all the objects derived from the Table.
 * xref:abac_rls-variables.adoc#_verify_entitlements[Verifying entitlements] +
-To ensure data security rules are applied, check the user entitlements and verify whether they are translated accurately during query generation.
+To ensure data security rules are applied, check user entitlements and verify if they are translated accurately during query generation.
 
 === Limitations
 The ABAC via tokens method requires the xref:trusted-authentication.adoc[trusted authentication] setup.
@@ -60,7 +60,7 @@ If a column is set with both `is_hidden: true` and `is_mandatory_token_filter: t
 
 == Create formula variables
 
-To view the variables available on your instance, use the `POST /api/rest/2.0/template/variables/search` API call. If you want to create a new variable, use the `/api/rest/2.0/template/variables/create` API endpoint.
+To view the variables available on your instance, use the `POST /api/rest/2.0/template/variables/search` API call. To create a new variable, use the `/api/rest/2.0/template/variables/create` API endpoint.
 
 To configure formula variables for all Orgs on your instance or the Primary Org, cluster administration privileges are required. Org administrators can configure formula variables for their respective Orgs. Users with the `CAN_MANAGE_VARIABLES` (*Can manage variables*) role privilege can also create and manage variables for their Org context.
 
@@ -74,6 +74,8 @@ The `/api/rest/2.0/template/variables/create` API endpoint allows creating formu
 * `DATE_TIME`
 
 During variable creation, specify the xref:variables.adoc#data_type[`data_type`].
+
+Formula variables for `BOOLEAN` and `TIME` data types are not supported.
 
 [source,cURL]
 ----
@@ -90,86 +92,75 @@ curl -X POST \
 }'
 ----
 
-The variable update API allows assigning variable values and setting the scope. For the ABAC implementation, administrators can set the variable values and scope when generating a JWT using the `/api/rest/2.0/auth/token/custom` API endpoint.
+The variable update API allows assigning variable values and setting the scope. In the ABAC implementation, administrators can set the variable values and scope when xref:abac_rls-variables.adoc#_create_an_abac_token_request_with_variable_attributes[generating a JWT] using the `/api/rest/2.0/auth/token/custom` API endpoint.
 
 == Add RLS rules with variable references
 To define RLS rules with variables for a Table:
 
 . Navigate to the Data workspace and click the Table for which to define RLS rules.
 . Click *Row security* and then click *+ Add row security*.
-. In the *Row Security Editor*, define the rules. To reference the formula variable in the rule, use the `ts_var` function. For example, if you want to limit user access to data of a specific region, you can create a region-specific variable, assign values in the token request, and then add a rule on the underlying Table.
-
-In this example, `country_var` is referenced in the RLS rule to limit user access to the country entitlement sent in the ABAC token.
-
-----
-country = ts_var('country_var')
-----
-
-The following examples show how to define RLS rules with formula  variables of different data types:
-
-RLS rule with a single variable reference::
-
-In the following examples, the formula references `region_var` and `country_var` variables. When the query is executed, the region will translate to the value defined for that variable, for example, West or EMEA. Similarly, `country_var` translates to the value specified for that variable.
-
+. In the *Row Security Editor*, define the rules. To reference the formula variable in the rule, use the `ts_var` function. For example, if you want to limit user access to data of a specific region, you can create a region-specific variable, assign values in the token request, and then add a rule on the underlying Table. +
 +
 ----
 region = ts_var('region_var')
 ----
+
+RLS rule with a single variable reference::
+
+In this example, the formula references the `country_var` variable.
 +
 ----
 country = ts_var('country_var')
 ----
-+
-The rule is translated to a filter, so only the rows that match the specified condition are displayed to the user.
 
 RLS rules with multiple variables::
 
-The RLS rules support the `AND` operator, which means that you can combine multiple conditions in a single RLS rule, so that a row is accessible only if all specified conditions are met.
+The RLS rules support the `AND` operator, which means that you can combine multiple conditions in a single RLS rule, so that a row is accessible only if all the specified conditions are met.
 
++
 ----
 Country = ts_var('country_var') AND Department = ts_var('dept_var')
 ----
-
++
 ----
 Region = ts_var('region_var') AND Product_Type = ts_var('product_type_var')
 ----
 
-Wildcard “show all” via variables::
-In this example, if the user’s region variable is set to `TS_WILDCARD_ALL`, they see all regions; otherwise, only their entitled region.
+When the rule is translated, only the rows that match the specified condition are displayed to the user.
 
+Wildcard “show all” via variables::
+In this example, if the user’s region variable is set to `TS_WILDCARD_ALL`, they can view all regions; otherwise, they can see only their assigned region.
+
++
 ----
 ts_var('region_var') = 'TS_WILDCARD_ALL' OR Region = ts_var('region_var')
 ----
 
 Group override rule with variable-based check::
 In any security formula you build, you may want a clause that gives access to all data to certain groups. In the rule definition, you can include system variables, such as `ts_groups`, to build your preferred logic:
-
++
 In this example, users in the "data developers" group see all data; others are filtered by their department entitlement.
 
++
 ----
 'data developers' in ts_groups OR Department = ts_var('dept_var')
 ----
 
-Variables with numeric and Date data type::
-
+Variables with numeric and Date data types::
++
 ----
 Revenue <= to_double(ts_var('revenue_cap_var'))
 ----
-
++
 ----
 (date_column >= ts_var('start_date_var')) AND (date_column <= ts_var('end_date_var'))
 ----
 
-[NOTE]
-====
-Formula variables with BOOLEAN and TIME data types are not supported.
-====
-
 == Create an ABAC token request with variable attributes
 
-To generate a token with formula variable attributes, send a `POST` request to the `POST /api/rest/2.0/auth/token/custom` API endpoint.
+To generate a token with variable attributes, use the `POST /api/rest/2.0/auth/token/custom` API call.
 
-The variable attributes defined in the token request take effect only if they are referenced in an RLS rule. If the variables are not used in any formula or RLS rule, they will have no impact on data access. Before generating the request with variable attributes, ensure the xref:abac_rls-variables.adoc#_add_rls_rules_with_formula_variables_to_tables[variables are added to the RLS rules] on the Table.
+The variable attributes defined in the token request take effect only if they are referenced in an RLS rule. If the variables are not used in any formula or RLS rule, they will have no impact on data access. Before generating the request with variable attributes, ensure that the xref:abac_rls-variables.adoc#_add_rls_rules_with_formula_variables_to_tables[variables are added to the RLS rules] for the Table.
 
 In the token request, include the following properties along with the `username`, xref:trusted-auth-secret-key.adoc[`secret_key`]:
 
@@ -185,11 +176,11 @@ The `variable_values` array requires the following parameters:
 * `name` +
 _-String__. Name of the formula variable. The formula variable referenced on the token request must be available in ThoughtSpot and included in the RLS rule.
 * `values` +
-__Array of string or numeric values__. When assigning values, ensure that the value matches the data type set for the variable during creation. If you are adding a variable to filter by country, you can specify the string values as shown here:
+__Array of strings or numeric values__. When assigning values, ensure the data format of values matches the data type set of that variable. If you are adding a variable to filter by country with the `VARCHAR` data type, specify the string values as shown in this example:
 
 [source,JSON]
 ----
-variable_values": [
+"variable_values": [
     {
       "name": "country_var",
       "values": [
@@ -198,7 +189,7 @@ variable_values": [
         "Australia"
       ]
     }
-  ]
+ ]
 ----
 
 All values are passed into the token as *arrays of strings*, even if the column is a numeric or date type in ThoughtSpot and the database. The column data type will be respected in the query issued to the database.
@@ -207,7 +198,7 @@ All values are passed into the token as *arrays of strings*, even if the column 
 
 To allow all values by default, specify `["TS_WILDCARD_ALL"]` as the variable value to grant access to all values in a given column.
 
-A user might be entitled to all access for one variable, while for other variables, you can set values to apply restrictions.
+In this example, the user is allowed all access for one variable, while for the others, specific values are set.
 
 [source,JSON]
 ----
@@ -236,7 +227,7 @@ A user might be entitled to all access for one variable, while for other variabl
   ]
 ----
 
-If `TS_WILDCARD_ALL` is set, ensure that the RLS rules are defined clearly on the Table to avoid unintended data exposure.
+If `TS_WILDCARD_ALL` is set for variable attributes, ensure that the RLS rules are defined clearly on the Table to avoid unintended data exposure.
 
 ==== Deny all by default
 For every variable you include in the request, you can assign a value or a list of values. If you do not assign a value for a variable, during query generation, the RLS rules for that variable will generate errors indicating that a mandatory variable has not been defined.
@@ -250,7 +241,7 @@ The ABAC implementation with formula variables and RLS does not support session-
 To append or replace the attributes, use the following options:
 
 * `APPEND`  +
-Adds the attributes defined in the API request to the user properties. These properties will be applied to current and future user sessions and the scheduled reports, until they are explicitly changed through a token update request.
+Adds the attributes defined in the API request to the user properties. These properties will be applied to the current and future user sessions and scheduled reports until they are explicitly changed through a token update request.
 
 * `REPLACE` +
 Replaces existing variable assignments with the new values.
