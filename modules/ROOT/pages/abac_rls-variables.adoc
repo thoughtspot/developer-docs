@@ -6,33 +6,38 @@
 :page-pageid: abac-via-rls-variables
 :page-description: Attribute-based access control pattern with variable attributes referenced in Row-Level Security (RLS) rules on a given table.
 
-In the ABAC via RLS rules implementation, administrators define RLS rules with variables on the Table from which objects such as Models, Liveboards, and Answers are derived. They can also assign variable values and pass these as user attributes and entitlements via a JWT token. This ensures that all derived objects inherit the data security rules from the Table and are filtered according to the user’s entitlements provided in the token.
+Attribute-Based Access Control (ABAC) is an access control model in which security entitlements are determined by evaluating a set of attributes included in a token generated for a user. The attributes are passed in a JSON Web Token (JWT) at session creation to dynamically filter data and enable user-specific security policies.
+
+== Overview
+
+To implement data security for application users, administrators can define RLS rules that use system variables such as `ts_username` or `ts_groups`. If a ThoughtSpot deployment requires granular access control and dynamic assignments beyond what system variables can support, administrators can use formula variables within RLS rules.
+
+Formula variables are custom variables that enable dynamic and context-aware logic in RLS rules. They can be assigned at the Org, user, and data model levels.
+
+In embedded analytics scenarios, where each user may require different data access, administrators can assign security attributes and rules on a per-user basis. For these use cases, administrators can implement a JWT-based ABAC model combined with RLS to enforce data security using dynamic attributes derived from formula variables.
+
+In the ABAC via RLS with variables method, administrators add formula variables to RLS rules and pass their values (`variable_values`) as security attributes and entitlements to the user session through a JWT. All derived objects then inherit the data security rules from the underlying Table and are filtered according to the user’s entitlements provided in the token.
 
 [NOTE]
 ====
 Formula variables are available on ThoughtSpot starting from 10.15.0.cl. If this feature is not enabled on your instance, contact ThoughtSpot Support.
 ====
 
-== Overview
-
-To implement data security for your application users, you can use the RLS rules with system variables such as `ts_username` or `ts_groups`. To provide dynamic and fine-grained access control that goes beyond what system variables can support, administrators can use formula variables in RLS rules. Formula variables allow you to define custom attributes and assign values at the user, Org, or Model level. This capability is useful if you want to enforce security policies that adapt to user context, such as region or department.
-
-In embedded analytics scenarios, where each user may need different data access, you may want to assign security attributes and rules per user. The ABAC implementation with custom variables allows assigning variable attributes (`variable_values`) individually to users via JWT, and thus enforce user-specific data security rules and entitlements at session creation.
-
 === Implementation steps
-The ABAC implementation with formula variables and RLS rules involves the following steps:
+The ABAC implementation with formula variables and RLS rules includes the following steps:
 
 * xref:abac_rls-variables.adoc#_create_formula_variables[Creating formula variables] +
-To generate tokens with variable attributes, the variable must be created and available on ThoughtSpot. To create variables, use the xref:variables.adoc#_create_a_variable[Variable REST API].
+To generate tokens with variable attributes, the variables must be available in ThoughtSpot. To create variables, use the xref:variables.adoc#_create_a_variable[Variable REST API].
 * xref:abac_rls-variables.adoc#_define_rls_rules_with_formula_variable[Adding RLS rules with formula variables to Tables] +
 When defining an RLS rule with variables, use the `ts_var` function. These RLS rules will apply to the Models, Liveboards, and other objects derived from that Table.
 * xref:abac_rls-variables.adoc#_define_values_and_scope_for_variables[Creating a token request with variable attributes] +
-To generate a JWT token, use the `/api/rest/2.0/auth/token/custom` REST API endpoint. Your token generation request must include the variable attributes that will be used for RLS evaluation, to enable per‑user entitlements and data filters across all the objects derived from the Table.
+To generate a JWT token, use the `/api/rest/2.0/auth/token/custom` REST API endpoint. The token generation request must include the variable attributes, which will be used for RLS evaluation to enable per‑user entitlements and data filters across all the objects derived from the Table.
 * xref:abac_rls-variables.adoc#_verify_entitlements[Verifying entitlements] +
-To ensure that data security rules are enforced dynamically and accurately, verify user entitlements and check whether they are translated into rules during query generation.
+To ensure data security rules are applied, check the user entitlements and verify whether they are translated accurately during query generation.
 
 === Limitations
 The ABAC via tokens method requires the xref:trusted-authentication.adoc[trusted authentication] setup.
+
 For indexing recommendations, see xref:abac-user-parameters.adoc#_indexing[Indexing].
 
 
