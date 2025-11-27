@@ -23,6 +23,12 @@ In the ABAC via RLS with variables method, administrators add formula variables 
 Formula variables are available on ThoughtSpot starting from 10.15.0.cl. If this feature is not enabled on your instance, contact ThoughtSpot Support.
 ====
 
+=== Indexing
+Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in *Explore* mode, use ThoughtSpot indexing. Due to the runtime nature of ABAC tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token. This means the indexed columns may expose values in search suggestions or autocompletion that a user should not see, even if ABAC filters would block access to the underlying data. To prevent this, you can do one of the following:
+
+* Disable indexing for columns and fields that must be restricted by ABAC. You may also want to disable indexing on all sensitive columns.
+* Define an RLS rule on those fields, since RLS is enforced at the indexing layer and will secure suggestions and sample values.
+
 === Implementation steps
 The ABAC implementation with formula variables and RLS rules includes the following steps:
 
@@ -98,55 +104,55 @@ To define RLS rules with variables for a Table:
 . In the *Row Security Editor*, define the rules. To reference the formula variable in the rule, use the `ts_var` function. For example, If you want to limit user access to data of a specific region, you can create a region-specific variable, `region = ts_var('region_var')`, and assign values in the token request.
 
 
-RLS rule with a single variable reference::
+=== RLS rule with a single variable reference
 
-In this example, the formula references the `country_var` variable.
-+
+In this formula example, `country` represents the column "country" in the data table, and `country_var` represents the variable. The user will only see rows where the value in the `country` column matches the value assigned to the `country_var` variable for that user.
+
 ----
 country = ts_var('country_var')
 ----
 
-RLS rules with multiple variables::
+=== RLS rules with multiple variables
 The RLS rules support the `AND` operator, which means that you can combine multiple conditions in a single RLS rule, so that a row is accessible only if all the specified conditions are met.
-+
+
+The following rule restricts data access to rows if the `country` column in the data table matches the value assigned to `country_var` and the `Department` column matches the value assigned to `department_var` for that user.
+
 ----
-Country = ts_var('country_var') AND Department = ts_var('dept_var')
+country = ts_var('country_var') AND Department = ts_var('department_var')
 ----
 
-+
+The rule in this example restricts data access to rows where the `region` column in the table matches the value assigned to `region_var` and the `product` column matches the value assigned to `product_var`.
+
 ----
-Region = ts_var('region_var') AND Product_Type = ts_var('product_type_var')
+region = ts_var('region_var') AND product = ts_var('product_var')
 ----
 
-+
-When the rule is translated, only the rows that match the specified condition are displayed to the user.
+=== Allow all rule with a TS_WILDCARD_ALL variable
+In this example, `customer` represents the column `customer` in the table and `customer_var` represents variable. If the value of the customer_var variable is set to `TS_WILDCARD_ALL`, the user can access all customers in the column.
 
-Wildcard “show all” via variables::
-In this example, if the user’s region variable is set to `TS_WILDCARD_ALL`, they can view all regions; otherwise, they can see only their assigned region.
-+
 ----
-ts_var('region_var') = 'TS_WILDCARD_ALL' OR Region = ts_var('region_var')
+customer = ts_var('customer_var')
 ----
 
-Group override rule with variable-based check::
+=== Group override rule with variable-based check
 In any security formula you build, you may want a clause that gives access to all data to certain groups. In the rule definition, you can include system variables, such as `ts_groups`, to build your preferred logic:
 
-+
-In this example, users in the "data developers" group see all data; others are filtered by their department entitlement.
+In this example, users can access data if they are in the "data developers" group, or if the `Department` column matches the value assigned to their `department_var` variable.
 
-+
 ----
-'data developers' in ts_groups OR Department = ts_var('dept_var')
+'data developers' in ts_groups OR Department = ts_var('department_var')
 ----
 
-Variables with numeric and Date data types::
+==== Variables with numeric and Date data types
 
-+
+The following rule enforces a numeric threshold and  restricts access to rows where the Revenue value is less than or equal to the value provided by the `revenue_cap_var` variable.
+
 ----
 Revenue <= to_double(ts_var('revenue_cap_var'))
 ----
 
-+
+The following rule restricts access to rows where the `date_column` is within the range defined by the `start_date_var` and `end_date_var` variables. Only rows with dates greater than or equal to the start date and less than or equal to the end date specified for these variables will be visible for the user.
+
 ----
 (date_column >= ts_var('start_date_var')) AND (date_column <= ts_var('end_date_var'))
 ----
@@ -207,14 +213,14 @@ In this example, the user is allowed all access for one variable, while for the 
       ]
     },
     {
-      "name": "dept_var",
+      "name": "department_var",
       "values": [
         "Sales",
         "Marketing"
       ]
     },
     {
-      "name": "product_type_var",
+      "name": "product_var",
       "values": [
         "TS_WILDCARD_ALL"
       ]
@@ -231,8 +237,6 @@ For every variable you include in the request, you can assign a value or a list 
 
 Variable attributes must be *persisted* for them to apply to user sessions when using xref:trusted-authentication.adoc#cookie[cookie-based trusted authentication] or scheduled reports. To specify whether variable attributes and rules should persist for user sessions, you must define the `persist_option` parameter.
 
-The ABAC implementation with formula variables and RLS does not support session-based ABAC rules, so we do not recommend setting the `persist_option` attribute to `NONE`.
-
 To append or replace the attributes, use the following options:
 
 * `APPEND`  +
@@ -241,10 +245,9 @@ Adds the attributes defined in the API request to the user properties. These pro
 * `REPLACE` +
 Replaces existing variable assignments with the new values.
 
- If you don’t want to append or replace any attributes, do not pass any variable values in the token update request.
-
 [NOTE]
 ====
+* The ABAC implementation with RLS and formula variables does not support session-based  rules. Therefore, ThoughtSpot does not recommend setting the `persist_option` attribute to `NONE`.
 * If you don't want to append or replace any attributes, do not pass any variable values in the token update request.
 * Passing an empty array does not reset the attributes.
 * Resetting attributes via `"persist_option": "RESET"` is not supported.
@@ -309,14 +312,14 @@ The following example shows the request body for generating a token with formula
       ]
     },
     {
-      "name": "dept_var",
+      "name": "department_var",
       "values": [
         "Sales",
         "Marketing"
       ]
     },
     {
-      "name": "product_type_var",
+      "name": "product_var",
       "values": [
         "TS_WILDCARD_ALL"
       ]
@@ -359,7 +362,7 @@ To verify the variable assignment, use the `POST /api/rest/2.0/users/search` API
             ]
           },
           {
-            "name": "dept_var",
+            "name": "department_var",
             "values": [
               "Sales",
               "Marketing"
@@ -377,18 +380,12 @@ To verify the security entitlements, start a user session using the JWT and insp
 == Verify the entitlements
 To verify the entitlements:
 
-. Log in to your app and start the user session with the ABAC token.
+. Log in to your app as a user who does not have the *Can administer and bypass RLS* privilege, and start the user session with the ABAC token.
 . Access a Liveboard, Saved Answer, or start a new search query.
 . Inspect the generated SQL for your query or visualization.
-. Verify if only permitted rows are displayed.
-. Check if data is returned if no variable values are defined.
+. Verify the rules and check whether only the permitted rows are displayed.
+. Verify whether data is displayed when no variable values are defined.
 . Repeat the steps for different variable assignments to confirm the RLS rule is enforced as expected for all scenarios.
-
-== Indexing
-Several features within ThoughtSpot, such as autocompletion in Search on values within columns or the suggestions in *Explore* mode, use ThoughtSpot indexing. Due to the runtime nature of ABAC tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token. This means the indexed columns may expose values in search suggestions or autocompletion that a user should not see, even if ABAC filters would block access to the underlying data. To prevent this, you can do one of the following:
-
-* Disable indexing for columns and fields that must be restricted by ABAC. You may also want to disable indexing on all sensitive columns.
-* Define an RLS rule on those fields, since RLS is enforced at the indexing layer and will secure suggestions and sample values.
 
 == Additional resources
 
