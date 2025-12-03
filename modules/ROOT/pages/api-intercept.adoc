@@ -6,12 +6,59 @@
 :page-pageid: api-search-intercept
 :page-description: Developers can intercept and control API calls originating from the embedded ThoughtSpot components
 
-Developers can intercept and control API calls and search requests made by embedded ThoughtSpot components using the following features:
+Developers can intercept and control search requests and APIs made by embedded ThoughtSpot components using the following features:
+
+* Interception of search requests from the embedded app +
+To enable interception of search execution requests by search embed or full application embed, use the `isOnBeforeGetVizDataInterceptEnabled` boolean attribute. When enabled, you can implement custom logic using the `OnBeforeGetVizDataIntercept` embed event, allow or block search requests, and show custom messages to users.
 
 * Interception of API calls from the embedded app: +
 To intercept API requests initiated by ThoughtSpot embedded components, such as Liveboard embed, full application embed, and Search embed, set the `enableApiIntercept` boolean attribute in the SDK. When enabled, you can define the URLs that you want to intercept in the `interceptUrls` attribute and handle interception using the `ApiIntercept` embed event.
-* Interception of search requests from the embedded app +
-To enable interception of search execution requests by search embed or full application embed, use the `isOnBeforeGetVizDataInterceptEnabled` boolean attribute. When enabled, you can implement custom logic using the `OnBeforeGetVizDataIntercept` embed event, allow or block search requests, and show custom messages to users.
+
+== Intercepting search execution requests
+
+To enable interception of search execution requests, set the `enableApiIntercept` flag to `true` in the SDK.
+
+When enabled, you can intercept and control search execution requests and implement a custom logic to trigger a response when the  `EmbedEvent.OnBeforeGetVizDataIntercept` event is emitted.
+
+The following example blocks the search request and returns a custom error message.
+
+[source,JavaScript]
+----
+embed.on(EmbedEvent.OnBeforeGetVizDataIntercept,
+(payload, responder) => {
+    responder({
+        data: {
+            execute: false, // Block the search from executing
+            error: {
+                // Custom error message shown to the user when the search is blocked
+                errorText: "This search query cannot be run. Please contact your administrator for more details."
+            }
+        }
+    })
+})
+----
+
+The following example blocks the search only if the query contains both `sales` and `county`; otherwise, it allows the search to proceed. It also provides an error message explaining why the search was blocked:
+
+[source,JavaScript]
+----
+embed.on(EmbedEvent.OnBeforeGetVizDataIntercept,
+(payload, responder) => {
+    const query = payload.data.data.answer.search_query
+    responder({
+        data: {
+            // Allow the search only if the query does NOT include both 'sales' AND 'county'
+            execute: !(query.includes("sales") && query.includes("county")),
+            error: {
+                // Custom error message and description shown if the search is blocked
+                errorText: "Error Occurred",
+                errorDescription: "You can't use this query :" + query +
+                ". The 'sales' measures can never be used at the 'county' level. Please try another measure, or remove 'county' from your search."
+            }
+        }
+    })
+})
+----
 
 == Intercepting API calls
 
@@ -128,58 +175,6 @@ embed.on(EmbedEvent.ApiIntercept, (payload, responder) => {
 })
 ----
 
-For more information, see the xref:EmbedEvent.adoc#_apiintercept[Event reference documentation].
-
-== Intercepting search execution requests
-
-To enable interception of search execution requests, set the `enableApiIntercept` flag to `true` in the SDK.
-
-When enabled, you can intercept and control search execution requests and implement a custom logic to trigger a response when the  `EmbedEvent.OnBeforeGetVizDataIntercept` event is emitted.
-
-The following example blocks the search request and returns a custom error message.
-
-[source,JavaScript]
-----
-embed.on(EmbedEvent.OnBeforeGetVizDataIntercept,
-(payload, responder) => {
-    responder({
-        data: {
-            execute: false, // Block the search from executing
-            error: {
-                // Custom error message shown to the user when the search is blocked
-                errorText: "This search query cannot be run. Please contact your administrator for more details."
-            }
-        }
-    })
-})
-----
-
-The following example blocks the search only if the query contains both `sales` and `county`; otherwise, it allows the search to proceed. It also provides an error message explaining why the search was blocked:
-
-[source,JavaScript]
-----
-embed.on(EmbedEvent.OnBeforeGetVizDataIntercept,
-(payload, responder) => {
-    const query = payload.data.data.answer.search_query
-    responder({
-        data: {
-            // Allow the search only if the query does NOT include both 'sales' AND 'county'
-            execute: !(query.includes("sales") && query.includes("county")),
-            error: {
-                // Custom error message and description shown if the search is blocked
-                errorText: "Error Occurred",
-                errorDescription: "You can't use this query :" + query +
-                ". The 'sales' measures can never be used at the 'county' level. Please try another measure, or remove 'county' from your search."
-            }
-        }
-    })
-})
-----
-
-For more information, see the xref:EmbedEvent.adoc#_onbeforegetvizdataintercept[Event reference documentation].
-
 == Related resources
-See xref:EmbedEvent.adoc[EmbedEvent] documentation
-
-
+See the xref:EmbedEvent.adoc#_apiintercept[Event reference documentation].
 
