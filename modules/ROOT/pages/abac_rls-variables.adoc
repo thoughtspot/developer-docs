@@ -20,7 +20,10 @@ In the ABAC via RLS with variables method, administrators add formula variables 
 
 [NOTE]
 ====
-Formula variables are available on ThoughtSpot starting from 10.15.0.cl. If this feature is not enabled on your instance, contact ThoughtSpot Support.
+* Formula variables are available on ThoughtSpot starting from 10.15.0.cl. If this feature is not enabled on your instance, contact ThoughtSpot Support.
+
+* ABAC via RLS does not support session-based ABAC (`persist_option: NONE`). If you are using `persist_option: NONE`, create dedicated user accounts for your application users and apply persisted rules. This approach ensures that Liveboard schedule attachments enforce security rules and deliver only secured output to your end users. +
+When combined with cookieless authentication, this configuration addresses all use cases that previously relied on session-based JWT. You can simplify user provisioning and programmatically manage user creation and deletion workflows using ThoughtSpot's REST APIs.
 ====
 
 === Indexing
@@ -106,11 +109,15 @@ To define RLS rules with variables for a Table:
 
 === RLS rule with a single variable reference
 
-In this formula example, `country` represents the column "country" in the data table, and `country_var` represents the variable. The user will only see rows where the value in the `country` column matches the value assigned to the `country_var` variable for that user.
+In this formula example, `country` refers to the "country" column in the data table, and `country_var` is the variable.
 
 ----
 country = ts_var('country_var')
 ----
+
+If `country_var` is assigned a single value, the user is permitted to view only rows where the `country` column matches that value.
+
+If `country_var` is assigned multiple values, the formula translates to `country IN ('value1', 'value2', ...)`. The query engine interprets `=` as the `IN` clause in this case and returns rows that match these values; for example, `WHERE country IN ('Australia', 'Germany')`.
 
 === RLS rules with multiple variables
 The RLS rules support the `AND` operator, which means that you can combine multiple conditions in a single RLS rule, so that a row is accessible only if all the specified conditions are met.
@@ -231,7 +238,11 @@ In this example, the user is allowed all access for one variable, while for the 
 If `TS_WILDCARD_ALL` is set for variable attributes, ensure that the RLS rules are defined clearly on the Table to avoid unintended data exposure.
 
 ==== Deny all by default
-For every variable you include in the request, you can assign a value or a list of values. If you do not assign a value for a variable, during query generation, the RLS rules for that variable will generate errors indicating that a mandatory variable has not been defined.
+For every variable included in the token request, you can assign one or several values. If a variable is not assigned a value, the RLS rules for that variable return an link:https://docs.thoughtspot.com/cloud/latest/search-data-errors-reference#search-data-error-11046[error, window=_blank] during query generation, indicating that a mandatory variable has not been defined.
+
+[.widthAuto]
+[.bordered]
+image:./images/formula-variable-error.png[Formula variable error]
 
 === Persist options and session-based rules
 
