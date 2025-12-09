@@ -43,7 +43,7 @@ const Header = (props: {
         },
         {
             name: 'Discord',
-            link: 'https://discord.com/invite/YBWP65W6te',
+            link: 'https://discord.gg/YBWP65W6te',
             external: true,
             icon: RiDiscordLine,
         },
