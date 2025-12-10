@@ -1,0 +1,215 @@
+= Set the default page
+:toc: true
+:toclevels: 2
+
+:page-title: Set the default page in full application embedding
+:page-pageid: set-default-page
+:page-description: Set a page as the default embedded view
+
+By default, home page is set as the default page when embedded application loads. To change the default settings, you can use either `pageId` or `path` parameter. If both `path` and `pageId` properties are defined in the Visual Embed SDK, the `path` definition takes precedence.
+
+== Set default page using pageId
+The `pageId` parameter of the `AppEmbed` xref:full-embed#_create_an_instance_of_the_appembed_object[parameters object] lets you specify the ThoughtSpot page in the `Page` enumeration that the AppEmbed component loads to. Valid values for this attribute are:
+
+* `Page.Home` for the ThoughtSpot *Home* page +
+* `Page.Search` for the ThoughtSpot *Search* page +
+* `Page.Answers` for the *Answers* page +
+* `Page.Liveboards` for the *Liveboards* page +
+* `Page.Data` for the *Data* page +
+* `Page.SpotIQ` for the *SpotIQ* analyses page
+
+[source,javascript]
+----
+const embed = new AppEmbed("#embed", {
+    pageId: Page.Liveboards,
+    showPrimaryNavbar: false,
+    frameParams: {
+        height: '100%',
+        width: '100%'
+    }
+});
+----
+
+
+== Set the default page using path attribute
+The URL path of the ThoughtSpot application page that you want your embed application users to navigate to. +
+
+[source,javascript]
+----
+const embed = new AppEmbed("#embed", {
+    path: 'pinboard/96a1cf0b-a159-4cc8-8af4-1a297c492ff9',
+    frameParams: {
+        height: '100%',
+        width: '100%'
+    }
+});
+----
+
+The following examples show valid strings for `path`:
+
+[width="100%", cols="3,6,6"]
+[options='header']
+|=====
+|Page| Classic experience | V2 and v3 experience
+|Home| `path: "home"` | `path: "home"`
+|Answers| `path: "answers"`| `path: "home/answers"`
+|Saved Answer| `path: "saved-answer/<answer-GUID>"` |`path: "saved-answer/<Answer-GUID>"`
+|Liveboards| `path: "pinboards"`| `path: "home/liveboards"`
+|Liveboard| `path: "pinboard/<Liveboard-GUID>"`| `path: "pinboard/<Liveboard-GUID>"`
+|SpotIQ analysis list|`path: "insights"`| `path: "insights/spotiq-analysis"`
+|SpotIQ analysis page| `path: "insight/<spotIQ-analysis-GUID>"`| `path: "insight/<spotIQ-analysis-GUID>"`
+|Data| `path: "data/tables/"`| `path: "data/tables/"`
+|Model, tables, views|`path: "data/tables/<object-GUID>"`| `path: "data/tables/<object-GUID>"`
+|Monitor| `path: "monitor"` a| Supported settings include:
+
+* `path: "monitor"` +
+* `path: "home/monitor-alerts"` +
+* `path: "insights/monitor-alerts"`
+|=====
+
+== navigateToPage()
+
+The `AppEmbed` object has a method called `navigateToPage()` that will switch the currently loaded page in the ThoughtSpot embedded application. The `navigateToPage()` method accepts the values that work for `pageId` or `path` parameters.
+
+The new navigation menu should call `navigateToPage` for the various pages you want to provide access to:
+
+[source,JavaScript]
+----
+embed.navigateToPage(Page.Answers);
+// with noReload option
+embed.navigateToPage(Page.Answers, true);
+----
+
+== history.back()
+Page changes within the `AppEmbed` component register as part of the embedding app's history to the web browser.
+
+The standard JavaScript `history.back()` function will cause the `AppEmbed` component to go to the previously loaded page up until the very first ThoughtSpot page loaded within the component.
+
+////
+== Navigate using a custom action
+To add a custom action for in-app navigation, follow these steps:
+
+. xref:custom-actions-callback.adoc[Add a custom action].
+. Define the navigation path
+
+In this example, the **view-report ** action on a Liveboard page calls the `navigateTo` method to open a specific saved Answer page when a user clicks the **View report** button in the embedded app.
+
+[source,JavaScript]
+----
+appEmbed.on(EmbedEvent.CustomAction, async (payload: any) => {
+    if (payload.payload.id === 'view-report') {
+        appEmbed.navigateToPage(
+            'saved-answer/3da14030-11e4-42b2-8e56-5ee042a8de9e'
+        );
+    }
+})
+----
+
+If you want to navigate to a specific application page without initiating a reload, you can set the `noReload` attribute to `true` as shown here:
+
+[source,javascript]
+----
+appEmbed.on(EmbedEvent.CustomAction, async (payload: any) => {
+    if (payload.payload.id === 'view-report') {
+        appEmbed.navigateToPage('saved-answer/3da14030-11e4-42b2-8e56-5ee042a8de9e', true);
+    }
+})
+----
+////
+
+== Detect changes in the currently loaded page
+Various actions the user takes within the embedded ThoughtSpot application may cause navigation within ThoughtSpot.
+
+The embedding web application can listen for the `EmbedEvent.RouteChange` event by attaching an event listener to the `AppEmbed` object. The response has a `currentPath` property which is the path after the ThoughtSpot domain, for example:
+----
+pinboard/96a1cf0b-a159-4cc8-8af4-1a297c492ff9
+----
+
+To parse the `currentPath` into varying useful components, this `tsAppState` object code can be created in the global scope for use by any other web application code:
+
+[source,JavaScript]
+----
+// Simple global object to handle details about what is visible in the AppEmbed component at a given moment
+let tsAppState = {
+  currentPath: startPath,
+  currentDatasources: [], // Can be set later when detected from TML or other events
+  // return back what is being viewed at the moment, in the form that will translate to the pageId property if captialized, or path property if not
+  get pageType() {
+      if (this.currentPath.includes('/saved-answer/')){
+          return 'answer';
+      }
+      else if (this.currentPath.includes('/pinboard/')){
+          return 'liveboard';
+      }
+      /*
+      * Others are meant to match the exact pageId from SDK
+      */
+      else if(this.currentPath.includes('/answer/')){
+          return 'Search';
+      }
+      else if(this.currentPath.includes('/answers')){
+          return 'Answers';
+      }
+      else if (this.currentPath.includes('/pinboards')){
+          return 'Liveboards';
+      }
+      else if(this.currentPath.includes('/insights')){
+          return 'SpotIQ';
+      }
+      else if(this.currentPath.includes('/monitor')){
+          return 'Monitor';
+      }
+      else if(this.currentPath.includes('/data')){
+          return 'Data';
+      }
+      else {
+          return 'Home';
+      }
+  },
+  // If viewing an Answer or Liveboard, returns the GUID of that object from the parsed URL
+  get objectId() {
+      let pathParts = this.currentPath.split('/');
+      // '/saved-answer/' is path for Answers (vs. /answer/)
+      if (this.currentPath.includes('/saved-answer/')){
+          answerGUID = pathParts[2];
+          return pathParts[2];
+      }
+      // '/pinboard/' is path for saved Liveboards
+      else if (this.currentPath.includes('/pinboard/')){
+          let pathParts = this.currentPath.split('/');
+          // May need adjustment for tabbed views to add in current Tab
+          liveboardGUID = pathParts[2];
+          return pathParts[2];
+      }
+      else{
+          return null;
+      }
+  }
+
+}
+----
+
+The following example shows the event listener code updating the global `tsAppState` object above whenever there is a change within the embedded ThoughtSpot app:
+
+[source,JavaScript]
+----
+embed.on(EmbedEvent.RouteChange, (response) => {
+  // console.log("RouteChange fires");
+  // console.log(response);
+  // tsAppState object has currentPath property, which allows its other methods to parse out pageId, object type, GUIDs etc.
+  tsAppState.currentPath = response.data.currentPath;
+  console.log("TS App page is now: ", tsAppState.currentPath);
+
+  // Update elements within your web application based on the new state of ThoughtSpot (adjust menu selections, etc.)
+
+})
+----
+
+== Additional resources
+
+* xref:full-app-customize.adoc[Customize full application embed]
+* xref:full-embed.adoc[Embed full application]
+* xref:AppViewConfig.adoc[AppViewConfig reference page]
+* xref:HostEvent.adoc[Host events]
+* xref:EmbedEvent.adoc[Embed Events]
+* xref:Action.adoc[Actions]
