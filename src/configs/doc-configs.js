@@ -40,6 +40,11 @@ module.exports = {
             subLabel: 'Cloud (Latest)',
         },
         {
+            label: '10.15.0.cl',
+            link: 'https://developer-docs-10-15-0-cl.vercel.app/docs/',
+            subLabel: 'Cloud (Now available',
+        },
+        {
             label: '10.13.0.cl',
             link: '10.13.0.cl',
             subLabel: 'Cloud',
