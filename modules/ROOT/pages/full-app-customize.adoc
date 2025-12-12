@@ -32,8 +32,7 @@ A dynamic left navigation menu that adjusts its contents according to the applic
 |Home page experience| Static home page with limited customization control | Modular home page |Modular home page with an enhanced look and feel, color theme, and visual elements
 
 |Feature availability| Enabled by default. | Currently, in beta and disabled by default. | Currently, in beta and disabled by default.
-|SDK controls for feature enablement| Enabled by default |Set `modularHomeExperience: true`.  | Set `discoveryExperience` with `primaryNavbarVersion` to `PrimaryNavbarVersion.Sliding`. +
-To set home page experience, use the `homePage` attribute. +
+
 ||||
 |=====
 
@@ -67,48 +66,78 @@ Once enabled, configure the `discoveryExperience` properties and customize your 
 
 == Customize the embedded application UI for your users
 
-If your instance is on the V1 classic experience, you can switch to either the V2 or V3 experience. The V3 experience provides an enhanced user interface with granular control over home page and navigation customization.Therefore, ThoughtSpot recommends switching to the V3 experience directly.
-
 Before updating the UI experience, review the xref:full-app-customize.adoc#_key_features_and_limitations[key features and limitations] of each UI experience mode, and verify whether the necessary customization controls for your embedding use case are available in the Visual Embed SDK.
 
 === Upgrade to the V3 experience
-The V3 experience is disabled by default on ThoughtSpot Embedded instances.
-To get started with the V3 experience for your embedding app, contact ThoughtSpot Support and ensure the V3 experience is enabled on your instance.
+If your instance is on the V1 classic experience, you can switch to either the V2 or V3 experience mode. We recommend migrating directly to the V3 experience, as it provides an enhanced user interface with granular control over the homepage and navigation.
+
+Before you begin:
+
+* The V3 experience is disabled by default. Contact ThoughtSpot Support to enable the V3 experience on your instance.
+* Ensure that your embedding environment has the latest version of the Visual Embed SDK. The minimum supported version for V3 experience is v1.40.0.
+* If you are using direct CSS selectors for style customization, test your customization in the Playground for breaking changes before upgrading.
+* If your embed uses action customization and the SDK events for app interactions, test your customizations for compatibility across different UI experiences to ensure seamless migration.
+
+==== V3 experience configuration attributes
+
+To enable the V3 experience, you must use the `discoveryExperience` object in the SDK. This object supports the following properties:
+
+* `primaryNavbarVersion` +
+Enables the V3 experience. Valid setting for the V3 experience is `PrimaryNavbarVersion.Sliding`. +
+If it's not set, no changes will be applied, and the current UI experience enabled on your instance is retained.
+
+*  `homePage` +
+Enables the modular home page experience. Valid values include:
+** `HomePage.Modular` +
+Enables the modular home page experience. This experience is the same as the V2 modular home page.
+
+** `HomePage.ModularWithStylingChanges`. +
+Enables V3 modular home page experience. You must include `primaryNavbarVersion` to update the UI experience to V3 modular home page.
+
+[IMPORTANT]
+====
+* To enable the full V3 experience, both  `primaryNavbarVersion` and `homePage` attributes must be set in the SDK. Not setting `primaryNavbarVersion` will result in no changes in the UI experience.
+* If you include only the `homePage: HomePage.ModularWithStylingChanges` attribute in `discoveryExperience`, it will be ignored.
+If you include only the homePage: HomePage.ModularWithStylingChanges attribute in the discoveryExperience object,
+* If you include only the homePage attribute with its value as `HomePage.Modular`, the v2 modular home page experience will be enabled.
+
+For information about supported configuration combinations and the resulting UI experience, see xref:full-app-customize.adoc#_configuration_matrix_and_resulting_ui_experience[Configuration matrix and resulting UI experience].
+====
 
 ==== Upgrade from the V1 classic experience
-If the V3 navigation and modular home page experience feature is enabled on your instance, use the following properties in the SDK to update your UI to the full V3 experience:
+The following example shows the code to enable the full V3 experience.
+Note that the navigation changes will be visible only if `showPrimaryNavbar` is set to `true`.
 
 [source,JavaScript]
 ----
 const embed = new AppEmbed('#tsEmbed', {
-  // Enable the V3 experience
-  // Show navigation panels
   discoveryExperience: {
-    // Enable sliding panel in left navigation
+    // Enable the v3 experience
     primaryNavbarVersion: PrimaryNavbarVersion.Sliding,
     // Set the home page to the V3 modular layout
     homePage: HomePage.ModularWithStylingChanges,
   },
+   // Show navigation panels
+   showPrimaryNavbar: true,
   //...other view config attributes
 });
 ----
+
 ==== Upgrade from the V2 experience
-If you are using the V2 experience, you can use the `discoveryExperience` property to upgrade to the V3 experience. Both V2 and V3 experience modes support a modular home page with customizable modules.
+Both V2 and V3 experience modes support a modular home page with customizable components.
+You choose to keep the same modular home page experience and enable only the V3 navigation panel.
 
-When upgrading, you can choose to keep the same modular experience from the V2 experience and enable only the V3 navigation panel.
+To specify your preference, set the `homePage` to one of the following values:
 
-To set your preference, set the `homePage` to one of the following values:
+* `homePage: HomePage.ModularWithStylingChanges` for V3 modular home page experience. +
+This option includes enhanced visual elements and additional customization settings.
 
-* `homePage: HomePage.ModularWithStylingChanges` +
-Enables the V3 modular home page experience. This option includes enhanced visual elements with additional customizable components.
 +
 [source,JavaScript]
 ----
 const embed = new AppEmbed('#tsEmbed', {
-  // Enable the V3 experience
-  // Show navigation panels
   discoveryExperience: {
-    // Enable sliding panel in left navigation
+    // Enable the V3 experience
     primaryNavbarVersion: PrimaryNavbarVersion.Sliding,
     // Set the home page to the V3 modular layout
     homePage: HomePage.ModularWithStylingChanges,
@@ -116,15 +145,14 @@ const embed = new AppEmbed('#tsEmbed', {
   //...other view config attributes
 });
 ----
-* `homePage: HomePage.Modular` +
-Enables the V2 modular home page layout. This option doesn't include the customizable components available in the V3 experience.
+
+* `homePage: HomePage.Modular` for the V2 modular home page layout. This option doesn't include the customizable components available in the V3 experience.
 +
 [source,JavaScript]
 ----
 const embed = new AppEmbed('#tsEmbed', {
-  // Enable the V3 experience
   discoveryExperience: {
-    // Enable sliding left navigation panel
+    // Enable the V3 experience
     primaryNavbarVersion: PrimaryNavbarVersion.Sliding,
     // Enable the V2 modular home page layout
     homePage: HomePage.Modular,
@@ -133,10 +161,22 @@ const embed = new AppEmbed('#tsEmbed', {
 });
 ----
 
-==== Notable UI enhancements in the V3 experience
+==== Post migration checks
+After you enable the V3 experience:
 
-After you switch to the V3 experience, the following features and enhancements will be visible:
+* Verify whether the relevant features and enhancements are available on your instance. +
+The following figure shows the user interface with the V3 experience:
++
+[.bordered]
+[.widthAuto]
+image::./images/new-nav3.png[New home page]
++
+For more information about the layout and UI elements in the V3 experience, see link:https://docs.thoughtspot.com/cloud/latest/thoughtspot-homepage[ThoughtSpot Product Documentation., window=_blank].
+* Verify whether the home page shows the modular components, such as Search, Watchlist, Favorites, and so on.
+* Verify your customization settings and workflow, particularly the CSS customization settings and menu actions.
+* If you have set up custom routes to enable navigation within your embedded app, verify the navigation workflows and ensure that there are no breaking changes.
 
+////
 * A sliding left navigation panel with the following components:
 ** The app selector icons for *Insights*, *Data workspace*, and *Develop* appear in the left navigation panel header.
 ** The *Liveboards*, *Answers*, *Search Data*, and *Spotter* menu options in the *Insights* section. The *Insights* panel also includes a list of users' favorites.
@@ -151,16 +191,10 @@ After you switch to the V3 experience, the following features and enhancements w
 
 * Home page experience
 ** Modular home page with specific sections for Search, Watchlist, Favorites, and so on.
+////
 
-The following figure shows the user interface with the V3 experience:
 
-[.bordered]
-[.widthAuto]
-image::./images/new-nav3.png[New home page]
-
-For more information about the layout and UI elements in the V3 experience, see link:https://docs.thoughtspot.com/cloud/latest/thoughtspot-homepage[ThoughtSpot Product Documentation., window=_blank]
-
-=== Upgrade to the V2 experience
+=== Upgrade from v1 to V2 experience
 To upgrade to the V2 experience, set the `modularHomeExperience: true` attribute in the SDK.
 
 [source,javascript]
@@ -171,67 +205,11 @@ const embed = new AppEmbed("#embed", {
     //... other view config attributes
 });
 ----
-
 The following figure shows the user interface with the V2 experience enabled:
 
 [.bordered]
 [.widthAuto]
 image::./images/homepage.png[New home page]
-
-=== UI experience customization summary
-
-The following table summarizes the resulting UI experience for different configuration combinations:
-
-[width="100%", cols="6,7,6"]
-[options='header']
-|===
-|If `modularHomeExperience` | And `discoveryExperience` is | Resulting UI experience
-
-|Is `true` / `false` +
- Not set / Incorrect  a|
-[source,JavaScript]
-----
-discoveryExperience: {
-    //V3 modular home page
-    primaryNavbarVersion: PrimaryNavbarVersion.Sliding,
-    //V3 modular home page
-    homePage: HomePage.ModularWithStylingChanges
-  }
-----
-| V3 navigation and modular home page
-
-|Is `true` / `false`  +
- Not set / Incorrect a|
-
-[source,JavaScript]
-
-----
-discoveryExperience: {
-    //V3 modular home page
-    primaryNavbarVersion: PrimaryNavbarVersion.Sliding,
-    //V2 modular home page
-    homePage: HomePage.Modular,
-  },
-----
-
-| V3 navigation and V2 modular home page
-
-|Is `true` / `false` +
-/ Not set / incorrect a|
-[source,JavaScript]
-----
-discoveryExperience: {
-    //V3 modular home page
-    primaryNavbarVersion: PrimaryNavbarVersion.Sliding,
-  },
-----
-|V3 navigation and V2 modular home page
-
-|Is `true`  | Not| V2 navigation and modular home page
-
-|Is `false` / Not set / incorrect | Not set| V1 classic experience.
-
-|===
 
 
 ////
@@ -343,6 +321,85 @@ By default, the Object Search bar is displayed on the embedded **Home** page.
 image::./images/sageDisabledwithNav_classic.png[]
 ////
 
+=== Configuration options and resulting UI experience
+
+The following table summarizes the resulting UI experience for different configuration combinations:
+
+[width="100%", cols="6,7,6"]
+[options='header']
+|===
+|If `modularHomeExperience` | And `discoveryExperience` is | Resulting UI experience
+
+|Is `true` / `false` +
+Not set / Incorrect  a|
+
+
+[source,JavaScript]
+----
+discoveryExperience: {
+    // Enable V3 experience and navigation
+    primaryNavbarVersion: PrimaryNavbarVersion.Sliding,
+    // Enable V3 modular home page
+    homePage: HomePage.ModularWithStylingChanges
+  }
+----
+| V3 navigation and V3 modular home page
+
+|Is `true` / `false`  +
+Not set / Incorrect a|
+
+[source,JavaScript]
+----
+discoveryExperience: {
+    // Enable V3 experience and navigation
+    primaryNavbarVersion: PrimaryNavbarVersion.Sliding,
+    // Enable V3 modular home page
+    homePage: HomePage.Modular
+  },
+----
+
+| V3 navigation and V2 modular home page
+
+|Is `true` / `false` +
+/ Not set / incorrect a|
+[source,JavaScript]
+----
+discoveryExperience: {
+    // V3 navigation
+    primaryNavbarVersion: PrimaryNavbarVersion.Sliding
+  },
+----
+|V3 navigation and V2 modular home page
+
+|Is `true` / `false` +
+/ Not set / incorrect a|
+
+[source,JavaScript]
+----
+discoveryExperience: {
+    // V3 modular home page
+    homePage: HomePage.Modular
+  },
+----
+
+| V2 navigation and V2 modular home page
+
+a|Is `true` / `false` / Not set / incorrect a|
+
+[source,JavaScript]
+----
+discoveryExperience: {
+    // V3 modular home page
+    homePage: HomePage.ModularWithStylingChanges
+  },
+----
+|V1 classic experience
+
+a|Is `true`  a| Not set | V2 navigation and V2 modular home page
+
+a|Is `false` / Not set / incorrect a| Not set|V1 classic experience
+|===
+
 == Customize navigation experience
 
 For information about the navigation elements in each UI experience mode and the related customization settings in the SDK, see xref:customize-nav-full-embed.adoc[Customize navigation experience].
@@ -397,7 +454,7 @@ An example of using direct selectors in a file is available in the link:https://
 }
 ----
 
-You can also declare direct selectors using the xref:css-customization.adoc#rules[rules] property in the Visual Embed SDK configuration. This is useful for real-time testing, especially in the Visual Embed SDK playground. Note that the format for encoding CSS rules into the JavaScript object is the format used for rules.
+You can also declare direct selectors using the xref:css-customization.adoc#rules[rules] property in the Visual Embed SDK configuration. This is useful for real-time testing, especially in the Visual Embed SDK playground. Note the required format for encoding CSS rules as JavaScript objects.
 
 == Additional resources
 
