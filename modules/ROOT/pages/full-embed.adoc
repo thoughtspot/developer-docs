@@ -63,7 +63,7 @@ xref:getting-started.adoc#initSdk[Initialize the SDK] and define authentication 
 
 == Create an instance of the AppEmbed object
 
-Create an instance of the AppEmbed object and pass parameters to set a page view.
+Create an instance of the `AppEmbed` object and specify the initial page to display when the embedded component loads in your app.
 
 [source,javascript]
 ----
@@ -110,12 +110,23 @@ https://{ThoughtSpot-Host}/?embedApp=true&primaryNavHidden=true&profileAndHelpIn
 ----
 ////
 
-The `AppEmbed` component allows you to embed a specific application page or the entire application experience. If you are embedding full application, you can xref:full-app-customize.adoc#_choose_the_page_to_load[choose to show a specific page when embedded content loads] using the  `pageId` or `path` property. The `AppEmbed` component also provides  several customization controls to customize full application experience in an embedded view. For more information, see the following pages:
+The `AppEmbed` component allows you to embed a specific application page or the entire application experience. If you are embedding full experience, you can xref:set-default-page.adoc[set a specific application page as the default page when the embedded content loads] using the  `pageId` or `path` property.
+
+
+== Customize your embed view (Optional)
+The `xref:AppViewConfig.adoc[AppViewConfig]` object in the `AppEmbed` component various attributes and properties to xref:css-customization.adoc[the look and feel of the embedded app],  xref:embed-actions.adoc[control the visibility of menu actions] and features, and xref:embed-events.adoc[manage interactions between the host and embedded app].
+
+By default, ThoughtSpot application loads in the classic (V1) experience mode. If the V3 navigation and modular home page feature is enabled on your instance, you can choose to enable this experience for your embedding application users and customize the UI experience as per your needs.
+
+For more information, see the following pages:
 
 * xref:full-app-customize.adoc[Customize full application embedding] +
-* xref:AppEmbed.adoc[AppEmbed] +
+* xref:customize-homepage-full-embed.adoc[Customize home page experience]
+* xref:customize-nav-full-embed.adoc[Customize navigation experience]
 * xref:AppViewConfig.adoc[AppViewConfig] +
 * xref:Action.adoc[Actions]
+* xref:EmbedEvent.adoc[Embed events]
+* xref:HostEvent.adoc[Host events]
 
 
 
@@ -268,7 +279,119 @@ For more information about events, see the following pages:
 * xref:EmbedEvent.adoc[EmbedEvent]
 * xref:embed-events.adoc[Events and app integration]
 
-== Test your embedding
+== Code sample
+
+The following example shows the minimal code required to embed full ThoughtSpot experience in an app.
+
+[source,JavaScript]
+----
+import {
+    AppEmbed,
+    Page,
+    AuthType,
+    init
+} from '@thoughtspot/visual-embed-sdk';
+// Alternatively, you can use the ES6 import from CDN as shown below:
+// import { AppEmbed, AuthType, init } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+// Initialize th Visual Embed SDK with the host and authentication type
+init({
+    thoughtSpotHost: '<YOUR_THOUGHTSPOT_HOST>', // Replace with your ThoughtSpot host
+    authType: AuthType.None,  // Use 'None' if authentication is handled outside the SDK
+});
+
+// Create an AppEmbed instance to embed the full ThoughtSpot application
+const appEmbed = new AppEmbed(
+    document.getElementById('ts-embed'), // The DOM element where the app will be embedded
+    {
+        frameParams: {
+            width: '100%', // Set the iframe width to 100%
+            height: '100%', // Set the iframe height to 100%
+        },
+        pageId: Page.Liveboards,  // Set the initial page to the Data page
+    }
+);
+
+// Render the embedded ThoughtSpot application in the specified DOM element
+appEmbed.render();
+----
+
+The following code sample demonstrates how to initialize the SDK with a trusted authentication token and customize styles, menu actions, and interactions between the host and embedded app:
+
+----
+import {
+    AppEmbed,
+    Page,
+    AuthType,
+    init,
+    EmbedEvent,
+    Action
+} from '@thoughtspot/visual-embed-sdk';
+
+// Initialize the SDK
+init({
+    thoughtSpotHost: '<YOUR_THOUGHTSPOT_HOST>', // Replace with your ThoughtSpot instance URL
+    authType: AuthType.TrustedAuthTokenCookieless, // Cookieless trusted authentication
+    // getAuthToken should return a Promise that resolves to a valid trusted authentication token from your backend
+    getAuthToken: () => {
+        return fetch('https://your-backend.app/ts-token') // Replace with your backend token fetching endpoint
+            .then((response) => response.json())
+            .then((data) => data.token);
+    }
+});
+
+// Create the AppEmbed instance for classic (V1) experience with customizations
+const appEmbed = new AppEmbed(document.getElementById('ts-embed'), {
+            pageId: Page.Home, // Set the initial page to Home
+            showPrimaryNavbar: true, // Show the top navigation bar
+            disableProfileAndHelp: true, // Hide profile and help icons
+            frameParams: {
+                width: '100%',
+                height: '100%'
+            }, // Set iframe size
+            // Basic style customization for layout, navbar, and buttons
+            customizations: {
+                customCSS: {
+                    variables: {
+                        "--ts-var-root-background": "#F5F5F5",
+                        "--ts-var-root-color": "#47515F",
+                        "--ts-var-button--primary-background": "#FFA97E",
+                        "--ts-var-button--primary--hover-background": "#FFCCB3",
+                        "--ts-var-button--primary--active-background": "#FF8142",
+                        "--ts-var-button--primary-color": "#FFFFFF",
+                        "--ts-var-button--secondary-background": "#ABC7F9",
+                        "--ts-var-button--secondary--hover-background": "#71A1F4",
+                        "--ts-var-button--secondary--active-background": "#ABC7F9",
+                        "--ts-var-nav-background": "#2359B6",
+                        "--ts-var-search-data-button-background": "#ABC7F9",
+                        "--ts-var-search-data-button-font-color": "#FFFFFF"
+                    },
+                },
+                // Hide actions from menus
+                hiddenActions: [Action.Present, Action.SyncToOtherApps],
+                // Disable action in menus
+                disabledActions: [Action.ShowUnderlyingData],
+                disabledActionReason: "Contact your administrator to enable this feature."
+            });
+
+        // Listen for route (page/path) changes in the embedded app
+        appEmbed.on(EmbedEvent.RouteChange, (response) => {
+            console.log('Route changed to:', response.data.currentPath);
+        });
+        // Listen for dialog open events in the embedded app
+        appEmbed.on(EmbedEvent.DialogOpen, (payload) => {
+            console.log('Dialog opened:', payload);
+        });
+
+        // Listen for dialog close events in the embedded app
+        appEmbed.on(EmbedEvent.DialogClose, (payload) => {
+            console.log('Dialog closed:', payload);
+        });
+      // Render the embedded ThoughtSpot app
+        appEmbed.render();
+----
+
+== Test your embed
 
 . Load the embedded object in your app. If the embedding is successful, you will see the ThoughtSpot application page.
 +
