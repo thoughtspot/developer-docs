@@ -51,6 +51,7 @@ npm install @thoughtspot/visual-embed-sdk
 === Import the embed package
 
 The SDK is written in TypeScript and is also provided both as ES Module (ESM) and Universal Module Definition (UMD) modules, allowing you to use it in a variety of environments.
+The SDK is written in TypeScript and is also provided both as ES Module (ESM) and Universal Module Definition (UMD) modules, allowing you to use it in a variety of environments.
 
 Import one of the following modules into your app:
 
@@ -170,30 +171,38 @@ import {
     HostEvent
 } from '@thoughtspot/visual-embed-sdk';
 
+// Create a new LiveboardEmbed instance, targeting the DOM element with id 'container'.
+
 const lb = new LiveboardEmbed('#container', {
+    // Set the frame size to 100% width and height
     frameParams: {
         width: '100%',
         height: '100%',
     },
-    liveboardId: '<%=liveboardGUID%>',
-    runtimeFilters: [],
+    liveboardId: '<%=liveboardGUID%>', // ID of the Liveboard
+    runtimeFilters: [{
+        columnName: 'Color',
+        operator: RuntimeFilterOp.EQ,
+        values: ['red'],
+    }, ],
 });
-// [Optional]: Register event listeners.
+
+// [Optional]: Register an event listener for the LiveboardRendered event.
+// This allows you to execute custom logic when the Liveboard has finished rendering.
 lb.on(EmbedEvent.LiveboardRendered, (e) => {
     /* handler */
 });
 
-// Do not forget to call render.
+// Render the embedded Liveboard inside the specified container.
+// This step is required to display the Liveboard in your application.
 lb.render();
 
-// [Optional]: Trigger events on the lb
-lb.trigger(HostEvent.UpdateRuntimeFilters, [
-    {
-        columnName: 'col1',
-        operator: RuntimeFilterOp.EQ,
-        values: ['val1'],
-    },
-]);
+// Programmatically trigger a HostEvent to update runtime filters on the embedded Liveboard.
+lb.trigger(HostEvent.UpdateRuntimeFilters, [{
+    columnName: 'Color',
+    operator: RuntimeFilterOp.EQ,
+    values: ['amber'],
+}, ]);
 ----
 
 `#container` is a selector for the DOM node which the code assumes is already attached to DOM. The SDK will render the ThoughtSpot component inside this container element.
@@ -203,24 +212,32 @@ ThoughtSpot provides React components for embedding Search, Liveboard, and the f
 
 [source,TypeScript]
 ----
+// Import the LiveboardEmbed React component from the ThoughtSpot Visual Embed SDK
 import { LiveboardEmbed } from '@thoughtspot/visual-embed-sdk/react';
 
 const App = () => {
+    // Create a ref to interact with the embedded Liveboard instance
     const embedRef = useEmbedRef();
+
+    // Event handler called when the Liveboard has finished rendering
     const onLiveboardRendered = () => {
+        // Trigger a HostEvent to update runtime filters on the embedded Liveboard
+        // This filter sets the 'col1' column to only show rows where the value is 'val1'
         embedRef.current.trigger(HostEvent.UpdateRuntimeFilters, [
             {
-                columnName: 'col1',
+                columnName: 'Color',
                 operator: RuntimeFilterOp.EQ,
-                values: ['val1'],
+                values: ['amber'],
             },
         ]);
     };
+
+    // Render the LiveboardEmbed component with the specified Liveboard ID and event handler
     return (
         <LiveboardEmbed
-            ref={embedRef}
-            liveboardId="<liveboard-guid>"
-            onLiveboardRendered={onLiveboardRendered}
+            ref={embedRef} // Attach the ref for programmatic control
+            liveboardId="<liveboard-guid>" // The GUID of the Liveboard to embed
+            onLiveboardRendered={onLiveboardRendered} // Register the event handler
         />
     );
 };
