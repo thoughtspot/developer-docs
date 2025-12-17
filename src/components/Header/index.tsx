@@ -66,6 +66,7 @@ const Header = (props: {
                             <a
                                 href="/docs/introduction"
                                 title={t('TS_LOGO_ALT_TEXT')}
+                                className="logo-link"
                             >
                                 <img
                                     src={TSLogo}
