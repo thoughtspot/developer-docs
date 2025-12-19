@@ -1,0 +1,412 @@
+= SpotterCode integration guide
+:toc: true
+:toclevels: 2
+
+:page-title: SpotterCode integration gude
+:page-pageid: SpotterCode
+:page-description: This document describes how to install, configure, and use SpotterCode in supported IDEs such as Cursor.
+
+SpotterCode is a server-side integration layer that enables seamless interaction between ThoughtSpot Analytics and Integrated development environments (IDE)s such as Cursor. It acts as an MCP Server providing MCP tools and skills that developers can within development environment to quickly build and deploy their embed code.
+
+== Overview
+SpotterCode leverages the agentic capabilities of AI-assisted IDEs such as Cursor to guide developers through the embedding process, and automate code generation for embedding and integrating ThoughtSpot's analytics into their apps seamlessly. Be it embedding in a new app or in your existing application, SpotterCode understands your project context and structure and helps you generate deployment-ready builds in no time.
+
+=== Why should you use SpotterCode
+SpotterCode is designed to help developers build their embed code with ease with the following capabilities:
+
+* Ability to directly access ThoughtSpot's Visual Embed SDK documentation, CSS customization framework, and code samples from the cursor IDE to generate embed code, configure embed view and customize styles for embedded ThoughtSpot pages.
+* Ability to support prompts with natural language queries and instructions in Cursor to generate embed pages with ThoughtSpot content, including Liveboards, full application experience, answers, and more.
+* Ability to parse user request, determine required parameters such as the host URL and automatically insert these into your projects, and render your app.
+* Ability to automatically generate and insert the code into your project, hande the integration errors, and embed ThoughtSpot components.
+
+One of the key advantages of SpotterCode is that it's hosted by ThoughtSpot and requires almost no extensive configuration or deployment assistance to start using its skills. Developers can choose the skills to use and automate code logic just by sending messages in natural language in the Cursor chat session.
+
+=== Supported MCP tools and skills
+When the SpotterCode MCP server is integrated with your IDE, a specific set of skills are exposed to the AI agent on your IDE.
+
+When a user asks a question or sends instructions in natural language, the AI model in your IDE interprets them and converts them into a structured MCP request with query and type parameters. The AI agent then calls the MCP server to execute the skill, receives the results, and provides them back to the model, which generates the final response for the user.
+
+In the current release, SpotterCode supports the following skills:
+
+* `get-sdk-docs` +
+Searches and retrieves documentation for ThoughtSpot SDKs, including Visual Embed SDK and REST API SDK. For example, when a user sends a natural language question about embedding ThoughtSpot, the AI agent on your IDE programmatically determines the `query` string and documentation `type`, invokes the `get-sdk-docs` skill, and returns responses from the Visual Embed SDK documentation.
+
+* `get-code-example` +
+Retrieves code example from ThoughtSpot SDKs. For example, when a user asks question on embedding Liveboard, the AI agent on your IDE determines the context programmatically and invokes `get-code-example` skill to retrieve code examples for embedding a Liveboard.
+
+* `get-style-customization` +
+Provides theming, styling, and customization guidance for ThoughtSpot UI and embeds. Supports changing colors, fonts, backgrounds, branding, and other visual elements using CSS variables, theme JSON, or the Visual Embed SDK. The skill can generate official `CustomVariables` code and styling examples for LiveBoard, Search, and Visualization embeds. This skill supports text queries, branding guidelines in PDF, and design mockup image and PDF.
++
+For example, when a user sends instructions to change the button or background color of the embedded page, the AI agent on your IDE invokes this `get-style-customization` skill to generate the code with variables supported in the ThoughtSpot's CSS customization framework. If the user's instruction is match your host app's style, the theme properties and values are extracted from your codebase and applied to your embed.
+
+==== Input schema
+
+The input schema for the SpotterCode skills consists of the following parameters. Note that the values for these parameters are context-driven and are programmatically added by the AI agent orchestrating the workflows in your IDE.
+
+* `query` +
+A free-form string describing the user's request or question. This is used to determine the context and intent of the skill invocation.
+* `type` +
+An optional attribute, but commonly used to specify the category of information passed in the query. For example, when a user asks a question or passes instructions in natural language to embed a Liveboard, the `query` string is determined based on the context and user's intent and the `get-sdk-docs` skill is invoked to return responses for the `visual-embed-sdk` type.
+
+* `appThemeContext` +
+This parameter in the `get-style-customization` input schema is used when a user sends the instruction to match the app's theme. It is an optional object containing extracted theme values such as `computedStyles`, `cssVariables`, `designTokens`, and `additionalContext`.
+
+=== How it works
+
+1. The AI agent interprets the user's natural language input and maps it to the appropriate skill.
+2. The agent constructs the MCP request, populating the input schema parameters sucg as `query`, `type`, `appThemeContext`.
+3. The skill uses the query to search documentation, provide customization guidance and embed code changes.
+4. The type parameter helps the skill filter or format the response according to the requested category or SDK.
+- For get-style-customization, if appThemeContext is provided, the skill uses it to tailor the customization guidance or code to match the application's theme.
+
+How they are used during skill execution:
+
+
+The MCP server acts as a protocol endpoint, but the agent is responsible for determining and populating these parameters before invoking the skill [[3]](https://us-2221.app.gong.io/call?id=4757216612579811115), [[18]](https://us-2221.app.gong.io/call?id=1107962737698455371), [[17]](https://us-2221.app.gong.io/call?id=4843370054653799918).
+
+
+
+
+`query` string and `type` of the documentation is determined programmatically to use the  `get-sdk-docs` skill and return responses from the Visual Embed SDK documentation.
+
+
+
+Each of these skills require `query` and `type` parameters
+The MCP server requires the `query` and `type` parameters to execute this skill.
+
+** `query` - A string with text or keywords related to the SDK documentation. For example, SDK feature names, embed types, method names such as `getEmbedConfig`, `getUserSession`, and keywords such as  "authentication," "init", and so on.
+** `type` - Type of the documentation to retrieve. For example, api-reference, visual-embed-sdk.
+
+
+:
+
+Embed SDK flags Allowed values are typically documentation categories such as "api-reference," "code-example," "usage," "configuration," or similar documentation types
+
+
+determines the type and context of  the query and type determines the skill to use to fetch content. For example, when a user asks for embedding code or a customization option related to embedding, the cursor agent uses this skill to fetch the requested data from  on related
+
+
+MCP request containing these parameters to the MCP server.
+The MCP server receives the request, interprets the parameters, and routes the request to the appropriate skill (in this case, get-sdk-docs) to fetch the relevant SDK documentation.
+
+
+
+
+
+The user specifies a query (such as an API name or embedding scenario) and a type (e.g., SDK, language, use case). The skill retrieves or generates a code sample matching the request, supporting both Visual Embed SDK and REST API SDK. For REST API, the API name is used to fetch the relevant code; for Visual Embed, the scenario description guides the code generation.
+Parameters:
+- query: The request for the code sample. For REST API, provide the API name. For Visual Embed, describe the scenario.
+- type: The type of code example to retrieve (SDK, language, or use case) [[1]](https://thoughtspot.atlassian.net/wiki/spaces/TC/pages/2562818122/Change+management+process+for+documentation), [14].
+
+
+
+
+
+
+==== Input schema for MCP skills
+The input schema for the MCP skills exposed by SpotterCode includes the `query` and `type` parameters:
+
+[width="100%" cols="4,7"]
+[options='header']
+|=====
+|query|type
+
+|
+|
+|=====
+
+
+
+
+
+get-sdk-docs
+Retrieves documentation for ThoughtSpot SDKs, including the Visual Embed SDK and REST API SDK. Used to answer questions about SDK usage, configuration, and available features.
+How it works:
+The user provides a query (question or keyword) and an optional type (e.g., API reference, code example). The skill searches the SDK documentation for relevant information and returns the requested details.
+
+
+
+Parameters:
+(e.g., API reference, code example) [[5]](https://us-2221.app.gong.io/call?id=5912984493548909625), [14].
+
+documentation to find answers for questions related to embedding, authentication and customization options. Uses the following parameters to fetch documentation:
+**
+
+* `get-code-example`
+* `get-style-customization`
+
+* `get_relevant_visual_embed_sdk_reference` +
+
+* `get_relevant_style_customization_variables` +
+Retrieves CSS and UI theme customization guidance from the ThoughtSpot's CSS customization and overrides framework.
+
+
+
+Agent automatically uses MCP tools listed under Available Tools when relevant. This includes Plan Mode. Ask for a specific tool by name or describe what you need. Enable or disable tools from settings.
+
+
+
+
+
+
+
+=== Enable SpotterCode in Cursor
+
+Obtain your ThoughtSpot MCP URL from your admin or deployment.
+In Cursor, open the SpotterCode extension settings.
+Enter the MCP URL in the configuration field.
+Save and restart the extension if prompted.
+
+
+tool in SpotterCode
+
+Register the ThoughtSpot MCP Server (SpotterCode) as a skill/tool in Cursor.
+Use Cursor’s prompt interface to request analytics features or code generation.
+SpotterCode handles code generation, embedding, and style customization, leveraging the full power of ThoughtSpot’s APIs and SDKs within your development workflow
+
+
+
+To integrate SpotterCode (MCP Server for IDE) with Cursor, follow these steps:
+
+1. Enable the SpotterCode (MCP server) skill in Cursor. Cursor recognizes SpotterCode as a skill, allowing it to access the ThoughtSpot SDK documentation, style customization, and code examples directly within the IDE [[2]](https://us-2221.app.gong.io/call?id=1807469900201446304).
+2. Use Cursor’s prompt interface to request analytics features. For example, you can prompt SpotterCode to embed a ThoughtSpot liveboard or add analytics/AI buttons to your app’s navigation. SpotterCode will parse your request, determine the necessary parameters (like the ThoughtSpot cluster URL), and generate the required code or embed files for you [[2]](https://us-2221.app.gong.io/call?id=1807469900201446304).
+3. SpotterCode will automatically write and insert the code into your project, handling the integration with the ThoughtSpot SDK and embedding the analytics components as requested [[2]](https://us-2221.app.gong.io/call?id=1807469900201446304).
+4. You can further use SpotterCode in Cursor to apply style customizations or other SDK features, leveraging the MCP server’s tools for code generation and validation [[1]](https://us-2221.app.gong.io/call?id=6233241180812311301).
+
+In summary: SpotterCode is available as a skill in Cursor, and you interact with it by prompting for analytics tasks. It generates and inserts the necessary code, leveraging the MCP server’s capabilities for seamless integration [[1]](https://us-2221.app.gong.io/call?id=6233241180812311301), [[2]](https://us-2221.app.gong.io/call?id=1807469900201446304).
+
+
+
+
+---
+title: SpotterCode IDE Integration Guide
+summary: How to install, configure, and use SpotterCode in supported IDEs (with Cursor example), including MCP URL setup, SDK and theming skills, authentication, usage, limitations, and code/query samples.
+toc: true
+last_updated: 2025-12-18
+sidebar: mydoc_sidebar
+permalink: /spottercode/ide-integration.html
+---
+
+# SpotterCode IDE Integration Guide
+
+## Overview
+
+SpotterCode brings ThoughtSpot’s Spotter AI and analytics code generation directly into developer IDEs. It enables embedding, customization, and automation of ThoughtSpot features (Liveboards, AI agents, analytics) using the ThoughtSpot SDK and APIs. Use cases include embedding analytics, automating code scaffolding, and customizing UI components to match your application’s branding.
+
+---
+
+## Supported IDEs
+
+- Cursor (primary example)
+- Cloud Code
+- Jupyter Notebook (data science workflows)
+- Additional IDEs may be supported as SpotterCode evolves
+
+---
+
+## Installation Steps (Cursor Example)
+
+1. **Prerequisites**
+- Supported IDE (e.g., Cursor)
+- Node.js and npm (for React/JS integrations)
+- Access to a ThoughtSpot instance with API credentials
+
+2. **Install SpotterCode Plugin/Extension**
+- In Cursor, search for “SpotterCode” in the extension marketplace.
+- Click “Install” and follow prompts.
+
+3. **Install ThoughtSpot Visual Embed SDK (if embedding)**
+```bash
+npm install @thoughtspot/visual-embed-sdk
+```
+
+---
+
+## MCP URL Setup in Cursor
+
+1. Obtain your ThoughtSpot MCP URL from your admin or deployment.
+2. In Cursor, open the SpotterCode extension settings.
+3. Enter the MCP URL in the configuration field.
+4. Save and restart the extension if prompted.
+
+This enables the agent in Cursor to access all SDK, API, and theming skills for embedding and customization tasks.
+
+---
+
+## Authentication and Setup Flow
+
+1. **Initialize SDK in Your Project**
+```javascript
+import { init, AuthType } from "@thoughtspot/visual-embed-sdk";
+init({
+thoughtSpotHost: "https://your-thoughtspot-host", // MCP URL
+authType: AuthType.None, // Or AuthType.EmbeddedSSO, etc.
+});
+```
+
+2. **Authenticate**
+- Use the authentication method appropriate for your environment (SSO, API token, etc.).
+- SpotterCode will prompt for credentials or use existing session tokens.
+
+3. **Configure Data Source**
+- Provide the worksheet or model ID to target for queries and embedding.
+
+---
+
+## Usage
+
+- **Code Generation:** SpotterCode generates code snippets for embedding Liveboards, analytics, and AI agents, referencing the latest SDK documentation and style guides.
+- **Theming and Customization:** Use SpotterCode to apply style customizations (CSS variables, theming options) so embedded analytics match your application’s branding.
+- **Security:** SpotterCode respects all ThoughtSpot security rules, including Column Level Security (CLS) and Row Level Security (RLS). No data is used for LLM training.
+- **Governance Controls:** Admins can enable/disable SpotterCode features cluster-wide, use incognito mode, and restrict LLM access to sensitive columns.
+
+---
+
+## Known Limitations (Early Access)
+
+- Only Azure OpenAI models are supported for BYOM LLM key.
+- Data model/file size limits for caching/processing.
+- No self-learning from user interactions; explicit coaching and reference questions required.
+- Full autonomous agent capabilities not available in EA.
+- Initial support is focused on Cursor and a few other environments; broader IDE support is planned.
+
+---
+
+## Code Samples
+
+### Embed a Liveboard
+
+```javascript
+import { LiveboardEmbed, AuthType, init } from '@thoughtspot/visual-embed-sdk';
+
+init({
+  thoughtSpotHost: 'https://your-thoughtspot-host', // MCP URL
+  authType: AuthType.EmbeddedSSO,
+});
+
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+  frameParams: { width: '100%', height: '100%' },
+  liveboardId: 'your-liveboard-id',
+  style: {
+    // Theming example: set primary color
+    '--ts-primary-color': '#1976d2',
+  },
+});
+liveboardEmbed.render();
+```
+
+### Embed Spotter Agent in React
+
+```javascript
+import React, { useState } from "react";
+import { init, AuthType } from "@thoughtspot/visual-embed-sdk";
+import { useSpotterAgent, SpotterMessage } from "@thoughtspot/visual-embed-sdk/react";
+
+init({
+  thoughtSpotHost: "https://your-thoughtspot-host",
+  authType: AuthType.None,
+});
+
+const SpotterAgentComponent = () => {
+  const { sendMessage: sendSpotterMessage } = useSpotterAgent({ worksheetId: "YOUR_MODEL_ID" });
+  const [input, setInput] = useState("");
+  const [response, setResponse] = useState(null);
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const result = await sendSpotterMessage(input);
+    setResponse(result.message);
+    setInput("");
+  };
+
+  return (
+    <div>
+      <input value={input} onChange={e => setInput(e.target.value)} />
+      <button onClick={handleSend}>Ask Spotter</button>
+      {response && <SpotterMessage message={response} />}
+    </div>
+  );
+};
+```
+
+---
+
+## Query and Response Samples
+
+**Query:**
+“What are the sales for this year?”
+
+**Response:**
+Spotter returns a visualization (e.g., bar chart) showing sales for the current year, using the default measure and filters defined in the worksheet/model.
+
+**Query:**
+“Embed the analytics Liveboard with ID `abc123` and style it to match my app’s primary color.”
+
+**Response:**
+SpotterCode generates the necessary embed code, applies the style customization, and inserts the code into your project files in Cursor.
+
+---
+
+## Summary Table
+|====
+| Section                | Details                                                                 |
+|------------------------|-------------------------------------------------------------------------|
+| Overview               | SpotterCode brings ThoughtSpot AI/code to IDEs for embedding/customization |
+| Supported IDEs         | Cursor, Cloud Code, Jupyter Notebook (initial)                          |
+| Installation           | Install extension, SDK, configure project, set MCP URL                  |
+| Authentication         | SDK init, SSO/API token, worksheet/model ID                             |
+| Usage                  | Code generation, embedding, theming, security respected                 |
+| Known Limitations      | Azure OpenAI only, data size limits, no self-learning, limited IDEs     |
+| Code Samples           | Provided for Liveboard and Spotter Agent embedding                      |
+| Query/Response Samples | Provided for analytics and code generation
+
+|===
+
+
+SpotterCode IDE Integration Guide
+Overview
+SpotterCode brings ThoughtSpot’s Spotter AI and analytics code generation directly into developer IDEs. It enables embedding, customization, and automation of ThoughtSpot features (Liveboards, AI agents, analytics) using the ThoughtSpot SDK and APIs. Use cases include embedding analytics, automating code scaffolding, and customizing UI components to match your application’s branding.
+
+Supported IDEs
+Cursor (primary example)
+Cloud Code
+Jupyter Notebook (data science workflows)
+Additional IDEs may be supported as SpotterCode evolves
+Installation Steps (Cursor Example)
+Prerequisites
+Supported IDE (e.g., Cursor)
+Node.js and npm (for React/JS integrations)
+Access to a ThoughtSpot instance with API credentials
+Install SpotterCode Plugin/Extension
+In Cursor, search for “SpotterCode” in the extension marketplace.
+Click “Install” and follow prompts.
+Install ThoughtSpot Visual Embed SDK (if embedding)
+bash
+Copy code
+npm install @thoughtspot/visual-embed-sdk
+MCP URL Setup in Cursor
+Obtain your ThoughtSpot MCP URL from your admin or deployment.
+In Cursor, open the SpotterCode extension settings.
+Enter the MCP URL in the configuration field.
+Save and restart the extension if prompted.
+This enables the agent in Cursor to access all SDK, API, and theming skills for embedding and customization tasks.
+
+Authentication and Setup Flow
+Initialize SDK in Your Project
+javascript
+Copy code
+import { init, AuthType } from "@thoughtspot/visual-embed-sdk";
+init({
+thoughtSpotHost: "https://your-thoughtspot-host", // MCP URL
+authType: AuthType.None, // Or AuthType.EmbeddedSSO, etc.
+});
+Authenticate
+Use the authentication method appropriate for your environment (SSO, API token, etc.).
+SpotterCode will prompt for credentials or use existing session tokens.
+Configure Data Source
+Provide the worksheet or model ID to target for queries and embedding.
+Usage
+Code Generation: SpotterCode generates code snippets for embedding Liveboards, analytics, and AI agents, referencing the latest SDK documentation and style guides.
+Theming and Customization: Use SpotterCode to apply style customizations (CSS variables, theming options) so embedded analytics match your application’s branding.
+Security: SpotterCode respects all ThoughtSpot security rules, including Column Level Security (CLS) and Row Level Security (RLS). No data is used for LLM training.
+Governance Controls: Admins can enable/disable SpotterCode features cluster-wide, use incognito mode, and restrict LLM access to sensitive columns.
