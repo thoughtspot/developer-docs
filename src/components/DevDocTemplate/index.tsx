@@ -57,6 +57,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         location,
         pageContext: { namePageIdMap },
     } = props;
+    console.log('props, ', props);
     const isBrowser = () => typeof window !== 'undefined';
 
     const { curPageNode, navNode } = data;
