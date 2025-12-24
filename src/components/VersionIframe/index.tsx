@@ -21,6 +21,7 @@ const VersionIframe: React.FC<VersionIframeProps> = ({
             const mainUrlParams = new URLSearchParams(window.location.search);
             if (mainUrlParams.has('pageid')) {
                 url.searchParams.set('pageid', mainUrlParams.get('pageid'));
+                url.pathname += `${mainUrlParams.get('pageid')}/`;
             } else if (mainUrlParams.has('pageId')) {
                 url.searchParams.set('pageid', mainUrlParams.get('pageId'));
             }
