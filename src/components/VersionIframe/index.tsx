@@ -23,7 +23,7 @@ const VersionIframe: React.FC<VersionIframeProps> = ({
                 url.searchParams.set('pageid', mainUrlParams.get('pageid'));
                 const pageId = mainUrlParams.get('pageid');
                 if (pageId === 'graphql-play-ground') {
-                    // Edge case for graphql-play-ground page
+                    // Edge case for graphql-play-ground page, Redirect to released version of the page
                     url.pathname = 'docs/graphql-play-ground/';
                 } else {
                     const pageIdSplit = pageId.split('__');
