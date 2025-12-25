@@ -22,21 +22,14 @@ const VersionIframe: React.FC<VersionIframeProps> = ({
             if (mainUrlParams.has('pageid')) {
                 url.searchParams.set('pageid', mainUrlParams.get('pageid'));
                 const pageId = mainUrlParams.get('pageid');
-                if (pageId === 'graphql-play-ground') {
-                    // Edge case for graphql-play-ground page, Redirect to released version of the page
-                    url.pathname = 'docs/graphql-play-ground/';
+                const pageIdSplit = pageId.split('__');
+                if (pageIdSplit.length > 1) {
+                    // Tutorials module pages have pageids like {subdirectory}_{real_url_ending}, must be split to generate matching URL
+                    const completePath = `tutorials/${pageIdSplit.join('/')}/`;
+                    url.pathname += completePath;
                 } else {
-                    const pageIdSplit = pageId.split('__');
-                    if (pageIdSplit.length > 1) {
-                        // Tutorials module pages have pageids like {subdirectory}_{real_url_ending}, must be split to generate matching URL
-                        const completePath = `tutorials/${pageIdSplit.join(
-                            '/',
-                        )}/`;
-                        url.pathname += completePath;
-                    } else {
-                        // Other pages are not tutorials with subdirectories, so just add the pageid
-                        url.pathname += `${pageId}/`;
-                    }
+                    // Other pages are not tutorials with subdirectories, so just add the pageid
+                    url.pathname += `${pageId}/`;
                 }
             } else if (mainUrlParams.has('pageId')) {
                 url.searchParams.set('pageid', mainUrlParams.get('pageId'));
