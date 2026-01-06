@@ -163,9 +163,37 @@ If the API request is successful, a conversation identifier is created. Note the
 ////
 The following AI API endpoints allow you to initiate a conversation session with Spotter:
 
-* xref:spotter-apis.adoc#_create_a_conversation_session_with_spotter_agent[`POST /api/rest/2.0/ai/agent/conversation/create`]
-* xref:spotter-apis.adoc#_create_a_conversation_session_legacy_api_endpoint[`POST /api/rest/2.0/ai/conversation/create`] +
-__This is a legacy API endpoint and will be deprecated in an upcoming release version__.
+If the API request is successful, the following data is sent in the API response:
+
+* `session_identifier` +
+GUID of the Answer session.
+* `generation_number` +
+Number assigned to the Answer session.
+* `message_type`
+Type of response received for the query. For example, `TSAnswer` (ThoughtSpot Answer).
+* `visualization_type` +
+The data format of the generated Answer; for example, a chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
+* `tokens` +
+Tokens generated from the natural language search query specified in the API request. These tokens can be used as input to the `/api/rest/2.0/ai/conversation/create` endpoint to set the context for a conversation session.
+
+[NOTE]
+====
+Note the session ID and generation number. To export the result generated from this API call, send these attributes in the `POST` request body to the `/api/rest/2.0/report/answer` endpoint.
+====
+
+[source,JSON]
+----
+[{
+  "session_identifier": "57784fa1-10fa-431d-8d82-a1657d627bbe",
+  "generation_number": 2,
+  "message_type": "TSAnswer",
+  "visualization_type": "Undefined",
+  "tokens": "[product], [region] = [region].'west', sort by [sales] descending"
+}]
+----
+
+== Conversational analytics with Spotter agent
+Spotter agent is an advanced, agentic version of Spotter, which supports context-aware interactions, data literacy features, and follow-up conversations for deeper analytics. Spotter agent can be used for complex reasoning and agentic interactions in an orchestrated framework.
 
 ////
 
@@ -1023,22 +1051,43 @@ The `POST /api/rest/2.0/ai/data-source-suggestions` API provides relevant data s
 [options='header']
 |=====
 |Parameter| Description
-|`query`|_String_. Required. Specify a natural language query string. For example, `Sales data for Jackets`.
-|=====
+|`metadata_context`  a| Required. Specify one of the following attributes to set the metadata context:
+
+* `data_source_identifiers` +
+__Array of strings__. IDs of the data source object such as Models.
+* `answer_identifiers` +
+__Array of strings__. GUIDs of the Answer objects that you want to use as metadata.
+* `conversation_identifier` +
+__String__. ID of the conversation session.
+* `liveboard_identifiers` +
+__Array of strings__. GUIDs of the Liveboards that you want to use as metadata.
+
+| `query` |__String__. Required parameter. Specify the query string that needs to be decomposed into smaller, analytical sub-questions.
+|`limit_relevant_questions` +
+__Optional__ | __Integer__. Sets a limit on the number of sub-questions to return in the response. Default is 5.
+|`bypass_cache` +
+__Optional__| __Boolean__. When set to `true`, disables cache and forces fresh computation.
+|`ai_context` +
+__Optional__. a| Additional context to guide the response. Define the following attributes as needed:
 
 ==== Example request
 
-[source,JSON]
+[source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/data-source-suggestions'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/relevant-questions/'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
   --data-raw '{
-  "query": "Sales data for Jackets"
+  "metadata_context": {
+    "data_source_identifiers": [
+      "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    ]
+  },
+  "query": "Net sales of Jackets in west coast",
+  "limit_relevant_questions": 3
 }'
-
 ----
 
 ==== API response
@@ -1047,33 +1096,21 @@ If the API request is successful, ThoughtSpot returns a ranked list of data sour
 [source,JSON]
 ----
 {
-  "data_sources": [
+  "relevant_questions": [
     {
-      "confidence": 0.97,
-      "details": {
-        "description": "",
-        "data_source_name": "(Sample) Retail - Apparel",
-        "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca"
-      },
-      "reasoning": "Following similar NL queries were asked earlier on this worksheet - \"show sales of jackets quarter on quarter\", \"show sales of jackets last quarter in east\", \"jacket sales for february. (ignore previous context\""
+      "query": "What is the trend of sales by type over time?",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
     },
     {
-      "confidence": 0.62,
-      "details": {
-        "description": "",
-        "data_source_name": "Dunder Mifflin Sales",
-        "data_source_identifier": "0e4406c7-d978-4be7-abd7-c34e8f7da835"
-      },
-      "reasoning": ""
+      "query": "Sales by item",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
     },
     {
-      "confidence": 0.45,
-      "details": {
-        "description": "",
-        "data_source_name": "Copy of Dunder Mifflin Sales-SSD",
-        "data_source_identifier": "c8305843-d31f-468a-ab1b-2636f64c83e5"
-      },
-      "reasoning": "Columns include 'Product', 'Category', 'Quantity', and 'Amount', which could support sales analysis for jackets if present, but no direct NLQ or answer matches."
+      "query": "Sales across regions",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
     }
   ]
 }
