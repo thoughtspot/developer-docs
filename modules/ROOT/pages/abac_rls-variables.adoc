@@ -1,0 +1,413 @@
+= ABAC via RLS with variables
+:toc: true
+:toclevels: 2
+
+:page-title: ABAC via tokens
+:page-pageid: abac-via-rls-variables
+:page-description: Attribute-based access control pattern with variable attributes referenced in Row-Level Security (RLS) rules on a given table.
+
+Attribute-Based Access Control (ABAC) is an access control model in which security entitlements are determined by evaluating a set of attributes included in a token generated for a user. The attributes are passed in a JSON Web Token (JWT) at session creation to dynamically filter data and enable user-specific security policies.
+
+== Overview
+
+To implement data security for application users, administrators can define RLS rules that use system variables such as `ts_username` or `ts_groups`. If a ThoughtSpot deployment requires granular access control and dynamic assignments beyond what system variables can support, administrators can use formula variables within RLS rules.
+
+Formula variables are custom variables that enable dynamic and context-aware logic in RLS rules. They can be assigned at the Org, user, and data model levels.
+
+In embedded analytics scenarios, where each user may require different data access, administrators can assign security attributes and rules on a per-user basis. For these use cases, administrators can implement a JWT-based ABAC model combined with RLS to enforce data security using dynamic attributes derived from formula variables.
+
+In the ABAC via RLS with variables method, administrators add formula variables to RLS rules and pass their values (`variable_values`) as security attributes and entitlements to the user session through a JWT. All derived objects then inherit the data security rules from the underlying Table and are filtered according to the user’s entitlements provided in the token.
+
+[NOTE]
+====
+
+* Formula variables are available on ThoughtSpot starting from 10.15.0.cl. If this feature is not enabled on your instance, contact ThoughtSpot Support.
+
+* In the legacy JWT ABAC token requests, you could set the `persist_option` parameter to `NONE`, `APPEND`, `REPLACE`, and `RESET`. However, when you use the `variable_values` parameter in the JWT API token request to set up RLS values for a given user, only `APPEND` and `REPLACE` are supported.
+
+* To reset the formula variable attributes of a user, use the `/api/rest/2.0/template/variables/update-values` API endpoint.
+
+* The ability to set variable values only for the current session, previously achieved by setting `persist_option: NONE`, is not supported with RLS via ABAC. +
+For session-based rules, create dedicated user accounts for your application users and apply persisted rules. This approach ensures that Liveboard schedule attachments enforce security rules and deliver only secured output to your end users. When combined with cookieless authentication, this configuration addresses all use cases that previously relied on session-based JWT. You can simplify user provisioning and programmatically manage user creation and deletion workflows using ThoughtSpot's REST APIs.
+====
+
+=== Indexing
+Several features within ThoughtSpot, such as autocompletion in Search on values within columns, use ThoughtSpot indexing. Due to the runtime nature of ABAC tokens, ThoughtSpot indexing will not be restricted by the values supplied in a token. This means the indexed columns may expose values in search suggestions or autocompletion that a user should not see, even if ABAC filters would block access to the underlying data. To prevent this, you can do one of the following:
+
+* Disable indexing for columns and fields that must be restricted by ABAC. You may also want to disable indexing on all sensitive columns.
+* Define an RLS rule on those fields, since RLS is enforced at the indexing layer and will secure suggestions and sample values.
+
+=== Implementation steps
+The ABAC implementation with formula variables and RLS rules includes the following steps:
+
+* xref:abac_rls-variables.adoc#_create_formula_variables[Creating formula variables] +
+To generate tokens with variable attributes, the variables must be available in ThoughtSpot. To create variables, use the xref:variables.adoc#_create_a_variable[Variable REST API].
+* xref:abac_rls-variables.adoc#_add_rls_rules_with_variable_references[Adding RLS rules with formula variables] +
+When defining an RLS rule with variables, use the `ts_var` function. These RLS rules will apply to the Models, Liveboards, and other objects derived from that Table.
+* xref:abac_rls-variables.adoc#_define_values_and_scope_for_variables[Creating a token request with variable attributes] +
+To generate a JWT token, use the `/api/rest/2.0/auth/token/custom` REST API endpoint. The token generation request must include the variable attributes, which will be used for RLS evaluation to enable per‑user entitlements and data filters across all the objects derived from the Table.
+* xref:abac_rls-variables.adoc#_verify_the_entitlements[Verifying entitlements] +
+To ensure data security rules are applied, check user entitlements and verify if they are translated accurately during query generation.
+
+The ABAC via tokens method requires the xref:trusted-authentication.adoc[trusted authentication] setup.
+
+////
+=== Mandatory token filters
+
+The `is_mandatory_token_filter: true` setting in object TML enforces that a filter rule must be provided for a specific column. When this attribute is set on a column in a Model, ThoughtSpot will deny all data access for users who do not have a corresponding filter rule for that column in their ABAC token.
+
+When setting filter rules within the token, you must place the `is_mandatory_token_filter: true` property on every column in a Model where a filter rule is expected. This setting will deny any access to data if a user has not been assigned values for the expected set of fields.
+
+[#column-name-warning]
+The filter rules require passing the *exact* column name as defined in the Model. Otherwise, the values will not bind to any column. You must coordinate between the team that maintains the data objects and the team that builds the xref:trusted-auth-token-request-service.adoc[token request service] to know if any changes will be made to a Model and to ensure column names remain consistent. +
+For this reason, end users of an embedded app must not be granted edit access to any Model using ABAC rules via tokens. Setting the `is_mandatory_token_filter: true` property on every column where a filter rule is expected ensures that no data is returned for users when column names change.
+
+[NOTE]
+====
+If a column is set with both `is_hidden: true` and `is_mandatory_token_filter: true`, and filter conditions for that column are defined in the ABAC token, the filter will be applied as expected. The column will be hidden from the user interface, but the mandatory filter requirement will still be enforced, and data will be shown according to the filter values provided in the token.
+====
+////
+
+== Create formula variables
+
+To view the variables available on your instance, use the `POST /api/rest/2.0/template/variables/search` API call. To create a new variable, use the `/api/rest/2.0/template/variables/create` API endpoint.
+
+To configure formula variables for all Orgs on your instance or the Primary Org, cluster administration privileges are required. Org administrators can configure formula variables for their respective Orgs. Users with the `CAN_MANAGE_VARIABLES` (*Can manage variables*) role privilege can also create and manage variables for their Org context.
+
+The `/api/rest/2.0/template/variables/create` API endpoint allows creating formula variables for the following data types:
+
+* `VARCHAR`
+* `INT32`
+* `INT64`
+* `DOUBLE`
+* `DATE`
+* `DATE_TIME`
+
+During variable creation, specify the xref:variables.adoc#data_type[`data_type`].
+
+Formula variables for `BOOLEAN` and `TIME` data types are not supported.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/]api/rest/2.0/template/variables/create' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "type": "FORMULA_VARIABLE",
+  "name": "country_var",
+  "is_sensitive": false,
+  "data_type": "VARCHAR"
+}'
+----
+
+The variable update API allows assigning variable values and setting the scope. In the ABAC implementation, administrators can set the variable values and scope when xref:abac_rls-variables.adoc#_create_an_abac_token_request_with_variable_attributes[generating a JWT] using the `/api/rest/2.0/auth/token/custom` API endpoint.
+
+== Add RLS rules with variable references
+To define RLS rules with variables for a Table:
+
+. Navigate to the Data workspace and click the Table for which to define RLS rules.
+. Click *Row security* and then click *+ Add row security*.
+. In the *Row Security Editor*, define the rules. To reference the formula variable in the rule, use the `ts_var` function. For example, If you want to limit user access to data of a specific region, you can create a region-specific variable, `region = ts_var('region_var')`, and assign values in the token request.
+
+
+=== RLS rule with a single variable reference
+
+In this formula example, `country` refers to the "country" column in the data table, and `country_var` is the variable.
+
+----
+country = ts_var('country_var')
+----
+
+If `country_var` is assigned a single value, the user is permitted to view only rows where the `country` column matches that value.
+
+If `country_var` is assigned multiple values, the formula translates to `country IN ('value1', 'value2', ...)`. The query engine interprets `=` as the `IN` clause in this case and returns rows that match these values; for example, `WHERE country IN ('Australia', 'Germany')`.
+
+=== RLS rules with multiple variables
+The RLS rules support the `AND` operator, which means that you can combine multiple conditions in a single RLS rule, so that a row is accessible only if all the specified conditions are met.
+
+The following rule restricts data access to rows if the `country` column in the data table matches the value assigned to `country_var` and the `Department` column matches the value assigned to `department_var` for that user.
+
+----
+country = ts_var('country_var') AND Department = ts_var('department_var')
+----
+
+The rule in this example restricts data access to rows where the `region` column in the table matches the value assigned to `region_var` and the `product` column matches the value assigned to `product_var`.
+
+----
+region = ts_var('region_var') AND product = ts_var('product_var')
+----
+
+=== Allow all rule with a TS_WILDCARD_ALL variable
+In this example, `customer` represents the column `customer` in the table and `customer_var` represents variable. If the value of the customer_var variable is set to `TS_WILDCARD_ALL`, the user can access all customers in the column.
+
+----
+customer = ts_var('customer_var')
+----
+
+=== Group override rule with variable-based check
+In any security formula you build, you may want a clause that gives access to all data to certain groups. In the rule definition, you can include system variables, such as `ts_groups`, to build your preferred logic:
+
+In this example, users can access data if they are in the "data developers" group, or if the `Department` column matches the value assigned to their `department_var` variable.
+
+----
+'data developers' in ts_groups OR Department = ts_var('department_var')
+----
+
+==== Variables with numeric and Date data types
+
+The following rule enforces a numeric threshold and  restricts access to rows where the Revenue value is less than or equal to the value provided by the `revenue_cap_var` variable.
+
+----
+Revenue <= to_double(ts_var('revenue_cap_var'))
+----
+
+The following rule restricts access to rows where the `date_column` is within the range defined by the `start_date_var` and `end_date_var` variables. Only rows with dates greater than or equal to the start date and less than or equal to the end date specified for these variables will be visible for the user.
+
+----
+(date_column >= ts_var('start_date_var')) AND (date_column <= ts_var('end_date_var'))
+----
+
+== Create an ABAC token request with variable attributes
+
+To generate a token with variable attributes, use the `POST /api/rest/2.0/auth/token/custom` API call.
+
+The variable attributes defined in the token request take effect only if they are referenced in an RLS rule. If the variables are not used in any formula or RLS rule, they will have no impact on data access. Before generating the request with variable attributes, ensure that the xref:abac_rls-variables.adoc#_add_rls_rules_with_formula_variables_to_tables[variables are added to the RLS rules] for the Table.
+
+In the token request, include the following properties along with the `username`, xref:trusted-auth-secret-key.adoc[`secret_key`]:
+
+* `variable_values`
+* `persist_option`
+
+Optionally, you can specify the `objects` and `org_identifier` to set the scope of access control.
+
+=== Variable values
+
+The `variable_values` array requires the following parameters:
+
+* `name` +
+__String__. Name of the formula variable. The formula variable referenced on the token request must be available in ThoughtSpot and included in the RLS rule.
+* `values` +
+__Array of strings or numeric values__. When assigning values, ensure the data format of values matches the data type set of that variable. If you are adding a variable to filter by country with the `VARCHAR` data type, specify the string values as shown in this example:
+
+[source,JSON]
+----
+"variable_values": [
+    {
+      "name": "country_var",
+      "values": [
+        "Japan",
+        "Singapore",
+        "Australia"
+      ]
+    }
+ ]
+----
+
+All values are passed into the token as *arrays of strings*, even if the column is a numeric or date type in ThoughtSpot and the database. The column data type will be respected in the query issued to the database.
+
+==== Allow all values by default
+
+To allow all values by default, specify `["TS_WILDCARD_ALL"]` as the variable value to grant access to all values in a given column.
+
+In this example, the user is allowed all access for one variable, while for the others, specific values are set.
+
+[source,JSON]
+----
+"variable_values": [
+    {
+      "name": "country_var",
+      "values": [
+        "Japan",
+        "Singapore",
+        "Australia"
+      ]
+    },
+    {
+      "name": "department_var",
+      "values": [
+        "Sales",
+        "Marketing"
+      ]
+    },
+    {
+      "name": "product_var",
+      "values": [
+        "TS_WILDCARD_ALL"
+      ]
+    }
+  ]
+----
+
+If `TS_WILDCARD_ALL` is set for variable attributes, ensure that the RLS rules are defined clearly on the Table to avoid unintended data exposure.
+
+==== Deny all by default
+For every variable included in the token request, you can assign one or more  values. All variables referenced in RLS rules are required. If a variable is not assigned any value, query generation will fail with the following error.
+
+`Error in loading data
+No values are assigned to some or all Formula Variables`
+
+[.bordered]
+[.widthAuto]
+image:./images/formula-variable-error.png[Formula variable error, scale=25%]
+
+Due to this error, no data is returned, effectively denying all data access for the user.
+
+=== Persist options and session-based rules
+
+Variable attributes must be *persisted* for them to apply to user sessions when using xref:trusted-authentication.adoc#cookie[cookie-based trusted authentication] or scheduled reports. To specify whether variable attributes and rules should persist for user sessions, you must define the `persist_option` parameter.
+
+To append or replace the attributes, use the following options:
+
+* `APPEND`  +
+Adds the attributes defined in the API request to the user properties. These properties will be applied to the current and future user sessions and scheduled reports until they are explicitly changed through a token update request.
+
+* `REPLACE` +
+Replaces existing variable assignments with the new values.
+
+[NOTE]
+====
+* The ABAC implementation with RLS and formula variables does not support session-based rules. Therefore, ThoughtSpot does not recommend setting the `persist_option` attribute to `NONE`.
+* If you don't want to append or replace any attributes, do not pass any variable values in the token update request.
+* Resetting attributes using the`"persist_option": "RESET"` attribute in the token request is not supported. Passing an empty array does not reset the attributes. To reset the formula variable attributes of a user, use the `/api/rest/2.0/template/variables/update-values` API endpoint.
+====
+
+=== Variable scope
+To restrict the scope of the variable attributes and rules to a specific Org context and  object, define the `org_identifier` and `objects`.
+
+==== Apply to specific objects
+To apply variable entitlements to a specific object, specify the object IDs in the `objects` array as shown in this example:
+
+[source,JSON]
+----
+"objects": [
+   {
+     // example of the format
+     "type": "{OBJECT_TYPE}",
+     "identifier": "{id or name of the object}"
+   },
+   {
+     "type": "LOGICAL_TABLE",
+     "identifier": "9b751df2-d344-4850-9756-18535797378c"
+   }
+]
+----
+
+The API supports only the `LOGICAL_TABLE` object type.
+
+If the object ID is not specified in the API request, the variable values will be applied to all formulas and rules that use those variables, across all objects in the Org for that user.
+
+==== Apply to Org context
+
+The `org_identifier` attribute in the token request specifies the Org context for the user session and entitlements.
+
+If the `org_identifier` parameter is not defined in the token request, the token is issued for the user's last logged-in Org. For new users, the token will be assigned to the default Org on their instance.
+
+To apply variable entitlements to a user session, you must ensure that the RLS rules with variables and relevant objects are available in the Org context specified in the token request.
+
+=== Example request body
+
+The following example shows the request body for generating a token with formula variable attributes:
+
+[source,cURL]
+----
+ curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/custom'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "UserA",
+  "validity_time_in_sec": 300,
+  "persist_option": "APPEND",
+  "auto_create": true,
+  "secret_key": "f8aa445b-5ff1-4a35-a58f-e324133320d5",
+  "variable_values": [
+    {
+      "name": "country_var",
+      "values": [
+        "Japan",
+        "Singapore",
+        "Australia"
+      ]
+    },
+    {
+      "name": "department_var",
+      "values": [
+        "Sales",
+        "Marketing"
+      ]
+    },
+    {
+      "name": "product_var",
+      "values": [
+        "TS_WILDCARD_ALL"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "type": "LOGICAL_TABLE",
+      "identifier": "35aa85fe-fbb4-4862-a335-f69679ebb6e0"
+    }
+  ]
+}'
+----
+
+If the request is successful, ThoughtSpot generates a token and sends the  token details in the API response.
+
+[NOTE]
+====
+ABAC details are sent in a JWT that can be used as a bearer token for cookieless trusted authentication, REST API calls, or as a sign-in token to start a session. JWTs are compressed by default to handle large payloads. It is recommended to keep the compression enabled to ensure all JWT tokens can get properly interpreted by the application regardless of their size, and to obfuscate the values passed in the JWT payload. If you want to disable it, contact ThoughtSpot Support.
+====
+
+=== Verify the variable assignment
+
+To verify the variable assignment, use the `POST /api/rest/2.0/users/search` API call and check `variable_values` in the user properties in the API response.
+
+[source,JSON]
+----
+//...
+{
+  "variable_values": {
+    "821119045": {
+      "ALL": {
+        "variable_values": [
+          {
+            "name": "country_var",
+            "values": [
+              "Japan",
+              "Singapore",
+              "Australia"
+            ]
+          },
+          {
+            "name": "department_var",
+            "values": [
+              "Sales",
+              "Marketing"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
+----
+
+To verify the security entitlements, start a user session using the JWT and inspect the generated SQL for your query or visualization.
+
+== Verify the entitlements
+To verify the entitlements:
+
+. Log in to your app with a user account that does not have the *Can administer and bypass RLS* privilege, and initiate the user session with the ABAC token.
+. Access a Liveboard, Saved Answer, or start a new search query.
+. Inspect the generated SQL for your query or visualization.
+. Verify the rules and check whether only the permitted rows are displayed.
+. Verify whether data is displayed when no variable values are defined.
+. Repeat the steps for different variable assignments to confirm the RLS rule is enforced as expected for all scenarios.
+
+== Additional resources
+
+* For information about variables and variable APIs, see link:https://docs.thoughtspot.com/cloud/latest/rls-variables-reference[Variables] and xref:variables.adoc[Variable APIs].
+* For information about RLS rules,see xref:rls-rules.adoc[RLS Rules] and  link:https://docs.thoughtspot.com/cloud/latest/security-rls[ThoughtSpot Product Documentation, window=_blank].

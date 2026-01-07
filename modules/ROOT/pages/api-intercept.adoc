@@ -1,0 +1,268 @@
+= Intercept API and data fetch requests
+:toc: true
+:toclevels: 2
+
+:page-title: Intercept API calls from embedded components
+:page-pageid: api-search-intercept
+:page-description: Developers can intercept and control API calls originating from the embedded ThoughtSpot components
+
+Developers can intercept data fetch and other API requests initiated by the embedded ThoughtSpot application using the following features:
+
+* Intercept data fetch requests: +
+To enable interception of search execution requests by search embed or full application embed, use the `isOnBeforeGetVizDataInterceptEnabled` attribute. When enabled, you can implement custom logic using the `OnBeforeGetVizDataIntercept` embed event, allow or block search requests, and show custom messages to users.
+
+* Intercept a specific API call or all requests: +
+If you want to intercept other API calls initiated by the embedded application, define the URLs that you want to intercept in the `interceptUrls` attribute and handle interception using the `ApiIntercept` embed event.
+
+Developers can use these interception features for:
+
+* Custom data handling
+* Securing sensitive data before sending a response
+* Debugging API failures or delays
+* Integrating with external systems or applying business logic before data is rendered
+
+== Intercepting data fetch requests
+
+To enable interception of data fetch requests, set the `isOnBeforeGetVizDataInterceptEnabled` attribute to `true` in the SDK.
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed', {
+  //...viewConfig,
+  isOnBeforeGetVizDataInterceptEnabled: true,
+  //...
+});
+----
+
+When enabled, you can intercept and control search execution and data fetch requests, and implement a custom logic to trigger a response when the  `EmbedEvent.OnBeforeGetVizDataIntercept` event is emitted.
+
+The following example blocks the search request and returns a custom error message.
+
+[source,JavaScript]
+----
+embed.on(EmbedEvent.OnBeforeGetVizDataIntercept,
+(payload, responder) => {
+    responder({
+        data: {
+            execute: false, // Block the search from executing
+            error: {
+                // Custom error message shown to the user when the search is blocked
+                errorText: "This search query cannot be run. Please contact your administrator for more details."
+            }
+        }
+    })
+})
+----
+
+The following example blocks the search only if the query contains both `sales` and `county`; otherwise, it allows the search to proceed. It also provides an error message explaining why the search was blocked:
+
+[source,JavaScript]
+----
+embed.on(EmbedEvent.OnBeforeGetVizDataIntercept,
+(payload, responder) => {
+    const query = payload.data.data.answer.search_query
+    responder({
+        data: {
+            // Allow the search only if the query does NOT include both 'sales' AND 'county'
+            execute: !(query.includes("sales") && query.includes("county")),
+            error: {
+                // Custom error message and description shown if the search is blocked
+                errorText: "Error Occurred",
+                errorDescription: "You can't use this query :" + query +
+                ". The 'sales' measures can never be used at the 'county' level. Please try another measure, or remove 'county' from your search."
+            }
+        }
+    })
+})
+----
+
+== Intercept specific URLs or all API calls
+
+The API intercept feature lets you intercept API calls made by the embedded application,  modify or block requests, and provide custom responses before they are sent to the backend.
+
+////
+=== Enable API interception
+
+To enable this feature on your embed, you must set the `enableApiIntercept` flag to `true` in the SDK.
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed', {
+  //...viewConfig,
+  enableApiIntercept: true,
+  //...
+});
+----
+////
+
+To intercept API requests from specific URLs, define the URLs in the `interceptUrls` array:
+
+Valid values for `interceptUrls` are:
+
+** `ALL` - Allows intercepting all API requests +
+** `AnswerData` - Allows intercepting APIs that fetch data for a search query or visualization. +
+** `LiveboardData` - Allows intercepting APIs requesting data for the embedded Liveboard.
+
+You can also set a specific URL that you want to intercept by specifying the array in the following format:
+
+`interceptUrls: [Type.AnswerData, '{URL-to-intercept}']`
+
+[NOTE]
+====
+You must specify at least one API type or URL in the array for interception to be effective. If `interceptUrls` is set as an empty array, no URLs will be intercepted.
+====
+
+=== Intercept timeout threshold
+To set a threshold for the interception handling, configure the `interceptTimeout` value in milliseconds. The default value is 30000. If the interception is not handled within the configured threshold, the API returns an error.
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed', {
+  ...viewConfig,
+  interceptUrls: [InterceptedApiType.AnswerData],
+  interceptTimeout: 2000,
+});
+----
+
+=== Event handling with custom workflows
+
+To listen to the API intercept event and trigger custom workflows, use `EmbedEvent.ApiIntercept`. You can implement a custom workflow or logic to handle interception and respond when the event is emitted. The structure of the response determines whether the user sees an error or receives custom data instead of the original API result.
+
+The following code intercepts the API call and blocks its execution. It returns an error message when the `EmbedEvent.ApiIntercept` event is emitted.
+
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.ApiIntercept, (payload, responder) => {
+    console.log('payload', payload); // Log the intercepted API call payload for debugging.
+    responder({
+        data: {
+            execute: false, // Block the API call from proceeding.
+            error: {
+                errorText: 'Error Occurred', // Provide an error message indicating the API call was blocked.
+            }
+        }
+    })
+})
+----
+
+The following example returns a detailed error response structure when an intercepted call is blocked, and the `EmbedEvent.ApiIntercept` event is emitted.
+
+[source,JavaScript]
+----
+embed.on(EmbedEvent.ApiIntercept, (payload, responder) => {
+    console.log('payload', payload); // Log the intercepted API call payload for debugging.
+    responder({
+        data: {
+            execute: false, // Block the API call from proceeding.
+            response: {
+               body: {
+                   errors: [{
+                     title: 'Error Occurred', // Error title shown to the user.
+                     description: 'Error Description', // Detailed error description.
+                     isUserError: true, // Indicates this is a user-facing error.
+                   }],
+                   data: {}, // Optionally include additional data in the response.
+               },
+            }
+        }
+    })
+})
+----
+
+The following example returns a custom response when an intercepted call is blocked and the `EmbedEvent.ApiIntercept` event is emitted.
+
+[source,JavaScript]
+----
+embed.on(EmbedEvent.ApiIntercept, (payload, responder) => {
+    console.log('payload', payload); // Log the intercepted API call payload for debugging.
+    responder({
+        data: {
+            execute: false, // Block the API call from proceeding.
+            response: {
+               body: {
+                   data: { // You can provide a custom data object here to override the API response.
+                   },
+               }
+            }
+        }
+    })
+})
+----
+
+== Use both methods for comprehensive interception
+To provide comprehensive control over data access and workflow customization, use both data fetch and API request interception properties in the SDK. In such configurations, API interception settings allow developers to intercept and manage API calls made by the embedded component, while `isOnBeforeGetVizDataInterceptEnabled` allows intercepting data fetch requests for visualizations and search queries before they are executed.
+
+[source,JavaScript]
+----
+const embed = new SearchEmbed('#embed', {
+  //...viewConfig,
+  isOnBeforeGetVizDataInterceptEnabled: true,
+  interceptUrls: [InterceptedApiType.AnswerData],
+  interceptTimeout: 2000,
+});
+----
+
+The following example shows how to handle events when using both methods of interception:
+
+[source,JavaScript]
+----
+// Intercept visualization data fetch before execution
+embed.on(EmbedEvent.OnBeforeGetVizDataIntercept, (payload, responder) => {
+    // Extract the search query from the payload
+    const searchQuery = payload.data.data.answer.search_query;
+
+    // Block execution if the query contains a restricted column
+    if (searchQuery.includes('restricted_column')) {
+        responder({
+            data: {
+                execute: false,
+                error: {
+                    errorText: 'Query contains restricted columns',
+                    errorDescription: 'Please modify your search to exclude restricted data.',
+                },
+            },
+        });
+    } else { // Allow execution if no restricted columns are present
+        responder({ data: { execute: true } });
+    }
+});
+
+// Intercept API calls
+embed.on(EmbedEvent.ApiIntercept, (payload, responder) => {
+    // Intercept AnswerData API calls
+    if (payload.urlType === InterceptedApiType.AnswerData) {
+        const requestBody = payload.init.body;
+
+        // Custom validation logic for the request body
+        if (validateRequest(requestBody)) {
+            responder({ data: { execute: true } });
+        } else {
+            // Block execution and return a custom error response
+            responder({
+                data: {
+                    execute: false,
+                    response: {
+                        body: {
+                            errors: [
+                                {
+                                    title: 'Validation Failed',
+                                    description: 'Request validation failed',
+                                    isUserError: true,
+                                },
+                            ],
+                            data: {},
+                        },
+                    },
+                },
+            });
+        }
+    } else if (payload.urlType === InterceptedApiType.LiveboardData) {
+        // Allow LiveboardData API calls by default
+        responder({ data: { execute: true } });
+    }
+});
+----
+
+== Related resources
+See the xref:EmbedEvent.adoc#_apiintercept[Event reference documentation].
+

@@ -35,27 +35,21 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '10.14.0.cl',
+            label: '10.15.0.cl',
             link: ' ',
-            subLabel: 'Cloud',
+            subLabel: 'Cloud (Latest)',
         },
         {
-            label: '10.15.0.cl',
-            link: '10.15.0.cl',
-            subLabel: 'Cloud (Now available)',
-            iframeUrl: 'https://developer-docs-10-15-0-cl.vercel.app/docs/',
+            label: '10.14.0.cl',
+            link: '10.14.0.cl',
+            subLabel: 'Cloud',
+            iframeUrl: 'https://developer-docs-10-14-0-cl.vercel.app/docs/',
         },
         {
             label: '10.13.0.cl',
             link: '10.13.0.cl',
             subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-10-13-0-cl.vercel.app/docs/',
-        },
-        {
-            label: '10.12.0.cl',
-            link: '10.12.0.cl',
-            subLabel: 'Cloud',
-            iframeUrl: 'https://developer-docs-10-12-0-cl.vercel.app/docs/',
         },
         {
             label: '10.10.0.sw',
@@ -69,30 +63,7 @@ module.exports = {
             subLabel: 'Software',
             iframeUrl: 'https://visual-embed-sdk-10-1.vercel.app/docs/',
         },
-        //{
-        //    label: '10.11.0.cl',
-        //    link: '10.11.0.cl',
-        //    subLabel: 'Cloud',
-        //    iframeUrl: 'https://developer-docs-10-11-0-cl.vercel.app/docs/',
-        //},
-        //{
-        //    label: '10.10.0.cl',
-        //     link: '10.10.0.cl',
-        //    subLabel: 'Cloud',
-        //    iframeUrl: 'https://developer-docs-10-10-0-cl.vercel.app/docs/',
-        //},
-        //{
-        //     label: '10.9.0.cl',
-        //     link: '10.9.0.cl',
-        //     subLabel: 'Cloud',
-        //     iframeUrl: 'https://developer-docs-10-9-0-cl.vercel.app/docs/',
-        //},
-        //{
-        //     label: '10.8.0.cl',
-        //     link: '10.8.0.cl',
-        //     subLabel: 'Cloud',
-        //     iframeUrl: 'https://developer-docs-10-8-0-cl.vercel.app/docs',
-        //},
+
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
