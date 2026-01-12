@@ -155,38 +155,30 @@ const _indent = (
 
 // All the parse functions are to be used internally (its used to get sub content)
 class TypeDocInternalParser {
-    static convertToItalic = (name: string | undefined) =>
-        name ? `_${name}_` : '';
+  static convertToItalic = (name: string | undefined) => (name ? `_${name}_` : '');
 
-    static convertNameToLink: (
-        node: string | undefined,
-        includeParent?: boolean,
-    ) => string;
+  static convertNameToLink: (node: string | undefined, includeParent?: boolean) => string;
 
-    static GITHUB_LINK =
-        'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
+  static GITHUB_LINK = 'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
 
-    static covertTypeDocText = (text: string) => {
+  static covertTypeDocText = (text: string) => {
     // 1) Convert Markdown links -> AsciiDoc links
-       let updated = text.replace(
-       /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
-       'link:$2[$1]',
+    const updated = text.replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+      'link:$2[$1]',
     );
 
     // 2) Existing logic: convert {@link Name.hash} -> xref:...
-       const matches = updated.match(/{@link\s[^{]+}/g);
-       if (!matches) return updated;
+    const matches = updated.match(/{@link\s[^{]+}/g);
+    if (!matches) return updated;
 
-       const updatedText = matches.reduce((prevUpdatedText, curLinkText) => {
-       const linkTo = curLinkText.split(/\s/)[1].replace('}', '');
-       const newLinkText = this.convertNameToLink(linkTo, true);
-       if (!newLinkText) return prevUpdatedText;
-       return prevUpdatedText.replace(curLinkText, newLinkText);
+    return matches.reduce((prevUpdatedText, curLinkText) => {
+      const linkTo = curLinkText.split(/\s/)[1].replace('}', '');
+      const newLinkText = this.convertNameToLink(linkTo, true);
+      if (!newLinkText) return prevUpdatedText;
+      return prevUpdatedText.replace(curLinkText, newLinkText);
     }, updated);
-
-    return updatedText;
-    };
-};
+  };
 
     // function to parse a tag
     static parseTag(tag: TypeDocCommentTag): string {
