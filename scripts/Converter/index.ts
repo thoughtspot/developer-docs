@@ -167,21 +167,26 @@ class TypeDocInternalParser {
         'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
 
     static covertTypeDocText = (text: string) => {
-        // convert all {@link Name.hash}
-        // to xref:Name.adoc#hash[Name]
-        const matches = text.match(/{@link\s[^{]+}/g);
-        if (!matches) return text;
-        const updatedText = matches?.reduce((prevUpdatedText, curLinkText) => {
-            const linkTo = curLinkText.split(/\s/)[1].replace('}', '');
-            const newLinkText = this.convertNameToLink(linkTo, true);
+    // 1) Convert Markdown links -> AsciiDoc links
+        let updated = text.replace(
+        /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+        'link:$2[$1]',
+    );
 
-            if (!newLinkText) return prevUpdatedText;
+    // 2) Existing logic: convert {@link Name.hash} -> xref:...
+    const matches = updated.match(/{@link\s[^{]+}/g);
+       if (!matches) return updated;
 
-            return prevUpdatedText.replace(curLinkText, newLinkText);
-        }, text);
+    const updatedText = matches.reduce((prevUpdatedText, curLinkText) => {
+       const linkTo = curLinkText.split(/\s/)[1].replace('}', '');
+       const newLinkText = this.convertNameToLink(linkTo, true);
+       if (!newLinkText) return prevUpdatedText;
+       return prevUpdatedText.replace(curLinkText, newLinkText);
+    }, updated);
 
-        return updatedText;
-    };
+    return updatedText;
+   };
+};
 
     // function to parse a tag
     static parseTag(tag: TypeDocCommentTag): string {
