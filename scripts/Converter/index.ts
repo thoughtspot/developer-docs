@@ -195,7 +195,7 @@ class TypeDocInternalParser {
         if (tag.tag === 'example') return `${tag.text}\n`;
 
         if (tag.tag === 'param') {
-            return `\nParameter::\n${tag.text}\n`;
+            return `\nParameter::\n${this.covertTypeDocText(tag.text)}\n`;
         }
         if (tag.tag === 'deprecated') {
             return `[deprecated]#Deprecated : ${tag.text.replace(
