@@ -173,7 +173,7 @@ class TypeDocInternalParser {
     if (!matches) return updated;
 
     return matches.reduce((prevUpdatedText, curLinkText) => {
-      const linkTo = curLinkText.split(/\s/)[1].replace('}', '');
+      const linkTo = curLinkText.split(/\s/)[1].replace(/}/g, '');
       const newLinkText = this.convertNameToLink(linkTo, true);
       if (!newLinkText) return prevUpdatedText;
       return prevUpdatedText.replace(curLinkText, newLinkText);
