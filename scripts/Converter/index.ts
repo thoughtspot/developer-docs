@@ -168,16 +168,16 @@ class TypeDocInternalParser {
 
     static covertTypeDocText = (text: string) => {
     // 1) Convert Markdown links -> AsciiDoc links
-        let updated = text.replace(
-        /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
-        'link:$2[$1]',
+       let updated = text.replace(
+       /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+       'link:$2[$1]',
     );
 
     // 2) Existing logic: convert {@link Name.hash} -> xref:...
-    const matches = updated.match(/{@link\s[^{]+}/g);
+       const matches = updated.match(/{@link\s[^{]+}/g);
        if (!matches) return updated;
 
-    const updatedText = matches.reduce((prevUpdatedText, curLinkText) => {
+       const updatedText = matches.reduce((prevUpdatedText, curLinkText) => {
        const linkTo = curLinkText.split(/\s/)[1].replace('}', '');
        const newLinkText = this.convertNameToLink(linkTo, true);
        if (!newLinkText) return prevUpdatedText;
@@ -185,7 +185,7 @@ class TypeDocInternalParser {
     }, updated);
 
     return updatedText;
-   };
+    };
 };
 
     // function to parse a tag
