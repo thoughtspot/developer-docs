@@ -34,11 +34,14 @@ const VersionIframe: React.FC<VersionIframeProps> = ({
             } else if (mainUrlParams.has('pageId')) {
                 url.searchParams.set('pageid', mainUrlParams.get('pageId'));
             }
+            if (location?.hash) {
+                url.hash = location?.hash;
+            }
             url.searchParams.set('_iframe', '1');
         }
 
         return url.toString();
-    }, [iframeUrl, isDarkMode, location?.search]);
+    }, [iframeUrl, isDarkMode, location?.search, location?.hash]);
 
     return (
         <div className="version-iframe-container">
