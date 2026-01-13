@@ -23,6 +23,7 @@ import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './playGround/RESTAPI';
 import GraphQLPlayGround from './playGround/GraphQL';
 import { AskDocs } from './askDocs';
+import AnnouncementBanner from '../AnnouncementBanner';
 import {
     TS_HOST_PARAM,
     TS_ORIGIN_PARAM,
@@ -34,6 +35,7 @@ import {
     DEFAULT_PREVIEW_HOST,
     DEFAULT_APP_ROOT,
     HOME_PAGE_ID,
+    HOME_ANNOUNCEMENT_BANNER,
     CUSTOM_PAGE_ID,
     BUILD_ENVS,
     VERSION_DROPDOWN,
@@ -511,6 +513,40 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             : { height: '0px' }
                     }
                 ></div>
+                {isPublicSiteOpen && (
+                    <AnnouncementBanner
+                        enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
+                        message={
+                            <span>
+                                {HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                    HOME_ANNOUNCEMENT_BANNER?.linkText && (
+                                        <a
+                                            className="announcementBanner__link"
+                                            href={HOME_ANNOUNCEMENT_BANNER.linkHref}
+                                            target={
+                                                HOME_ANNOUNCEMENT_BANNER?.openInNewTab
+                                                    ? '_blank'
+                                                    : undefined
+                                            }
+                                            rel={
+                                                HOME_ANNOUNCEMENT_BANNER?.openInNewTab
+                                                    ? 'noreferrer'
+                                                    : undefined
+                                            }
+                                        >
+                                            {HOME_ANNOUNCEMENT_BANNER.linkText}
+                                        </a>
+                                    )}
+                                {(HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                    HOME_ANNOUNCEMENT_BANNER?.linkText) && ' '}
+                                {HOME_ANNOUNCEMENT_BANNER?.message ||
+                                    (VERSION_DROPDOWN?.[0]?.label
+                                        ? `Version ${VERSION_DROPDOWN[0].label} is now available!`
+                                        : 'A new version is now available!')}
+                            </span>
+                        }
+                    />
+                )}
                 <main
                     className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}

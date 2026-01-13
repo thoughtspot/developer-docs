@@ -1,3 +1,5 @@
+const PRE_GA_RELEASE_URL = process.env.GATSBY_PRE_GA_RELEASE_URL;
+
 module.exports = {
     SITE_URL: 'https://developers.thoughtspot.com/docs',
     SITE_PREFIX: 'docs',
@@ -13,6 +15,16 @@ module.exports = {
     NOT_FOUND_PAGE_ID: '404-error',
     HOME_PAGE_ID: 'introduction',
     NOT_FOUND_GO_HOME_PAGE_ID: 'introduction',
+    HOME_ANNOUNCEMENT_BANNER: {
+        enabled: true,
+        message:
+            'is now available. Read about the new features and enhancements.',
+        // During pre-GA, set GATSBY_PRE_GA_RELEASE_URL to an http(s) URL to override
+        // the GA link and open in a new tab.
+        linkHref: PRE_GA_RELEASE_URL || '/docs/whats-new',
+        linkText: 'Version 26.2.0.cl',
+        openInNewTab: Boolean(PRE_GA_RELEASE_URL),
+    },
     TYPE_DOC_PREFIX: 'typedoc',
     DEFAULT_HOST: 'https://try-everywhere.thoughtspot.cloud',
     DEFAULT_PREVIEW_HOST: 'https://try-everywhere.thoughtspot.cloud/v2',
