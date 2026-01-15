@@ -1,6 +1,6 @@
 = Security settings
 :toc: true
-:toclevels: 2
+:toclevels: 3
 
 :page-title: Security settings
 :page-pageid: security-settings
@@ -21,7 +21,7 @@ To avoid this issue, ThoughtSpot recommends the following:
 * If you are using a ThoughtSpot Cloud instance, set up your instance to the same domain as your host application. For more information, see link:https://docs.thoughtspot.com/cloud/latest/custom-domains[Custom domain configuration, window=_blank].
 * If you are using authentication methods that rely on cookies, xref:_enable_partition_cookies[enable partition cookies].
 
-== Security settings in ThoughtSpot
+== Configure security settings via the ThoughtSpot UI
 
 Users with administration privileges can configure security settings on the Security settings page of the ThoughtSpot UI. Note that the following settings on the **Security Settings** page will appear as locked for ThoughtSpot Analytics application users and will require an embedding license:
 
@@ -31,7 +31,7 @@ Users with administration privileges can configure security settings on the Secu
 * xref:configure-saml.adoc#saml-redirect[SAML redirect domains]
 * xref:trusted-authentication.adoc[Trusted authentication]
 
-=== Security settings for Orgs
+==== Security settings for Orgs
 
 On ThoughtSpot instances with Orgs, security settings can be managed at two levels:
 
@@ -86,7 +86,7 @@ Each Org can have a separate secret key, which can be used to authenticate users
 ====
 
 
-== CSP allowlists
+=== CSP allowlists
 
 To allow another application to embed ThoughtSpot, you must xref:security-settings.adoc#csp-viz-embed-hosts[add your host application domain as a CSP Visual Embed host].
 
@@ -98,7 +98,7 @@ If your instance has Orgs configured, note that the default Org on your instance
 ====
 
 [#csp-viz-embed-hosts]
-=== Add CSP visual embed hosts
+==== Add CSP visual embed hosts
 To allow your host domain to set the `frame-ancestors` CSP policy header and embed a ThoughtSpot object within your application frame, add your application domain as a CSP visual embed host.
 
 . On your ThoughtSpot application instance, go to *Develop* page.
@@ -114,7 +114,7 @@ Only users with a valid embed license can add Visual Embed hosts.
 ====
 
 [#csp-connect-src]
-=== Add URLs to CSP connect-src allowlist
+==== Add URLs to CSP connect-src allowlist
 If you plan to use a custom action or webhook to send data to an external endpoint or application, you must add the domains of the target endpoints or applications to the `CSP connect-src` allowlist.
 
 . On your ThoughtSpot application instance, go to *Develop* page.
@@ -125,7 +125,7 @@ If you plan to use a custom action or webhook to send data to an external endpoi
 . Click *Save changes*.
 
 [#csp-trusted-domain]
-=== Add other trusted domains
+==== Add other trusted domains
 
 To import images, fonts, and stylesheets from external sites, or load the content from an external site using an iFrame element, you must add the source URLs as trusted domains in the CSP allowlist.
 For example, in the Liveboard Note tiles, if you want to insert an image from an external site or embed content from an external site in an iFrame, you must add domain URLs of these sites to the CSP allowList. Similarly, to import fonts and custom styles from an external source, you must add the source URL as a trusted domain in ThoughtSpot.
@@ -148,7 +148,7 @@ Add the domains from which you want host scripts. For more information, see xref
 Add the iframe source URL domains.
 ////
 
-=== Add permitted iFrame domains
+==== Add permitted iFrame domains
 Features such as link:https://docs.thoughtspot.com/software/latest/liveboard-notes[Liveboard Note tiles, window=_blank] and link:https://docs.thoughtspot.com/cloud/latest/chart-custom[custom charts, window=_blank] allow iFrame content. If you are planning to embed content from an external site, make sure the domain URLs of these sites are added to the iFrame domain allowlist:
 
 . On your ThoughtSpot application instance, go to *Develop* page.
@@ -160,7 +160,7 @@ Features such as link:https://docs.thoughtspot.com/software/latest/liveboard-not
 
 
 [#cors-hosts]
-=== Enable CORS
+==== Enable CORS
 
 To allow your embedding application to call ThoughtSpot, access its resources, and render embedded content, add your host application domain URL as a trusted host for CORS.
 
@@ -183,7 +183,7 @@ To add domain names to the CORS allowlist, follow these steps:
 . Click *Save changes*.
 
 [#csp-cors-hosts]
-=== Domain name format for CSP and CORS configuration
+==== Domain name format for CSP and CORS configuration
 
 [IMPORTANT]
 ====
@@ -282,10 +282,10 @@ a|+++Wildcard (*) for port+++
 |====
 
 
-== Block access to non-embedded ThoughtSpot pages
+=== Block access to non-embedded ThoughtSpot pages
 If you have embedded ThoughtSpot content in your app, you may want your users to access only the ThoughtSpot pages embedded within the context of your host app. ThoughtSpot allows administrators to restrict user access to non-embedded application pages from the embedding application context or selectively grant access to specific user groups. For information, see xref:selective-user-access.adoc[Control User Access].
 
-== Enable partitioned cookies
+=== Enable partitioned cookies
 Many web browsers do not allow third-party cookies. If you are using authentication methods that rely on cookies, users will not be able to access the embedded content when browsers block third-party cookies. Therefore, ThoughtSpot recommends using xref:trusted-auth-sdk.adoc[cookieless authentication] in production environments.
 
 However, if your implementation uses cookie-based authentication or xref:embed-authentication.adoc#none[AuthType.None], ensure that you enable partitioned cookies:
@@ -304,5 +304,35 @@ With partitioned cookies enabled, when a user logs in to ThoughtSpot and accesse
 Safari blocks all third-party cookies and does not support partitioned cookies. You can switch to a different browser that supports partitioned cookies, or use cookieless authentication in your embedding implementation.
 ====
 
-== Trusted authentication
+=== Trusted authentication
 See xref:trusted-authentication.adoc[Trusted authentication] and xref:_secret_key_management[Secret key management].
+
+== Configure security settings via API
+
+* For REST API v2 operations, the Org context is determined based on the authentication token used in your API requests. Ensure you log in to the appropriate Org context from which you want to send API requests.
+* Ensure that you have developer or administrator privileges for the Org.
+
+=== Configure Security Settings
+Security settings can be configured for the ThoughtSpot instance and for the Org as well. To configure security settings send a `POST` request to `POST /api/rest/2.0/system/security-settings/configure` API endpoint.
+
+[NOTE]
+====
+* When security settings are defined at both levels, the Org-level settings take precedence over cluster-level settings within that Org.
+* If the configuration settings are available at both levels and are configured only at the All Orgs level, the Orgs on the instance will inherit these settings.
+* If the settings are not defined either at the All Orgs level or per Org, the system defaults will be applied.
+====
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|cluster_preferences a|__String__. Required. A JSON map of customizable security settings for the ThoughtSpot instance.
+|enable_partitioned_cookies a|__Boolean__.
+|org_identifier a|__String__. Required. The unique ID or name of the Org for which the email customization is being updated.
+|=====
+
+
