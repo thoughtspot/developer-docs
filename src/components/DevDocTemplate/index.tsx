@@ -251,6 +251,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     }
 
                     url.searchParams.set('pageid', e.data.params.pageid);
+                    const hash = e.data.subsection;
+                    if (hash) {
+                        url.hash = hash;
+                    }
                     window.history.replaceState({}, '', url.toString());
                 }
             }
