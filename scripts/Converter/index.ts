@@ -155,33 +155,30 @@ const _indent = (
 
 // All the parse functions are to be used internally (its used to get sub content)
 class TypeDocInternalParser {
-    static convertToItalic = (name: string | undefined) =>
-        name ? `_${name}_` : '';
+  static convertToItalic = (name: string | undefined) => (name ? `_${name}_` : '');
 
-    static convertNameToLink: (
-        node: string | undefined,
-        includeParent?: boolean,
-    ) => string;
+  static convertNameToLink: (node: string | undefined, includeParent?: boolean) => string;
 
-    static GITHUB_LINK =
-        'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
+  static GITHUB_LINK = 'https://github.com/thoughtspot/visual-embed-sdk/blob/main/src';
 
-    static covertTypeDocText = (text: string) => {
-        // convert all {@link Name.hash}
-        // to xref:Name.adoc#hash[Name]
-        const matches = text.match(/{@link\s[^{]+}/g);
-        if (!matches) return text;
-        const updatedText = matches?.reduce((prevUpdatedText, curLinkText) => {
-            const linkTo = curLinkText.split(/\s/)[1].replace('}', '');
-            const newLinkText = this.convertNameToLink(linkTo, true);
+  static covertTypeDocText = (text: string) => {
+    // 1) Convert Markdown links -> AsciiDoc links
+    const updated = text.replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+      'link:$2[$1]',
+    );
 
-            if (!newLinkText) return prevUpdatedText;
+    // 2) Existing logic: convert {@link Name.hash} -> xref:...
+    const matches = updated.match(/{@link\s[^{]+}/g);
+    if (!matches) return updated;
 
-            return prevUpdatedText.replace(curLinkText, newLinkText);
-        }, text);
-
-        return updatedText;
-    };
+    return matches.reduce((prevUpdatedText, curLinkText) => {
+      const linkTo = curLinkText.split(/\s/)[1].replace(/}/g, '');
+      const newLinkText = this.convertNameToLink(linkTo, true);
+      if (!newLinkText) return prevUpdatedText;
+      return prevUpdatedText.replace(curLinkText, newLinkText);
+    }, updated);
+  };
 
     // function to parse a tag
     static parseTag(tag: TypeDocCommentTag): string {
@@ -195,7 +192,7 @@ class TypeDocInternalParser {
         if (tag.tag === 'example') return `${tag.text}\n`;
 
         if (tag.tag === 'param') {
-            return `\nParameter::\n${tag.text}\n`;
+            return `\nParameter::\n${this.covertTypeDocText(tag.text)}\n`;
         }
         if (tag.tag === 'deprecated') {
             return `[deprecated]#Deprecated : ${tag.text.replace(
