@@ -18,15 +18,18 @@ const Docmap = (props: {
         const tocEl = doc.querySelector('#toc');
         if (tocEl) {
             const { hash } = props.location;
+            setToc(tocEl.innerHTML);
             if (hash) {
                 const ele = document.querySelector(hash);
                 if (ele) {
-                    document.documentElement.scrollTop =
-                        (ele as HTMLElement).offsetTop -
-                        INTRO_WRAPPER_MARGIN_TOP;
+                    ele.scrollIntoView({
+                        block: 'start',
+                    });
+
+                    // Apply offset to keep header visible
+                    window.scrollBy(0, -70);
                 }
             }
-            setToc(tocEl.innerHTML);
         } else {
             setToc('');
         }
@@ -50,7 +53,10 @@ const Docmap = (props: {
         toc !== '' && (
             <div className="docmapLinks">
                 <p className="tocTitle">{t('RIGHT_NAV_SIDERBAR_TITLE')}</p>
-                <div data-testid="toc" dangerouslySetInnerHTML={{ __html: toc }} />
+                <div
+                    data-testid="toc"
+                    dangerouslySetInnerHTML={{ __html: toc }}
+                />
             </div>
         )
     );

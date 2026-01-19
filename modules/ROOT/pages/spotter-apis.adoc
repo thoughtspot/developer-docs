@@ -1,42 +1,123 @@
-= Generate Answers from AI APIs [beta betaBackground]^Beta^
+= Spotter AI APIs
 :toc: true
-:toclevels: 3
+:toclevels: 2
 
 :page-title: Spotter APIs
 :page-pageid: spotter-api
 :page-description: You can use Spotter REST APIs to receive Answers for your analytical queries sent  through the conversational experience with ThoughtSpot.
 
-ThoughtSpot provides a set of Spotter AI APIs [beta betaBackground]^Beta^ to create a conversation session with Spotter, ask follow-up questions, and generate Answers for their analytic queries.
-
-This article describes how to use ThoughtSpot REST APIs for the following operations:
-
-* xref:spotter-apis.adoc#createManageConversations[Create a conversation and ask follow-up questions]
-* xref:spotter-apis.adoc#_generate_a_single_answer[Generate a single Answer for a natural language query]
-* xref:spotter-apis.adoc#process_results[Process results generated from Spotter APIs]
-
-[#createManageConversation]
-== Create and manage conversations
-Use the following Spotter AI APIs to initiate a conversation with Spotter and ask follow-up questions.
-
-* xref:spotter-apis.adoc#_create_conversation[Create a conversation session]
-* xref:spotter-apis.adoc#ask_question[Send a question to an ongoing conversation]
+ThoughtSpot's Spotter AI APIs [beta betaBackground]^Beta^ allow users to query and explore data through conversational interactions.
 
 [NOTE]
 ====
-The Spotter AI APIs are in beta and disabled by default on ThoughtSpot instances. To enable these APIs on your instance, contact ThoughtSpot Support.
+The Spotter AI APIs are in Beta and disabled by default on ThoughtSpot instances. To enable these APIs on your instance, contact ThoughtSpot Support.
 ====
 
+== Overview
+Spotter AI APIs collectively support natural-language-driven analytics, context-aware and guided data analysis, and integration with agentic systems.
+
+The key capabilities of the Spotter APIs include the following:
+
+* Initiating and managing conversational sessions
+* Processing natural-language queries and interpreting user intent
+* Generating analytical responses, insights, and visualizations
+//* Recommending relevant datasets or data sources
+* Decomposing complex user queries
+
+Spotter manages conversation sessions, context tracking, and response generation for user-submitted queries. The Spotter APIs are designed for use in Spotter-driven analytics and also for agentic interactions within an orchestrated agent framework.
+
+=== Locale settings for API requests
+
+When using the xref:spotter-apis.adoc#_generate_a_single_answer[Single Answer] and xref:spotter-apis.adoc#_send_a_question_to_generate_answer[Send message] APIs, the locale used for API requests depends on your application's locale settings:
+
+* If your application is set to "Use browser language," the API will not apply the default locale. In this case, you must explicitly include the desired locale code in the `Accept-Language` header of your API request. If you do not specify the locale, the API may not return responses in the expected language or regional format.
+* If you have set a specific locale in your ThoughtSpot instance or user profile, the API will use this locale to generate responses, overriding the browser or OS locale.
+
+To ensure consistent localization, set the `Accept-Language` header in your API requests when relying on browser language detection, or configure the locale explicitly in the user profile settings in ThoughtSpot.
+
+=== API endpoints
+Each of the Spotter AI APIs serves a specific function:
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Category| API endpoints
+|Conversational analytics with Spotter (Classic) a|
+
+* `POST /api/rest/2.0/ai/conversation/create` +
+xref:spotter-apis.adoc#_create_a_conversation_session[Creates a conversation session] with Spotter to generate Answers from a specific data Model. The resulting session sets the context for subsequent queries and responses.
+
+* `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse` +
+Allows xref:spotter-apis.adoc#_send_a_query_to_a_conversation_session[Sending a message or follow-up query] to an ongoing conversation session.
+
+* `POST /api/rest/2.0/ai/answer/create` +
+xref:spotter-apis.adoc#_generate_a_single_answer[Generates an answer] for a natural language query specified in the API request.
+
+|Advanced analytics and agentic interaction a| * `POST /api/rest/2.0/ai/agent/conversation/create` +
+xref:spotter-apis.adoc#_create_a_conversation_session_with_spotter_agent[Creates a conversation session with the Spotter agent] to generate Answers for the specified data context. This API endpoint is designed for agentic or orchestrated frameworks that leverage Spotter agent's capabilities for advanced analytics, context-aware conversations, and data literacy. +
+__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
+
+* `POST /api/rest/2.0/ai/agent/converse/sse` +
+xref:spotter-apis.adoc#_send_a_question_and_generate_streaming_responses[Streams responses], including tokens and visualizations, for a specific conversation context. This API endpoint can be used for real-time agentic interactions and orchestrated experiences. +
+__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
+
+* `POST /api/rest/2.0/ai/agent/{conversation_identifier}/converse` +
+xref:spotter-apis.adoc#_send_queries_to_a_conversation_session_with_spotter_agent[Sends a message] to an ongoing conversation session with Spotter agent. +
+__Available on ThoughtSpot Cloud instances from 10.15.0.cl onwards__.
+
+|Data literacy and guided analysis a|
+//* `POST /api/rest/2.0/ai/data-source-suggestions` +
+//xref:spotter-apis.adoc#_get_data_source_suggestions[Returns a list of relevant data sources], such as Models, based on a query and thus helping users and agents choose the most appropriate data source for analytics. +
+//__Available on ThoughtSpot Cloud instances from 10.15.0.cl onwards__.
+
+* `POST /api/rest/2.0/ai/relevant-questions/`] +
+xref:spotter-apis.adoc#_get_relevant_questions[Decomposes a user query] into relevant sub-questions. Guides users to explore data more deeply for a  comprehensive analysis. +
+__Available on ThoughtSpot Cloud instances from 10.13.0.cl onwards__.
+
+|NL instructions to coach Spotter a| * `POST /api/rest/2.0/ai/instructions/set` +
+xref:spotter-apis.adoc#_set_nl_instructions[Sets natural language instructions] on a specific data model to guide Spotter and enhance the quality of Spotter-generated responses. +
+__Available on ThoughtSpot Cloud instances from 10.15.0.cl onwards__.
+
+* `POST /api/rest/2.0/ai/instructions/get` +
+xref:spotter-apis.adoc#_retrieve_nl_instructions_assigned_to_a_model[Retrieves NL instructions assigned to a Model] +
+__Available on ThoughtSpot Cloud instances from 10.15.0.cl onwards__.
+|=====
+
+== Per-user API rate limits
+
+The following rate limits apply to xref:spotter-apis.adoc#_conversational_analytics_with_spotter_agent[Spotter agent APIs] per user:
+
+* A maximum of 10 conversation creation requests per minute.
+* A maximum of 30 query messages to a conversation session per minute.
+
+[width="100%" cols="2,2"]
+[options='header']
+|=====
+|API endpoint| Rate Limit (per user, per minute)
+|`/api/rest/2.0/ai/agent/conversation/create` |	10
+|`/api/rest/2.0/ai/agent/{conversation_identifier}/converse`| 30
+|`/api/rest/2.0/ai/agent/converse/sse` | 30
+||
+|=====
+
+If you are integrating these APIs in your environment, consider implementing a retry logic to handle the rate limit errors.
+
+== Conversational analytics with Spotter (Classic)
+In the Spotter classic mode, the conversation session and context will be managed by Spotter. The APIs allow users to interact directly with Spotter with no specific agentic capabilities or framework.
+
 === Create a conversation session
-To create a conversation session, send a `POST` request body with the data source ID and search token string to the `/api/rest/2.0/ai/conversation/create` API endpoint.
+To create a conversation session with Spotter, send a `POST` request to the  `/api/rest/2.0/ai/conversation/create` API endpoint. The resulting conversation session maintains the context and can be used to send queries and follow-up questions to generate answers.
 
 ==== Request parameters
+Include the following parameters in the request body:
 
 [width="100%" cols="2,4"]
 [options='header']
 |=====
 |Form parameter|Description
-|`metadata_identifier`|_String_. Required. Specify the GUID of the ThoughtSpot Worksheet or Model. The metadata object specified in the API request will be used as a data source for the conversation.
-|`tokens` __Optional__  a|_String_. To set the context for the conversation, you can specify a set of keywords as token string. For example, `[sales],[item type],[state]`.
+|`metadata_identifier`|_String_. Required. Specify the GUID of the data source objects such as ThoughtSpot Models. The metadata object specified in the API request will be used as a data source for the conversation.
+|`tokens` +
+__Optional__  a|_String_. To set the context for the conversation, you can specify a set of keywords as token string. For example, `[sales],[item type],[state]`.
 |=====
 
 ==== Example requests
@@ -51,7 +132,7 @@ curl -X POST \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "metadata_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-  "tokens": "[sales],[item type],[state]"
+  "tokens": "[sales],[item type],[Jackets]"
 }'
 ----
 
@@ -78,23 +159,48 @@ If the API request is successful, a conversation identifier is created. Note the
 {"conversation_identifier":"98f9b8b0-6224-4f9d-b61c-f41307bb6a89"}
 ----
 
+
 ////
-===== Response codes
-[width="100%" cols="2,4"]
-[options='header']
-|===
-|HTTP status code|Description
-|**200**| Successful operation
-|**400**| Invalid parameter
-|**401**| Unauthorized access
-|**500**| Internal error
-|===
+The following AI API endpoints allow you to initiate a conversation session with Spotter:
+
+If the API request is successful, the following data is sent in the API response:
+
+* `session_identifier` +
+GUID of the Answer session.
+* `generation_number` +
+Number assigned to the Answer session.
+* `message_type`
+Type of response received for the query. For example, `TSAnswer` (ThoughtSpot Answer).
+* `visualization_type` +
+The data format of the generated Answer; for example, a chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
+* `tokens` +
+Tokens generated from the natural language search query specified in the API request. These tokens can be used as input to the `/api/rest/2.0/ai/conversation/create` endpoint to set the context for a conversation session.
+
+[NOTE]
+====
+Note the session ID and generation number. To export the result generated from this API call, send these attributes in the `POST` request body to the `/api/rest/2.0/report/answer` endpoint.
+====
+
+[source,JSON]
+----
+[{
+  "session_identifier": "57784fa1-10fa-431d-8d82-a1657d627bbe",
+  "generation_number": 2,
+  "message_type": "TSAnswer",
+  "visualization_type": "Undefined",
+  "tokens": "[product], [region] = [region].'west', sort by [sales] descending"
+}]
+----
+
+== Conversational analytics with Spotter agent
+Spotter agent is an advanced, agentic version of Spotter, which supports context-aware interactions, data literacy features, and follow-up conversations for deeper analytics. Spotter agent can be used for complex reasoning and agentic interactions in an orchestrated framework.
+
 ////
 
-[#ask_question]
-=== Send questions to a conversation session
+=== Send a query to a conversation session
+To send a question to an ongoing conversation session or ask follow-up questions to , send a `POST` request body with conversation ID and query text to the `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse` API endpoint.
 
-To send a follow-up query to an ongoing conversation, send a `POST` request body with conversation ID and query text to the `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse` API endpoint.
+This API endpoint supports only the conversation sessions created using the `POST /api/rest/2.0/ai/conversation/create` API call.
 
 ==== Request parameters
 
@@ -103,8 +209,8 @@ To send a follow-up query to an ongoing conversation, send a `POST` request body
 |=====
 |Parameter|Type| Description
 |`conversation_identifier`|Path parameter|__String__. Required. Specify the GUID of the conversation received from the xref:spotter-apis.adoc#_create_a_conversation_session[create conversation API call].
-|`metadata_identifier`|Form parameter|_String_. Required. Specify the GUID of the ThoughtSpot Worksheet or Model. The metadata object specified in the API request will be used as a data source for the follow-up conversation.
-|`message`|Form parameter|_String_. Required. Specify the follow-up question as natural language query string. For example, `Sales data for Jackets`.
+|`metadata_identifier`|Form parameter|_String_. Required. Specify the GUID of the data source object, for example, Model. The metadata object specified in the API request will be used as a data source for the follow-up conversation.
+|`message`|Form parameter|_String_. Required. Specify a natural language query string. For example, `Sales data for Jackets`.
 |=====
 
 ==== Example request
@@ -114,6 +220,7 @@ To send a follow-up query to an ongoing conversation, send a `POST` request body
 curl -X POST \
   --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/conversation/03f48527-b973-4efa-81fd-a8568a4f9e78/converse'  \
   -H 'Accept: application/json' \
+  -H 'accept-language: en-US', \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
@@ -130,12 +237,12 @@ If the API request is successful, the following data is sent in the API response
 GUID of the Answer session.
 * `generation_number` +
 Number assigned to the Answer session.
-* `message_type`
+* `message_type` +
 Type of response received for the query. For example, `TSAnswer` (ThoughtSpot Answer).
-* `visualization_type`
-The data format of the generated Answer; for example, chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
+* `visualization_type` +
+The data format of the generated Answer, for example, a chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
 * `tokens` +
-Tokens generated from the natural language search query string specified in the API request. You can use these tokens as input for `query_string` in your API request to `/api/rest/2.0/searchdata` and  export the raw data of the query, or as input to `POST /api/rest/2.0/ai/conversation/create` to initiate a new conversation with a new context.
+Tokens generated from the natural language search query specified in the API request. These tokens can be used as input to the `/api/rest/2.0/ai/conversation/create` API endpoint to set the context for a conversation session.
 
 [NOTE]
 ====
@@ -157,7 +264,7 @@ Note the session ID and generation number. To export the Answer generated from t
 
 ==== Ask follow-up questions
 
-The API retains the context of previous queries when you send follow-up questions. To verify this, you can send another API request with a follow-up question to drill down the Answer data.
+The API retains the context of previous queries when you send follow-up questions. To verify this, you can send another API request with a follow-up question to drill down into the data.
 
 [source,cURL]
 ----
@@ -187,20 +294,7 @@ The API retrains the context of the initial question and returns a response:
 ]
 ----
 
-////
-===== Response codes
-[width="100%" cols="2,4"]
-[options='header']
-|===
-|HTTP status code|Description
-|**200**| Successful operation
-|**400**| Invalid parameter
-|**401**| Unauthorized access
-|**500**| Internal error
-|===
-////
-
-== Generate a single Answer
+=== Generate a single Answer
 To generate an Answer from a natural language search query, send a `POST` request to the `/api/rest/2.0/ai/answer/create` API endpoint. In the request body, include the query and the data source ID.
 
 ==== Request parameters
@@ -210,16 +304,18 @@ To generate an Answer from a natural language search query, send a `POST` reques
 |=====
 |Form parameter| Description
 |`query`|__String__. Required. Specify the string as a natural language query. For example, `Top performing products in the west coast`.
-|`metadata_identifier`|_String_. Required. Specify the GUID of the ThoughtSpot Worksheet or Model. The metadata object specified in the API request will be used as a data source for the follow-up conversation.
+|`metadata_identifier`|_String_. Required. Specify the GUID of the data source object, for example, Model. The metadata object specified in the API request will be used as a data source for the follow-up conversation.
 |=====
 
 ==== Example request
+In the following example, a query string and the model ID are included in the request body to set the context of the conversation.
 
 [source,cURL]
 ----
 curl -X POST \
   --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/answer/create'  \
   -H 'Accept: application/json' \
+  -H 'accept-language: en-US', \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN} \
   --data-raw '{
@@ -238,10 +334,10 @@ GUID of the Answer session.
 Number assigned to the Answer session.
 * `message_type`
 Type of response received for the query. For example, `TSAnswer` (ThoughtSpot Answer).
-* `visualization_type`
-The data format of the generated Answer; for example, chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
+* `visualization_type` +
+The data format of the generated Answer; for example, a chart or table. When you download this Answer, the data will be exported in the format indicated by the `visualization_type`.
 * `tokens` +
-Tokens generated from the natural language search query string specified in the API request. You can use these tokens as input for `query_string` in your API request to `/api/rest/2.0/searchdata` and  export the raw data of the query, or as input to `POST /api/rest/2.0/ai/conversation/create` to initiate a new conversation with a new context.
+Tokens generated from the natural language search query specified in the API request. These tokens can be used as input to the `/api/rest/2.0/ai/conversation/create` endpoint to set the context for a conversation session.
 
 [NOTE]
 ====
@@ -259,116 +355,971 @@ Note the session ID and generation number. To export the result generated from t
 }]
 ----
 
-////
-===== Response codes
-[width="100%" cols="2,4"]
-[options='header']
-|===
-|HTTP status code|Description
-|**200**| Successful operation
-|**400**| Invalid parameter
-|**401**| Unauthorized access
-|**500**| Internal error
-|===
-////
-[#process_results]
-== Process results generated from Spotter APIs
-You can process the results generated from Spotter APIs in the following ways:
+== Conversational analytics with Spotter agent
+Spotter agent is an advanced, agentic version of Spotter, which supports context-aware interactions, data literacy features, and follow-up conversations for deeper analytics. Spotter agent can be used for complex reasoning and agentic interactions in an orchestrated framework.
 
-* xref:spotter-apis.adoc#exportSpotterData[Export the results as CSV or PNG]
-* xref:spotter-apis.adoc#_use_tokens_generated_from_spotter_apis_as_raw_data[Use tokens generated from Spotter APIs as raw data]
+=== Create a conversation session with Spotter agent
 
-[#exportSpotterData]
-=== Export data generated from Spotter APIs
-To export results generated from Spotter APIs, use the `/api/rest/2.0/report/answer` API endpoint. In the `POST` request body, include the session ID and generation number received from the xref:spotter-apis.adoc#ask_question[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] or xref:spotter-apis.adoc#_generate_a_single_answer[`POST /api/rest/2.0/ai/answer/create`] API call.
+The `/api/rest/2.0/ai/agent/conversation/create` API endpoint allows you to initiate a new conversation session with Spotter Agent for different data contexts, such as Answers, Liveboards, or Models.
 
+[NOTE]
+====
+Clients must have at least view access to the objects specified in the API request to create a conversation context and use it for subsequent queries.
+====
 
 ==== Request parameters
+To set the context for the conversation session, you must specify the metadata type and context in the `POST` request body. Optionally, you can also define additional parameters to refine the data context and generate precise responses.
 
-[width="100%" cols="3,4"]
-[options='header']
-|=====
-|Form parameter|Description
-|`metadata_identifier` +
-__Optional__|_String_. GUID of the object to export. In this case, the metadata object ID is not required, because you will be exporting the data generated from the conversation and not a saved Answer.
-a|`session_identifier` [beta betaBackground]^Beta^ a|_String_. Required. GUID of the session identifying the conversation. The session ID is generated from a xref:spotter-apis.adoc#ask_question[POST call] to the `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse` endpoint, or when an API request is sent to the `/api/rest/2.0/ai/answer/create` endpoint to xref:_generate_a_single_answer[generate a single Answer].
-a|`generation_number` [beta betaBackground]^Beta^ +
-__Optional__ a| _Integer_. Generation number identifying the conversation. The generation number is created in response to a xref:spotter-apis.adoc#ask_question[POST call] to the `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse` endpoint, or when an API request is sent to the `/api/rest/2.0/ai/answer/create` endpoint to xref:_generate_a_single_answer[generate a single Answer].
-
-|`file_format`  +
-__Optional__|__String__. Specifies the format of the output. You can export the Spotter-generated data as PNG or CSV file. By default, the API exports this data in PNG file format.
-|=====
-
-==== Request example
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer'  \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "file_format": "CSV",
-  "session_identifier": "ee077665-08e1-4a9d-bfdf-7b2fe0ca5c79",
-  "generation_number": 2
-}'
-----
-
-==== API Response
-
-If the API request is successful, ThoughtSpot returns the data in the specified file format. You can download the file to use it later or import it into your application environment.
-
-////
-===== Response codes
 [width="100%" cols="2,4"]
 [options='header']
-|===
-|HTTP status code|Description
-|**200**| Successful operation
-|**400**| Invalid parameter
-|**401**| Unauthorized access
-|**401**| Forbidden request
-|**500**| Internal error
-|===
-////
-=== Use tokens generated from Spotter APIs as raw data
+|=====
+|Form parameter| Description
+|`metadata_context` a| Defines the data context for the conversation.
 
-For every natural language query and follow-up question, Spotter APIs return tokens in the API response. You can use these tokens as raw data to generate an Answer from ThoughtSpot via  xref:data-report-v2-api.adoc#_search_data_api[`/api/rest/2.0/searchdata`] API.
+* `type` +
+Metadata context type. The context type is mandatory. Select one of the following values:
+** `data_source` - To set a data source context for the conversation session. +
+If the context type is `data_source`, you must define the `data_source_context` in the request payload.
+** `answer` - To use an existing Spotter-generated Answer as the object. +
+If the context type is `answer`, you must define both `data_source_context` and `answer_context` in the request payload.
+** `liveboard` - To use an existing Liveboard as context. +
+If the context type is `liveboard`, you must define  `data_source_context`, `liveboard_context`, and `answer_context` in the request payload.
 
-In the `POST` request body, include the session ID and generation number received from the xref:spotter-apis.adoc#ask_question[`POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`] or xref:spotter-apis.adoc#_generate_a_single_answer[`POST /api/rest/2.0/ai/answer/create`] API call.
+* `answer_context` +
+If the metadata type is set as `answer` or `liveboard`, specify the following attributes:
+** `session_identifier`: __string__, Unique ID representing the answer session.
+** `generation_number`: __Integer__. Specific generation/version number of the answer within a conversation session.
++
+The session identifier and generation numbers are assigned to the Answers generated from the Spotter AI REST APIs. These properties serve as the ID of the AI-generated Answer within the ThoughtSpot system.
 
-==== Request example
+* `liveboard_context` +
+If the metadata type is set as `liveboard`, specify the GUIDs of the Liveboard and visualization.
+* `data_source_context` +
+Specify the GUID of the data source object. Required parameter for all types of metadata context.
+
+|`conversation_settings` a|__Optional__. Defines additional parameters for the conversation context. You can set any of the following attributes as needed:
+
+* `enable_contextual_change_analysis` +
+__Boolean__. When enabled, Spotter analyzes how context changes over time, that is comparing results from different queries.
+* `enable_natural_language_answer_generation` +
+__Boolean__. Allows sending natural language queries to the conversation session.
+* `enable_reasoning` +
+__Boolean__. Allows Spotter to use reasoning for deep analysis and precise responses.
+|=====
+
+==== Example request
+
+The following example shows the request payload for the `data_source` context type:
 
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/searchdata'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/create'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
-  "query_string": "by [city], [product], [item type] = [item type].'\''jackets'\'', [region] = [region].'\''west'\'', sort by sum [sales] descending",
-  "logical_table_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-  "data_format": "COMPACT",
-  "record_offset": 0,
-  "record_size": 10
+  "metadata_context": {
+    "type": "data_source",
+    "data_source_context": {
+      "guid": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    }
+  },
+  "conversation_settings": {
+    "enable_contextual_change_analysis": false,
+    "enable_natural_language_answer_generation": true,
+    "enable_reasoning": false
+  }
+}'
+----
+
+The following example shows the request payload for the `liveboard` context type:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_context": {
+    "type": "liveboard",
+    "answer_context": {
+      "session_identifier": "c3a00fa7-fd01-4d58-8c84-0704df986d9d",
+      "generation_number": 2
+    },
+    "liveboard_context": {
+      "liveboard_identifier": "cffdc614-0214-42ba-9f57-cb6e8312fe5a",
+      "visualization_identifier": "da0ed3da-ce1f-4071-8876-74d551b05faf"
+    },
+    "data_source_context": {
+      "guid": "54beb173-d755-42e0-8f73-4d4ec768114f"
+    }
+  },
+  "conversation_settings": {
+    "enable_contextual_change_analysis": false,
+    "enable_natural_language_answer_generation": true,
+    "enable_reasoning": false
+  }
+}'
+----
+
+The following example shows the request payload for the `answer` context type:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_context": {
+    "type": "answer",
+    "answer_context": {
+      "session_identifier": "f131ca07-47e9-4f56-9e21-454120912ae1",
+      "generation_number": 1
+    },
+    "data_source_context": {
+      "guid": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    }
+  },
+  "conversation_settings": {
+    "enable_contextual_change_analysis": false,
+    "enable_natural_language_answer_generation": true,
+    "enable_reasoning": false
+  }
 }'
 ----
 
 ==== API response
 
-If the API request is successful, ThoughtSpot returns the Answer data for the query string sent in the API request.
+If the API request is successful, the API returns the conversation ID. You can use this ID to send follow-up questions to the conversation session.
 
-////
-===== Response codes
+[source,JSON]
+----
+{"conversation_id":"q9tZYf_6WnFC"}
+----
+Note the conversation ID for subsequent agentic interactions and API calls.
+
+=== Send a question and generate streaming responses
+
+To send queries to an ongoing conversation session with Spotter agent and receive streaming responses, use the `/api/rest/2.0/ai/agent/converse/sse` API endpoint. This API endpoint uses the SSE protocol to deliver data incrementally as it becomes available, rather than waiting for the entire response to be generated before sending it to the client.
+
+The `/api/rest/2.0/ai/agent/converse/sse` API can be used as an integrated tool for real-time streaming of conversational interactions between agents and the ThoughtSpot backend. It enables AI agents to send user queries and receive incremental, streamed responses that can be processed and sent to users. REST clients can also send a `POST` request with a conversation ID and query string to fetch streaming responses.
+
+==== Request parameters
+
 [width="100%" cols="2,4"]
 [options='header']
-|===
-|HTTP status code|Description
-|**200**| Successful operation
-|**400**| Invalid parameter
-|**401**| Unauthorized access
-|**401**| Forbidden request
-|**500**| Internal error
-|===
+|=====
+|Parameter| Description
+|`conversation_identifier` |__String__. Specify the conversation ID received from the xref:spotter-apis.adoc#_create_a_conversation_session_with_spotter_agent[POST /api/rest/2.0/ai/agent/conversation/create] API call.
+|`messages`|_Array of Strings_. Include at least one natural language query. For example, `Sales data for Jackets`, `Top performing products in the west coast`.
+|=====
+
 ////
+|`settings` |__Optional__.  Defines additional parameters for the conversation context. You can set any of the following attributes as needed:
+
+* `enable_contextual_change_analysis` +
+__Boolean__. When enabled, Spotter analyzes how the context changes over time, that is comparing results from different queries.
+* `enable_natural_language_answer_generation` +
+__Boolean__. Allows sending natural language queries to the conversation session.
+* `enable_reasoning` +
+__Boolean__. Allows Spotter to use reasoning for deep analysis and precise responses.
+////
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/converse/sse'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "conversation_identifier": "h2I_pTGaRQof",
+  "messages": [
+    "Net sales of Jackets"
+  ]
+}'
+----
+
+==== API response
+
+If the API request is successful, the response includes a stream of events, each containing a partial or complete message from the AI agent, rather than a single JSON object.
+
+Each event is a simple text-based message in a specific format, `data: <your_data>\n\n`; `<your_data>\n\n` means that each message sent from the server to the client is prefixed with `data:` keyword, followed by the actual payload (`<your_data>`), and ends with two newline characters (`\n\n`).
+
+The API uses this format so that the clients can reconstruct the AI-generated response as it streams in, chunk by chunk, and show the responses in real-time. In agentic workflows, the receiving client or agent listens to the SSE stream, parses each event, and assembles the full response for its users.
+
+===== Example response
+
+[source,]
+----
+data: [{"type": "ack", "node_id": "BRxCtJ-aGt8l"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": "I"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " understand"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " you're"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " interested"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " in"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " net"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " of"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " Jackets"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " I'll"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " retrieve"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " relevant"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " data"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " you"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"type": "notification", "group_id": "o8dQ9SAWdtrL", "metadata": {"title": "Net sales of Jackets"}, "code": "nls_start"}]
+
+data: [{"type": "notification", "group_id": "o8dQ9SAWdtrL", "code": "QH", "message": "Fetching Worksheet Data"}]
+
+data: [{"type": "notification", "group_id": "o8dQ9SAWdtrL", "code": "TML_GEN", "message": "Translating your query with the Reasoning Engine"}]
+
+data: [{"type": "notification", "group_id": "o8dQ9SAWdtrL", "code": "ANSWER_GEN", "message": "Verifying results with the Trust Layer"}]
+
+data: [{"id": "r24X7D99SROD", "type": "answer", "group_id": "o8dQ9SAWdtrL", "metadata": {"sage_query": "[sales] [item type] = [item type].'jackets'", "session_id": "b321b404-cbf1-4905-9b0c-b93ad4eedf89", "gen_no": 1, "transaction_id": "6874259d-13b1-478c-83cb-b3ed52628850", "generation_number": 1, "warning_details": null, "ambiguous_phrases": null, "query_intent": null, "assumptions": "You want to see the total sales amount for jackets item type.", "tml_phrases": ["[sales]", "[item type] = [item type].'jackets'"], "cached": false, "sub_queries": null, "title": "Net sales of Jackets", "worksheet_id": "cd252e5c-b552-49a8-821d-3eadaa049cca"}, "title": "Net sales of Jackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "The"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " net"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " Jackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " have"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " been"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " visual"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "ized"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " you"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " This"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " analysis"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " specifically"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " filtered"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " item"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " type"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "jackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "\""}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " and"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " calculated"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " total"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " amount"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " associated"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " with"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " those"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " products"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ".\n\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "**"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "Summary"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " &"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " Insights"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ":"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "**\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "-"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " The"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " visualization"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " shows"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " total"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " net"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " all"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " jacket"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " transactions"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " in"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " your"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " apparel"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " dataset"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ".\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "-"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " The"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " calculation"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " uses"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " only"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " amounts"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " where"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " item"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " type"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " is"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " \""}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "J"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "ackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ".\"\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "-"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " This"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " information"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " is"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " useful"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " understanding"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " revenue"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " contribution"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " of"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " jackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " within"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " your"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " product"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " mix"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ".\n\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "If"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " you'd"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " like"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " to"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " see"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " a"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " breakdown"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " by"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " region"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " state"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " time"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " period"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " or"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " compare"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " jacket"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " to"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " other"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " product"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " types"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " please"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " let"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " me"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " know"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "!"}]
+----
+
+The messages in the API response include the following parts:
+
+* `id` +
+A unique identifier for the message group
+* `type`
+Type of the message. Valid types are:
+** `ack` +
+Confirms receipt of the request. For example, the type in the first message `data: [{"type": "ack", "node_id": "BRxCtJ-aGt8l"}]`, which indicates that the server has received the client's request and is acknowledging it.
+** `text / text-chunk` +
+Content chunks, optionally formatted.
+** `answer` +
+The final structured response with metadata and analytics
+** `error` +
+Indicates a failure.
+** `notification` +
+Notification messages.
+* `group_id` +
+Groups related chunks together.
+* `metadata`:
+Indicates content format, for example, markdown.
+* `content` +
+The actual text content sent incrementally. For example, `"I"`, `"understand"`, `"you're"`, `"interested"`, `"in"`, `"the"`, `"net"`, `"sales"`, and so on.
+
+The following example shows the response text contents for the `answer` message type.
+
+[source,JSON]
+----
+[
+  {
+    "id": "r24X7D99SROD",
+    "type": "answer",
+    "group_id": "o8dQ9SAWdtrL",
+    "metadata": {
+      "sage_query": "[sales] [item type] = [item type].'jackets'",
+      "session_id": "b321b404-cbf1-4905-9b0c-b93ad4eedf89",
+      "gen_no": 1,
+      "transaction_id": "6874259d-13b1-478c-83cb-b3ed52628850",
+      "generation_number": 1,
+      "warning_details": null,
+      "ambiguous_phrases": null,
+      "query_intent": null,
+      "assumptions": "You want to see the total sales amount for jackets item type.",
+      "tml_phrases": [
+        "[sales]",
+        "[item type] = [item type].'jackets'"
+      ],
+      "cached": false,
+      "sub_queries": null,
+      "title": "Net sales of Jackets",
+      "worksheet_id": "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    },
+    "title": "Net sales of Jackets"
+  }
+]
+----
+
+The session ID and generation number serve as the data context for the Answer. You can use this information to create a new conversation session using `/api/rest/2.0/ai/agent/conversation/create`, or download the answer via the `/api/rest/2.0/report/answer` API endpoint.
+
+////
+* The tokens and TML phrases returned in the response can be used as inputs for the search data API call to get an Answer.
+////
+
+=== Send queries to a conversation session with Spotter agent
+
+To send queries to an ongoing conversation session with the Spotter agent, use the `/api/rest/2.0/ai/agent/{conversation_identifier}/converse` API endpoint.
+To use this API, the user must have access to the relevant conversational session and include its ID in the API request URL. The API request body must include at least one message in natural language format.
+
+==== Request parameters
+
+[width="100%" cols="2,2,4"]
+[options='header']
+|=====
+|Parameter|Type| Description
+|`conversation_identifier`|Path parameter|__String__. Required. Specify the conversation ID received from the xref:spotter-apis.adoc#_create_a_conversation_session_with_spotter_agent[POST /api/rest/2.0/ai/agent/conversation/create] API call.
+|`messages`|Form parameter|_Array of strings_. Required. Specify at least one query in natural language. For example, `total sales of jackets last month`.
+|=====
+
+
+////
+|`settings` |__Optional__.  Defines additional parameters for the conversation context. You can set any of the following attributes as needed:
+
+* `enable_contextual_change_analysis` +
+__Boolean__. When enabled, Spotter analyzes how the context changes over time, that is comparing results from different queries.
+* `enable_natural_language_answer_generation` +
+__Boolean__. Allows sending natural language queries to the conversation session.
+* `enable_reasoning` +
+__Boolean__. Allows Spotter to use reasoning for deep analysis and precise responses.
+////
+
+==== Example request
+
+The following example shows the request body with the query text and the conversation ID.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/-1XZmqqMcbtm/converse'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'  \
+  --data-raw '{
+  "messages": [
+    "total sales of jackets"
+  ]
+}'
+----
+
+==== API response
+
+If the request is successful, the API returns an array of objects in the response. The messages in the API response include the following parts:
+
+* `type` +
+Type of the message, such as text, answer, or error.
+* `text` +
+Response message generated for the query.
+* `metadata` +
+Additional information based on the message type.
+
+The following example shows the response text contents for the `answer` message type.
+
+[source,JSON]
+----
+{
+   "messages":[
+      {
+         "metadata":{
+         },
+         "internal":{
+         },
+         "type":"text",
+         "text":"Let me retrieve the total sales of jackets from the dataset.",
+         "agent_context":""
+      },
+      {
+         "metadata":{
+            "output":"{metadata-output}",
+            "worksheet_id":"cd252e5c-b552-49a8-821d-3eadaa049cca",
+            "assumptions":"You want to know the total sales amount for jackets specifically.",
+            "chart_type":"KPI",
+            "data_awareness_enabled":true
+         },
+         "internal":{
+         },
+         "type":"answer",
+         "title":"total sales of jackets",
+         "description":"",
+         "session_id":"19a5da20-28c5-4266-a3be-e1c61f122b5d",
+         "gen_no":1,
+         "sage_query":"sum [sales] [item type] = [item type].'jackets'",
+         "tml_tokens":[
+            "sum [sales]",
+            "[item type] = [item type].'jackets'"
+         ],
+         "formulas":[
+         ],
+         "subqueries":[
+         ],
+         "viz_suggestion":"CAAQIBomEiQzNGRmZjA2ZS0yNTViLTQ3NjUtYmJmYi00M2EwOGEzYmI4MjkoATIA",
+         "ac_state":null
+      },
+      {
+         "metadata":{
+         },
+         "internal":{
+         },
+         "type":"text",
+         "text":"The total sales of jackets has already been visualized for you.\n\n**Summary & Insights:**\n- The result represents the overall sales amount specifically for the item type \"jackets\".\n- This metric is useful for understanding the revenue contribution of jackets within your apparel product portfolio.\n- You can use this figure to benchmark jacket performance against other item types, evaluate promotional effectiveness, or inform inventory decisions.\n\nIf you’d like a breakdown by region, store, or time period, just let me know!",
+         "agent_context":""
+      }
+   ],
+   "__args":{
+      "conversation_identifier":"IrnWPL1NFc6H",
+      "messages":[
+         "total sales of jackets"
+      ]
+   }
+}
+----
+
+The session ID and generation number serve as the data context for the Answer. You can use this information to create a new conversation session using `/api/rest/2.0/ai/agent/conversation/create`, or download the answer via the `/api/rest/2.0/report/answer` API endpoint.
+
+[#process_results]
+== Process results generated from Spotter APIs
+To export or download the Answer data generated by the Spotter APIs, use the xref:data-report-v2-api.adoc#exportSpotterData[Answer report] API.
+
+[NOTE]
+====
+Using tokens generated by the Spotter API in a xref:data-report-v2-api.adoc#_search_data_api[Search Data API] request can return invalid column errors, because these tokens may reference formulas or columns not present in the data model. Instead, use the xref:data-report-v2-api.adoc#exportSpotterData[Answer report] API and include the session ID and generation number obtained from the Spotter API in your API request to retrieve the data.
+====
+
+== Data literacy and query assistance
+The query assistance APIs help users who may need assistance with exploring and analyzing data effectively.
+
+////
+The query assistance APIs help users find the appropriate dataset for a given query string, suggest what questions can be asked, and return example questions. These APIs are specifically designed to improve data literacy for users who may not be familiar with the underlying data, making it easier for them to explore and analyze data effectively.
+
+=== Get data source suggestions
+
+The `POST /api/rest/2.0/ai/data-source-suggestions` API provides relevant data source recommendations for a user-submitted natural language query. To use this API, you must have at least view access to the underlying metadata object referenced in the response.
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter| Description
+|`metadata_context`  a| Required. Specify one of the following attributes to set the metadata context:
+
+* `data_source_identifiers` +
+__Array of strings__. IDs of the data source object such as Models.
+* `answer_identifiers` +
+__Array of strings__. GUIDs of the Answer objects that you want to use as metadata.
+* `conversation_identifier` +
+__String__. ID of the conversation session.
+* `liveboard_identifiers` +
+__Array of strings__. GUIDs of the Liveboards that you want to use as metadata.
+
+| `query` |__String__. Required parameter. Specify the query string that needs to be decomposed into smaller, analytical sub-questions.
+|`limit_relevant_questions` +
+__Optional__ | __Integer__. Sets a limit on the number of sub-questions to return in the response. Default is 5.
+|`bypass_cache` +
+__Optional__| __Boolean__. When set to `true`, disables cache and forces fresh computation.
+|`ai_context` +
+__Optional__. a| Additional context to guide the response. Define the following attributes as needed:
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/relevant-questions/'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+  --data-raw '{
+  "metadata_context": {
+    "data_source_identifiers": [
+      "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    ]
+  },
+  "query": "Net sales of Jackets in west coast",
+  "limit_relevant_questions": 3
+}'
+----
+
+==== API response
+If the API request is successful, ThoughtSpot returns a ranked list of data sources, each annotated with relevant reasoning.
+
+[source,JSON]
+----
+{
+  "relevant_questions": [
+    {
+      "query": "What is the trend of sales by type over time?",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
+    },
+    {
+      "query": "Sales by item",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
+    },
+    {
+      "query": "Sales across regions",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
+    }
+  ]
+}
+----
+
+The returned results include metadata such as:
+
+* `confidence` +
+A float indicating the Model's confidence in the relevance of each recommendation.
+* `details` +
+The data source ID, name, and description for each recommended data source.
+* `reasoning` +
+Reason provided by the LLM to explain why each data source was recommended.
+
+////
+
+=== Get relevant questions
+
+The `/api/rest/2.0/ai/relevant-questions/` API endpoint breaks down a user-submitted query into relevant sub-questions. It accepts the original query and optional additional context, then generates a set of related questions to help users explore their data comprehensively.
+
+During agentic interactions, this API can be used as an integrated tool to decompose user queries and suggest relevant questions for a specific data context. REST clients can also call this API directly to fetch relevant questions via a `POST` request.
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter| Description
+|`metadata_context`  a| Required. Specify one of the following attributes to set the metadata context:
+
+* `data_source_identifiers` +
+__Array of strings__. IDs of the data source object such as Models.
+* `answer_identifiers` +
+__Array of strings__. GUIDs of the Answer objects that you want to use as metadata.
+* `conversation_identifier` +
+__String__. ID of the conversation session.
+* `liveboard_identifiers` +
+__Array of strings__. GUIDs of the Liveboards that you want to use as metadata.
+
+| `query` |__String__. Required parameter. Specify the query string that needs to be decomposed into smaller, analytical sub-questions.
+|`limit_relevant_questions` +
+__Optional__ | __Integer__. Sets a limit on the number of sub-questions to return in the response. Default is 5.
+|`bypass_cache` +
+__Optional__| __Boolean__. When set to `true`, disables cache and forces fresh computation.
+|`ai_context` +
+__Optional__. a| Additional context to guide the response. Define the following attributes as needed:
+
+* `instructions` +
+__Array of strings__. Custom user instructions to influence how the AI interprets and processes the query.
+* `content` +
+__Array of strings__. Additional input such as raw text or CSV-formatted data to enhance context and answer quality.
+|=====
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/relevant-questions/'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+  --data-raw '{
+  "metadata_context": {
+    "data_source_identifiers": [
+      "cd252e5c-b552-49a8-821d-3eadaa049cca"
+    ]
+  },
+  "query": "Net sales of Jackets in west coast",
+  "limit_relevant_questions": 3
+}'
+----
+
+==== Example response
+If the request is successful, the API returns a set of questions related to the query and metadata context in the `relevant_questions` array. Each object in the `relevant_questions` array contains the following fields:
+
+* `query` +
+A string containing the natural language (NL) sub-question.
+* `data_source_identifier` +
+GUID of the data source object.
+* `data_source_name` +
+Name of the associated data source object.
+
+[source,JSON]
+----
+{
+  "relevant_questions": [
+    {
+      "query": "What is the trend of sales by type over time?",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
+    },
+    {
+      "query": "Sales by item",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
+    },
+    {
+      "query": "Sales across regions",
+      "data_source_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+      "data_source_name": "(Sample) Retail - Apparel"
+    }
+  ]
+}
+----
+
+== NL instructions to coach Spotter
+Administrators and data owners can guide and refine how Spotter interprets and answers user questions. The natural language (NL) instructions API allows setting instructions at the data model level. The API provides business context and preferred interpretations for specific queries or terminology to coach Spotter, but it does not train or change the underlying LLM.
+
+=== Set NL instructions
+To coach and instruct the Spotter system on how to interpret queries, apply filters, select columns, handle data nuances, and present answers using the data from a specific model, you can set global rules in natural language format. Setting instructions helps Spotter generate precise and consistent responses for user queries.
+
+To set instructions for a Model, send a `POST` request to the `/api/rest/2.0/ai/instructions/set` API endpoint.
+
+[NOTE]
+====
+To set NL instructions, you'll need administration or data management privileges, or at least edit access to the data Model.
+====
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Form parameter| Description
+|`data_source_identifier`|__String__. ID of the Model.
+|`nl_instructions_info` a|Instructions in the natural language format.
+
+* `instructions` +
+_Array of strings_. Include the rules that you want to add in the `ìnstructions` array. Ensure that the instructions do not exceed 3000 characters.
+* `scope`
+Sets the scope for the rules. By default, the rules are applied globally for all Spotter users who can access the Model specified in the request.
+|=====
+
+==== Example request
+
+The following example defines instructions to coach Spotter on how to interpret the query:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/set'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN} \
+  --data-raw '{
+  "data_source_identifier": "71311827-31bb-48b2-8465-9a215adbc05d",
+  "nl_instructions_info": [
+    {
+      "instructions": [
+        "When I ask for last month, use ‘last 30 days’ as a filter.",
+        "Exclude orders where order_status = '\''CANCELLED-USER'\'' when calculating total revenue"
+      ],
+      "scope": "GLOBAL"
+    }
+  ]
+}'
+----
+
+==== Example response
+If the API request is successful, ThoughtSpot returns the `{"success":true}` response.
+
+=== Retrieve NL instructions assigned to a Model
+
+To view the NL instructions assigned for a Model, send a `POST` request to the `/api/rest/2.0/ai/instructions/get` API endpoint.
+
+Only Spotter users with view access to the data model can retrieve instructions via API requests.
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Form parameter| Description
+|`data_source_identifier`|__String__. ID of the Model from which you want to fetch instructions.
+|=====
+
+==== Example request
+The following example shows the request body for retrieving NL instructions configured on a Model:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/set'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN} \
+    --data-raw '{
+  "data_source_identifier": "3bbeac16-a723-4886-9eba-c4779d07fd83"
+}'
+----
+
+==== Example response
+If the instructions are configured on the Model specified in the API request, ThoughtSpot returns an array of instructions in the API response.
+
+[source,JSON]
+----
+{
+  "nl_instructions_info": [
+    {
+      "instructions": [
+        "When I ask for last month, use ‘last 30 days’ as a filter.",
+        "Exclude orders where order_status = 'CANCELLED-USER' when calculating total revenue"
+      ],
+      "scope": "GLOBAL"
+    }
+  ]
+}
+----
+
+== Additional resources
+
+* Visit the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fgetting-started%2Fintroduction">REST API v2.0 Playground</a>+++ to view the API endpoints and verify the request and response workflows.
+* For information about MCP tools, see xref:mcp-integration.adoc[MCP server integration].

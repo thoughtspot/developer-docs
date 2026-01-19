@@ -43,7 +43,7 @@ const Header = (props: {
         },
         {
             name: 'Discord',
-            link: 'https://discord.gg/JHPGwCkvjQ',
+            link: 'https://discord.gg/YBWP65W6te',
             external: true,
             icon: RiDiscordLine,
         },
@@ -66,6 +66,7 @@ const Header = (props: {
                             <a
                                 href="/docs/introduction"
                                 title={t('TS_LOGO_ALT_TEXT')}
+                                className="logo-link"
                             >
                                 <img
                                     src={TSLogo}
