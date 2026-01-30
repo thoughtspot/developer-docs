@@ -1,23 +1,22 @@
 = Embed Spotter
 :toc: true
-:toclevels: 3
+:toclevels: 2
 
 :page-title: Embed Spotter
 :page-pageid: embed-spotter
 :page-description: You can use the SpotterEmbed SDK library to embed Conversational analytics experience in your application.
 
-To embed the full Spotter interface with a conversation panel that allows natural language queries, data source selection, and interactions with AI generated Answers, use the `SpotterEmbed` component.
+You can embed the full Spotter experience in your applications using the `SpotterEmbed` component in the Visual Embed SDK. Using the customization settings available in the SDK for each Spotter version, you can configure the Spotter interface to suit the needs of your embedding application.
 
 == Before you begin
 
-Before you begin, check the following:
+To embed Spotter, you need the following access and setup:
 
-* You have a ThoughtSpot instance with Spotter and Spotter Agent enabled.
-* Your host application domain is added to ThoughtSpot CSP and CORS allowlists.
-* You have access to the latest version of the Visual Embed SDK or at least v1.33.1.
+* Access to a ThoughtSpot instance with the Spotter feature. If you want a specific version of Spotter enabled, work with your ThoughtSpot administrator to enable the xref:embed-ai-analytics.adoc#_feature_status_and_availability_in_embed_mode[required features and settings] on your instance.
+* Your host application domain is added to xref:security-settings.adoc[ThoughtSpot CSP and CORS allowlists].
+* Your application project has access to the xref:api-changelog.adoc[latest version of the Visual Embed SDK].
 
 == Import the SDK package
-
 Import the `SpotterEmbed` SDK library to your application environment:
 
 **npm**
@@ -28,6 +27,8 @@ import {
     AuthType,
     init,
     prefetch,
+    EmbedEvent,
+    HostEvent
 }
 from '@thoughtspot/visual-embed-sdk';
 ----
@@ -41,6 +42,8 @@ from '@thoughtspot/visual-embed-sdk';
         AuthType,
         init,
         prefetch,
+        EmbedEvent,
+        HostEvent
     }
 from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/index.js';
 ----
@@ -50,154 +53,200 @@ from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/index.js';
 To initialize the SDK, the following information is required:
 
 * `thoughtSpotHost` +
-The hostname of your ThoughtSpot application instance. See xref:faqs.adoc#tsHostName[FAQs] to know how to find the hostname of your application instance.
+The xref:faqs.adoc#tsHostName[hostname] of your ThoughtSpot application instance.
 * `authType` +
-Authentication type. ThoughtSpot supports a variety of Authentication types. For testing purposes, you can use `AuthType.None`. For other authentication options, see xref:embed-authentication.adoc[Authentication].
+Authentication type. For testing purposes, you can use `AuthType.None`. For information about other authentication options, see xref:embed-authentication.adoc[Authentication].
 
 [source,JavaScript]
 ----
 init({
     thoughtSpotHost: 'https://your-thoughtspot-host', // Replace with your ThoughtSpot application URL
-    authType: AuthType.None,
+    authType: AuthType.None, // Use the appropriate AuthType for your setup
 });
 ----
 
 == Create an instance of the SpotterEmbed object
 
-Create an instance of the `SpotterEmbed` object and specify the data source ID. Optionally, you can specify the search query string to generate a chart or table at load time.
+Create an instance of the `SpotterEmbed` object.
+
+If you are embedding the Spotter Classic or Spotter 2 experience, the data source ID is required. If Spotter 3 experience is enabled on your instance, you can either specify the data source ID or enable the *Auto mode* to allow Spotter to automatically discover and select data sources.
+
+[IMPORTANT]
+====
+Auto mode is disabled by default on ThoughtSpot Embedded instances. To enable this feature on your instance, contact ThoughtSpot Support.
+====
 
 [source,JavaScript]
 ----
-const conversation = new SpotterEmbed(document.getElementById('ts-embed'), {
+const spotterEmbed= new SpotterEmbed(document.getElementById('ts-embed'), {
     frameParams: {
         width: '100%',
         height: '100%',
     },
-    worksheetId: '<%=datasourceGUID%>', // ID of the data source object to query data
-    searchOptions: {
-        searchQuery: 'sales by region', // Optional: initial search query string to pass on load
-    },
+    worksheetId: '<%=datasourceGUID%>', //ID of the data source object. To use the Auto mode, set the ID to '_spotter_data_source_discovery_id',
+    //... other attributes
 });
 ----
+
+=== Customize your embed (Optional)
+The SDK provides configuration settings to customize the embedded Spotter interface.
+For example, you can hide sample questions or disable data source selection using the `hideSampleQuestions` and `disableSourceSelection` parameters.
+
+[source,JavaScript]
+----
+const conversation = new SpotterEmbed(document.getElementById('ts-embed'), {
+    //...other embed configuration attributes
+    hideSampleQuestions: true,
+    disableSourceSelection: true
+});
+----
+For more information and examples, see xref:embed-spotter.adoc#configControls[Customizing embedded Spotter interface].
+
+=== Register event listeners
+
+To listen to the events emitted by the embedded ThoughtSpot component, register xref:embed-events.adoc#embed-events[embed event] handlers.
+
+The following example shows how to register xref:EmbedEvent.adoc#_init[EmbedEvent.Init] and xref:EmbedEvent.adoc#_load[EmbedEvent.Load] listeners.
+
+[source,JavaScript]
+----
+// Register event listeners
+spotterEmbed.on(EmbedEvent.Init, showLoader); // Show loader when initialization starts
+spotterEmbed.on(EmbedEvent.Load, hideLoader); // Hide loader when embed is fully loaded
+----
+
+To trigger actions on the embedded interface, use the xref:HostEvent.adoc[Host events].
+
+The following examples shows the host event to reset a Spotter conversation session:
+
+[source,JavaScript]
+----
+// Example: Add a host event to reset the Spotter conversation
+document.getElementById('resetBtn').addEventListener('click', () => {
+    spotterEmbed.trigger(HostEvent.ResetSpotterConversation);
+});
+----
+
+=== Render the embedded object
+
+[source,JavaScript]
+----
+spotterEmbed.render();
+----
+
+=== Verify your embed
+
+* Load the embedded object.
+** If the embedding is successful, you'll see the Spotter page.
+** Initiate a chat session, ask a question, and view the results.
+** If you see a blank screen:
+*** Verify that your embed code has the correct ThoughtSpot host URL. Ensure that your ThoughtSpot instance is accessible.
+*** Verify whether the authentication credentials used in your code are valid.
+* Verify whether the customization settings are applied.
 
 [#configControls]
-=== Configuration controls for embed view (Optional)
+== Customizing embedded Spotter interface
+When you embed Spotter, you'll notice that the embedded component loads an initial page with a prompt interface. The look and feel of this page vary depending on the Spotter version used for embedding.
 
-The embed package for Spotter includes the additional configuration flags to customize the Spotter interface.
-For example, you can hide or disable data source selection using the `hideSourceSelection` and `disableSourceSelection` +
-parameters. Disables data source selection panel for embed users when set to `true`.
-You can also set locale preference for Spotter interactions using the `locale` property.
+=== Spotter Classic and Spotter 2 experience
+If you have embedded Spotter Classic or Spotter 2, the initial page includes a prompt bar for user input, a data source selector, and the UI options to preview data and reset a Spotter session.
 
-The following code sample sets the locale to English (United Kingdom) and enables viewing Spotter feature limitations.
+[.widthAuto]
+[.bordered]
+image::./images/spotter-embed-legacy.png[Spotter embed]
 
-[source,JavaScript]
-----
-const conversation = new SpotterEmbed(document.getElementById('ts-embed'), {
-    frameParams: {
-        width: '100%',
-        height: '100%',
-    },
-    worksheetId: '<%=datasourceGUID%>', // ID of the data source object to query data
-    searchOptions: {
-        searchQuery: 'sales by region', // Optional: initial search query string to pass on load
-    },
-    locale: 'en-GB',
-    showSpotterLimitations: true,
-});
-----
+=== Spotter 3 experience
+In Spotter 3 embedding, you can load the page with a pre-selected data source or use the *Auto mode* to allow Spotter to automatically discover and select a relevant data model for user queries.
 
-For a complete list of Spotter embed view configuration settings, see xref:SpotterEmbedViewConfig.adoc[SDK reference Documentation].
+**Default view**:
 
-== Customize your embed view
-To customize your embedded Spotter views, the following options are available with the Visual Embed SDK:
+[.widthAuto]
+[.bordered]
+image::./images/spotter3-legacy-interface.png[Spotter 3 interface]
 
-* Control the xref:embed-spotter.adoc#spotterMenuActions[visibility of menu actions in the embedded view]
-* xref:embed-spotter.adoc#_customize_styles_and_interface_elements[Customize styles and interface elements]
-* xref:embed-spotter.adoc#_customize_app_interactions_with_events[Customize app interactions]
+**With Auto mode enabled**:
 
-[#spotterMenuActions]
-=== Customize menu actions and elements
-
-The SDK provides action IDs to disable, show, or hide the following elements and menu actions via `disabledActions`, `visibleActions`, or `hiddenActions` array.
-
-The following menu actions are available by default in the embedded Spotter interface:
-
-* *Preview data* and *Reset* actions on the conversation panel
-* The edit and delete icons on the prompt panel
-* *Pin*, *Save*, *Download*, *Modify* on Spotter-generated Answers
-* Spotter feedback widget and chart switcher icon on Spotter-generated Answers
-
-The following example shows how to disable actions and menu elements using xref:embed-actions.adoc[`disabledActions`] array:
-
-[source,JavaScript]
-----
- // Show these actions
- visibleActions: [Action.Pin,Action.Save,Action.Edit,Action.PreviewDataSpotter,Action.ResetSpotterChat,Action.SpotterFeedback,Action.EditPreviousPrompt,Action.DeletePreviousPrompt],
- // Disable these actions
- disabledActions:[Action.PreviewDataSpotter,Action.Edit],
- disabledActionReason: "Contact your administrator to enable this feature"
-----
-
-For a complete list of supported actions, see xref:embed-action-ref.adoc#_spotter[Spotter menu actions].
-
-=== Customize styles and interface elements
-To customize the look and feel of the Spotter interface, use the xref:css-customization.adoc[CSS customization framework] in the SDK. The `customizations` object allows you to add xref:customize-css-styles.adoc[custom CSS definitions], xref:customize-text-strings.adoc[text strings], and xref:customize-icons.adoc[icons].
-
-==== Override icons
-To override the icons, you must first identify the icon ID, create an SVG file to replace this icon, and add the SVG hosting URL to your embed customization code.
-
-The most common icon ID to override is `rd-icon-spotter`, the default Spotter icon.
-
-The following example uses the link:https://github.com/thoughtspot/custom-css-demo/blob/main/alternate-spotter-icon.svg[alternate-spotter-icon.svg, window=_blank] file hosted on `\https://cdn.jsdelivr.net/` to override the Spotter icon.
-
-[source,JavaScript]
-----
- init({
-     //...
-     customizations: {
-         // Specify the SVG hosting URL to overide the icon, for example Spotter (`rd-icon-spotter`) icon
-         iconSpriteUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/alternate-spotter-icon.svg"
-     }
- });
-----
+[.widthAuto]
+[.bordered]
+image::./images/spotter3-leagcy-interface-automode.png[Spotter 3 interface]
 
 [NOTE]
 ====
-When customizing icons, ensure that the SVG hosting server is added to the CSP allowlist on the *Develop* > *Security Settings* page. For more information, see xref:customize-icons.adoc#_update_allowlists_in_security_settings_page[Customize icons].
+When Auto mode is enabled, **Preview data** and **Data Model instructions** options will not be available.
 ====
 
-==== Customize text strings
-To replace text strings, you can use the `stringsIDs` and `strings` properties in the content customization object.
+==== Optional settings for Spotter 3
 
-The following example shows how to replace "Spotter" and other text strings on the Spotter interface.
+Spotter 3 experience is available with a new prompt interface that includes additional features and user elements to enrich your Spotter experience. You can include the *Chat history* panel to allow your users to access the chat history from their previous sessions.
+
+To enable new chat interface and chat history features, set the `updatedSpotterChatPrompt` and `enablePastConversationsSidebar` attributes to `true`, as shown in this example:
 
 [source,JavaScript]
 ----
-// Initialize the SDK with custom text string replacements
-init({
-    // ...
-    customizations: {
-        content: {
-            // Use the strings object to replace the visible UI text with custom labels.
-            strings: {
-                // Change all instances of "Liveboard" to "Dashboard"
-                "Liveboard": "Dashboard",
-                // Change all instances of "Answer" to "Reports"
-                "Answer": "Reports",
-                // Change all instances of "Spotter" to "dataAnlyzer"
-                "Spotter": "dataAnlyzer",
-                // Change all instances of "Search" to "Analyze"
-                "Search": "Analyze",
-            }
-        }
-    }
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    // ...other embed configuration attributes
+
+    // Enable the updated Spotter chat prompt experience.
+    updatedSpotterChatPrompt: true,
+
+    // Enable the sidebar for accessing past Spotter conversations
+    enablePastConversationsSidebar: true
 });
 ----
 
-[#SpotterCSS]
-==== Customize styles
+The following figure shows UI elements and functions available in the new chat prompt and chat history panel:
 
-There are several CSS variables available for customizing Spotter interface. You can customize the background color of the conversation and prompt panels, button elements, and the components of the charts generated by Spotter.
+[.widthAuto]
+[.bordered]
+image::./images/spotter3-new-interface.png[Spotter 3 new interface]
+
+==== MCP connectors and resource selection icon
+A Connector is an external MCP server or tool, such as Google Drive, Slack, Notion, Confluence/Jira, which can be used as a data source in Spotter sessions. ThoughtSpot administrators can configure connectors to enable Spotter users to include both structured and unstructured data in their conversation sessions.
+
+If the new prompt interface in Spotter 3 is enabled, the Spotter page displays the *MCP Connectors* menu along with a '\+' icon in the prompt panel. Your application users can connect to a tool pre-configured by your ThoughtSpot administrator directly from the Spotter 3 prompt interface using the '+' icon and add resources to their conversation context.
+
+[NOTE]
+====
+The MCP connector module and the '+' icon are displayed by default if the new prompt interface is enabled in your embed. However, we do not recommend using this feature in your production environments.
+====
+
+Currently, the Visual Embed SDK does not provide any attributes or action IDs to hide these elements. As a workaround, you can use the CSS selectors to hide these elements:
+
+[source,JavaScript]
+----
+init({
+   thoughtSpotHost: 'https://your-thoughtspot-host', // URL of your ThoughtSpot instance
+   authType: AuthType.None, // Authentication type; use appropriate AuthType for your environment
+   customizations: {
+    style: {
+      customCSS: {
+        rules_UNSTABLE: {
+          // Hide the MCP connectors module in the Spotter prompt panel
+          ".button-module__buttonWrapper.chat-connector-resources-module__addConnectorResourceButton": {
+            "display": "none !important"
+          },
+          // Hide the add resources (+) icon in the Spotter prompt panel
+          "button.button-module__button.button-module__buttonWithIcon.button-module__tertiary.button-module__sizeM.button-module__backgroundLight.button-module__both": {
+            "display": "none !important"
+          }
+        }
+      }
+    }
+  },
+  // ...other configuration attributes
+});
+----
+
+=== Customizing styles and interface elements
+The visual Embed SDK provides a comprehensive style customization framework for overriding icons, text strings, and the appearance of UI elements.
+
+The `customizations` object allows you to add custom CSS definitions, replace text strings, and override icons. If your customization framework uses external sources or hosting servers, ensure they are added to the CSP allowlist. For more information, see the xref:css-customization.adoc[CSS customization framework], xref:customize-text-strings.adoc[Customize text strings], and xref:customize-icons.adoc[Customize icons] sections.
+
+[#SpotterCSS]
+=== Customize using CSS variables
+You can customize the background color of the conversation and prompt panels, button elements, and the components of the charts generated by Spotter using xref:customize-css-styles.adoc[CSS variables].
+
+If Theme Builder is enabled on your ThoughtSpot instance, you can find the variables for Spotter customization by navigating to *Develop* > *Customizations* > *Theme Builder* in the ThoughtSpot UI and downloading the CSS variables.
 
 [source,JavaScript]
 ----
@@ -219,97 +268,217 @@ init({
   },
 ----
 
-For more information about CSS variables for style customization, see xref:customize-css-styles.adoc#_spotter_interface[Spotter interface customization].
+==== Customizing text strings
+To replace text strings, you can use the `stringsIDs` and `strings` properties in the content customization object.
 
-== Customize app interactions with events
-
-To listen to the events emitted by the embedded ThoughtSpot component, register xref:embed-events.adoc#embed-events[embed event] handlers.
-
-The following example shows how to register xref:EmbedEvent.adoc#_init[EmbedEvent.Init] and xref:EmbedEvent.adoc#_load[EmbedEvent.Load] listeners.
+The following example shows how to replace "Spotter" and other text strings on the Spotter interface.
 
 [source,JavaScript]
 ----
- conversation.on(EmbedEvent.Init, showLoader)
- conversation.on(EmbedEvent.Load, hideLoader)
-----
-
-Similarly, to trigger actions on the embedded ThoughtSpot interface, use xref:HostEvent.adoc[Host events].
-
-== Render the embedded object
-
-[source,JavaScript]
-----
-conversation.render();
-----
-
-== Code sample
-
-[source,JavaScript]
-----
-import { SpotterEmbed, AuthType, init } from '@thoughtspot/visual-embed-sdk';
-
-// Initialize the SDK
+// Initialize the SDK with custom text string replacements
 init({
-  thoughtSpotHost: 'https://your-thoughtspot-host', // Replace with your ThoughtSpot application URL
-  authType: AuthType.None, // Use the appropriate AuthType for your setup
+    // ...
+    customizations: {
+        content: {
+            // Use the strings object to replace the visible UI text with custom labels.
+            strings: {
+                // Change all instances of "Preview data" to "Show data"
+                "Preview data": "Show data",
+                // Change all instances of "Spotter" to "dataAnlyzer"
+                "Spotter": "dataAnlyzer",
+            }
+        }
+    }
 });
-
-// Find the container element in your HTML
-const container = document.getElementById('ts-embed');
-if (container) {
-  // Create and render SpotterEmbed
-  const spotterEmbed = new SpotterEmbed(container, {
-    frameParams: {
-      height: '600px',
-      width: '100%',
-    },
-    worksheetId: 'your-worksheet-id', // ID of the data source object (Model) to query data
-    searchOptions: {
-      searchQuery: 'Sales by year', // Optional: initial search query string to populate on load
-    },
-    // Add more configuration options as needed
-    // Add event listeners as needed
-    onInit: () => console.log('Spotter initialized'),
-    onLoad: () => console.log('Spotter loaded'),
-    });
-
-  spotterEmbed.render();
 ----
 
-== Test your embed
+=== Customizing the Spotter icon
+To override an icon, you must find ID of the icon, create an SVG file to replace this icon, and add the SVG hosting URL to your embed customization code. The most common icon to override is the default Spotter icon and its icon ID is `rd-icon-spotter`.
 
-* Build your app and load the embedded object.
+The following example uses the link:https://github.com/thoughtspot/custom-css-demo/blob/main/alternate-spotter-icon.svg[alternate-spotter-icon.svg, window=_blank] file hosted on `\https://cdn.jsdelivr.net/` to override the Spotter icon.
 
-** If the embedding is successful, you'll see the Spotter page with a conversation panel.
-+
-[.widthAuto]
-[.bordered]
-image::./images/converseEmbed_default.png[Spotter embed]
+[source,JavaScript]
+----
+ init({
+     //...
+     customizations: {
+         // Specify the SVG hosting URL to overide the icon, for example Spotter (`rd-icon-spotter`) icon
+         iconSpriteUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/alternate-spotter-icon.svg"
+     }
+ });
+----
 
-** Add a query, click the prompt button, and view the results.
-+
-[.widthAuto]
-[.bordered]
-image::./images/converseEmbed-with-query.png[Spotter embed]
-
-** If you see a blank screen:
-*** Check if your code has the correct ThoughtSpot host URL. Ensure that your instance is accessible.
-*** Check if the authentication credentials in your code are valid
-
-* Verify the customized objects and elements. +
-The following figures show the customized Spotter icon and text:
-+
+The following figures show the customized Spotter icon:
 [.widthAuto]
 [.bordered]
 image::./images/spotter-icon-customization.png[Spotter icon customization]
 
-+
-[.widthAuto]
-[.bordered]
-image::./images/spotter-text-customization.png[Spotter customization]
+=== Hiding Spotter icon and ThoughtSpot branding in the reasoning interface
+If you want to hide the Spotter icon from the prompt response page and reasoning interface, or if you want to remove ThoughtSpot branding, you can use the CSS rules with selectors, as shown in this example:
+
+[source,JavaScript]
+----
+init({
+   //... embed configuration attributes
+   customizations: {
+    style: {
+      customCSS: {
+        rules_UNSTABLE: {
+          // Hide the Spotter icon in the tool call card under reasoning
+          "svg.chat-module__spotterIcon.icon-module__iconStyle.icon-module__xxl.icon-module__white": {
+            "display": "none !important"
+          },
+          // Control the visibility for the ThoughtSpot text in the tool call card under reasoning
+          // Hide the element completely if MCP connectors are enabled, since the text-indent works for ThoughtSpot text only
+          ".collapsible-item-response-module__title": {
+            "text-indent": "-89px",
+            "overflow": "hidden",
+            "margin-left": "-24px"
+          },
+          // Hide the ThoughtSpot (or Connector) icon in the tool call card under reasoning
+          ".collapsible-item-response-module__customIconWrapper": {
+            "display": "none"
+          },
+        },
+      },
+    },
+  }
+});
+----
+
+[#spotterMenuActions]
+=== Customizing menu actions and elements
+
+The SDK provides action IDs to disable, show, or hide the following elements and menu actions via `disabledActions`, `visibleActions`, or `hiddenActions` array.
+
+For example, you can hide the *Preview data**, *Reset* in the prompt panel, or  *Pin*, *Download*, and other actions from in Spotter-generated response.
+
+The following code sample disables actions and menu elements using xref:embed-actions.adoc[`disabledActions`] array:
+
+[source,JavaScript]
+----
+ // Hide these actions
+ hiddenActions: [Action.Pin,Action.ResetSpotterChat,Action.DeletePreviousPrompt],
+ // Disable actions
+ disabledActions:[Action.PreviewDataSpotter,Action.Edit],
+ disabledActionReason: "Contact your administrator to enable this feature"
+----
+For a comprehensive list of supported actions, see xref:Action.adoc[Spotter menu actions].
+
+
+== Code samples
+
+**Code sample for embedding Spotter Classic and Spotter 2 experience**
+
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    AuthType,
+    init,
+    EmbedEvent,
+    HostEvent
+} from '@thoughtspot/visual-embed-sdk';
+// Initialize the ThoughtSpot Visual Embed SDK with your ThoughtSpot URL and authentication type.
+init({
+    thoughtSpotHost: 'https://your-thoughtspot-host', // Replace with your ThoughtSpot application URL
+    authType: AuthType.None, // Use the appropriate AuthType for your setup
+});
+
+//Define event handler to show a loading indicator when the embed is initializing.
+function showLoader() {
+    // Show loading indicator
+}
+
+// Define event handler to hide the loading indicator when the embed has loaded.
+function hideLoader() {
+    // Hide loading indicator
+}
+
+// Find the container element in your HTML where the SpotterEmbed will be rendered.
+const container = document.getElementById('ts-embed');
+if (container) {
+    // Create and configure the SpotterEmbed
+    const spotterEmbed = new SpotterEmbed(container, {
+        frameParams: {
+            height: '100%', // Set the height of the embedded frame
+            width: '100%', // Set the width of the embedded frame
+        },
+        worksheetId: 'your-worksheet-id', // ID of the data source object to query data from
+        //... other configuration attributes
+    });
+
+    // Register event listeners
+    spotterEmbed.on(EmbedEvent.Init, showLoader); // Show loader when initialization starts
+    spotterEmbed.on(EmbedEvent.Load, hideLoader); // Hide loader when embed is fully loaded
+
+    // Render the SpotterEmbed in the container.
+    spotterEmbed.render();
+    // Example: Add a host event to reset the Spotter conversation
+    document.getElementById('resetBtn').addEventListener('click', () => {
+        spotterEmbed.trigger(HostEvent.ResetSpotterConversation);
+    });
+}
+----
+
+**Code sample for embedding Spotter 3 experience**
+
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    AuthType,
+    init,
+    EmbedEvent,
+    HostEvent
+} from '@thoughtspot/visual-embed-sdk';
+// Initialize the ThoughtSpot Visual Embed SDK with your ThoughtSpot URL and authentication type.
+init({
+    thoughtSpotHost: 'https://your-thoughtspot-host', // Replace with your ThoughtSpot application URL
+    authType: AuthType.None, // Use the appropriate AuthType for your setup
+});
+
+//Define event handler to show a loading indicator when the embed is initializing.
+function showLoader() {
+    // Show loading indicator
+}
+
+// Define event handler to hide the loading indicator when the embed has loaded.
+function hideLoader() {
+    // Hide loading indicator
+}
+
+// Find the container element in your HTML where the SpotterEmbed will be rendered.
+const container = document.getElementById('ts-embed');
+if (container) {
+    // Create and configure the SpotterEmbed
+    const spotterEmbed = new SpotterEmbed(container, {
+        frameParams: {
+            height: '100%', // Set the height of the embedded frame
+            width: '100%', // Set the width of the embedded frame
+        },
+        worksheetId: 'your-worksheet-id', // ID of the data source object to query data from. For automatic model discovery and selection (Auto mode), specify '_spotter_data_source_discovery_id'
+        updatedSpotterChatPrompt: true, // Enable new chat interface
+        enablePastConversationsSidebar: true, // Enable chat history
+        //... other configuration attributes
+    });
+
+    // Register event listeners
+    spotterEmbed.on(EmbedEvent.Init, showLoader); // Show loader when initialization starts
+    spotterEmbed.on(EmbedEvent.Load, hideLoader); // Hide loader when embed is fully loaded
+
+    // Render the SpotterEmbed in the container.
+    spotterEmbed.render();
+    // Example: Add a host event to reset the Spotter conversation
+    document.getElementById('resetBtn').addEventListener('click', () => {
+        spotterEmbed.trigger(HostEvent.ResetSpotterConversation);
+    });
+}
+----
 
 == Additional resources
-* link:https://docs.thoughtspot.com/cloud/latest/spotter[Spotter Documentation]
+* xref:embed-ai-analytics.adoc[Spotter features and embedding options]
 * link:https://developers.thoughtspot.com/docs/Class_SpotterEmbed[SpotterEmbed classes and methods]
 * link:https://developers.thoughtspot.com/docs/Interface_SpotterEmbedViewConfig[Configuration options for Spotter interface customization]
 * link:https://github.com/thoughtspot/developer-examples/tree/main/visual-embed/spotter/spotter-embed[Developer examples, window=_blank]
+* link:https://docs.thoughtspot.com/cloud/latest/spotter[Spotter Product Documentation]
