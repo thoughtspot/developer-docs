@@ -51,6 +51,44 @@ export const customizeDocContent = () => {
         wrapperDiv.appendChild(buttonElement);
         tag.parentElement.appendChild(wrapperDiv);
     });
+    /* Add copy buttons to marked table cells */
+    document
+        .querySelectorAll('.copy-cell-table table, table.copy-cell-table')
+        .forEach((table) => {
+            (table as HTMLElement)
+                .querySelectorAll('tbody tr td:nth-child(2)')
+                .forEach((cell) => {
+                    const cellElement = cell as HTMLElement;
+                    if (cellElement.querySelector('.tableCopyButton')) {
+                        return;
+                    }
+                    cellElement.classList.add('tableCopyCell');
+                    const contentWrapper = document.createElement('div');
+                    contentWrapper.classList.add('tableCopyContent');
+                    while (cellElement.firstChild) {
+                        contentWrapper.appendChild(cellElement.firstChild);
+                    }
+                    cellElement.appendChild(contentWrapper);
+                    const buttonElement = document.createElement('button');
+                    buttonElement.setAttribute('class', 'tableCopyButton');
+                    buttonElement.setAttribute(
+                        'aria-label',
+                        t('CODE_COPY_BTN_HOVER_TEXT'),
+                    );
+                    buttonElement.setAttribute(
+                        'title',
+                        t('CODE_COPY_BTN_HOVER_TEXT'),
+                    );
+                    enableCopyToClipboard(buttonElement, contentWrapper);
+                    const imageElement = document.createElement('span');
+                    imageElement.innerHTML = getHTMLFromComponent(
+                        <RiFileCopyFill />,
+                        'copyIcon',
+                    );
+                    buttonElement.appendChild(imageElement);
+                    cellElement.appendChild(buttonElement);
+                });
+        });
     /* To highlight code snippets */
     document.querySelectorAll('pre code').forEach((block) => {
         hljs.highlightBlock(block as HTMLElement);
