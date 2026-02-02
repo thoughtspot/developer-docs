@@ -34,16 +34,11 @@ module.exports = {
         DEV: 'dev',
     },
     VERSION_DROPDOWN: [
+
         {
-            label: '10.15.0.cl',
+            label: '26.2.0.cl',
             link: ' ',
-            subLabel: 'Cloud',
-        },
-        {
-            label: '10.15.0.cl',
-            link: '10.15.0.cl',
-            subLabel: 'Cloud (Now available)',
-            iframeUrl: 'https://developer-docs-10-15-0-cl.vercel.app/docs/',
+            subLabel: 'Cloud (Latest)',
         },
     ],
     CUSTOM_PAGE_ID: {
