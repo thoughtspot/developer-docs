@@ -19,7 +19,7 @@ module.exports = {
             'is now available. Read about the new features and enhancements.',
         // Swap this between:
         // - Pre-GA: release-specific URL (full http(s) URL), ex:
-        //   'https://developers.thoughtspot.com/docs/26.2.0.cl?pageid=introduction'
+        //   'https://developers.thoughtspot.com/docs/26.2.0.cl?pageid=whats-new'
         // - GA: ' /docs/whats-new'
         //linkHref: '/docs/whats-new',
         linkHref: '/docs/26.2.0.cl?pageid=whats-new',
