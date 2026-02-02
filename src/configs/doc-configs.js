@@ -22,7 +22,7 @@ module.exports = {
         //   'https://developers.thoughtspot.com/docs/26.2.0.cl?pageid=introduction'
         // - GA: ' /docs/whats-new'
         //linkHref: '/docs/whats-new',
-        linkHref: 'https://developers.thoughtspot.com/docs/26.2.0.cl?pageid=whats-new',
+        linkHref: '/docs/26.2.0.cl?pageid=whats-new',
         linkText: 'Version 26.2.0.cl',
     },
     TYPE_DOC_PREFIX: 'typedoc',
@@ -75,7 +75,12 @@ module.exports = {
             subLabel: 'Software',
             iframeUrl: 'https://visual-embed-sdk-10-1.vercel.app/docs/',
         },
-
+        {
+            label: '26.2.0.cl',
+            link: '26.2.0.cl',
+            subLabel: 'Coming soon',
+            iframeUrl: 'https://developer-docs-26-2-0-cl.vercel.app/docs/',
+        },
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
