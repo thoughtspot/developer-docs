@@ -23,6 +23,7 @@ import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './playGround/RESTAPI';
 import GraphQLPlayGround from './playGround/GraphQL';
 import { AskDocs } from './askDocs';
+import AnnouncementBanner from '../AnnouncementBanner';
 import {
     TS_HOST_PARAM,
     TS_ORIGIN_PARAM,
@@ -34,6 +35,7 @@ import {
     DEFAULT_PREVIEW_HOST,
     DEFAULT_APP_ROOT,
     HOME_PAGE_ID,
+    HOME_ANNOUNCEMENT_BANNER,
     CUSTOM_PAGE_ID,
     BUILD_ENVS,
     VERSION_DROPDOWN,
@@ -491,6 +493,36 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return cName;
     };
 
+    const getCloudLatestVersion = () => {
+        const cloudLatest = VERSION_DROPDOWN?.find(
+            (v) => v?.subLabel && v.subLabel.toLowerCase().includes('cloud (latest)'),
+        );
+        return cloudLatest?.label;
+    };
+
+    const extractVersionString = (text: string | undefined | null) => {
+        if (!text) return undefined;
+        // Matches versions like 26.2.0.cl or 10.15.0.cl / 10.10.0.sw
+        const match = text.match(/\b\d+\.\d+\.\d+\.(?:cl|sw)\b/i);
+        return match?.[0]?.toLowerCase();
+    };
+
+    const shouldShowAnnouncementBanner = () => {
+        if (!isPublicSiteOpen) return false;
+        if (!HOME_ANNOUNCEMENT_BANNER?.enabled) return false;
+
+        const cloudLatest = extractVersionString(getCloudLatestVersion());
+        const bannerVersion =
+            extractVersionString(HOME_ANNOUNCEMENT_BANNER?.linkText) ||
+            extractVersionString(HOME_ANNOUNCEMENT_BANNER?.message);
+
+        // Only hide when we can confidently compare and they match.
+        if (cloudLatest && bannerVersion && cloudLatest === bannerVersion) return false;
+        return true;
+    };
+
+    const isExternalLink = (href?: string) => /^https?:\/\//i.test(href || '');
+
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
@@ -515,6 +547,44 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             : { height: '0px' }
                     }
                 ></div>
+                {shouldShowAnnouncementBanner() && (
+                    <AnnouncementBanner
+                        enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
+                        message={
+                            <span>
+                                {HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                    HOME_ANNOUNCEMENT_BANNER?.linkText && (
+                                        <a
+                                            className="announcementBanner__link"
+                                            href={HOME_ANNOUNCEMENT_BANNER.linkHref}
+                                            target={
+                                                isExternalLink(
+                                                    HOME_ANNOUNCEMENT_BANNER.linkHref,
+                                                )
+                                                    ? '_blank'
+                                                    : undefined
+                                            }
+                                            rel={
+                                                isExternalLink(
+                                                    HOME_ANNOUNCEMENT_BANNER.linkHref,
+                                                )
+                                                    ? 'noreferrer'
+                                                    : undefined
+                                            }
+                                        >
+                                            {HOME_ANNOUNCEMENT_BANNER.linkText}
+                                        </a>
+                                    )}
+                                {(HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                    HOME_ANNOUNCEMENT_BANNER?.linkText) && ' '}
+                                {HOME_ANNOUNCEMENT_BANNER?.message ||
+                                    (VERSION_DROPDOWN?.[0]?.label
+                                        ? `Version ${VERSION_DROPDOWN[0].label} is now available!`
+                                        : 'A new version is now available!')}
+                            </span>
+                        }
+                    />
+                )}
                 <main
                     className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}
