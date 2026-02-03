@@ -24,6 +24,7 @@ module.exports = {
         //linkHref: '/docs/whats-new',
         linkHref: '/docs/26.2.0.cl?pageid=whats-new',
         linkText: 'Version 26.2.0.cl',
+        openInNewTab: true,
     },
     TYPE_DOC_PREFIX: 'typedoc',
     DEFAULT_HOST: 'https://try-everywhere.thoughtspot.cloud',

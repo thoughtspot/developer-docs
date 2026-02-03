@@ -522,6 +522,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     };
 
     const isExternalLink = (href?: string) => /^https?:\/\//i.test(href || '');
+    const shouldOpenBannerLinkNewTab = (href?: string) =>
+        Boolean(HOME_ANNOUNCEMENT_BANNER?.openInNewTab) || isExternalLink(href);
+    const bannerLinkOpensInNewTab = shouldOpenBannerLinkNewTab(
+        HOME_ANNOUNCEMENT_BANNER?.linkHref,
+    );
 
     return (
         <>
@@ -558,17 +563,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                                             className="announcementBanner__link"
                                             href={HOME_ANNOUNCEMENT_BANNER.linkHref}
                                             target={
-                                                isExternalLink(
-                                                    HOME_ANNOUNCEMENT_BANNER.linkHref,
-                                                )
-                                                    ? '_blank'
-                                                    : undefined
+                                                bannerLinkOpensInNewTab ? '_blank' : undefined
                                             }
                                             rel={
-                                                isExternalLink(
-                                                    HOME_ANNOUNCEMENT_BANNER.linkHref,
-                                                )
-                                                    ? 'noreferrer'
+                                                bannerLinkOpensInNewTab
+                                                    ? 'noopener noreferrer'
                                                     : undefined
                                             }
                                         >
