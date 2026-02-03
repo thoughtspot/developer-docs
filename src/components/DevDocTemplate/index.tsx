@@ -507,6 +507,42 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return match?.[0]?.toLowerCase();
     };
 
+    const getVersionFromPath = (pathname?: string) => {
+        if (!pathname) return undefined;
+        const normalizedPath = pathname.toLowerCase();
+
+        const versionFromOptions = VERSION_DROPDOWN?.find((option) => {
+            const link = option?.link?.trim();
+            if (!link || link === '') return false;
+
+            const linkPath = link.startsWith('/') ? link : `/${link}`;
+            const hyphenPath = link.replace(/\./g, '-');
+            const hyphenPathWithSlash = hyphenPath.startsWith('/')
+                ? hyphenPath
+                : `/${hyphenPath}`;
+
+            return (
+                normalizedPath.includes(linkPath.toLowerCase()) ||
+                normalizedPath.includes(hyphenPathWithSlash.toLowerCase())
+            );
+        });
+
+        const optionVersion =
+            extractVersionString(versionFromOptions?.label) ||
+            extractVersionString(versionFromOptions?.link);
+        if (optionVersion) return optionVersion;
+
+        return extractVersionString(normalizedPath.replace(/-/g, '.'));
+    };
+
+    const getVersionFromHost = (hostname?: string) => {
+        if (!hostname) return undefined;
+        return extractVersionString(hostname.replace(/-/g, '.').toLowerCase());
+    };
+
+    const getCurrentDocVersion = () =>
+        getVersionFromPath(location?.pathname) || getVersionFromHost(location?.hostname);
+
     const shouldShowAnnouncementBanner = () => {
         if (!isPublicSiteOpen) return false;
         if (!HOME_ANNOUNCEMENT_BANNER?.enabled) return false;
@@ -514,10 +550,15 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         const cloudLatest = extractVersionString(getCloudLatestVersion());
         const bannerVersion =
             extractVersionString(HOME_ANNOUNCEMENT_BANNER?.linkText) ||
-            extractVersionString(HOME_ANNOUNCEMENT_BANNER?.message);
+            extractVersionString(HOME_ANNOUNCEMENT_BANNER?.message) ||
+            extractVersionString(HOME_ANNOUNCEMENT_BANNER?.linkHref);
+        const currentDocVersion = getCurrentDocVersion();
 
         // Only hide when we can confidently compare and they match.
         if (cloudLatest && bannerVersion && cloudLatest === bannerVersion) return false;
+        if (currentDocVersion && bannerVersion && currentDocVersion === bannerVersion) {
+            return false;
+        }
         return true;
     };
 
