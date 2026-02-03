@@ -1,0 +1,998 @@
+= REST API v2.0 authentication
+:toc: true
+:toclevels: 3
+
+:page-title: User authentication and session management
+:page-pageid: api-authv2
+:page-description: REST v2 APIs support basic and token-based authentication methods.
+
+The REST API v2.0 framework supports the following types of authentication:
+
+xref:authentication.adoc#loginTS[Cookie-based authentication]::
+In this method, the REST client sends an API request to the `api/rest/2.0/auth/session/login` endpoint with the `username` and `password`. The client session is assigned a cookie upon successful login. This session cookie is used to authenticate the client in subsequent API calls.
+
+Token-based authentication::
+In this method, the REST clients obtain an authentication token from ThoughtSpot and use this token in their subsequent API calls to authorize their requests. Based on your client setup, use one of the following methods:
+
+xref:authentication.adoc#_basic_authentication[Basic authentication];;
+In this method, a REST client sends the `username` and `password` to authenticate to ThoughtSpot and obtains a token.
+
+xref:authentication.adoc#trusted-auth-v2[Trusted authentication];;
+In this method, the REST client must send the `username` and `secret_key` in the API request to obtain an authentication token. The `secret_key` is generated if **Trusted authentication** is enabled on your ThoughtSpot instance.
+
+Multifactor authentication (MFA)::
++
+ThoughtSpot now supports multifactor authentication (MFA) for environments using local authentication with Identity and Access Management (IAMv2). If MFA  is enabled on your ThoughtSpot instance,
+
+*  The REST API calls to the API endpoints authenticating to ThoughtSpot with only `username` and `password` will return an error. You will now have an additional authentication factor.
++
+Contact https://community.thoughtspot.com/customers/s/login/?ec=302&startURL=%2Fcustomers%2Fs%2Fcontactsupport[ThoughtSpot Support] for assistance.
+* Embedded users authenticating to ThoughtSpot with basic authentication are recommended to switch to `AuthType.TrustedAuthTokenCookieless`.
+* Non-embedded users calling REST APIs authenticating to ThoughtSpot with only `username` and `password` will return an error. Contact https://community.thoughtspot.com/customers/s/login/?ec=302&startURL=%2Fcustomers%2Fs%2Fcontactsupport[ThoughtSpot Support] for assistance.
+
+For more information, see https://docs.thoughtspot.com/cloud/latest/authentication-local-mfa[Multifactor authentication for customers using local authentication, window=_blank].
+
+[#loginTS]
+== Cookie-based authentication
+For cookie-based authentication, make an API call to the `/api/rest/2.0/auth/session/login` endpoint with the `username`, `password`, and other attributes in the request body.
+
+[NOTE]
+====
+* If MFA is enabled on your ThoughtSpot instance then authentication with only `username` and `password` will return an error. Contact https://community.thoughtspot.com/customers/s/login/?ec=302&startURL=%2Fcustomers%2Fs%2Fcontactsupport[ThoughtSpot Support] for assistance.
+* MFA can be enabled on your instance only if Identity and Access Management (IAMv2) is already enabled.
+====
+
+=== Request parameters
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`username`
+|__String__. Username of the ThoughtSpot user.
+
+|`password`
+|__String__. The password of the user account.
+
+|`org_identifier`
+|__String__. Name of ID of the Org. If no Org ID is specified, the user will be logged into the Org context of their previous session.
+
+|`remember_me`
+__Optional__
+|__Boolean__. A flag to remember the user session.
+When set to true, the session cookie persists in subsequent API calls for about 7 days.
+
+If `remember_me` is set to `false`, the user session times out after three hours of inactivity. To get a cookie assigned to your user session, you need to log in to ThoughtSpot again.
+|=====
+
+=== Example request
+.cURL
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/session/login' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "tsUserA",
+  "password": "Guest@123!",
+  "remember_me": true
+}'
+----
+
+.Request URL
+----
+POST {ThoughtSpot-Host}/api/rest/2.0/auth/session/login
+----
+
+=== Example response
+
+If the login is successful, ThoughtSpot returns the 204 response code. A session cookie is assigned to the logged-in user and sent in the response header.
+
+----
+Set-Cookie: JSESSIONID=b9a5b821-fa91-49ea-99fc-12817a141e76; Path=/; HttpOnly
+Set-Cookie: clientId=76d83461-1b8a-425a-9116-66c8d6f006bb; Path=/; Secure; HttpOnly
+----
+
+=== Response codes
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|HTTP status code|Description
+|**204**
+|Successful logon
+|**400**
+|Bad request +
+Invalid username or password
+|**401**
+|Unauthorized success +
+|**500**
+|Operation failed
+|=====
+
+=== Cookie usage in subsequent API requests
+
+The session cookie is automatically set in the request header when you make your subsequent API calls via a web browser. Note that if you are using a Web browser or Postman to make a REST API call, the session cookie obtained from the  `/tspublic/v1/session/login` API call is automatically set. REST clients in a non-browser environment must include the session cookie in the request header as shown in the following example:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/search' \
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  -H 'Cookie: JSESSIONID=fc3424f9-d3f0-4a24-bd33-400fd826cac7; clientId=70cf1328-af97-40b2-9bd5-1c520e133963' \
+  --data-raw '{
+    "metadata": [
+     {
+      "type": "LIVEBOARD"
+      }
+    ]
+  }'
+----
+
+[NOTE]
+====
+If you are accessing the REST API outside a web browser, create a long-lived session object in your code, and then call the login API using that session object. Make subsequent REST API calls with the same session object to send the cookie along with the other aspects of the particular REST API call.
+====
+
+[#bearerToken]
+== Token-based authentication
+
+In this method, REST clients can send a `POST` request to the `/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` API endpoint to get an authentication token. After ThoughtSpot issues an authentication token, the user must include the token in the `Authorization` header of their subsequent API requests.
+
+[NOTE]
+====
+By default, the token obtained from ThoughtSpot is valid for 5 minutes (300 seconds). If a REST client tries to make an API call with an expired token, the server returns an error. In such cases, obtain a new token and use it in your subsequent API calls. If you want to use the token for more than 5 minutes, set the token expiry duration to a higher value.
+====
+
+=== Basic authentication
+
+You can obtain a token that grants read-only access to a ThoughtSpot metadata object via a `POST` request to the `/api/rest/2.0/auth/token/object` endpoint, or get a token that grants full access to  ThoughtSpot via `/api/rest/2.0/auth/token/full`.
+
+[NOTE]
+====
+* If MFA is enabled on your ThoughtSpot instance then authentication with only `username` and `password` will return an error. Contact https://community.thoughtspot.com/customers/s/login/?ec=302&startURL=%2Fcustomers%2Fs%2Fcontactsupport[ThoughtSpot Support] for assistance.
+* MFA can be enabled on your instance only if Identity and Access Management (IAMv2) is already enabled.
+====
+
+==== Get a token for full access
+
+To get an access token that grants full access to ThoughtSpot, send a `POST` request with `username`, `password`, and other attributes to the `/api/rest/2.0/auth/token/full` endpoint:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`username`
+|__String__. Username of the ThoughtSpot user.
+|`password`
+|__String__. Password of the user account.
+|`org_id` +
+__Optional__|__Integer__. If the Orgs feature is enabled on your instance, specify the ID of the Org for which you want to generate the authentication token. If no value is specified, the token is generated for the Primary Org (Org 0).
+|`validity_time_in_sec` +
+__Optional__|__Integer__. Token validity duration in seconds. By default, the token is valid for 5 minutes.
+|=====
+
+===== Example request
+
+.cURL
+[sourc,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/full' \
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "tsUserA",
+  "password": "Guest123!",
+  "org_id": 1,
+  "validity_time_in_sec": 86400
+}'
+----
+
+===== Example response
+If the API request is successful, ThoughtSpot returns the authentication token that grants full application access.
+
+[source,JSON]
+----
+{
+  "token": "{AUTH_TOKEN}",
+  "creation_time_in_millis": 1675129264089,
+  "expiration_time_in_millis": 1675129564089,
+  "scope": {
+    "access_type": "FULL",
+    "org_id": 1,
+    "metadata_id": null
+  },
+  "valid_for_user_id": "59a122dc0-38d7-43e7-bb90-86f724c7b602",
+  "valid_for_username": "tsUserA"
+}
+----
+
+===== Response codes
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|HTTP status code|Description
+|**204**
+|Successful logon
+|**400**
+|Bad request +
+Invalid parameter
+|**401**
+|Unauthorized success
+|**403**
+|Forbidden access
+|**500**
+|Operation failed
+|=====
+
+==== Get a token to access a specific object
+
+To get a token that grants read-only access to a ThoughtSpot metadata object, send a `POST` request with `username`, `password`, `object_id`, and other attributes to the `/api/rest/2.0/auth/token/object` endpoint:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|  Description
+|`username`
+|__String__. Username of the ThoughtSpot user.
+|`password`
+|__String__. Password of the user account.
+|`object_id`
+|__String__. GUID of the ThoughtSpot object.
+The token obtained from this API request grants `Read-Only` access to the specified object.
+|`org_id` +
+__Optional__|__Integer__. If the Orgs feature is enabled on your instance, specify the ID of the Org for which you want to generate the authentication token. If no value is specified, the token is generated for the Primary Org (Org 0).
+|`validity_time_in_sec` +
+__Optional__|__Integer__. Token validity duration in seconds. By default, the token is valid for 5 minutes.
+|=====
+
+===== Example request
+
+.cURL
+[sourc,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/object' \
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "tsUserA",
+  "org_id": 1,
+  "validity_time_in_sec": 86400,
+  "auto_create": false,
+  "password": "Guest123!"
+  "object_id": "fa68ae91-7588-4136-bacd-d71fb12dda69"
+}'
+----
+
+===== Example response
+If the API request is successful, ThoughtSpot returns the authentication token that grants access to the metadata object specified in the request.
+
+[source,JSON]
+----
+{
+  "token": "{AUTH_TOKEN}",
+  "creation_time_in_millis": 1675129264089,
+  "expiration_time_in_millis": 1675129564089,
+  "scope": {
+    "access_type": "REPORT_BOOK_VIEW",
+    "org_id": 1,
+    "metadata_id": "e65d7d3b-c934-4a59-baa1-d5cb7b679cc9"
+  },
+  "valid_for_user_id": "59a122dc0-38d7-43e7-bb90-86f724c7b602",
+  "valid_for_username": "tsUserA"
+}
+----
+
+===== Response codes
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|HTTP status code|Description
+|**204**
+|Successful logon
+|**400**
+|Bad request +
+Invalid parameter
+|**401**
+|Unauthorized success
+|**403**
+|Forbidden access
+|**500**
+|Operation failed
+|=====
+
+[#trusted-auth-v2]
+=== Trusted authentication
+
+Trusted authentication allows an authenticator service to request tokens on behalf of users who require access to the ThoughtSpot content embedded in a third-party application.
+
+The token issued from ThoughtSpot can be used to log in a user. By default, the token is valid for 300 seconds and the token expiration duration is configurable. Note that the token is necessary only during the login process, after which any request to ThoughtSpot will include session cookies identifying the signed-in user.
+
+To request a token on behalf of another user, you need administrator privileges and a `secret key` that allows you to securely pass the authentication details of an embedded application user. The `secret key` is generated xref:trusted-authentication.adoc#trusted-auth-enable[when Trusted authentication is enabled on a ThoughtSpot instance].
+
+==== Get a token for full access
+
+To get an access token that grants full access to ThoughtSpot, send a `POST` request with `username`, `secret_key`, and other attributes to the `/api/rest/2.0/auth/token/full` endpoint:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|  Description
+|`username`
+|__String__. Username of the ThoughtSpot user. If the user is not available in ThoughtSpot, you can set the `auto_create` parameter to `true` to create a user just-in-time(JIT).
+|`secret_key`
+|__String__. The secret key string generated for your ThoughtSpot instance. The secret key is created xref:trusted-authentication.adoc#trusted-auth-enable[when trusted authentication is enabled] on your instance.
+|`validity_time_in_sec` +
+__Optional__| __Integer__. Token expiry duration in seconds. The default duration is 300 seconds.
+|`org_id` +
+__Optional__|__Integer__. If the Orgs feature is enabled on your instance, specify the ID of the Org for which you want to generate the authentication token. If no value is specified, the token is generated for the Primary Org (Org 0).
+|=====
+
+===== Example request
+
+The following example shows the request body with `username` and `secret_key`:
+
+.cURL
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://stage-grapes-champagne.thoughtspotstaging.cloud/api/rest/2.0/auth/token/full'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "tsUserA",
+  "org_id": 1,
+  "validity_time_in_sec": 300,
+  "auto_create": false,
+  "secret_key": "2657f6f9-6aa9-4432-99f2-bf0d70f240ac"
+}'
+----
+
+
+===== Example response
+If the API request is successful, ThoughtSpot returns the authentication token that grants access to the metadata object specified in the request.
+
+[source,JSON]
+----
+{
+   "token":"{AUTH_TOKEN}",
+   "creation_time_in_millis":1675163671270,
+   "expiration_time_in_millis":1675163971270,
+   "scope":{
+      "access_type":"FULL",
+      "org_id":1,
+      "metadata_id":null
+   },
+   "valid_for_user_id":"fd873d1e-11cc-4246-8ee2-78e78d2b5840",
+   "valid_for_username":"tsUserA"
+}
+----
+
+===== Response codes
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|HTTP status code|Description
+|**204**
+|Successful logon
+|**400**
+|Bad request +
+Invalid parameter
+|**401**
+|Unauthorized success
+|**403**
+|Forbidden access
+|**500**
+|Operation failed
+|=====
+
+==== Get a token to access a specific object
+
+To get a token that grants a `READ-ONLY` access to a specific metadata object, send a `POST` request with `username`, `secret_key`, `object_id`, and other attributes to the `/api/rest/2.0/auth/token/object` endpoint:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`username`
+|__String__. Username of the ThoughtSpot user. If the user is not available in ThoughtSpot, you can set the `auto_create` parameter to `true` to create a user just-in-time (JIT).
+
+|`secret_key`
+|__String__. The secret key string generated for your ThoughtSpot instance. The secret key is created xref:trusted-authentication.adoc#trusted-auth-enable[when trusted authentication is enabled] on your instance.
+
+|`object_id`
+|__String__. GUID of the ThoughtSpot object.
+The token obtained from this API request grants `Read-Only` access to the specified object.
+|`org_id` +
+__Optional__|__Integer__. If the Orgs feature is enabled on your instance, specify the ID of the Org for which you want to generate the authentication token. If no value is specified, the token is generated for the Primary Org (Org 0).
+|`validity_time_in_sec` +
+__Optional__| __Integer__. Token expiry duration in seconds. The default duration is 300 seconds.
+|=====
+
+===== Example request
+
+The following example shows the request body with `username`, `secret_key`, and `object_id`:
+
+.cURL
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/object' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "tsUserA",
+  "org_id": 1,
+  "object_id": "061457a2-27bc-43a9-9754-0cd873691bf0",
+  "secret_key": "69fb6d98-1696-42c0-9841-22b078c04060",
+}'
+----
+
+===== Example response
+If the API request is successful, ThoughtSpot returns the authentication token that grants access to the metadata object specified in the request.
+
+[source,JSON]
+----
+{
+   "token":"{AUTH_TOKEN}",
+   "creation_time_in_millis":1675162190374,
+   "expiration_time_in_millis":1675162490374,
+   "scope":{
+      "access_type":"REPORT_BOOK_VIEW",
+      "org_id":1,
+      "metadata_id":"061457a2-27bc-43a9-9754-0cd873691bf0"
+   },
+   "valid_for_user_id":"fd873d1e-11cc-4246-8ee2-78e78d2b5840",
+   "valid_for_username":"tsUserA"
+}
+----
+
+===== Response codes
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|HTTP status code|Description
+|**204**
+|Successful logon
+|**400**
+|Bad request +
+Invalid parameter
+|**401**
+|Unauthorized success
+|**403**
+|Forbidden access
+|**500**
+|Operation failed
+|=====
+
+=== Just-in-time provisioning
+
+If the `username` does not exist in the ThoughtSpot system, you can provision a new user and assign privileges using `auto_create` and `group_identifiers` attributes. For xref:just-in-time-provisioning.adoc[Just-in-time provisioning], include the following attributes along with `username` and `secret_key` in the `POST` request body:
+
+[NOTE]
+====
+When provisioning new users via `POST /api/rest/2.0/auth/token/custom` API endpoint, note that the user will be added if `auto_create` is set to `true` and the username specified in the API request does not exist in ThoughtSpot. Unlike the other token API endpoints (`POST /api/rest/2.0/auth/token/full` and `POST /api/rest/2.0/auth/token/object`), the user properties such as the display name, email, Org and group assignment will not be updated with new values.
+====
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`username`
+|__String__. Username of the ThoughtSpot user. If the user is not available in ThoughtSpot, you can set the `auto_create` parameter to `true` to create a user just-in-time (JIT).
+|`secret_key`
+|__String__. The secret key string provided by the ThoughtSpot server. ThoughtSpot generates this secret key xref:trusted-authentication.adoc#trusted-auth-enable[when trusted authentication is enabled].
+|`email` +
+__Optional__ |__String__. Email address of the user. Use this parameter to add the email address of the user during JIT provisioning.
+|`display_name` +
+__Optional__ |__String__. Display name of the user. Use this parameter when adding a user  just-in-time (JIT).
+|`auto_create` +
+__Optional__|__Boolean__. Creates a user if the specified username is not already available in ThoughtSpot. The default value is `false`.
+|`group_identifiers` +
+__Optional__|__Array of Strings__. GUIDs or names of the groups to assign the user to. This attribute can be used in conjunction with `auto_create` to dynamically assign groups and privileges to a user.
+|=====
+
+==== Example requests
+
+The following sample shows the request format to provision a new user just-in-time and get an authentication token that grants access to ThoughtSpot:
+
+.cURL
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/full' \
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "tsUserA",
+  "object_id": "061457a2-27bc-43a9-9754-0cd873691bf0",
+  "secret_key": "69fb6d98-1696-42c0-9841-22b078c04060",
+  "org_id": 2
+  "email": "userA@example.com",
+  "display_name": "User A"
+  "auto_create": true,
+  "group_identifiers": [
+    "DataAdmin",
+    "Analyst"
+  ]
+}'
+----
+
+The following sample shows the request format to provision a new user just-in-time and get an authentication token that grants access to a specific metadata object in ThoughtSpot:
+
+.cURL
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/object' \
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "tsUserA",
+  "object_id": "061457a2-27bc-43a9-9754-0cd873691bf0",
+  "secret_key": "69fb6d98-1696-42c0-9841-22b078c04060",
+  "org_id": 2
+  "auto_create": true,
+  "group_identifiers": [
+    "DataAdmin",
+    "Analyst"
+  ]
+}'
+----
+
+[NOTE]
+====
+The `auth/token/custom` API endpoint also allows you to automatically create a user during token generation. For more information, see xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[Get a token with custom rules and filter conditions for ABAC implementation].
+====
+
+[#_get_tokens_with_custom_rules_and_filter_conditions]
+=== Get a token with custom rules and filter conditions for ABAC implementation
+
+To get a token with security entitlements encoded in JSON Web Token (JWT) format for a user, send a `POST` request with the user details, filter rules, and parameter values to the `/api/rest/2.0/auth/token/custom` API endpoint. This API allows administrators to generate a token with a specific set of rules and column filtering conditions that are applied when a user session is created.
+
+[NOTE]
+====
+If your application instance is upgraded 10.4.0.cl or a later version, ThoughtSpot recommends using the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fauthentication%2Fget-custom-access-token">/api/rest/2.0/auth/token/custom</a>+++ API endpoint to generate a JWT token with custom security rules for Attribute-Based Access Control (ABAC) implementation. +
+The `user_parameters` property used for generating an ABAC token via `/api/rest/2.0/auth/token/full` and `/api/rest/2.0/auth/token/object` API endpoints in the beta implementation is deprecated in 10.4.0.cl. +
+If your current implementation is using the beta version of the ABAC and you want to migrate your beta ABAC implementation to `/api/rest/2.0/auth/token/custom`, refer to the instructions in xref:jwt-migration.adoc[ABAC migration guide].
+====
+
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`username`
+|__String__. Username of the ThoughtSpot user. If the user is not available in ThoughtSpot, a new user account will be created and added to ThoughtSpot.
+|`password`
+a|__String__. Password of the user account. If using `secret_key` to generate the token, do not specify the `Password`. +
+If MFA is enabled on your ThoughtSpot instance then API call with only `username` and `password` will return an error.
+|`secret_key`
+|__String__. The secret key string provided by the ThoughtSpot server. ThoughtSpot generates this secret key xref:trusted-authentication.adoc#trusted-auth-enable[when trusted authentication is enabled].
+|`validity_time_in_sec` +
+__Optional__| __Integer__. Token expiry duration in seconds. The default duration is 300 seconds.
+|`org_id` +
+__Optional__|__Integer__. If the Orgs feature is enabled on your instance, specify the ID of the Org for which you want to generate the authentication token. If an Org ID is not specified, the token is generated for the Primary Org (Org 0).
+|`persist_option` a| Indicates if the filter rules and Parameter attributes defined in the API request should persist for user sessions initiated with the token obtained from this API call. The following options are available:
+
+* `APPEND` +
+Adds the attributes defined in the API request to the user properties. These properties will be applied to user sessions and for scheduled jobs if any.
+
+* `NONE` +
+
+Does not update the existing user properties. The attributes defined in the API request will be applied to the token, but do not persist when the token expires.
+
+* `REPLACE` +
+Available from 10.5.0.cl. Replaces existing user properties of the user with the new attributes assigned to the token in the API request.
+
+* `RESET` +
+Resets the existing user properties upon token generation and adds the new attributes defined in the request. By default, `"persist_option": "RESET"` resets all attributes
+
+
+
+|`filter_rules`  a|__Array of filter rules__. An array of runtime filter conditions to pass via token. Each rule in the array must include the following information:
+
+* `column_name` +
+Name of the column in the data source object (Model).
+* `operator` +
+Filter operator to use. For a complete list of supported operators, see xref:runtime-filters.adoc#rtOperator[filter operators].
+* `values` +
+The values to filter on. To get all records, use `TS_WILDCARD_ALL` .
+
+[source,JSON]
+----
+  "filter_rules": [
+    {
+      "column_name": "Customer ID",
+      "operator": "EQ",
+      "values": [
+        "492810"
+      ]
+    },
+    {
+      "column_name": "Item type",
+      "operator": "EQ",
+      "values": [
+        "Jackets"
+      ]
+    }
+  ]
+----
+
+|`parameter_values` a| __Array of Parameter values__. Parameter rules to apply. Each rule in the array must include the following attributes:
+
+* `name` +
+Name of the column in the data source object (Model)
+* `value` +
+The values to use.
+
+[source,JSON]
+----
+"parameter_values": [
+    {
+      "name": "Discount",
+      "values": ["20"]
+    },
+    {
+      "name": "DATE,
+      "values": ["1656914873"]
+    }
+  ]
+----
+|`objects` +
+__Optional__ a|__Array of strings__. An array of object names or GUIDs to which you want to apply the security rules. The object `type` is mandatory if the object `name` is specified as the `identifier`. Specify the object type as `LOGICAL_TABLE`.  
+
+If no object is specified in the API request, the filter and Parameter rules will be applied to all `LOGICAL_TABLE` objects that the user has access to.
+
+[NOTE]
+====
+The `LIVEBOARD` and `ANSWER` object types are not supported. 
+====
+
+|`email` +
+__Optional__ |__String__. Email address of the user. Use this parameter to add the email address of the user if `auto_create` is set to `true`.
+|`display_name` +
+__Optional__ |__String__. Display name of the user. Use this parameter if `auto_create` is set to `true.
+|`auto_create` +
+__Optional__|__Boolean__. Available from 10.5.0.cl. Creates a user if the specified username is not already available in ThoughtSpot. The default value is `true`.
+|`groups` +
+__Optional__|__Array of Strings__. GUIDs or names of the groups to assign the user to. This attribute can be used in conjunction with `auto_create` to dynamically assign groups and privileges to a user.
+|=====
+
+
+
+//unless a specific `reset_option` is defined.
+////
+|`reset_option` a|__Array of strings__. Allows you to define the type of attributes to reset upon token generation. The following options are available:
+
+* `FILTER_RULES` +
+Resets filter attributes.
+
+* `PARAMETERS`
+Resets only Parameters.
+
+* `GROUPS`
+Resets group assignments
+////
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/custom'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "UserA",
+  "validity_time_in_sec": 300,
+  "persist_option": "APPEND",
+  "auto_create": true,
+  "filter_rules": [
+    {
+      "column_name": "Item type",
+      "operator": "EQ",
+      "values": [
+        "Jackets","Bags"
+      ]
+    },
+    {
+      "column_name": "Customer ID",
+      "operator": "EQ",
+      "values": [
+        "412870"
+      ]
+    }
+  ],
+  "parameter_values": [
+    {
+      "name": "Discount",
+      "values": [
+        "20"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "type": "LOGICAL_TABLE",
+      "identifier": "4c55ff63-d03e-497a-8ec6-1be083f160ee"
+    }
+  ],
+  "email": "UserA@thoughtspot.com",
+  "display_name": "User A",
+  "groups": [
+    {
+      "identifier": "a71d5d1f-6e02-4ee1-a6e9-e158af844367"
+    }
+  ],
+  "org_identifier": "0",
+  "secret_key": "4c55ff63-d03e-497a-8ec6-1be083f160ee"
+}'
+----
+
+==== API response
+If the API request is successful, ThoughtSpot returns a token with the security rules and attributes applied.
+
+[source,JSON]
+----
+{
+  "id": "58185cfd-4c04-4570-8bab-63bc8dad2c98",
+  "token": "{AUTH_TOKEN}",
+  "org": {
+    "id": 0,
+    "name": "Primary"
+  },
+  "user": {
+    "id": "00000845-7688-795c-c4a1-857dc78d799d",
+    "name": "userA"
+  },
+  "creation_time_in_millis": 1763654650210,
+  "expiration_time_in_millis": 1763654949981
+}
+----
+
+===== Response codes
+
+[options="header", cols="1,4"]
+|====
+|HTTP status code|Description
+|**204**|Successful token revocation
+|**400**|Invalid request
+|**401**|Unauthorized access
+|**403**|Forbidden access
+|**500**|Failed operation or unauthorized request
+|====
+
+== Get token details
+
+To get the authentication token assigned to the current session of the logged-in user, send a request to `/api/rest/2.0/auth/session/token`. You can also this API to get the token issued for the logged-in user for trusted authentication.
+
+=== Example request
+
+.cURL
+[source,cURL]
+----
+curl -X GET \
+  --url 'https://{ThoughtSpot-host}/api/rest/2.0/auth/session/token' \
+  -H 'Accept: application/json'
+----
+
+=== Example response
+
+[source,JSON]
+----
+ {
+    "token": "{AUTH_TOKEN}"
+    "creation_time_in_millis":1704471154477
+    "expiration_time_in_millis":1704557554477
+    "valid_for_user_id":"59481331-ee53-42be-a548-bd87be6ddd4a"
+    "valid_for_username":"tsadmin"
+ }
+----
+
+== Revoke a token
+
+To revoke a token, send a `POST` request with the following attributes to the `/api/rest/2.0/auth/token/revoke` endpoint.
+
+===== Request parameters
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|  Description
+|`user_identifier`
+|__String__. GUID or name of the ThoughtSpot user.
+|`token`
+|__String__. Token issued for the user specified in `user_identifier`.
+|=====
+
+===== Example request
+
+.cURL
+[source, cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-host}/api/rest/2.0/auth/token/revoke' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "user_identifier": "tsUserA,
+  "token": {access_token_user}
+}'
+----
+
+===== Example response
+
+If the API request is successful, the access token is revoked, and the current user session becomes invalid. Before making another API call, you must obtain a new token.
+
+===== Response codes
+
+[options="header", cols="1,4"]
+|====
+|HTTP status code|Description
+|**204**|Successful token revocation
+|**400**|Invalid request
+|**401**|Unauthorized access
+|**403**|Forbidden access
+|**500**|Failed operation or unauthorized request
+|====
+
+== View session information
+
+To get details of the session object for the currently logged-in user, send a `GET` request to the `GET /api/rest/2.0/auth/session/user` endpoint.
+
+
+=== Example request
+
+.cURL
+[source, cURL]
+----
+curl -X GET \
+  --url 'https://{ThoughtSpot-host}/api/rest/2.0/auth/session/user' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'\
+  -H 'Accept: application/json'
+----
+
+=== Example response
+
+If the API request is successful, ThoughtSpot returns the following response:
+
+[source, JSON]
+----
+{
+   "id":"658a4b35-d021-4009-bf16-c66504dee6a4",
+   "name":"tsUserZ",
+   "display_name":"tsUserZ",
+   "visibility":"SHARABLE",
+   "author_id":"59481331-ee53-42be-a548-bd87be6ddd4a",
+   "can_change_password":true,
+   "complete_detail":true,
+   "creation_time_in_millis":1675163378622,
+   "current_org":{
+      "id":0,
+      "name":"Primary"
+   },
+   "deleted":false,
+   "deprecated":false,
+   "account_type":"REMOTE_USER",
+   "account_status":"ACTIVE",
+   "email":"testUser1@thoughtspot.com",
+   "expiration_time_in_millis":1675171235,
+   "external":false,
+   "favorite_metadata":[
+
+   ],
+   "first_login_time_in_millis":1675170739789,
+   "group_mask":4,
+   "hidden":false,
+   "home_liveboard":null,
+   "incomplete_details":[
+
+   ],
+   "is_first_login":false,
+   "modification_time_in_millis":1675170835628,
+   "modifier_id":"59481331-ee53-42be-a548-bd87be6ddd4a",
+   "notify_on_share":true,
+   "onboarding_experience_completed":false,
+   "orgs":[
+      {
+         "id":0,
+         "name":"Primary"
+      }
+   ],
+   "owner_id":"658a4b35-d021-4009-bf16-c66504dee6a4",
+   "parent_type":"USER",
+   "privileges":[
+      "AUTHORING",
+      "USERDATAUPLOADING",
+      "DATADOWNLOADING",
+      "DEVELOPER"
+   ],
+   "show_onboarding_experience":true,
+   "super_user":false,
+   "system_user":false,
+   "tags":[
+
+   ],
+   "tenant_id":"982d6da9-9cd1-479e-b9a6-35aa05f9282a",
+   "user_groups":[
+      {
+         "id":"0b531ff7-2a5e-45ee-a954-43fbd25c4c92",
+         "name":"DATAMANAGEMENT"
+      },
+      {
+         "id":"4fa3f1ca-337a-4fb3-9e7c-dc85da8e6b8e",
+         "name":"A3ANALYSIS"
+      },
+      {
+         "id":"ed7435bc-cab4-40c2-ab2e-87e517eb3640",
+         "name":"Developer"
+      },
+      {
+         "id":"1cf05016-988c-422a-aae6-bf0ac9f106b7",
+         "name":"USERDATAUPLOADING"
+      }
+   ],
+   "user_inherited_groups":[
+      {
+         "id":"ed7435bc-cab4-40c2-ab2e-87e517eb3640",
+         "name":"Developer"
+      },
+      {
+         "id":"1cf05016-988c-422a-aae6-bf0ac9f106b7",
+         "name":"USERDATAUPLOADING"
+      },
+      {
+         "id":"4fa3f1ca-337a-4fb3-9e7c-dc85da8e6b8e",
+         "name":"A3ANALYSIS"
+      },
+      {
+         "id":"0b531ff7-2a5e-45ee-a954-43fbd25c4c92",
+         "name":"DATAMANAGEMENT"
+      }
+   ],
+   "welcome_email_sent":false
+}
+----
+
+=== Response codes
+
+[options="header", cols="1,4"]
+|===
+|HTTP status code|Description
+|**200**|Successful retrieval of session information
+|**400**|Invalid request
+|**401**|Unauthorized request
+|**500**|Failed operation
+|===
+
+== Log out of a session
+
+To log out of your current session, send a `POST` request to the `/api/rest/2.0/auth/session/logout` API endpoint.
+
+
+=== Example request
+
+.cURL
+[source, cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-host}/api/rest/2.0/auth/session/logout'  \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+=== Example response
+
+If the API request is successful, ThoughtSpot returns the 204 response code and ends the user session.
+
+=== Response codes
+
+[options="header", cols="2,4"]
+|===
+|HTTP status code|Description
+|**204**|The user is logged out of ThoughtSpot
+|**500**|Failed operation
+|===
