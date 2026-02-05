@@ -12,31 +12,93 @@ ThoughtSpot instances act as a constantly running service, so xref:development-a
 
 ThoughtSpot provides numerous tools for building a structured deployment process, built around the link:https://docs.thoughtspot.com/cloud/latest/tml[ThoughtSpot Modeling Language (TML), window=_blank] format for representing the xref:intro-thoughtspot-objects.adoc[objects within ThoughtSpot].
 
-== Best practices
-The primary tool for structured development and deployment in ThoughtSpot is called xref:orgs.adoc[Orgs].
+== Overview
+ThoughtSpot may provision your organization one or more separate *instances*, each with an individual URL. 
 
-Each Org in ThoughtSpot can be xref:version_control.adoc[paired] to a link:https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches[branch, target=_blank] in a link:https://docs.github.com/en/repositories/creating-and-managing-repositories/about-repositories[Git repository, target=_blank] as a single *environment*. 
+Within a ThoughtSpot instance, the administrator of the Primary Org can create any number of logical tenants called xref:orgs.adoc[Orgs].
 
 xref:orgs.adoc[Orgs] are fully separated tenants on a single ThoughtSpot instance. For TSE customers and others who need a structured development and deployment process, Orgs should always be enabled.
 
-Once your environments are configured, you can xref:version_control.adoc#moving-tml-changes-between-environments[move data models and content] from the initial "dev environment" to any other environment using the xref:git-rest-api-guide.adoc[Git integration REST APIs].
+image::./images/instances_and_orgs.png[Instances and Orgs]
+
+By setting the `xref:intro-thoughtspot-objects.adoc#object-identifiers[obj_id]` property of objects, objects in various Orgs that are related copies of one another will have the same `obj_id`, allowing for tracking related objects and updating them without concern for each object's unique GUID.
 
 [NOTE]
 ====
 ThoughtSpot does not recommend TML export and import across different versions of ThoughtSpot application because the TML syntax, supported features, and object schemas can vary between releases and can sometimes lead to compatibility issues and validation errors.
 ====
 
+== Version Control
+*Version control* is the process of tracking changes that occur to objects in ThoughtSpot. 
+
+A single branch in Git can be used for version control of a single Org in ThoughtSpot.
+
+ThoughtSpot provides a GitHub-based link:https://docs.thoughtspot.com/cloud/10.15.0.cl/git-version-control[automated version control in the UI] for Liveboards and answers or a customized process can be built using the TML Export API to any Git provider.
+
+It is best to use separate branches or even repositories for the UI automated version control and direct REST API processes.
+
+== Deployment
+*Deployment* is the process of *making copies of objects* from one Org to another Org. 
+
+Deployment is used in the process of building a *release* from a *dev Org* and then deploying copies of the release objects via TML to *test*, *uat*, and eventual *prod* Orgs.
+
+The TML Export and Import APIs allow customizable release and deployment processes to integrate with any Git provider. 
+
+The standard deployment pattern for a xref:multi-tenancy-intro.adoc[multi-tenanted prod database] is shown below. RLS rules will filter the shared data models on the "prod" Org so that standard LBs and Answers only show the right data for each end customer, who are all only added as users to the "prod" Org.
+
+image::./images/multi_tenant_deployment.png[Multi-tenant Database Deployment SDLC Pattern]
+
+In a scenario where xref:single-tenant-data-models.adoc[end customer databases are single-tenanted], an Org can be created programmatically matching with the level of tenant separation, so that there is an Org representing each separate logical database.
+
+There are two techniques for managing Orgs for single-tenanted databases:
+
+ * Publishing[beta betaBackground]^Beta^
+ * Deploy to each Org using TML Import
+
+== Publishing
+
+*xref:publishing-overview.adoc[Publishing]* makes objects available in other Orgs without making copies. 
+
+Variables can be set at the Org level to override the Connection and Table object details for Publishing objects when they are accessed in a specific Org. Variables for connections and tables work with both Publishing and TML Import.
+
+image::./images/publishing_diagram.png[Publishing and Variables]
+
+With single-tenanted prod Orgs, the *Publishing* feature allows the final deployment step to import TML into the *publisher* Org, updating the *Published* objects, which instantly updates the objects in every Org the objects are published to.
+
+image::./images/single_tenant_publishing.png[Publishing to Single-Tenants]
+
+If there are structural differences within the various databases that make Publishing unviable, the TML Import process can be used to deploy unique copies of the release TML into each Org. This process may also include modifying the release TML to introduce variation into the objects that are deployed.
+
+image::./images/single_tenant_deployment.png[Individual Deployment to Single-Tenants]
+
+
+
+
+////
+Each Org in ThoughtSpot can be xref:version_control.adoc[paired] to a link:https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches[branch, target=_blank] in a link:https://docs.github.com/en/repositories/creating-and-managing-repositories/about-repositories[Git repository, target=_blank] as a single *environment*. 
+////
+
+////
+Once your environments are configured, you can xref:version_control.adoc#moving-tml-changes-between-environments[move data models and content] from the initial "dev environment" to any other environment using the xref:git-rest-api-guide.adoc[Git integration REST APIs].
+////
+
+
+
 ////
 If you have used ThoughtSpot for a long time and are enabling Orgs for the first time, please see xref:moving-to-orgs.adoc[moving to Orgs from single-tenant ThoughtSpot instance].
 ////
-== Standard structure of Orgs
+////
+== Typical Orgs pattern for SDLC
 When Orgs are enabled, the *Primary Org* (`org_id: 0`) should be treated as the "root" or "super-admin" Org, and all "real content" should exist on Orgs other than the Primary.
+
+Additionally, the *Primary Org* is the only Org where *Published* objects can originate, so *Primary* serves as the *Publisher* Org within SDLC flows that involve Publishing.
 
 The most basic standard configuration for separated development and deployment, with a xref:multi-tenancy-best-practices.adoc[multi-tenanted "prod" environment], has the following environments:
 
 - *Primary*: only used for administration of instance and Orgs themselves
-- *Dev*: ThoughtSpot customer internal development team builds data models and standard Liveboards and Answers
-- *Prod*: Data models and standard content are published to this environment by service account. All end customers get READ-ONLY access to data models, standard Liveboards, and Answers.
+- *dev*: ThoughtSpot customer internal development team builds data models and standard Liveboards and Answers
+- *test*: 
+- *prod*: Data models and standard content are published to this environment by service account. All end customers get READ-ONLY access to data models, standard Liveboards, and Answers.
 
 image::./images/multi-tenanted_prod_deployment.png[Multi-tenanted prod deployment model]
 
@@ -47,20 +109,25 @@ RLS filters the shared data models on the "prod" Org so that standard LBs and An
 If the production end customer data models are xref:single-tenant-data-models.adoc[single-tenanted (logical separation for each end customer)], such that a different connection is necessary), then the standard deployment involves a "release"/"pre-prod" Org and then one prod Org per end customer.
 
 image::./images/single-tenant_prod_per_customer.png[Single-tenant final deployment model]
-
+////
+////
 === Additional "typical" Orgs 
 
 - *Test*, *UAT*: Additional steps in the publishing process between Dev and Prod, for verification before changes are deployed into Prod
 - *Internal Org(s)*: Org(s) for ThoughtSpot customer's own business work, never to be shared with end customers
 - Separate *'dev' instance*: Some people want a fully separated environment for dev, especially if doing MAJOR changes, even to cluster config. Recommend there be a 'Test Org' on the 'Prod Instance' to push to first, before pushing to 'Prod'
 - Separate *regional instances*: prod per customer Orgs may extend to multiple ThoughtSpot instances in different regional cloud data centers
+////
 
+////
 [#deploy-between-environments]
 == Deploying content between environments
-////
+
 The workflow for a very simple "dev" to "prod" flow on the same environment shown here, is the same pattern for any source-to-destination environment flow:
 
 image::./images/development-deployment-process.png[Development and deployment workflow]
+////
+
 ////
 === Git deployment
 The xref:version_control.adoc[Git REST APIs] are designed for the best practice pattern of building on a Dev Org and then deploying to any number of Orgs through Prod(s).
@@ -74,9 +141,12 @@ You will need a xref:guid-mapping.adoc[GUID Mapping file] that records the `orig
 
 == Multi-tenancy and data security
 The exact deployment pattern chosen will depend on the design of your data warehouse. Please see the xref:multi-tenancy-intro.adoc[full documentation on multi-tenancy within ThoughtSpot] to determine which deployment pattern best fits your needs.
+////
 
+////
 == Publishing content to Orgs within a ThoughtSpot instance
 
 Starting with the 10.10.0.cl release, ThoughtSpot provides the ability to parameterize object properties using variables for each Org and publish objects directly from the Primary Org to other Orgs on a multi-tenant instance. The publishing feature [beta betaBackground]^Beta^ enables administrators to create a single main object in the Primary Org and distribute it to other Orgs within the instance.
 
 For more information, see xref:publishing-overview.adoc[Publishing content to Orgs].
+////
