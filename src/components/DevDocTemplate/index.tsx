@@ -23,6 +23,7 @@ import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './playGround/RESTAPI';
 import GraphQLPlayGround from './playGround/GraphQL';
 import { AskDocs } from './askDocs';
+import AnnouncementBanner from '../AnnouncementBanner';
 import {
     TS_HOST_PARAM,
     TS_ORIGIN_PARAM,
@@ -34,6 +35,7 @@ import {
     DEFAULT_PREVIEW_HOST,
     DEFAULT_APP_ROOT,
     HOME_PAGE_ID,
+    HOME_ANNOUNCEMENT_BANNER,
     CUSTOM_PAGE_ID,
     BUILD_ENVS,
     VERSION_DROPDOWN,
@@ -491,6 +493,82 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return cName;
     };
 
+    const getCloudLatestVersion = () => {
+        const cloudLatest = VERSION_DROPDOWN?.find(
+            (v) => v?.subLabel && v.subLabel.toLowerCase().includes('cloud (latest)'),
+        );
+        return cloudLatest?.label;
+    };
+
+    const extractVersionString = (text: string | undefined | null) => {
+        if (!text) return undefined;
+        // Matches versions like 26.2.0.cl or 10.15.0.cl / 10.10.0.sw
+        const match = text.match(/\b\d+\.\d+\.\d+\.(?:cl|sw)\b/i);
+        return match?.[0]?.toLowerCase();
+    };
+
+    const getVersionFromPath = (pathname?: string) => {
+        if (!pathname) return undefined;
+        const normalizedPath = pathname.toLowerCase();
+
+        const versionFromOptions = VERSION_DROPDOWN?.find((option) => {
+            const link = option?.link?.trim();
+            if (!link || link === '') return false;
+
+            const linkPath = link.startsWith('/') ? link : `/${link}`;
+            const hyphenPath = link.replace(/\./g, '-');
+            const hyphenPathWithSlash = hyphenPath.startsWith('/')
+                ? hyphenPath
+                : `/${hyphenPath}`;
+
+            return (
+                normalizedPath.includes(linkPath.toLowerCase()) ||
+                normalizedPath.includes(hyphenPathWithSlash.toLowerCase())
+            );
+        });
+
+        const optionVersion =
+            extractVersionString(versionFromOptions?.label) ||
+            extractVersionString(versionFromOptions?.link);
+        if (optionVersion) return optionVersion;
+
+        return extractVersionString(normalizedPath.replace(/-/g, '.'));
+    };
+
+    const getVersionFromHost = (hostname?: string) => {
+        if (!hostname) return undefined;
+        return extractVersionString(hostname.replace(/-/g, '.').toLowerCase());
+    };
+
+    const getCurrentDocVersion = () =>
+        getVersionFromPath(location?.pathname) || getVersionFromHost(location?.hostname);
+
+    const shouldShowAnnouncementBanner = () => {
+        if (!isPublicSiteOpen) return false;
+        if (!HOME_ANNOUNCEMENT_BANNER?.enabled) return false;
+
+        const cloudLatest = extractVersionString(getCloudLatestVersion());
+        const bannerVersion =
+            extractVersionString(HOME_ANNOUNCEMENT_BANNER?.linkText) ||
+            extractVersionString(HOME_ANNOUNCEMENT_BANNER?.message) ||
+            extractVersionString(HOME_ANNOUNCEMENT_BANNER?.linkHref);
+        const currentDocVersion = getCurrentDocVersion();
+
+        // Only hide when we can confidently compare and they match.
+        if (cloudLatest && bannerVersion && cloudLatest === bannerVersion) return false;
+        if (currentDocVersion && bannerVersion && currentDocVersion === bannerVersion) {
+            return false;
+        }
+        return true;
+    };
+
+    const isExternalLink = (href?: string) => /^https?:\/\//i.test(href || '');
+    const shouldOpenBannerLinkNewTab = (href?: string) =>
+        Boolean(HOME_ANNOUNCEMENT_BANNER?.openInNewTab) || isExternalLink(href);
+    const bannerLinkOpensInNewTab = shouldOpenBannerLinkNewTab(
+        HOME_ANNOUNCEMENT_BANNER?.linkHref,
+    );
+
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
@@ -515,6 +593,38 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             : { height: '0px' }
                     }
                 ></div>
+                {shouldShowAnnouncementBanner() && (
+                    <AnnouncementBanner
+                        enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
+                        message={
+                            <span>
+                                {HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                    HOME_ANNOUNCEMENT_BANNER?.linkText && (
+                                        <a
+                                            className="announcementBanner__link"
+                                            href={HOME_ANNOUNCEMENT_BANNER.linkHref}
+                                            target={
+                                                bannerLinkOpensInNewTab ? '_blank' : undefined
+                                            }
+                                            rel={
+                                                bannerLinkOpensInNewTab
+                                                    ? 'noopener noreferrer'
+                                                    : undefined
+                                            }
+                                        >
+                                            {HOME_ANNOUNCEMENT_BANNER.linkText}
+                                        </a>
+                                    )}
+                                {(HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                    HOME_ANNOUNCEMENT_BANNER?.linkText) && ' '}
+                                {HOME_ANNOUNCEMENT_BANNER?.message ||
+                                    (VERSION_DROPDOWN?.[0]?.label
+                                        ? `Version ${VERSION_DROPDOWN[0].label} is now available!`
+                                        : 'A new version is now available!')}
+                            </span>
+                        }
+                    />
+                )}
                 <main
                     className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}
