@@ -39,12 +39,6 @@ module.exports = {
             link: ' ',
             subLabel: 'Cloud',
         },
-        {
-            label: '10.15.0.cl',
-            link: '10.15.0.cl',
-            subLabel: 'Cloud (Now available)',
-            iframeUrl: 'https://developer-docs-10-15-0-cl.vercel.app/docs/',
-        },
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
