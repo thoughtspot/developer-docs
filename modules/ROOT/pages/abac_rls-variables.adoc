@@ -259,7 +259,36 @@ If you don't want to append or replace any attribute values, do not pass any det
 === Resetting a User or a Variable
 Passing an empty array along with a formula variable name in the token request *does not reset the attribute values* for that formula variable for that user. 
 
-To reset the formula variable attributes of a user, use the `/api/rest/2.0/template/variables/update-values` API endpoint.
+To change the formula variable attributes of a user for a particular, particularly to set their entitlements to an empty set, use the `/api/rest/2.0/template/variables/update-values` API endpoint.
+
+[WARNING]
+====
+The `RESET` operation erases all variable value settings for all users for a variable, regardless of any `variable_value_scope` provided. Use with caution, it is a complete reset.
+====
+
+A formula variable exists across all Orgs in ThoughtSpot, but the values are recorded on a per Org and per Principal basis. To use the Update Variable Values REST API, you'll need to provide the `org_identifier` as well as the username as `principal_identifier` and set `principal_type` to `USER` as seen below:
+
+[,json]
+----
+{
+  "variable_assignment": [
+    {
+      "variable_identifier": "country_var",
+      "variable_values": [],
+      "operation": "REPLACE"
+    }
+  ],
+  "variable_value_scope": [
+    {
+      "org_identifier": "Prod",
+      "principal_type": "USER",
+      "principal_identifier": "jane.smith@company.com"
+    }
+  ]
+}
+----
+The above command would result in jane.smith@company.com being denied any access when `country_var` is used in an RLS rule.
+
 
 [NOTE]
 ====
@@ -302,17 +331,7 @@ The API supports only the `LOGICAL_TABLE` object type.
 
 If the object ID is not specified in the API request, the variable values will be applied to all formulas and rules that use those variables, across all objects in the Org for that user.
 
-==== Apply to Org context
-
-The `org_identifier` attribute in the token request specifies the Org context for the user session and entitlements.
-
-If the `org_identifier` parameter is not defined in the token request, the token is issued for the user's last logged-in Org. For new users, the token will be assigned to the default Org on their instance.
-
-To apply variable entitlements to a user session, you must ensure that the RLS rules with variables and relevant objects are available in the Org context specified in the token request.
-
-=== Example request body
-
-The following example shows the request body for generating a token with formula variable attributes:
+The following example shows the request body for generating a token with formula variable attributes scoped to a particular Model object:
 
 [source,JSON]
 ----
@@ -347,12 +366,19 @@ The following example shows the request body for generating a token with formula
 }
 ----
 
-If the request is successful, ThoughtSpot generates a token and sends the token details in the API response.
+==== Apply to Org context
+
+The `org_identifier` attribute in the token request specifies the Org context for the user session and entitlements.
+
+If the `org_identifier` parameter is not defined in the token request, the token is issued for the user's last logged-in Org. For new users, the token will be assigned to the default Org on their instance.
+
+To apply variable entitlements to a user session, you must ensure that the RLS rules with variables and relevant objects are available in the Org context specified in the token request.
 
 [NOTE]
 ====
 ThoughtSpot access tokens are JWTs that are compressed by default to handle large payloads. It is recommended to keep the compression enabled to ensure all tokens can get properly interpreted by the application regardless of their size, and to obfuscate the values passed in the payload. If you want to disable it, contact ThoughtSpot Support.
 ====
+
 
 ////
 --- THIS IS NOT TRUE ANYMORE
@@ -394,6 +420,49 @@ To retrieve user information and object properties, you can use the `POST /api/r
 
 == Verify the entitlements
 You can also use the `POST /api/rest/2.0/template/variables/search` API call to xref:variables.adoc#_get_variables[get the list of variables] assigned to a specific user, Org, and Model.
+
+Set the `response_content` parameter to `METADATA_AND_VALUES` to see the values that have been set for each user per Org:
+
+[,json]
+----
+{
+  "record_offset": 0,
+  "record_size": -1,
+  "response_content": "METADATA_AND_VALUES"
+}
+----
+
+Would result in the response:
+
+[,json]
+----
+[
+  { "id":"d3abc655-b706-4f91-90ea-cc26bc966d46",
+    "name":"country_var",
+    "variable_type":"FORMULA_VARIABLE",
+    "sensitive":false,
+    "values":[
+      { 
+        "value": null,
+        "value_list": ["CustomerC","CustomerD"],
+        "org_identifier": "Prod",
+        "principal_type": "USER",
+        "principal_identifier": "ron.smith@company.com",
+        "model_identifier": null,
+        "priority": null
+      },{
+        "value": null,
+        "value_list": null,
+        "org_identifier": "Prod",
+        "principal_type": "USER",
+        "principal_identifier": "jane.smith@company.com",
+        "model_identifier": null,
+        "priority": null
+      }
+     ]
+  }
+]
+----
 
 To verify the entitlements:
 
