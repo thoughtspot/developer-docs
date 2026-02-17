@@ -160,7 +160,9 @@ The following rule restricts access to rows where the `date_column` is within th
 
 == Create an ABAC token request with variable attributes
 
-To generate a token with variable attributes, use the `POST /api/rest/2.0/auth/token/custom` API call.
+To set or update variable values for a user, use the POST `/api/rest/2.0/auth/token/custom` endpoint when logging in the user. 
+
+You can also use the `/api/rest/2.0/template/variables/update-values` endpoint for bulk operations or targeted resets. 
 
 The variable attributes defined in the token request take effect only if they are referenced in an RLS rule. If the variables are not used in any formula or RLS rule, they will have no impact on data access. Before generating the request with variable attributes, ensure that the xref:abac_rls-variables.adoc#_add_rls_rules_with_formula_variables_to_tables[variables are added to the RLS rules] for the Table.
 
@@ -196,34 +198,25 @@ __Array of strings or numeric values__. When assigning values, ensure the data f
 
 All values are passed into the token as *arrays of strings*, even if the column is a numeric or date type in ThoughtSpot and the database. The column data type will be respected in the query issued to the database.
 
-==== Allow all values by default
+==== Allow all wildcard value
 
-To allow all values by default, specify `["TS_WILDCARD_ALL"]` as the variable value to grant access to all values in a given column.
+To allow all values for a given field, set the formula variable value to an array using the wildcard: `["TS_WILDCARD_ALL"]`.
 
-In this example, the user is allowed all access for one variable, while for the others, specific values are set.
+In this example, the user is allowed all access for one variable, while for the other, specific values are set.
 
 [source,JSON]
 ----
 "variable_values": [
+    {
+      "name": "product_var",
+      "values": ["TS_WILDCARD_ALL"]
+    }
     {
       "name": "country_var",
       "values": [
         "Japan",
         "Singapore",
         "Australia"
-      ]
-    },
-    {
-      "name": "department_var",
-      "values": [
-        "Sales",
-        "Marketing"
-      ]
-    },
-    {
-      "name": "product_var",
-      "values": [
-        "TS_WILDCARD_ALL"
       ]
     }
   ]
@@ -299,13 +292,9 @@ To apply variable entitlements to a user session, you must ensure that the RLS r
 
 The following example shows the request body for generating a token with formula variable attributes:
 
-[source,cURL]
+[source,JSON]
 ----
- curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/custom'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  --data-raw '{
+{
   "username": "UserA",
   "validity_time_in_sec": 300,
   "persist_option": "APPEND",
@@ -313,24 +302,17 @@ The following example shows the request body for generating a token with formula
   "secret_key": "f8aa445b-5ff1-4a35-a58f-e324133320d5",
   "variable_values": [
     {
+      "name": "product_var",
+      "values": [
+        "TS_WILDCARD_ALL"
+      ]
+    },
+    {
       "name": "country_var",
       "values": [
         "Japan",
         "Singapore",
         "Australia"
-      ]
-    },
-    {
-      "name": "department_var",
-      "values": [
-        "Sales",
-        "Marketing"
-      ]
-    },
-    {
-      "name": "product_var",
-      "values": [
-        "TS_WILDCARD_ALL"
       ]
     }
   ],
@@ -340,14 +322,14 @@ The following example shows the request body for generating a token with formula
       "identifier": "35aa85fe-fbb4-4862-a335-f69679ebb6e0"
     }
   ]
-}'
+}
 ----
 
-If the request is successful, ThoughtSpot generates a token and sends the  token details in the API response.
+If the request is successful, ThoughtSpot generates a token and sends the token details in the API response.
 
 [NOTE]
 ====
-ABAC details are sent in a JWT that can be used as a bearer token for cookieless trusted authentication, REST API calls, or as a sign-in token to start a session. JWTs are compressed by default to handle large payloads. It is recommended to keep the compression enabled to ensure all JWT tokens can get properly interpreted by the application regardless of their size, and to obfuscate the values passed in the JWT payload. If you want to disable it, contact ThoughtSpot Support.
+ThoughtSpot access tokens are JWTs that are compressed by default to handle large payloads. It is recommended to keep the compression enabled to ensure all tokens can get properly interpreted by the application regardless of their size, and to obfuscate the values passed in the payload. If you want to disable it, contact ThoughtSpot Support.
 ====
 
 === Verify the variable assignment
@@ -385,7 +367,13 @@ To retrieve user information and object properties, you can use the `POST /api/r
 
 You can also use the `POST /api/rest/2.0/template/variables/search` API call to xref:variables.adoc#_get_variables[get the list of variables] assigned to a specific user, Org, and Model.
 
-=== Resetting a User or a Variable
+== Resetting a User or a Variable
+
+[NOTE]
+====
+Do not use the `/api/rest/2.0/users/{user_identifier}/update` endpoint, as it does not support updating variable values.
+====
+
 [NOTE]
 ====
 
@@ -396,10 +384,6 @@ You can also use the `POST /api/rest/2.0/template/variables/search` API call to 
 * The ability to set variable values only for the current session, previously achieved by setting `persist_option: NONE`, is not supported with RLS via ABAC. +
 For session-based rules, create dedicated user accounts for your application users and apply persisted rules. This approach ensures that Liveboard schedule attachments enforce security rules and deliver only secured output to your end users. When combined with cookieless authentication, this configuration addresses all use cases that previously relied on session-based JWT. You can simplify user provisioning and programmatically manage user creation and deletion workflows using ThoughtSpot's REST APIs.
 ====
-
-=== Updating variable values for a user
-To update variable values for a user, you can use the `/api/rest/2.0/template/variables/update-values` endpoint, or `/api/rest/2.0/auth/token/custom` endpoint when logging in the user. Do not use the `/api/rest/2.0/users/{user_identifier}/update` endpoint, as it does not support updating variable values.
-
 
 == Verify the entitlements
 To verify the entitlements:
