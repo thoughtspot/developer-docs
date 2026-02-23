@@ -48,10 +48,10 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '26.2.0.cl',
+            label: '26.3.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
-            iframeUrl: 'https://developer-docs-26-2-0-cl.vercel.app/docs/',
+            iframeUrl: 'https://developer-docs-26-3-0-cl.vercel.app/docs/',
         },
     ],
     CUSTOM_PAGE_ID: {
