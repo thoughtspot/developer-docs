@@ -758,7 +758,7 @@ class TypeDocParser {
         let content = '';
         if (node.indexSignature?.parameters) {
             content += 'Index Signature Parameters\n\n';
-            node.indexSignature.parameters
+            content += node.indexSignature.parameters
                 .map(this.convertTypeDocNode)
                 .join('\n\n');
         } else if (node.signatures) {
@@ -771,7 +771,11 @@ class TypeDocParser {
             });
         } else if (node.children) {
             content += 'Parameters\n\n';
-            content += node.children.map(this.convertTypeDocNode).join('\n\n');
+            content += node.children
+                .map((child) =>
+                    this.handleParameterNode(child as ParameterNode),
+                )
+                .join('\n\n');
         }
 
         return content;
