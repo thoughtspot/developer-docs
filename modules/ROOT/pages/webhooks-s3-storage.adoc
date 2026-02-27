@@ -10,19 +10,19 @@ You can integrate ThoughtSpot with your Amazon Web Services (AWS) S3 storage to 
 
 When this integration is enabled, the webhook configured on your instance can deliver file attachments up to 25 MB directly to your Amazon S3 bucket.
 
-== Prerequisites
+== Before you begin
 
 Before you begin, review the following prerequisites and ensure that you have the required access and information to get started with the integration.
 
 * You have access to a ThoughtSpot instance. +
-Ensure that the webhook feature is enabled on your instance and your ThoughtSpot user account has the administration or **Can Manage Webhooks** role privilege.
+Ensure that the webhook feature is enabled on your instance and your ThoughtSpot user account has the administration or *Can Manage Webhooks* role privilege.
 * You have an AWS account with the required permissions to create and manage S3 buckets, Identity and Access Management (IAM) role, and trust policies to allow ThoughtSpot to send data to your S3 bucket.
 * You have a webhook listener endpoint that can accept `POST` requests with JSON payloads.
 
 == Getting started
 To enable this integration, your AWS administrator must create an IAM role and configure the S3 permissions and IAM trust policy. ThoughtSpot administrators configure the webhook with the S3 storage destination.
 
-. xref:webhooks-s3-storage.adoc#_configuring_your_aws_s3_bucket_iam_role_and_policies[Configuring your AWS S3 bucket, IAM role, trust policies, and permissions]
+. xref:webhooks-s3-storage.adoc#_configure_your_aws_s3_bucket_iam_role_and_policies[Configuring your AWS S3 bucket, IAM role, trust policies]
 . xref:webhooks-s3-storage.adoc#_configure_a_webhook_with_the_s3_storage_destination[Creating a Webhook with an S3 storage destination] in ThoughtSpot.
 . xref:webhooks-s3-storage.adoc#_test_the_integration[Testing the integration]
 
@@ -41,14 +41,14 @@ To create an S3 bucket for your AWS account:
 . In the AWS console, go to **S3** > **Buckets**.
 . Create a new bucket (recommended), or select an existing one. +
 Use a dedicated S3 bucket or prefix for ThoughtSpot exports to enhance security and simplify auditing.
-. Optionally, create a folder. For example, `thoughtspot/`  to logically separate ThoughtSpot files. This serves as the S3 prefix for Webhook delivery.
+. Optionally, create a folder, for example, `thoughtspot/`, to logically separate ThoughtSpot files. This serves as the S3 prefix for webhook delivery.
 
 ==== Create an IAM role
 To create a cross-account IAM role:
 
-. Go to AWS Console → **IAM** > **Roles** > **Create role**.
+. Go to the AWS Console > **IAM** > **Roles** > **Create role**.
 . Select *Custom trust policy*. +
-The IAM role’s trust policy must allow ThoughtSpot's AWS account to `sts:AssumeRole` to assume the role. The trust policy must also include an external ID and include the parameters shown in this example:
+The IAM role's trust policy must allow ThoughtSpot's AWS account to call `sts:AssumeRole`. The trust policy must also include an external ID and the parameters shown in this example:
 +
 [source,]
 ----
@@ -74,7 +74,7 @@ The IAM role’s trust policy must allow ThoughtSpot's AWS account to `sts:Assum
 . Replace the following in the above example with appropriate values:
 
 * `111111111111` with the ThoughtSpot AWS Account ID provided to you.
-* `YOUR-EXTERNAL-ID` with your chosen External ID (case‑sensitive).  The External ID is a secret string you create. Use a unique, random value to prevent unauthorized access.
+* `YOUR-EXTERNAL-ID` with your chosen External ID (case-sensitive). The External ID is a secret string you create. Use a unique, random value to prevent unauthorized access.
 
 . Give the role a descriptive name. For example, `thoughtspot-s3-upload`.
 
@@ -82,7 +82,7 @@ The IAM role’s trust policy must allow ThoughtSpot's AWS account to `sts:Assum
 In the role creation wizard:
 
 . Click **Add permissions**.
-. Select **Create policy**
+. Select **Create policy**.
 . Select the **JSON** tab and paste the policy text from the following example:
 +
 [source,]
@@ -109,7 +109,7 @@ In the role creation wizard:
 "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/thoughtspot/webhooks/*"
 ----
 . Save the policy and attach it to your IAM Role.
-. Copy the Role ARN from the role’s Summary page; you need to provide this information to ThoughtSpot administrator.
+. Copy the Role ARN from the role's Summary page; you need to provide this information to your ThoughtSpot administrator.
 
 ==== Provide the storage configuration information to ThoughtSpot
 After the S3 bucket, IAM role, and trust policy are configured, provide the following information to your ThoughtSpot administrator:
@@ -118,14 +118,14 @@ After the S3 bucket, IAM role, and trust policy are configured, provide the foll
 * External ID. For example, `ts-webhook-x7k9m2p4q1`
 * S3 bucket name. For example, `ts-data-exports`
 * S3 region. For example, `us-east-1`
-* S3 prefix for the folder (Optional). For example, `thoughtspot/`.
+* S3 prefix for the folder (optional). For example, `thoughtspot/`.
 
 === Configure a Webhook with the S3 storage destination
-To create a Webhook channel, the Webhook feature must be enabled on your instance. Users with administration or the**Can manage Webhooks** privilege can create a Webhook.
+To create a webhook channel, the webhook feature must be enabled on your instance. Users with administration privileges or the *Can Manage Webhooks* privilege can create a webhook.
 
-To configure the S3 storage properties, you'll need the IAM role, external ID, S3 bucket name, and S3 region configured for your AWS cross-account.
+To configure the S3 storage properties, you'll need the IAM role, external ID, S3 bucket name, and S3 region configured for your AWS cross-account setup.
 
-Currently, ThoughtSpot supports Webhook creation with AWS S3 storage via REST APIs only.
+Currently, ThoughtSpot supports webhook creation with AWS S3 storage via REST APIs only.
 
 ==== Creating a Webhook
 To create a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/create` API endpoint.
@@ -145,35 +145,36 @@ ThoughtSpot allows only one webhook per Org.
 | `description` +
 __Optional__ a|__String__. Description text for the webhook.
 | `url` a|__String__. The listening endpoint URL where the webhook payload will be sent. The payload will include metadata and a URL referencing the file stored in S3.
-|`url_params` a|__Optional__.  A JSON map of key-value pairs of parameters to add as a GET query params in the webhook URL.
+| `url_params` a|__Optional__. A JSON map of key-value pairs to append as query parameters in the webhook URL.
 | `events` a|__Array of strings__. List of events to subscribe to. Specify the event as `LIVEBOARD_SCHEDULE`. When this event is emitted, a webhook payload is initiated to send data to the configured S3 storage destination.
 | `storage_destination` a| Configuration for storage destination. Specify the following parameters:
 * `storage_type` +
-__String__ Type of storage destination. Specify `AWS_S3`.
-* `sstorage_config` +
+__String__ Type of storage destination. Specify `AWS_S3`. +
+
+* `storage_config` +
 Storage configuration parameters. Specify the storage configuration parameters from your AWS account administrator.
 
 * `bucket_name` +
 __String__. S3 bucket name. For example, `ts-data-exports`
-* `region`+
+* `region` +
 __String__. S3 region. For example, `us-east-1`
 * `role_arn` +
 __String__. IAM role ARN. For example, `arn:aws:iam::999888777666:role/thoughtspot-s3-upload`
 * `external_id` +
 __String__. External ID. For example, `ts-webhook-x7k9m2p4q1`
 * `path_prefix` __Optional__ +
-__String__. S3 prefix for the folder For example, `thoughtspot/`.
+__String__. S3 prefix for the folder. For example, `thoughtspot/`.
 |====
 
 ===== API request
 
-[source.cURL]
+[source,cURL]
 ----
 curl -X POST \
   --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/create'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer  {AUTH_TOKEN}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "name": "Webhook_S3",
   "url": "https://api.example.com/thoughtspot/webhook",
@@ -185,9 +186,9 @@ curl -X POST \
     "storage_config": {
       "aws_s3_config": {
         "bucket_name": "my-company-data-exports",
-        "region": "us-east-1 ",
-        "role_arn": "arn:aws:iam::999888777666:role/thoughtspot-s3-upload ",
-        "external_id": "ts-webhook-x7k9m2p4q1 ",
+        "region": "us-east-1",
+        "role_arn": "arn:aws:iam::999888777666:role/thoughtspot-s3-upload",
+        "external_id": "ts-webhook-x7k9m2p4q1",
         "path_prefix": "thoughtspot/"
       }
     }
@@ -231,9 +232,9 @@ If the API request is successful, ThoughtSpot returns the Webhook configuration 
          "aws_s3_config":{
             "bucket_name":"ts-webhook-x7k9m2p4q1",
             "region":"us-east-1",
-            "role_arn":"arn:aws:iam::999888777666:role/thoughtspot-s3-upload ",
+            "role_arn":"arn:aws:iam::999888777666:role/thoughtspot-s3-upload",
             "external_id":"ts-webhook-x7k9m2p4q1",
-            "path_prefix":"thoughtspot/ "
+            "path_prefix":"thoughtspot/"
          }
       }
    }
@@ -274,7 +275,7 @@ The following example shows the request body for updating the name, description 
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://try-everywhere.thoughtspot.cloud/api/rest/2.0/webhooks/create'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/{webhook_identifier}/update' \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
@@ -293,9 +294,9 @@ curl -X POST \
       "aws_s3_config": {
         "bucket_name": "ts-webhook-x7k9m2p4q1",
         "region": "us-east-1",
-        "role_arn": "arn:aws:iam::999888777666:role/thoughtspot-s3-upload ",
+        "role_arn": "arn:aws:iam::999888777666:role/thoughtspot-s3-upload",
         "external_id": "ts-webhook-x7k9m2p4q1",
-        "path_prefix": "thoughtspot/webhook "
+        "path_prefix": "thoughtspot/webhook"
       }
     }
   }
@@ -310,21 +311,21 @@ If the API request is successful, the API returns a 204 response code indicating
 
 To test the integration:
 
-. Trigger a Liveboard Schedule event and verify if the webhook payload is initiated.
+. Trigger a Liveboard schedule event and verify that the webhook payload is initiated.
 . Verify whether ThoughtSpot assumes your IAM role with the provided external ID. +
-When ThoughtSpot calls `sts:AssumeRole` with your Role ARN and External ID, the AWS STS validates the request against your trust policy. If valid, AWS returns temporary credentials that are valid for 1 hour.
+When ThoughtSpot calls `sts:AssumeRole` with your Role ARN and External ID, AWS STS validates the request against your trust policy. If valid, AWS returns temporary credentials that are valid for 1 hour.
 
 . When ThoughtSpot is assuming the IAM role, and if you see the **Access Denied** error message:
-* Verify whether the ThoughtSpot's Account ID in your trust policy is correct
+* Verify whether the ThoughtSpot account ID in your trust policy is correct.
 * Check the external ID matches. External IDs are case-sensitive.
 * Ensure the Role ARN you provided is correct.
 
-. If you see the  **invalid external ID** error:
+. If you see the **invalid external ID** error:
 
-* Verify whether the external ID is valid. Esnure that it does not include extra space or special characters.
+* Verify whether the external ID is valid. Ensure that it does not include extra spaces or special characters.
 * If the error persists, update the external ID both in your trust policy and ThoughtSpot.
 +
-. If the access is denied when uploading to S3, check whether your permissions policy has the `s3:PutObject`. +
+. If access is denied when uploading to S3, check whether your permissions policy has `s3:PutObject`. +
 
 * Verify the bucket name in the Resource ARN is correct.
 * If using a prefix, ensure the Resource ARN includes it.
@@ -334,6 +335,6 @@ ThoughtSpot can control which buckets can be accessed, what actions are permitte
 
 == Additional resources
 
-* See also, xref:webhooks.adoc[Webhooks] and xref:webhooks-lb-schedule.adoc[Webhooks for Liveboard schedule events].
+* See also: xref:webhooks.adoc[Webhooks] and xref:webhooks-lb-schedule.adoc[Webhooks for Liveboard schedule events].
 * link:https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies-cross-account-resource-access.html[AWS IAM documentation] and link:https://docs.aws.amazon.com/IAM/latest/UserGuide/troubleshoot_iam-s3.html[IAM and Amazon S3 troubleshooting guide].
 
