@@ -1,0 +1,814 @@
+= Connect clients to ThoughtSpot MCP Server
+:toc: true
+:toclevels: 3
+
+:page-title: MCP integration
+:page-pageid: connect-mcp-server-to-clients
+:page-description: Learn how to connect ThoughtSpot MCP server to clients and call tools
+
+To connect clients to the ThoughtSpot MCP server, add the MCP server endpoint to your LLM client.
+
+Authentication is handled per user, typically using OAuth. When connected, the client can discover available MCP tools, select data sources, and interact with ThoughtSpot analytics by calling MCP tools. The MCP server exposes only the data sources and functions the authenticated user is allowed to access, and all actions are performed in the context of that user’s security entitlements.
+
+== Before you begin
+Before you begin, check the following prerequisites and ensure that the required configuration and setup are available for connecting your client to the ThoughtSpot MCP server.
+
+* Node.js version 22 or later is installed for node-based examples and local clients.
+* A ThoughtSpot application instance with 10.11.0.cl or a later release version.
+* Users have the necessary privileges to view data from relevant models/tables in ThoughtSpot. Existing RLS/CLS rules on tables are enforced automatically in data source responses.
+* For Answer and Liveboard creation, the user must have the data download and content-creation privileges.
+
+== Connecting Remote MCP-aware clients
+If you are using a client that supports remote MCPs natively, use the following MCP server endpoint:
+
+`https://agent.thoughtspot.app/mcp`
+
+For clients that require a bearer token for authentication:
+
+`https://agent.thoughtspot.app/bearer/mcp`
+
+For OpenAI MCP and Responses API integration, use the following URL:
+
+`https://agent.thoughtspot.app/openai/mcp`
+
+For additional information, refer to your client’s documentation for how to register a remote MCP server.
+
+Once registered, the agent discovers ThoughtSpot tools from the MCP endpoint and calls tools such as `getRelevantQuestions`, `getAnswer`, and `createLiveboard` as needed to answer the user's question.
+
+=== Claude MCP connector
+
+The following example shows the code to connect Claude to the MCP server:
+
+[source,bash]
+----
+curl https://api.anthropic.com/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: mcp-client-2025-04-04" \
+  -d '{
+    "model": "claude-3-5-sonnet-latest",
+    "max_tokens": 1000,
+    "messages": [{
+      "role": "user",
+      "content": "How do I increase my sales?"
+    }],
+    "mcp_servers": [
+      {
+        "type": "url",
+        "url": "https://agent.thoughtspot.app/bearer/mcp",
+        "name": "thoughtspot",
+        "authorization_token": "TS_AUTH_TOKEN@my-instance.thoughtspot.cloud"
+      }
+    ]
+  }'
+----
+
+
+=== OpenAI Responses API (MCP tools)
+
+The following example shows the code to connect OpenAI to the MCP server:
+
+[source,bash]
+----
+curl https://api.openai.com/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "model": "gpt-4.1",
+    "tools": [
+      {
+        "type": "mcp",
+        "server_label": "thoughtspot",
+        "server_url": "https://agent.thoughtspot.app/bearer/mcp",
+        "headers": {
+          "Authorization": "Bearer TS_AUTH_TOKEN",
+          "x-ts-host": "my-instance.thoughtspot.cloud"
+        }
+      }
+    ],
+    "input": "How can I increase my sales?"
+  }'
+----
+
+=== Gemini with MCP
+
+The following example shows the code to connect Gemini to the MCP server:
+
+[source,typescript]
+----
+import {
+  GoogleGenAI,
+  mcpToTool,
+} from '@google/genai';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+
+const transport = new StreamableHTTPClientTransport(
+  new URL("https://agent.thoughtspot.app/bearer/mcp"),
+  {
+    requestInit: {
+      headers: {
+        "Authorization": "Bearer TS_AUTH_TOKEN",
+        "x-ts-host": "my-instance.thoughtspot.cloud"
+      },
+    }
+  }
+);
+
+const mcpClient = new Client({
+  name: "example-client",
+  version: "1.0.0",
+});
+
+await mcpClient.connect(transport);
+
+const ai = new GoogleGenAI({});
+
+const response = await ai.models.generateContent({
+  model: "gemini-2.5-flash",
+  contents: `Show me last quarter's sales by region`,
+  config: {
+    tools: [mcpToTool(mcpClient)],
+  },
+});
+
+console.log(response.text);
+await mcpClient.close();
+----
+
+== Connecting clients that do not natively support remote MCP servers
+
+Some clients that do not natively support configuring a remote MCP URL may require an `mcp-remote` component. In such cases, configure the MCP server as shown in this example:
+
+[source,JSON]
+----
+{
+  "mcpServers": {
+    "ThoughtSpot": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://agent.thoughtspot.app/mcp"
+      ]
+    }
+  }
+}
+----
+
+== Internal API routes
+
+If you are building your own web app or chatbot, you might want to set up internal routes that act as messengers, passing requests from your app to the ThoughtSpot MCP Server or REST APIs and then returning the results to your app. This allows your app to fetch data or answers from ThoughtSpot without connecting to it directly.
+
+The sample patterns in the following examples define two internal routes for a Next.js app. You can adapt this pattern to other backend frameworks:
+
+* `/api/mcp` +
+Forwards tool calls to the ThoughtSpot MCP server.
+* `/api/search-worksheets` +
+Searches models using the ThoughtSpot REST API.
+
+=== POST /api/mcp
+
+Serves as a proxy endpoint for calling ThoughtSpot MCP tools from the client side. This route forwards requests from your frontend to the ThoughtSpot MCP tools.
+
+==== Request parameters
+
+[cols="1,1,3",options="header"]
+|===
+|Parameter
+|Required?
+|Description
+
+|`toolName`
+|Yes
+|Name of the MCP tool to call. For example, `getRelevantQuestions`, `getAnswer`, or `createLiveboard`.
+
+|`args`
+|Yes
+|Input object for the selected tool.
+
+|`tsHost`
+|Yes
+|ThoughtSpot instance URL. For example, `https://my-instance.thoughtspot.cloud`.
+
+|`authToken`
+|Yes
+|ThoughtSpot bearer token used for authentication.
+|===
+
+==== Example request
+[source,TypeScript]
+----
+const response = await fetch("/api/mcp", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    toolName: "getAnswer",
+    args: {
+      question: "Total sales by region",
+      datasourceId: "model-guid"
+    },
+    tsHost: "https://my-instance.thoughtspot.cloud",
+    authToken: "your-bearer-token"
+  })
+});
+----
+
+==== Example response
+
+[source,json]
+----
+{
+  "success": true,
+  "tool": "getAnswer",
+  "args": { "question": "...", "datasourceId": "..." },
+  "result": {
+    "content": "JSON string with tool response",
+    "rawResult": { },
+    "timestamp": "2024-01-01T00:00:00.000Z"
+  }
+}
+----
+
+The `result.content` field is a JSON string. Parse it before use:
+
+[source,TypeScript]
+----
+const parsed = JSON.parse(answerResult.result.content);
+----
+
+=== POST /api/search-worksheets
+
+This route searches for data sources such as models in ThoughtSpot using the REST API.
+
+==== Request parameters
+
+[cols="1,1,2",options="header"]
+|===
+| Parameter | Required | Description
+| `tsHost` | Yes | __String__. ThoughtSpot instance URL
+| `authToken` | Yes |__String__. Bearer token for authentication
+| `namePattern` |No |__String__. Pattern to filter model names. Default is `*`.
+|===
+
+==== Example request
+
+[source,TypeScript]
+----
+const response = await fetch("/api/search-worksheets", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    tsHost: "https://my-instance.thoughtspot.cloud",
+    authToken: "your-bearer-token",
+    namePattern: "*" // optional, defaults to "*"
+  })
+});
+----
+
+==== Example response
+
+[source,json]
+----
+{
+  "worksheets": [
+    {
+      "id": "worksheet-guid",
+      "name": "Sales Data",
+      "description": "Sales metrics and dimensions",
+      "created": 1234567890,
+      "modified": 1234567890,
+      "author": "John Doe"
+    }
+  ]
+}
+----
+
+Use the `id` value as `datasourceId` when calling MCP tools.
+
+== MCP tools and responses
+All MCP tools are called via the MCP protocol. However, in many custom apps, you'll also call them through a proxy endpoint like `/api/mcp`, using a helper such as `callMCPTool(toolName, args)`.
+
+[source,TypeScript]
+----
+async function callMCPTool(toolName: string, args: any) {
+  const response = await fetch("/api/mcp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      toolName,
+      args,
+      tsHost: "https://my-instance.thoughtspot.cloud",
+      authToken: "your-bearer-token"
+    })
+  });
+  return response.json();
+}
+----
+
+The available tools are:
+* `ping`
+* `getDataSourceSuggestions`
+* `getRelevantQuestions`
+* `getAnswer`
+* `createLiveboard`
+
+
+=== ping
+Runs a health check to validate that the MCP Server is reachable and authenticated.
+
+=== getDataSourceSuggestions
+
+Suggests appropriate ThoughtSpot data sources for a given question.
+
+==== Query attributes
+
+[source,TypeScript]
+----
+{
+  query: string;  // User's natural language query
+}
+----
+
+==== Response example
+
+Returns an array of suggestions, each including:
+
+* `header.guid` +
+Data source GUID that will be used as `datasourceId` later in subsequent queries.
+* `header.displayName` +
+Display name
+* `header.description` +
+Description.
+* `confidence` +
+Numeric confidence score.
+* `llmReasoning` +
+Human-readable reasoning for the suggestion.
+
+
+=== getRelevantQuestions
+
+Gets AI-suggested analytical questions relevant to the user’s query for a given data context.
+
+==== Query attributes
+
+[source,Typescript]
+----
+{
+  query: string;   // User's natural language query
+  datasourceIds: string[]; // Array of worksheet/datasource GUIDs
+}
+----
+
+==== Example call
+
+[source,Typescript]
+----
+const result = await callMCPTool("getRelevantQuestions", {
+  query: "show me sales data",
+  datasourceIds: ["model-guid-123"]
+});
+----
+
+==== Parsed response example
+
+[source,json]
+----
+{
+  "questions": [
+    "What is the total sales by region?",
+    "Which products have the highest revenue?",
+    "What are the top selling categories?"
+  ]
+}
+----
+
+These questions can then be passed individually into `getAnswer` calls.
+
+=== getAnswer
+
+Generates a visualization from a natural language question for a given context.
+
+==== Query attributes
+
+[source,TypeScript]
+----
+{
+  question: string;   // Natural language question
+  datasourceId: string;  // Worksheet/datasource GUID
+  context?: string;   // Optional conversation context
+}
+----
+
+==== Example call
+
+[source,TypeScript]
+----
+const result = await callMCPTool("getAnswer", {
+  question: "Total sales by region",
+  datasourceId: "worksheet-guid-123"
+});
+----
+
+==== Response example
+
+[source,JSON]
+----
+{
+  "question": "Total sales by region",
+  "session_identifier": "abc-123-def-456",
+  "generation_number": 2,
+  "data": "\"Region\",\"Total Sales\"\n\"East\",100000\n...",
+  "frame_url": "https://...",
+  "fields_info": "..."
+}
+----
+
+===== Key fields
+[cols="1,3",options="header"]
+|===
+|Field
+|Description
+
+|`session_identifier`
+|Unique session ID used to group answers. Required when creating a Liveboard from this answer via `createLiveboard`.
+
+|`generation_number`
+|Version number for this answer. Required for Liveboard creation.
+
+|`question`
+|The question executed, useful both for display and to pass it into `createLiveboard`.
+
+|`data`
+|Data in CSV format. You can parse it to show tables or charts.
+
+|`frame_url`
+|Optional. Iframe URL for embedding the visualization in a custom UI.
+
+|`fields_info`
+|Descriptive metadata about the fields and chart, useful for explanations.
+|===
+
+=== createLiveboard
+
+Creates a ThoughtSpot Liveboard from one or more answer sessions.
+
+This is a two-step process and includes the following calls:
+
+. Call `getAnswer` to generate visualizations and get session data via `session_identifier` and `generation_number`.
+. Call `createLiveboard` to create a Liveboard using the session data from step 1.
+
+==== Query attribute
+
+[source,TypeScript]
+----
+{
+  name: string;   // Display name for the liveboard
+  noteTile: string;  // Description or note for the liveboard
+  answers: Array<{
+    question: string;
+    session_identifier: string;
+    generation_number: number;
+  }>;
+}
+----
+
+==== Example call
+
+[source,TypeScript]
+----
+const answerData = JSON.parse(answerResult.result.content);
+
+const liveboardResult = await callMCPTool("createLiveboard", {
+  name: "My Sales Dashboard",
+  noteTile: "My Sales Dashboard was created by TS MCP Chat",
+  answers: [{
+    question: answerData.question,
+    session_identifier: answerData.session_identifier,
+    generation_number: answerData.generation_number
+  }]
+});
+----
+
+==== Response example
+[source,JSON]
+----
+{
+  "liveboardId": "liveboard-guid-here",
+  "name": "My Sales Dashboard",
+  "frame_url": "https://..."
+}
+----
+
+===== Key fields
+[cols="1,3",options="header"]
+|===
+|Field
+|Notes
+
+|`noteTile`
+|Required. Do *not* use `description` here.
+
+|`answers`
+|Required array. Each item must include `question`, `session_identifier`, and `generation_number`.
+
+|`datasourceId`
+|Not needed for `createLiveboard`. It is used by `getAnswer`.
+|===
+
+== Complete workflow examples
+
+=== Single question → Liveboard
+
+This example:
+
+. Gets an answer for a question.
+. Parses and validates the response.
+. Creates a Liveboard from that answer.
+
+
+[source,TypeScript]
+----
+async function createLiveboardFromQuestion(question: string, datasourceId: string) {
+  try {
+    // Step 1: Get the answer
+    console.log("Step 1: Getting answer...");
+    const answerResult = await callMCPTool("getAnswer", {
+      question: question,
+      datasourceId: datasourceId
+    });
+
+    // Step 2: Parse the response
+    console.log("Step 2: Parsing answer data...");
+    const answerData = JSON.parse(answerResult.result.content);
+
+    // Step 3: Validate required fields
+    if (!answerData.session_identifier) {
+      throw new Error("Missing session_identifier from getAnswer response");
+    }
+    if (!answerData.generation_number) {
+      throw new Error("Missing generation_number from getAnswer response");
+    }
+
+    // Step 4: Create the liveboard
+    console.log("Step 4: Creating liveboard...");
+    const liveboardResult = await callMCPTool("createLiveboard", {
+      name: "Sales Analysis",
+      noteTile: `Created from question: ${question}`,
+      answers: [{
+        question: answerData.question,
+        session_identifier: answerData.session_identifier,
+        generation_number: answerData.generation_number
+      }]
+    });
+
+    console.log(" ✓  Liveboard created:", liveboardResult);
+    return liveboardResult;
+  } catch (error) {
+    console.error("Failed to create liveboard:", error);
+    throw error;
+  }
+}
+----
+
+=== Query mode – suggested questions → liveboard
+
+This workflow:
+
+. Gets AI-suggested questions for a user query.
+. Gets answers for each suggested question.
+. Creates a Liveboard with all answers [1].
+
+[source,TypeScript]
+----
+async function queryModeWorkflow(userQuery: string, datasourceId: string) {
+  // Step 1: Get relevant questions
+  const relevantQuestionsResult = await callMCPTool("getRelevantQuestions", {
+    query: userQuery,
+    datasourceIds: [datasourceId]
+  });
+
+  const questionsData = JSON.parse(relevantQuestionsResult.result?.content || "{}");
+  const suggestedQuestions = questionsData.questions || [];
+
+  // Step 2: Get answers for each suggested question
+  const answers = await Promise.all(
+    suggestedQuestions.map(async (question: string) => {
+      const answerResult = await callMCPTool("getAnswer", {
+        question: question,
+        datasourceId: datasourceId
+      });
+
+      const answerData = JSON.parse(answerResult.result?.content || "{}");
+
+      return {
+        question: answerData.question,
+        session_identifier: answerData.session_identifier,
+        generation_number: answerData.generation_number
+      };
+    })
+  );
+
+  // Step 3: Create liveboard with all answers
+  const liveboardTitle = `Analysis: ${userQuery}`;
+  const createLiveboardResult = await callMCPTool("createLiveboard", {
+    name: liveboardTitle,
+    noteTile: `${liveboardTitle} was created by TS MCP Chat`,
+    answers: answers
+  });
+
+  return createLiveboardResult;
+}
+----
+
+=== Multi-answer mode – user questions → liveboard
+
+This workflow:
+
+. Takes a list of user-provided questions.
+. Gets answers for each.
+. Creates a Liveboard with all answers [1].
+
+[source,TypeScript]
+----
+async function multiAnswerWorkflow(
+  questions: string[],
+  datasourceId: string,
+  liveboardTitle: string
+) {
+  // Step 1: Get answers for each question
+  const answers = await Promise.all(
+    questions.map(async (question) => {
+      const answerResult = await callMCPTool("getAnswer", {
+        question: question,
+        datasourceId: datasourceId
+      });
+
+      const answerData = JSON.parse(answerResult.result?.content || "{}");
+
+      return {
+        question: answerData.question,
+        session_identifier: answerData.session_identifier,
+        generation_number: answerData.generation_number
+      };
+    })
+  );
+
+  // Step 2: Create liveboard with all answers
+  const createLiveboardResult = await callMCPTool("createLiveboard", {
+    name: liveboardTitle,
+    noteTile: `${liveboardTitle} was created by TS MCP Chat`,
+    answers: answers
+  });
+
+  return createLiveboardResult;
+}
+----
+
+== Error handling
+The most frequent issues fall into two categories:
+
+* Validation errors. For example, missing required fields like `answers`, `session_identifier`, `generation_number`, or `noteTile`, or sending a value with the wrong type. These are returned as structured “invalid_type” errors that tell you which field is wrong and why.
+
+* Authentication errors, typically HTTP 401 or 403 responses when the `authToken` is invalid or has expired, or when it lacks the required permissions. In such cases, you must obtain a new ThoughtSpot token and retry the call.
+
+=== Common validation errors
+
+==== Missing `answers` array
+
+[source,json]
+----
+{
+  "code": "invalid_type",
+  "expected": "array",
+  "received": "undefined",
+  "path": ["answers"],
+  "message": "Required"
+}
+----
+
+Fix: Include the `answers` array when calling `createLiveboard`.
+
+==== Missing session data
+[source,json]
+----
+{
+  "code": "invalid_type",
+  "expected": "string",
+  "received": "undefined",
+  "path": ["answers", 0, "session_identifier"],
+  "message": "Required"
+}
+----
+Fix: Extract `session_identifier` and `generation_number` from the `getAnswer` response and pass them into `answers`.
+
+==== Missing `noteTile`
+
+[source,json]
+----
+{
+  "code": "invalid_type",
+  "expected": "string",
+  "received": "undefined",
+  "path": ["noteTile"],
+  "message": "Required"
+}
+----
+
+Fix: Include the `noteTile` field. Do not use `description`.
+
+=== Authentication errors (401 / 403)
+
+If `/api/mcp` or `/api/search-worksheets` returns 401 or 403, verify whether:
+
+* `authToken` has expired.
+* The token has the right permissions.
+* `tsHost` is correct and reachable.
+
+
+== Visual Embed SDK equivalent
+
+If you use the Visual Embed SDK, the MCP approach is similar but requires additional parameters.
+
+The Liveboard creation flow works in two different ways:
+
+* By triggering `HostEvent.CreateLiveboard` on an embedded ThoughtSpot component using the Visual Embed SDK in the browser.
+* By calling the `createLiveboard` MCP tool after `getAnswer` through your `/api/mcp` endpoint. This helps you map existing embed-based implementations to the new MCP-based approach without changing the underlying ThoughtSpot behavior.
+
+=== Visual Embed SDK
+
+[source,ts]
+----
+const result = await embedRef.current.trigger(HostEvent.CreateLiveboard, {
+  answers: [{
+    question: answerData.question,
+    session_identifier: answerData.session_identifier,
+    generation_number: answerData.generation_number
+  }]
+});
+----
+
+=== MCP SDK via /api/mcp
+
+[source,ts]
+----
+const result = await callMCPTool("createLiveboard", {
+  name: "Liveboard Name",
+  noteTile: "Description",
+  answers: [{
+    question: answerData.question,
+    session_identifier: answerData.session_identifier,
+    generation_number: answerData.generation_number
+  }]
+});
+----
+
+MCP requires `name` and `noteTile` in addition to the `answers` array.
+
+== Best practices
+
+* Always call `getAnswer` before `createLiveboard`. +
+You cannot create a Liveboard without `session_identifier` and `generation_number`.
+* Validate tool responses. +
+** Verify that `session_identifier` and `generation_number` exist before creating a Liveboard.
+** Log raw MCP responses for debugging.
+* Use meaningful Liveboard metadata +
+Parameters such as `name` and `noteTile` should make it easy for users to understand what the Liveboard shows and how it was created.
+* Search models before querying.
+** Use a helper like `/api/search-worksheets` to list available data sources and then pass `datasourceId` into `getRelevantQuestions` / `getAnswer` calls.
+* Use `getRelevantQuestions` to discover questions +
+For open-ended prompts, use `getRelevantQuestions` to decompose the user's request into concrete analyses.
+* Log and monitor. +
+Log tool requests and responses, excluding sensitive data, to help debug issues faster.
+* Handle errors using the detailed validation messages.
+
+== Post integration checks
+To test the integration, use the following checklist:
+
+* `getAnswer` returns `session_identifier`.
+* `getAnswer` returns `generation_number`.
+* `createLiveboard` receives:
+** `name`
+** `noteTile` (not `description`)
+** `answers` array
+* Each item in `answers` contains:
+** `question`
+** `session_identifier`
+** `generation_number`
+* Liveboard is created successfully in ThoughtSpot.
+* `frame_url` is returned for embedding.
+* `/api/search-worksheets` returns worksheets successfully.
+* `/api/mcp` works for all MCP tools.
+* Authentication tokens are properly formatted and valid.
+
+== Additional resources
+
+* See also: xref:mcp-integration.adoc[ThoughtSpot MCP Server overview].
+* Check the link:https://github.com/thoughtspot/mcp-server[MCP Server GitHub repo, window=_blank] for implementation instructions.
+* In case of issues with connection or authentication, refer to the link:https://github.com/thoughtspot/mcp-server?tab=readme-ov-file#troubleshooting[troubleshooting steps^].
+* For chat client examples, see link:https://github.com/thoughtspot/mcp-chat-client[MCP Chat Client repository, window=_blank].
+
+
+
+
+
