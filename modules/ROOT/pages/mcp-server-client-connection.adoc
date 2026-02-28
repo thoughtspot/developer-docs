@@ -1,4 +1,4 @@
-= Connect clients to ThoughtSpot MCP Server
+= Connecting clients to ThoughtSpot MCP Server
 :toc: true
 :toclevels: 3
 
@@ -6,24 +6,26 @@
 :page-pageid: connect-mcp-server-to-clients
 :page-description: Learn how to connect ThoughtSpot MCP server to clients and call tools
 
-To connect clients to the ThoughtSpot MCP server, add the MCP server endpoint to your LLM client.
+To connect ThoughtSpot MCP server to your environment, add the MCP server endpoint to your LLM client's configuration settings.
 
-Authentication is handled per user, typically using OAuth. When connected, the client can discover available MCP tools, select data sources, and interact with ThoughtSpot analytics by calling MCP tools. The MCP server exposes only the data sources and functions the authenticated user is allowed to access, and all actions are performed in the context of that user’s security entitlements.
+Authentication is handled per user, typically using xref:mcp-integration.adoc#_user_authentication[OAuth or trusted authentication tokens].
+
+When connected, the client can discover available MCP tools, select data sources, and interact with ThoughtSpot analytics by calling MCP tools. The MCP Server exposes only the data sources and functions that the authenticated user is allowed to access, and all actions are performed in the context of that user's security entitlements defined in the ThoughtSpot instance.
 
 == Before you begin
-Before you begin, check the following prerequisites and ensure that the required configuration and setup are available for connecting your client to the ThoughtSpot MCP server.
+Before you begin, review the following prerequisites and ensure that the required configuration and setup are available for integration:
 
-* Node.js version 22 or later is installed for node-based examples and local clients.
-* A ThoughtSpot application instance with 10.11.0.cl or a later release version.
-* Users have the necessary privileges to view data from relevant models/tables in ThoughtSpot. Existing RLS/CLS rules on tables are enforced automatically in data source responses.
-* For Answer and Liveboard creation, the user must have the data download and content-creation privileges.
+* Ensure that Node.js version 22 or later is installed for node-based examples and local clients.
+* Your setup has access to a ThoughtSpot application instance with 10.11.0.cl or a later release version.
+* Your users have the necessary privileges to view data from relevant models and tables in ThoughtSpot. Existing RLS/CLS rules on tables are enforced automatically in data source responses.
+* For Answer and Liveboard creation, the user must have the data download and content creation privileges.
 
-== Connecting Remote MCP-aware clients
+== Connecting remote MCP-aware clients
 If you are using a client that supports remote MCPs natively, use the following MCP server endpoint:
 
 `https://agent.thoughtspot.app/mcp`
 
-For clients that require a bearer token for authentication:
+For clients that require a bearer token for authentication, use the following URL format:
 
 `https://agent.thoughtspot.app/bearer/mcp`
 
@@ -31,9 +33,9 @@ For OpenAI MCP and Responses API integration, use the following URL:
 
 `https://agent.thoughtspot.app/openai/mcp`
 
-For additional information, refer to your client’s documentation for how to register a remote MCP server.
+For additional information about how to register a remote MCP server, refer to your client’s documentation.
 
-Once registered, the agent discovers ThoughtSpot tools from the MCP endpoint and calls tools such as `getRelevantQuestions`, `getAnswer`, and `createLiveboard` as needed to answer the user's question.
+When the MCP Server is connected, the AI agent or LLM in your environment automatically discovers ThoughtSpot tools from the MCP endpoint and calls tools as needed.
 
 === Claude MCP connector
 
@@ -64,10 +66,9 @@ curl https://api.anthropic.com/v1/messages \
   }'
 ----
 
-
 === OpenAI Responses API (MCP tools)
 
-The following example shows the code to connect OpenAI to the MCP server:
+The following example shows how to connect OpenAI to the MCP server:
 
 [source,bash]
 ----
@@ -93,7 +94,7 @@ curl https://api.openai.com/v1/responses \
 
 === Gemini with MCP
 
-The following example shows the code to connect Gemini to the MCP server:
+The following example shows the code required to connect Gemini to the MCP server:
 
 [source,typescript]
 ----
@@ -137,9 +138,8 @@ console.log(response.text);
 await mcpClient.close();
 ----
 
-== Connecting clients that do not natively support remote MCP servers
-
-Some clients that do not natively support configuring a remote MCP URL may require an `mcp-remote` component. In such cases, configure the MCP server as shown in this example:
+== Connecting clients that do not support remote MCP servers
+Some clients that do not natively support configuring a remote MCP server URL may require an `mcp-remote` component. In such cases, configure the MCP server as shown in this example:
 
 [source,JSON]
 ----
@@ -158,7 +158,7 @@ Some clients that do not natively support configuring a remote MCP URL may requi
 
 == Internal API routes
 
-If you are building your own web app or chatbot, you might want to set up internal routes that act as messengers, passing requests from your app to the ThoughtSpot MCP Server or REST APIs and then returning the results to your app. This allows your app to fetch data or answers from ThoughtSpot without connecting to it directly.
+If you are building your own web app or chatbot, you might want to set up internal routes that act as messengers, passing requests from your app to the ThoughtSpot MCP Server or REST APIs, and then returning the results to your app. This allows your app to fetch data or answers from ThoughtSpot without connecting to it directly.
 
 The sample patterns in the following examples define two internal routes for a Next.js app. You can adapt this pattern to other backend frameworks:
 
@@ -168,7 +168,6 @@ Forwards tool calls to the ThoughtSpot MCP server.
 Searches models using the ThoughtSpot REST API.
 
 === POST /api/mcp
-
 Serves as a proxy endpoint for calling ThoughtSpot MCP tools from the client side. This route forwards requests from your frontend to the ThoughtSpot MCP tools.
 
 ==== Request parameters
@@ -247,8 +246,8 @@ This route searches for data sources such as models in ThoughtSpot using the RES
 |===
 | Parameter | Required | Description
 | `tsHost` | Yes | __String__. ThoughtSpot instance URL
-| `authToken` | Yes |__String__. Bearer token for authentication
-| `namePattern` |No |__String__. Pattern to filter model names. Default is `*`.
+| `authToken` | Yes | __String__. Bearer token for authentication.
+| `namePattern` | No | __String__. Pattern to filter model names. Default is `*`.
 |===
 
 ==== Example request
@@ -352,7 +351,7 @@ Gets AI-suggested analytical questions relevant to the user’s query for a give
 
 ==== Query attributes
 
-[source,Typescript]
+[source,TypeScript]
 ----
 {
   query: string;   // User's natural language query
@@ -362,7 +361,7 @@ Gets AI-suggested analytical questions relevant to the user’s query for a give
 
 ==== Example call
 
-[source,Typescript]
+[source,TypeScript]
 ----
 const result = await callMCPTool("getRelevantQuestions", {
   query: "show me sales data",
@@ -376,7 +375,7 @@ const result = await callMCPTool("getRelevantQuestions", {
 ----
 {
   "questions": [
-    "What is the total sales by region?",
+    "What are total sales by region?",
     "Which products have the highest revenue?",
     "What are the top selling categories?"
   ]
@@ -458,7 +457,7 @@ This is a two-step process and includes the following calls:
 . Call `getAnswer` to generate visualizations and get session data via `session_identifier` and `generation_number`.
 . Call `createLiveboard` to create a Liveboard using the session data from step 1.
 
-==== Query attribute
+==== Query attributes
 
 [source,TypeScript]
 ----
@@ -573,11 +572,11 @@ async function createLiveboardFromQuestion(question: string, datasourceId: strin
 
 === Query mode – suggested questions → liveboard
 
-This workflow:
+This workflow includes the following steps:
 
 . Gets AI-suggested questions for a user query.
 . Gets answers for each suggested question.
-. Creates a Liveboard with all answers [1].
+. Creates a Liveboard with all answers.
 
 [source,TypeScript]
 ----
@@ -623,11 +622,11 @@ async function queryModeWorkflow(userQuery: string, datasourceId: string) {
 
 === Multi-answer mode – user questions → liveboard
 
-This workflow:
+This workflow includes the following steps:
 
 . Takes a list of user-provided questions.
 . Gets answers for each.
-. Creates a Liveboard with all answers [1].
+. Creates a Liveboard with all answers.
 
 [source,TypeScript]
 ----
