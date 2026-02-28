@@ -1,4 +1,4 @@
-= ThoughtSpot MCP Server
+= Using ThoughtSpot MCP Server
 :toc: true
 :toclevels: 3
 
@@ -6,44 +6,43 @@
 :page-pageid: mcp-integration
 :page-description: Learn how to use the ThoughtSpot Model Context Protocol (MCP) server to interact with ThoughtSpot data via MCP tools
 
-ThoughtSpot’s Agentic Model Context Protocol (MCP) Server allows you to integrate ThoughtSpot analytics into any AI agent, custom chatbot, or LLM platform that supports MCP.
+ThoughtSpot’s Agentic Model Context Protocol (MCP) Server allows you to integrate ThoughtSpot analytics into any AI agent, custom chatbot, or LLM platform that supports MCP. Instead of rebuilding analytics logic yourself, you connect an LLM/AI agent to the ThoughtSpot MCP Server.
 
-Instead of rebuilding analytics logic yourself, you connect an LLM/AI agent to the ThoughtSpot MCP Server. The LLM can then:
+When integrated, the MCP Server equips your client and AI agent/LLM with the following capabilities:
 
-* Discover ThoughtSpot MCP tools automatically
-* Ask questions in natural language
-* Create Liveboards programmatically from answer sessions
+* Discovering ThoughtSpot MCP tools automatically
+* Natural language queries and responses
+* Programmatic creation of Liveboards
 
 == Spotter and MCP Server
 
-ThoughtSpot provides three main options to integrate AI and analytics:
+ThoughtSpot provides the following options to integrate AI and analytics into your workflows:
 
 [cols="1,3",options="header"]
 |===
 | Feature | Purpose
+| **ThoughtSpot MCP Server**
+a| Allows using your own UI, agent, or LLM and orchestration. ThoughtSpot exposes governed analytics tools via the MCP protocol, allowing your agent to discover and call tools programmatically. +
 
 |**Spotter Embed**
-| Allows embedding Spotter conversational UI and agentic capabilities directly into your application using the Visual Embed SDK.
-Requires minimal development effort and supports faster deployment. This option is recommended for conversational analytics experiences within your application context.
+|Allows xref:embed-spotter.adoc[embedding Spotter conversational UI and agentic capabilities] directly into your application using the Visual Embed SDK. +
+Requires minimal development effort and supports faster deployment. +
+Recommended for integrating conversational analytics experiences within your application context.
 
-| **ThoughtSpot MCP Server**
-a| Allows using your own UI, agent or LLM, and orchestration. ThoughtSpot exposes governed analytics tools via the MCP protocol, allowing your agent to discover and call tools programmatically. This method is recommended for using ThoughtSpot as a plug-in analytics engine in your AI experience.
-
-Use ThoughtSpot MCP Server when:
-
-* Integrating with agents that natively support MCP, such as Claude, OpenAI, Gemini, or custom MCP clients.
-
-* You want to reuse ThoughtSpot’s governed analytics and data security controls such as Row-level Security (RLS), Column-level Security (CLS) rules, Liveboards, and data modeling options, instead of building analytics logic in your application.
-
-* You want the LLM to discover and call tools via the MCP protocol, rather than connecting every endpoint manually.
-
-
-| Spotter APIs
-| Provides REST APIs for full programmatic control over analytics workflows. You can use your own LLM and orchestration logic to interact with Spotter and retrieve structured answers, charts, or relevant questions for a specific data model.
+|**Spotter APIs**
+|Provides xref:spotter-apis.adoc[REST APIs] for programmatic control of analytics and agentic workflows. You can use your own LLM and orchestration logic to interact with Spotter, retrieve structured answers, charts, or relevant questions for a specific data model.
 ||
 |===
 
-=== Access to MCP Server
+=== MCP Server use cases
+
+ThoughtSpot recommends using MCP Server for the following business scenarios:
+
+* When you want to use ThoughtSpot as a plug-in analytics engine within your AI or agentic experience. This enables you to leverage ThoughtSpot’s governed analytics, including Row-level Security (RLS), Column-level Security (CLS), Liveboards, and data modeling, rather than building analytics logic directly into your application.
+* When you are working with agents or LLMs that natively support the MCP protocol, such as Claude, OpenAI, Gemini, or custom MCP clients.
+* When you want your LLM or agent to discover and call tools via the MCP protocol, allowing for dynamic tool discovery and orchestration, instead of manually connecting to each endpoint.
+
+=== MCP Server access
 The ThoughtSpot MCP Server is an add-on feature available with the link:https://www.thoughtspot.com/pricing[ThoughtSpot Analytics and ThoughtSpot Embedded offerings, window=_blank]. To purchase the MCP Server subscription and enable the MCP Server in your environment, you must have an active subscription to one of the following ThoughtSpot license plans:
 
 * Enterprise Edition of ThoughtSpot Analytics
@@ -51,17 +50,15 @@ The ThoughtSpot MCP Server is an add-on feature available with the link:https://
 
 To learn more about subscription options, contact your ThoughtSpot Sales representative.
 
-
 == Architecture and roles
-
-A typical implementation with ThoughtSpot MCP Server includes the following core components:
+The MCP Server integration and orchestration layer includes the following core components:
 
 [width="100%" cols="2,4"]
 [options='header']
 |======
 |Component|Role
 |*Agent or LLM*
-a| Acts as orchestrator
+a| Acts as orchestrator.
 - Receives the user’s prompt.
 - Discovers ThoughtSpot MCP tools via the MCP protocol.
 - Decides which tools to call and in what order.
@@ -76,89 +73,57 @@ The user-facing interface that renders chat, responses, and charts. For example,
 ||
 |======
 
-The interaction between the user, agent, and MCP Server is illustrated in the following figure:
+The following figure illustrates the interaction between the user, agent, and MCP Server:
 
 [.widthAuto]
 image::./images/agents-mcp-server-arch.png[MCP integration]
 
-
-
-
 == How it works
-The MCP Server implementation with an agentic framework or LLM client typically involves the following workflow:
+The MCP Server integration and orchestration in agentic environments typically involves the following workflows:
 
 . *User asks a question* +
 User sends a query in the chat interface to get data. For example, `What were the total sales of Jackets and Bags in the Northeast last year?` +
-+
 Optionally, the user can specify the data context so that data from a specific source is used to generate answers.
 
-. *(Optional) Data source selection via `getDataSourceSuggestions`* +
-If the question doesn’t specify a data source, the agent can call `getDataSourceSuggestions`.
-+
-ThoughtSpot returns multiple candidate data sources (models) with confidence scores and reasoning.
+. *Agent calls `getDataSourceSuggestions`* (Optional) +
+If the user's question doesn’t specify a data source, the agent can call `getDataSourceSuggestions`. In response to this request, ThoughtSpot returns multiple candidate data sources (models) with confidence scores and reasoning.
 
-. **Query decomposition** +
-The user's query is decomposed into smaller questions via `getRelevantQuestions`.
-+
-The agent calls `getRelevantQuestions` with the following parameters: +
-* The user query (`query`)
-* One or more `datasourceIds`
-+
-ThoughtSpot returns the AI-suggested, schema-aware questions that are easier to run analytically.
+. **User's query is decomposed into sub-questions** +
+To decompose the user's query into smaller questions, the agent calls `getRelevantQuestions`. +
+In response to the agent's request, ThoughtSpot returns the AI-suggested, schema-aware questions that are easier to run analytically.
 
-. *Answer generation via `getAnswer`* +
-For each suggested or chosen question, the agent calls `getAnswer` with:
-+
-* `question`
-* `datasourceId`
-+
-ThoughtSpot returns the following:
-+
+. *Query is processed for generating answers* +
+For each suggested or chosen question, the agent calls `getAnswer`. In response to this request, ThoughtSpot returns the following: +
 * Preview data (CSV string) for LLM reasoning.
 * Visualization metadata, including an embeddable `frame_url`.
 * `session_identifier` and `generation_number` for charts that are used for creating Liveboards.
 
-. *(Optional) Liveboard creation via `createLiveboard`* +
-To save one or more answers as a Liveboard:
-+
-* The agent extracts `question`, `session_identifier`, and `generation_number` from each `getAnswer` response.
-* Calls `createLiveboard` with:
-** `name` – Name of the Liveboard.
-** `noteTile` – descriptive HTML text shown as a note tile.
-** `answers` – array of answers from `getAnswer`.
-+
+. *Creates a Liveboard using metadata from query response* (Optional) +
+The user can choose to save answers from query responses in a ThoughtSpot Liveboard. For this workflow, the agent extracts `question`, `session_identifier`, and `generation_number` from each `getAnswer` response and calls `createLiveboard`. +
 ThoughtSpot creates a Liveboard and returns identifiers and a `frame_url` for the Liveboard.
 
-. *User experience for chat sessions*
-+
-In MCP platforms such as Claude and ChatGPT, users typically see a natural-language summary with a link to a ThoughtSpot Liveboard.
-+
-In custom apps, you can:
+During this interaction, users on MCP platforms such as Claude and ChatGPT typically see a natural-language summary with a link to a ThoughtSpot Liveboard.
 
-* Embed the `frame_url` in iframes to show interactive charts inline.
-* Provide Call To Action (CTA) elements backed by `createLiveboard`.
+In custom apps, you can embed the `frame_url` generated from this interaction in iframes to show interactive charts inline and provide Call To Action (CTA) elements backed by `createLiveboard` if required.
 
-== Authentication for MCP Server
-
-The MCP Server always runs under an authenticated ThoughtSpot user context. You can authenticate in two main ways:
+== User authentication
+When integrated, the MCP Server runs under an authenticated ThoughtSpot user context. You can choose one of the following authentication options:
 
 OAuth::
-Use OAuth when:
-* Connecting plug-and-play MCP platforms such as Claude, Gemini, ChatGPT integrations, and more.
-* You want the platform to drive a browser-based sign-in flow.
+Use OAuth in the following scenarios:
+* When connecting plug-and-play MCP platforms, such as Claude, Gemini, ChatGPT, and others.
+* When you want the platform to drive a browser-based sign-in flow.
 
 +
 In a typical OAuth flow:
-
 . ThoughtSpot MCP Server is configured as an MCP tool/connection in the client.
 . Client redirects the user to ThoughtSpot to sign in.
 . Client stores the OAuth token and passes it to the MCP Server on each tool call.
 
 Token-based trusted authentication::
-Use trusted authentication if:
-
-* You are building a custom UI or custom MCP client.
-* You handle user identity and want seamless SSO from your app into ThoughtSpot.
+Use trusted authentication in the following scenarios:
+* If you are building a custom UI or custom MCP client.
+* If your setup has a backend component, and your organization handles user identity and wants seamless SSO from your app into ThoughtSpot.
 
 +
 In a typical trusted authentication flow:
@@ -168,15 +133,8 @@ In a typical trusted authentication flow:
 ** `GET /api/rest/2.0/auth/session/token`.
 . The token generated for the user session is then passed to the MCP Server as a bearer token header, or as part of the client's MCP server configuration. For example, `authorization_token` for Claude.
 
-////
-[NOTE]
-====
-Trusted authentication tokens used only as HTTP headers do not create a browser session by themselves. For embedded sessions, you may also need a cookie.
-====
-////
-
-== Connecting MCP clients
-For information about supported platforms, how to connect MCP clients, examples, and best practices, see xref:mcp-server-client-connection.adoc[Connect clients to ThoughtSpot MCP server].
+== Integration with MCP platforms and client environments
+For information about the supported MCP platforms, instructions on how to connect MCP clients, code examples, and best practices, see xref:mcp-server-client-connection.adoc[Connecting clients to ThoughtSpot MCP server].
 
 == Additional resources
 
