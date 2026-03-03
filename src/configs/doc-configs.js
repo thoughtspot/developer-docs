@@ -19,11 +19,11 @@ module.exports = {
             'is now available. Read about the new features and enhancements.',
         // Swap this between:
         // - Pre-GA: release-specific URL (full http(s) URL), ex:
-        //   'https://developers.thoughtspot.com/docs/26.2.0.cl?pageid=whats-new'
+        //   'https://developers.thoughtspot.com/docs/26.3.0.cl?pageid=whats-new'
         // - GA: ' /docs/whats-new'
         //linkHref: '/docs/whats-new',
-        linkHref: '/docs/26.2.0.cl?pageid=whats-new',
-        linkText: 'Version 26.2.0.cl',
+        linkHref: '/docs/26.3.0.cl?pageid=whats-new',
+        linkText: 'Version 26.3.0.cl',
         openInNewTab: true,
     },
     TYPE_DOC_PREFIX: 'typedoc',
@@ -70,6 +70,12 @@ module.exports = {
             link: '10.13.0.cl',
             subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-10-13-0-cl.vercel.app/docs/',
+        },
+        {
+            label: '26.3.0.cl',
+            link: ' ',
+            subLabel: 'Cloud (Coming soon)',
+            iframeUrl: 'https://developer-docs-26-3-0-cl.vercel.app/docs/',
         },
         {
             label: '10.10.0.sw',
