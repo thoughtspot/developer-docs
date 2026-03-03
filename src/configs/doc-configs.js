@@ -73,7 +73,7 @@ module.exports = {
         },
         {
             label: '26.3.0.cl',
-            link: ' ',
+            link: '26.3.0.cl',
             subLabel: 'Cloud (Coming soon)',
             iframeUrl: 'https://developer-docs-26-3-0-cl.vercel.app/docs/',
         },
