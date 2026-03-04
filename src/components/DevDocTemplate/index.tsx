@@ -337,6 +337,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         const customStyles = {
             overlay: {
                 background: 'rgba(50,57,70, 0.9)',
+                zIndex: 10,
             },
             content: {
                 top: '50px',
