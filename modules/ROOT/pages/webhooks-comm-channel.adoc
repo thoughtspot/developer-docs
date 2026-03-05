@@ -1,0 +1,275 @@
+= Configure webhook communication channel
+:toc: true
+:toclevels: 3
+
+:page-title: Configure webhook communication channel
+:page-pageid: webhooks-comm-channel
+:page-description: Configure communication channels for webhook delivery
+
+To provide flexibility and programmatic control for users who want to customize notifications and automate workflows based on Liveboard scheduling events, ThoughtSpot allows you to configure a webhook communication channel.
+
+Use the following REST APIs to set and view communication channel preferences:
+
+* `POST /api/rest/2.0/system/preferences/communication-channels/configure`
+* `POST /api/rest/2.0/system/preferences/communication-channels/search`
+
+[NOTE]
+====
+In the current release:
+
+* REST APIs support webhook channel configuration for `LIVEBOARD_SCHEDULE` events only.
+* You can configure only one webhook for the Liveboard schedule event per Org.
+====
+
+== Before you begin
+
+Check your application environment for the following prerequisites:
+
+* Ensure that you have access to a ThoughtSpot instance with the required permissions to set communication channel preferences, create and manage webhooks, and schedule Liveboard jobs.
+* Ensure that the REST APIs for setting communication channel preferences and configuring webhooks are enabled on your instance. If the APIs are not available on your instance, contact ThoughtSpot Support.
+
+
+== Configure a webhook communication channel
+
+To create a webhook communication channel for the Liveboard schedule event, use the communication channel preference REST API.
+
+=== Create a webhook communication channel
+
+To create the webhook communication channel and set messaging preferences, send a `POST` request to the `/api/rest/2.0/system/preferences/communication-channels/configure` API endpoint. You can set preferences at the cluster level for all Orgs or at the Org level. When both are configured, the preferences set at the Org level take precedence.
+
+==== Request parameters
+
+[width="100%" cols="1,2,6"]
+[options='header']
+|=====
+|Parameter|Description |
+.3+| `cluster_preferences` 2+|__Array of objects__. Sets default preferences for all Orgs in the instance. You must specify the following parameters:
+
+| `event_type`
+a|__String__. Type of event for which communication channels are configured. For the Liveboard schedule event, set the parameter value to `LIVEBOARD_SCHEDULE`.
+
+| `channels` a|
+__Array of strings__. Communication channels for the event type specified in the request. Valid values are: +
+
+* `EMAIL`
+* `WEBHOOK`
+
+To create a webhook channel for the Liveboard schedule event, specify `WEBHOOK`.
+
+.5+| `org_preferences` 2+|__Array of objects__. By default, preferences configured at the cluster level apply to all Orgs in the instance. To override default preferences for your Org, set Org-specific preferences:
+
+| `org_identifier`  a|
+__String__. Name or ID of the Org.
+| `preferences` a|
+__Array of objects__. Define the following parameters to set communication channel preferences for the Org. If preferences are not set, the Org inherits the default preferences applied at the cluster level.
+
+* `event_type` +
+__String__. Type of the event for which communication channels are configured. For the Liveboard schedule event, set the parameter value as `LIVEBOARD_SCHEDULE`.
+* `channels` +
+__Array of strings__. Communication channels for the event type specified in the request. Valid values are: +
+** `EMAIL`
+** `WEBHOOK`
+
++
+To set up a webhook channel for the Liveboard schedule event, specify `WEBHOOK`.
+
+| `operation` a|__String__. Type of operation to perform. The following options are available:
+
+** `REPLACE` - To replace default preferences.
+** `RESET` - To restore default preferences. For reset operation, you'll also need to specify the event type. Note that this operation removes any Org-specific overrides and restores the default preferences configured at the cluster level.
+
+| `reset_events` a|__Array of strings__. For `RESET` operations, specify the event type to reset. Note that the reset operation removes Org-specific configuration for the events specified in `reset_events`.
+|=====
+
+==== Example request
+
+The following example shows the request body for setting a communication channel preference at the cluster level.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/configure'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "cluster_preferences": [
+    {
+      "event_type": "LIVEBOARD_SCHEDULE",
+      "channels": [
+        "WEBHOOK"
+      ]
+    }
+  ]
+}'
+----
+
+The following example shows the request body for setting a communication channel preference at the Org level.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/configure'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "org_preferences": [
+    {
+      "org_identifier": "testOrg1",
+      "operation": "REPLACE",
+      "preferences": [
+        {
+          "event_type": "LIVEBOARD_SCHEDULE",
+          "channels": [
+            "WEBHOOK"
+          ]
+        }
+      ]
+    }
+  ]
+}'
+----
+
+==== API response
+If the request is successful, the API returns a 204 response.
+
+=== View the communication channel preferences
+
+To review and audit the communication channel preferences set on your instance, send a `POST` request to the `/api/rest/2.0/system/preferences/communication-channels/search` API endpoint.
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`cluster_preferences` +
+__Optional__ a|__Array of strings__. To filter the API response by event type, specify the event type for which the communication channel preference is set at the cluster level.
+| `org_preferences` +
+__Optional__ a|__Array of strings__. To filter API response by Org-specific overrides, specify the following parameters:
+
+* `org_identifier`  +
+__String__. Name or ID of the Org.
+* `event_types` +
+__Array of strings__. Event types to search for. To get channel preferences for Liveboard schedule events, specify `LIVEBOARD_SCHEDULE`.
+|=====
+
+==== Example request
+
+The following request fetches channel preferences configured for the Liveboard schedule event at the cluster level:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "cluster_preferences": [
+    "LIVEBOARD_SCHEDULE"
+  ]
+}'
+----
+
+The following request fetches channel preferences configured for the Liveboard schedule event at the Org level:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "org_preferences": [
+    {
+      "org_identifier": "testOrg1",
+      "event_types": [
+        "LIVEBOARD_SCHEDULE"
+      ]
+    }
+  ]
+}'
+----
+
+==== Example response
+
+If the request is successful, the API returns the channel preference details.
+
+The following example shows the communication channel preferences configured for the specified event type at the cluster level:
+
+[source,JSON]
+----
+{
+  "cluster_preferences": [],
+  "org_preferences": [
+    {
+      "org": {
+        "id": "0",
+        "name": "Primary"
+      },
+      "preferences": []
+    },
+    {
+      "org": {
+        "id": "1532970882",
+        "name": "testOrg"
+      },
+      "preferences": [
+        {
+          "event_type": "LIVEBOARD_SCHEDULE",
+          "channels": [
+            "EMAIL",
+            "WEBHOOK"
+          ]
+        }
+      ]
+    },
+    {
+      "org": {
+        "id": "2100019165",
+        "name": "testOrg1"
+      },
+      "preferences": [
+        {
+          "event_type": "LIVEBOARD_SCHEDULE",
+          "channels": [
+            "WEBHOOK"
+          ]
+        }
+      ]
+    }
+  ]
+}
+----
+
+The following example shows the preferences returned for a specific Org:
+
+[source,JSON]
+----
+{
+  "cluster_preferences": [],
+  "org_preferences": [
+    {
+      "org": {
+        "id": "2100019165",
+        "name": "testOrg1"
+      },
+      "preferences": [
+        {
+          "event_type": "LIVEBOARD_SCHEDULE",
+          "channels": [
+            "WEBHOOK"
+          ]
+        }
+      ]
+    }
+  ]
+}
+----
+
+== Additional resources
+
+* Refer to the documentation on how to xref:webhooks-lb-schedule.adoc[deliver Liveboard reports to an external application using a webhook]
+* Refer to the documentation on how to xref:webhooks-s3-storage.adoc[Deliver content to AWS S3 storage using webhooks]

@@ -8,20 +8,18 @@
 
 [beta betaBackground]Beta
 
-To provide flexibility and programmatic control for users who want to customize notifications and automate workflows based on Liveboard scheduling events, ThoughtSpot provides the ability to configure a webhook communication channel. By configuring a webhook, users can send notifications automatically to a target application whenever a scheduled Liveboard job is triggered in ThoughtSpot.
+By configuring a webhook, users can send notifications automatically to a target application whenever a scheduled Liveboard job is triggered in ThoughtSpot.
 
-Webhook support for Liveboard schedule events is available only on ThoughtSpot Cloud instances running 10.14.0.cl or later. This feature is currently in beta and is not enabled by default. To enable this feature on your instance, contact ThoughtSpot Support.
+[NOTE]
+====
+* Webhook support for Liveboard schedule events is available only on ThoughtSpot Cloud instances with 10.14.0.cl or later. The webhook feature is currently in beta and not enabled by default. To enable this feature on your instance, contact ThoughtSpot Support.
+* You can configure only one webhook for the Liveboard schedule event per Org.
+====
 
 == Overview
 
 If you have scheduled a Liveboard job to receive a daily report via email, you can configure ThoughtSpot to send the report directly to a webhook endpoint and create your own custom emails or workflows.
 
-To automate sending scheduled Liveboard notifications to a webhook endpoint, the following configuration is required:
-
-* Ensure that "webhook" is selected as a communication channel for your Org or at the cluster level for all Orgs on your instance. +
-Use the following REST APIs to set and view communication channel preferences:
-** `POST /api/rest/2.0/system/preferences/communication-channels/configure`
-** `POST /api/rest/2.0/system/preferences/communication-channels/search`
 * A webhook for the Liveboard schedule event to enable programmatic communication between the target application and ThoughtSpot. +
 To create and manage webhook APIs, use the following APIs:
 ** `POST /api/rest/2.0/webhooks/create`
@@ -29,22 +27,8 @@ To create and manage webhook APIs, use the following APIs:
 ** `POST /api/rest/2.0/webhooks/search`
 ** `POST /api/rest/2.0/webhooks/{webhook_identifier}/update`
 
-[NOTE]
-====
-In the current release:
 
-* REST APIs support webhook channel configuration for `LIVEBOARD_SCHEDULE` events only.
-* You can configure only one webhook for the Liveboard schedule event per Org.
-====
-
-== Get started
-The webhook setup for Liveboard schedule events includes the following steps:
-
-* xref:webhooks-lb-schedule.adoc#_configure_a_webhook_communication_channel[Configuring a webhook communication channel at the instance level or for a specific Org].
-* xref:webhooks-lb-schedule.adoc#_configure_a_webhook[Creating a webhook to listen to Liveboard schedule events].
-* xref:webhooks-lb-schedule.adoc#_verify_the_webhook_payload[Verifying the webhook payload].
-
-=== Before you begin
+== Before you begin
 
 Check your application environment for the following prerequisites:
 
@@ -52,257 +36,24 @@ Check your application environment for the following prerequisites:
 If your instance has Role-based Access Control (RBAC) enabled, you need the following privileges:
 ** `APPLICATION_ADMINISTRATION` (*Can Manage Application settings*) to create and view communication channels.
 ** `CAN_MANAGE_WEBHOOKS` (*Can manage webhooks*) to create and manage webhooks.
-* Ensure that the REST APIs for setting communication channel preferences and configuring webhooks are enabled on your instance. If the APIs are not available on your instance, contact ThoughtSpot Support.
+* Ensure that a xref:webhooks-comm-channel.adoc[webhook communication channel] is configured for your Org or at the cluster level on your instance.
 * To allow outbound traffic from ThoughtSpot to the webhook endpoint, add the webhook destination URL to the xref:security-settings.adoc#csp-connect-src[CSP connect-src] allowlist in ThoughtSpot.
 * Ensure that your destination application has a callback URL to accept HTTP POST requests from ThoughtSpot.
 * If you plan to use OAuth authentication, make sure you have the OAuth credentials and authorization URL of your application.
 * If you plan to use an API key for authentication, ensure that you have a valid API key.
 
-=== Configure a webhook communication channel
+== Configuration steps
 
-To create a webhook communication channel for the Liveboard schedule event, use the channel preference REST API.
+The webhook setup for Liveboard schedule events includes the following steps:
 
-==== Create a webhook communication channel
+* xref:webhooks-lb-schedule.adoc#_configure_a_webhook[Creating a webhook to listen to Liveboard schedule events].
+* xref:webhooks-lb-schedule.adoc#_verify_the_integration[Verifying the integration and webhook payload].
 
-To create the webhook communication channel and set messaging preferences, send a `POST` request to the `/api/rest/2.0/system/preferences/communication-channels/configure` API endpoint. You can set preferences at the cluster level for all Orgs or at the Org level. When both are configured, the preferences set at the Org level take precedence.
-
-===== Request parameters
-
-[width="100%" cols="1,2,6"]
-[options='header']
-|=====
-|Parameter|Description |
-.3+| `cluster_preferences` 2+|__Array of objects__. Sets default preferences for all Orgs in the instance. You must specify the following parameters:
-
-| `event_type`
-a|__String__. Type of the event for which communication channels are configured. For the Liveboard schedule event, set the parameter value as `LIVEBOARD_SCHEDULE`.
-
-| `channels` a|
-__Array of strings__. Communication channel for the event type specified in the request. Valid values are: +
-
-* `EMAIL`
-* `WEBHOOK`
-
-To create a webhook channel for the Liveboard schedule event, specify `WEBHOOK`.
-
-.5+| `org_preferences` 2+|__Array of objects__. By default, preferences configured at the cluster level apply to all Orgs in the instance. To override default preferences for your Org, set Org-specific preferences:
-
-| `org_identifier`  a|
-__String__. Name or ID of the Org.
-| `preferences` a|
-__Array of objects__. Define the following parameters to set communication channel preferences for the Org. If preferences are not set, the Org inherits the default preferences applied at the cluster level.
-
-* `event_type` +
-__String__. Type of the event for which communication channels are configured. For the Liveboard schedule event, set the parameter value as `LIVEBOARD_SCHEDULE`.
-* `channels` +
-__Array of strings__. Communication channel for the event type specified in the request. Valid values are: +
-** `EMAIL`
-** `WEBHOOK`
-
-+
-To set up a webhook channel for the Liveboard schedule event, specify `WEBHOOK`.
-
-| `operation` a|__String__. Type of operation. The following options are available:
-
-** `REPLACE` - To replace default preferences.
-** `RESET` - To restore default preferences. For reset operation, you'll also need to specify the event type. Note that this operation removes any Org-specific overrides and restores the default preferences configured at the cluster level.
-
-| `reset_events` a|__Array of strings__. For `RESET` operations, specify the event type to reset. Note that the reset operation removes Org-specific configuration for the events specified in `reset_events`.
-|=====
-
-===== Example request
-
-The following example shows the request body for setting a communication channel preference at the cluster level.
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/configure'  \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "cluster_preferences": [
-    {
-      "event_type": "LIVEBOARD_SCHEDULE",
-      "channels": [
-        "WEBHOOK"
-      ]
-    }
-  ]
-}'
-----
-
-The following example shows the request body for setting a communication channel preference at the Org level.
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/configure'  \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "org_preferences": [
-    {
-      "org_identifier": "testOrg1",
-      "operation": "REPLACE",
-      "preferences": [
-        {
-          "event_type": "LIVEBOARD_SCHEDULE",
-          "channels": [
-            "WEBHOOK"
-          ]
-        }
-      ]
-    }
-  ]
-}'
-----
-
-===== API response
-If the request is successful, the API returns a 204 response.
-
-==== View the communication channel preferences
-
-To review and audit the communication channel preferences set on your instance, send a `POST` request to the `/api/rest/2.0/system/preferences/communication-channels/search` API endpoint.
-
-===== Request parameters
-
-[width="100%" cols="2,4"]
-[options='header']
-|=====
-|Parameter|Description
-
-|`cluster_preferences` +
-__Optional__ a|__Array of strings__. To filter API response by event type, specify the event type for which the communication channel preference is set at the cluster level.
-| `org_preferences` +
-__Optional__ a|__Array of strings__. To filter API response by Org-specific overrides, specify the following parameters:
-
-* `org_identifier`  +
-__String__. Name or ID of the Org.
-* `event_types` +
-__Array of strings__. Event types to search for. To get channel preferences for Liveboard schedule events, specify `LIVEBOARD_SCHEDULE`.
-|=====
-
-===== Example request
-
-The following request fetches channel preferences configured for the Liveboard schedule event at the cluster level:
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/search'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "cluster_preferences": [
-    "LIVEBOARD_SCHEDULE"
-  ]
-}'
-----
-
-The following request fetches channel preferences configured for the Liveboard schedule event at the Org level:
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/search'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "org_preferences": [
-    {
-      "org_identifier": "testOrg1",
-      "event_types": [
-        "LIVEBOARD_SCHEDULE"
-      ]
-    }
-  ]
-}'
-----
-
-===== Example response
-
-If the request is successful, the API returns the channel preference details.
-
-The following example shows the communication preferences configured for the specified event type at the cluster level:
-
-[source,JSON]
-----
-{
-  "cluster_preferences": [],
-  "org_preferences": [
-    {
-      "org": {
-        "id": "0",
-        "name": "Primary"
-      },
-      "preferences": []
-    },
-    {
-      "org": {
-        "id": "1532970882",
-        "name": "testOrg"
-      },
-      "preferences": [
-        {
-          "event_type": "LIVEBOARD_SCHEDULE",
-          "channels": [
-            "EMAIL",
-            "WEBHOOK"
-          ]
-        }
-      ]
-    },
-    {
-      "org": {
-        "id": "2100019165",
-        "name": "testOrg1"
-      },
-      "preferences": [
-        {
-          "event_type": "LIVEBOARD_SCHEDULE",
-          "channels": [
-            "WEBHOOK"
-          ]
-        }
-      ]
-    }
-  ]
-}
-----
-
-The following example shows the preferences returned for a specific Org:
-
-[source,JSON]
-----
-{
-  "cluster_preferences": [],
-  "org_preferences": [
-    {
-      "org": {
-        "id": "2100019165",
-        "name": "testOrg1"
-      },
-      "preferences": [
-        {
-          "event_type": "LIVEBOARD_SCHEDULE",
-          "channels": [
-            "WEBHOOK"
-          ]
-        }
-      ]
-    }
-  ]
-}
-----
-
-=== Configure a webhook
+== Configure a webhook
 
 To configure webhooks for the Liveboard schedule event, use the webhook REST API.
 
-==== Create a webhook
+=== Create a webhook
 
 To create a webhook for the Liveboard schedule event, send a `POST` request to the `/api/rest/2.0/webhooks/create` API endpoint. ThoughtSpot allows only one webhook per Org.
 
@@ -348,15 +99,10 @@ HTTP header where the signature is sent.
 Hash algorithm used for signature verification.
 * `secret` +
 Shared secret used for HMAC signature generation.
-| `storage_destination` | Configuration for the storage destination. Include the following attributes if you want to add destination storage for attachments delivered via a webhook.
-
-* `storage_type` +
-Type of storage destination. Currently, only the Amazon S3 Bucket is supported as the storage destination.
-* `storage_config` +
-Storage configuration parameters. If you have selected `AWS_S3`, specify the storage configuration parameters required for Amazon S3 integration. For more information, see xref:webhooks-s3-storage.adoc[S3 storage integration for webhook delivery].
+| `storage_destination` | Configuration parameters for the S3 storage destination. For more information, see xref:webhooks-s3-storage.adoc[Deliver content to AWS S3 storage using webhooks].
 |=====
 
-===== Example request
+==== Example request
 The following example shows the request body for creating a webhook:
 
 [source,cURL]
@@ -379,11 +125,11 @@ curl -X POST \
 }'
 ----
 
-===== Example response
+==== Example response
 
 If webhook creation is successful, the API returns a 204 response code.
 
-==== View webhook properties
+=== View webhook properties
 
 To view the properties of a webhook or get a list of webhooks configured on your ThoughtSpot instance, send a `POST` request to the `/api/rest/2.0/webhooks/search` API endpoint.
 
@@ -401,7 +147,7 @@ __Optional__ |__String__. ID or name of the Org.
 __Optional__ | __String__. ID or name of the webhook.
 | `event_type` +
 __Optional__| __String__. Type of webhook event to filter by. For Liveboard schedule events, specify `LIVEBOARD_SCHEDULE`.
-|Pagination settings a| If fetching multiple records, specify the following parameters to paginate API response: +
+|Pagination settings a| If fetching multiple records, specify the following parameters to paginate the API response: +
 
 * `record_offset` +
 __Integer__. Specifies the starting point (index) from which records should be returned. Default is 0.
@@ -412,7 +158,7 @@ __Optional__| Enables sorting of the API response by a specific field in ascendi
 |
 |=====
 
-===== Example request
+==== Example request
 
 The following example shows the request body to fetch webhook properties:
 
@@ -431,7 +177,7 @@ curl -X POST \
 }'
 ----
 
-===== Example response
+==== Example response
 
 If the API request is successful, ThoughtSpot returns the webhook configuration details:
 
@@ -475,7 +221,7 @@ If the API request is successful, ThoughtSpot returns the webhook configuration 
 }
 ----
 
-==== Update the properties of a webhook
+=== Update the properties of a webhook
 
 To update the name, description text, endpoint URL, or the authentication settings of a webhook object, send a `POST` request to the `/api/rest/2.0/webhooks/{webhook_identifier}/update` API endpoint.
 
@@ -520,11 +266,11 @@ curl -X POST \
 }'
 ----
 
-===== Example response
+==== Example response
 
 If the API request is successful, the API returns a 204 response code indicating a successful operation.
 
-==== Delete a webhook
+=== Delete a webhook
 
 To delete a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/delete` endpoint.
 
@@ -533,7 +279,7 @@ To delete a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/delete
 When you delete a webhook with S3 storage, the webhook endpoint is removed and any events or workflows configured to use that webhook can no longer deliver payloads. Files already stored in S3 are not deleted as part of webhook deletion; only the delivery mechanism is removed.
 ====
 
-===== Request parameters
+==== Request parameters
 Specify the name or ID of the webhook to delete.
 
 [width="100%" cols="2,4"]
@@ -543,7 +289,7 @@ Specify the name or ID of the webhook to delete.
 | `webhook_identifiers` |__Array of strings__. ID or name of the webhooks to delete.
 |=====
 
-===== Example request
+==== Example request
 
 [source,cURL]
 ----
@@ -559,7 +305,7 @@ curl -X POST \
 }'
 ----
 
-===== Example response
+==== Example response
 
 If the API request is successful, the webhook is deleted, and the API returns the details of the deleted webhook in the response body.
 
@@ -597,18 +343,16 @@ If the API request is successful, the webhook is deleted, and the API returns th
 }
 ----
 
-=== Verify the webhook payload
+== Verify the integration
 
-After a webhook channel is configured for Liveboard schedule events and a webhook is created for these events at the Org level, it is applied to all Liveboard schedules in an Org.
-
-When a Liveboard schedule event is triggered based on the conditions defined in the schedule, the webhook sends the payload with the following schema to the configured endpoint. Based on the Liveboard job settings, the payload includes metadata properties such as webhook communication channel ID, recipient details, Liveboard schedule details, event properties, and a link to the Liveboard.
+To verify the integration, trigger a webhook delivery and xref:webhooks-payload.adoc[verify the payload].
 
 For testing purposes, you can use a URL from link:https://webhook.site/[Webhook.site^] as a webhook endpoint and check the payload when the Liveboard schedule event is triggered.
 
-==== Contents of the webhook payload
+=== Contents of the webhook payload
 See xref:webhooks-payload.adoc[Webhook payload].
 
 == Additional resources
-
+* xref:webhooks-comm-channel.adoc[Configure webhook communication channel]
 * link:https://docs.thoughtspot.com/cloud/latest/liveboard-schedule[Scheduling Liveboard jobs^]
 * +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fschedules%2Fcreate-schedule">Liveboard schedule REST APIs</a>+++
