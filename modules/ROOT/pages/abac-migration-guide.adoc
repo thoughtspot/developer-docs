@@ -11,16 +11,30 @@ Administrators can migrate their existing implementation of ABAC with JSON Web T
 * Row-level security (RLS) rules are defined in ThoughtSpot on tables and data models
 * JWTs only provide values for variables used in those RLS rules, instead of sending full filter rules.
 
-This guide describes the migration procedure for the following migration scenarios:
+== Supported migration paths
 
-* xref:abac-migration-guide.adoc#_from_legacy_jwt_abac_with_filter_rules_to_abac_via_rls[From legacy ABAC implementation with `filter_rules` to ABAC via RLS]
+* xref:abac-migration-guide.adoc#_from_legacy_jwt_abac_with_filter_rules_to_abac_via_rls[From legacy ABAC implementation with "filter_rules" to ABAC via RLS]
 * xref:abac-migration-guide.adoc#_from_jwt_abac_beta_implementation_to_abac_via_rls[From JWT ABAC beta implementation to ABAC via RLS]
 
-[IMPORTANT]
-====
-The legacy JWT ABAC implementation is deprecated and will be removed from the product in an upcoming version. ABAC beta implementation is no longer supported in ThoughtSpot. ThoughtSpot strongly recommends using xref:abac_rls-variables.adoc[ABAC via RLS] in all new implementations and migrating your existing legacy or beta JWT ABAC implementation to ABAC via RLS.
-====
+== Important notes and considerations
+Review the information in the following sections before getting started with the migration.
 
+=== ABAC feature support
+
+The legacy JWT ABAC implementation is deprecated and will be removed from the product in an upcoming version. The ABAC beta implementation is no longer supported in ThoughtSpot.
+ThoughtSpot strongly recommends using xref:abac_rls-variables.adoc[ABAC via RLS] in all new implementations and migrating your existing legacy or beta JWT ABAC implementation to ABAC via RLS.
+
+=== Persistence behavior
+ABAC via RLS does not support session-based ABAC rules (`"persist_option": "NONE"`). If your implementation currently relies on session-based rules: +
+
+- Create dedicated user accounts for your application users. You can use REST APIs to automate user creation, update, or deletion.
+- Apply persisted security rules to those users.
+- Use cookieless authentication with these persisted users.
+
+This approach addresses all use cases that previously relied on session-based JWT and ensures Liveboard schedule attachments enforce security rules and deliver only secured output to your end users.
+
+=== Table joins
+The filters in JWT ABAC beta implementation respect `MODEL JOINS`. However, RLS by default is an `INNER` join. If you want to adjust behavior for your implementation, contact ThoughtSpot Support.
 
 == From legacy JWT ABAC with filter_rules to ABAC via RLS
 
@@ -28,7 +42,7 @@ Before migrating to the new method, complete the following checks:
 
 * Analyze your current JWT ABAC implementation.
 * Configure equivalent RLS rules using variables.
-* Implement and test RLS-based ABAC in a non‑production environment.
+* Implement and test RLS-based ABAC in a non-production environment.
 * Adjust your JWT payloads to set variable values instead of `filter_rules`.
 * Roll out and decommission legacy JWT ABAC.
 
@@ -102,7 +116,7 @@ You may want to set up RLS rules and variables equivalent to filter and paramete
 
 To set equivalent RLS rule conditions and variables:
 
-. Create formula variables using the xref:abac_rls-variables.adoc#_create_formula_variables[/api/rest/2.0/template/variables/create] API endpoint. These variables will be referenced in RLS rules. To create variables, you need `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege. If Role-Based Access control (RBAC) is enabled on your instance, the `CAN_MANAGE_VARIABLES` (**Can manage variables**) privilege is required.
+. Create formula variables using the xref:abac_rls-variables.adoc#_create_formula_variables[/api/rest/2.0/template/variables/create] API endpoint. These variables will be referenced in RLS rules. To create variables, you need `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege. If role-based access control (RBAC) is enabled on your instance, the `CAN_MANAGE_VARIABLES` (**Can manage variables**) privilege is required.
 
 . Create rules using these variable(s) directly on the ThoughtSpot table in the **Row Security Editor** tab. These should be the same rules as the ones previously defined in the JWT, which will be ultimately replaced after migration. To add multiple conditions, use the `AND` operator.
 
@@ -112,7 +126,7 @@ To set equivalent RLS rule conditions and variables:
 image:./images/rls-rules-abac.png[RLS rules editor]
 
 +
-. Create a JWT token request with `variable_values` and generate the token using the  `/api/rest/2.0/auth/token/custom` API endpoint. Note that these values can be scoped to specific models, so that different security rules can be applied to different data in ThoughtSpot.
+. Create a JWT token request with `variable_values` and generate the token using the `/api/rest/2.0/auth/token/custom` API endpoint. Note that these values can be scoped to specific models, so that different security rules can be applied to different data in ThoughtSpot.
 
 +
 [source,cURL]
@@ -161,13 +175,19 @@ Users with administration and *Can Administer and Bypass RLS* privileges are exe
 
 +
 . Verify variable values are assigned to your users. This information can be retrieved using one of the following methods:
-* via a `POST` request to the `/api/rest/2.0/users/search` API endpoint. Verify the `variable_values`  section of the user metadata returned in the API response.
-* Via a `POST` request to the `/api/rest/2.0/template/variables/search` API endpoint, with  variables specified in the request body. Set the `response_content` to be `METADATA_AND_VALUES` to fetch the variable values and verify the response payload.
+* Via a `POST` request to the `/api/rest/2.0/users/search` API endpoint. Verify the `variable_values` section of the user metadata returned in the API response.
+* Via a `POST` request to the `/api/rest/2.0/template/variables/search` API endpoint, with variables specified in the request body. Set `response_content` to `METADATA_AND_VALUES` to fetch the variable values and verify the response payload.
 +
 [NOTE]
 ====
 We do not recommend using the `/api/rest/2.0/users/{user_identifier}/update` endpoint to update variable values for a user. Instead, use either `/api/rest/2.0/template/variables/update-values` or `/api/rest/2.0/auth/token/custom`.
 ====
+
+==== Expected setup before the testing phase
+
+Ensure that you have both legacy JWT GA and ABAC via RLS properly set up in your environment before starting the tests. For testing purposes, we'll use an example setup with `filter_rules`, the mandatory token filter setting in the model, and RLS rules with `country_rls_var` and `category_rls_var` variables.
+
+Your implementation can also include parameters to configure security rules by xref:abac-user-parameters.adoc#_use_parameters_with_pass_through_functions[using pass-through functions]. Typically, users may want to map existing security rules, such as those created with `filter_rules` or parameter values used in model formulas and model filters, to new RLS rules that reference variables and are applied at the table level.
 
 === Test the migration
 We recommend testing the migration in these main steps:
@@ -268,7 +288,7 @@ image:./images/legacy-jwt-abac-migration-test.png[JWT migration test]
 ==== Phase 2: Bypass legacy JWT configuration
 If the phase 1 testing is conclusive, bypass legacy JWT configuration. To test RLS independently while keeping legacy JWT configuration as a fallback:
 
-. When generating tokens, set legacy JWT ABAC implementation to allow everything by using the  keyword `TS_WILDCARD_ALL` in your legacy `filter_rules`  and  `parameter_values`.
+. When generating tokens, set the legacy JWT ABAC implementation to allow everything by using the keyword `TS_WILDCARD_ALL` in your legacy `filter_rules` and `parameter_values`.
 . Keep sending `variable_values` for the RLS rules as before.
 
 For example:
@@ -398,7 +418,7 @@ a|[source,json]
 ----
 |`country != ts_var(country_rls_var)`
 
-|`NOT_IN` (not in list)
+|`NOT_IN` (not in)
 a|[source,json]
 ----
 "filter_rules": [
@@ -434,19 +454,6 @@ This document assumes that you are currently using the `/api/rest/2.0/auth/token
 ====
 The legacy JWT ABAC beta implementation is deprecated and is no longer supported in ThoughtSpot.
 ====
-
-==== Persistence behavior
-
-ABAC via RLS does not support session-based ABAC rules (`"persist_option": "NONE"`). If your implementation currently relies on session-based rules: +
-
-- Create dedicated user accounts for your application users. You can use REST APIs to automate user creation, update, or deletion.
-- Apply persisted security rules to those users.
-- Use cookieless authentication with these persisted users.
-
-This approach addresses all use cases that previously relied on session-based JWT and ensures Liveboard schedule attachments enforce security rules and deliver only secured output to your end users.
-
-==== Table joins
-The filters in JWT ABAC beta implementation respect `MODEL JOINS`. However, RLS by default is an `INNER` join. If you want to adjust behavior for your implementation, contact ThoughtSpot Support.
 
 === Review your legacy JWT ABAC Beta implementation
 
@@ -484,7 +491,7 @@ curl -X POST \
 }'
 ----
 
-You may also be using `parameter` property to pass a validation in the data model to ensure the data model is secured by default, as shown in the following token request example:
+You may also be using a `parameter` property to pass a validation in the data model and ensure that the model is secured by default, as shown in the following token request example:
 
 [.bordered]
 [.widthAuto]
@@ -493,7 +500,7 @@ image:./images/jwt-beta-parameter-security.png[JWT beta migration test]
 Ensure that indexing is disabled on all sensitive columns in your tables.
 
 ==== Retrieve values stored for each user (Optional)
-If required, you can retrieve the values previously stored on each user after token generation. To do so, get user's metadata via  `/api/rest/2.0/users/search` API endpoint. The response from this call will give you a list of filter and variable values in the `user_parameters` section of the output.
+If required, you can retrieve the values previously stored for each user after token generation. To do so, get user metadata via the `/api/rest/2.0/users/search` API endpoint. The response from this call provides a list of filter and variable values in the `user_parameters` section of the output.
 
 For example:
 
@@ -583,7 +590,7 @@ curl -X POST \
 [NOTE]
 ====
 * RLS can be turned on or off per model created from a table. When enabled on a model, its queries honor the table’s RLS rules; when disabled, users see all data allowed by table-level RLS.
-* ThoughtSpot administrators are exempt from RLS by default. For more information, see link:https://docs.thoughtspot.com/cloud/26.2.0.cl/security-rls-concept#exempt-rls[How rule-based RLS works, window=_blank].
+* ThoughtSpot administrators are exempt from RLS by default. For more information, see link:https://docs.thoughtspot.com/cloud/latest/security-rls-concept#exempt-rls[How rule-based RLS works, window=_blank].
 ====
 
 ==== Verify variable values for users (Optional)
@@ -597,7 +604,7 @@ If you want to update variables, use either `/api/rest/2.0/template/variables/up
 === Review the configuration
 Before you begin testing, your setup should have the following JWT ABAC configuration:
 
-* Your JWT ABAC beta implementation has tokens generated for your users via `POST /api/rest/2.0/auth/token/full`, with `runtime_filters` and  required parameters.
+* Your JWT ABAC beta implementation has tokens generated for your users via `POST /api/rest/2.0/auth/token/full`, with `runtime_filters` and required parameters.
 * Variables are configured, RLS rules with variables are applied on the tables, and the values for variables are defined in the tokens generated via `/api/rest/2.0/auth/token/custom` API endpoint.
 
 === Test the migration
@@ -700,7 +707,7 @@ curl -X POST \
   }
 }'
 ----
-. Verify that your users no longer have `runtime_filters` values by calling `POST  /api/rest/2.0/users/search` API. The user property must show an empty `user_parameters.runtimeFilters` property.
+. Verify that your users no longer have `runtime_filters` values by calling the `POST /api/rest/2.0/users/search` API. The user property must show an empty `user_parameters.runtimeFilters` property.
 
 . With your user no longer having filtering conditions applied via JWT ABAC Beta, create a login token passing security rules using `POST /api/rest/2.0/auth/token/custom` API endpoint to implement ABAC via RLS.
 +
@@ -742,7 +749,7 @@ After you have validated behavior with JWT ABAC Beta attributes bypassed, remove
 .. Click **Save Changes**.
 . Authenticate your users with the token generated via `/api/rest/2.0/auth/token/custom` API endpoint. Authenticate users exclusively using `POST /api/rest/2.0/auth/token/custom` API endpoint. Ensure that `variable_values` are defined in the token.
 
-This will result in the same filtering logic for that user, with JWT ABAC Beta token  no longer applied.
+This will result in the same filtering logic for that user, with the JWT ABAC Beta token no longer applied.
 
 [.bordered]
 [.widthAuto]
@@ -820,5 +827,5 @@ RLS supports multi-value variables and rich expression functions (such as `conta
 
 == Additional resources
 
-* For information about JWT with custom variables and RLS rules, see  xref:abac_rls-variables.adoc[ABAC via RLS rules].
-* For information about RLS, see xref:rls-rules.adoc[RLS Rules] and  link:https://docs.thoughtspot.com/cloud/latest/security-rls[ThoughtSpot Product Documentation, window=_blank].
+* For information about JWT with custom variables and RLS rules, see xref:abac_rls-variables.adoc[ABAC via RLS rules].
+* For information about RLS, see xref:rls-rules.adoc[RLS Rules] and link:https://docs.thoughtspot.com/cloud/latest/security-rls[ThoughtSpot Product Documentation, window=_blank].
