@@ -1,0 +1,411 @@
+= Webhook payload for Liveboard events
+:toc: true
+:toclevels: 3
+
+:page-title: Webhook payload for Liveboard events
+:page-pageid: webhooks-lb-payload
+:page-description: Review the webhook payload content delivered to a target destination URL or S3 storage
+
+The payload contains metadata about the event, the source, the actor, the target object, and event-specific data. The payload is typically sent as a form field named `payload` in a `multipart/form-data` request with file attachments.
+
+== Payload content for S3 storage destination
+
+The payload intended for the S3 storage destination includes file attachments. The supported file formats are PDF, CSV, and XLSX.
+
+[source,JSON]
+----
+{
+  "eventId": "n.18bd8bd5-dee3-4d5c-918e-aec3ba1a090f",
+  "timestamp": "2026-02-26T09:25:32Z",
+  "eventType": "LIVEBOARD_SCHEDULE",
+  "schemaVersion": "1.0",
+  "source": {
+    "applicationName": "ThoughtSpot",
+    "applicationUrl": "https://your-cluster.thoughtspot.cloud",
+    "instanceId": "your-instance-id",
+    "orgId": "0"
+  },
+  "actor": {
+    "actorType": "SYSTEM"
+  },
+  "metadataObject": {
+    "objectType": "LIVEBOARD",
+    "id": "c30a0d49-5747-475d-8985-e975b1c2cf6d",
+    "name": "Sales Dashboard",
+    "url": "https://your-cluster.thoughtspot.cloud/#/pinboard/c30a0d49-5747-475d-8985-e975b1c2cf6d"
+  },
+  "data": {
+    "scheduleDetails": {
+      "scheduleId": "cffddca8-d4fc-4575-b8ec-a50e696ccdfc",
+      "name": "Daily Sales Report",
+      "creationTime": "2026-02-26T07:52:23Z",
+      "description": "Daily report",
+      "authorId": "59481331-ee53-42be-a548-bd87be6ddd4a",
+      "userIds": ["59481331-ee53-42be-a548-bd87be6ddd4a"],
+      "groupIds": [],
+      "runId": "29001ffd-6a84-45cd-a957-621fce89afc6",
+      "exportRequest": {
+        "object_type": "LIVEBOARD",
+        "request_type": "SCHEDULE"
+      },
+      "fileFormat": "pdf",
+      "status": "SCHEDULED",
+      "emailIds": []
+    },
+    "recipients": [
+      {
+        "type": "USER",
+        "id": "59481331-ee53-42be-a548-bd87be6ddd4a",
+        "name": "John Doe",
+        "email": "john@company.com",
+        "locale": "en_US"
+      }
+    ],
+    "aiHighlights": "",
+    "msgUniqueId": "2f31df6a-2623-4953-a9bb-5af9b2922474",
+    "channelID": "6dfa4d82-fdc8-4d5b-8294-a5de0dd5ede1",
+    "channelType": "webhook",
+    "communicationType": "LiveboardSchedules"
+  }
+}
+----
+
+The following content in the file attachment indicates a successful delivery to the S3 storage destination:
+
+[source,JSON]
+----
+{
+  "files": [
+    {
+      "filename": "sales_report.pdf",
+      "contentType": "application/pdf",
+      "size": 1024000,
+      "provider": "AWS_S3",
+      "bucketName": "my-webhook-files",
+      "region": "us-west-2",
+      "objectKey": "thoughtspot-webhooks/cluster-abc/user-123/org-0/liveboard/sales_report.pdf",
+      "uploadStatus": "SUCCESS"
+    },
+    {
+      "filename": "sales_data.csv",
+      "contentType": "text/csv",
+      "size": 512000,
+      "provider": "AWS_S3",
+      "bucketName": "my-webhook-files",
+      "region": "us-west-2",
+      "objectKey": "thoughtspot-webhooks/cluster-abc/user-123/org-0/liveboard/sales_data.csv",
+      "uploadStatus": "SUCCESS"
+    }
+  ]
+}
+----
+
+The following examples show a failed delivery of file attachments due to access denied errors:
+
+[source,JSON]
+----
+{
+  "files": [
+    {
+      "filename": "sales_report.pdf",
+      "contentType": "application/pdf",
+      "size": 1024000,
+      "provider": "AWS_S3",
+      "bucketName": "my-webhook-files",
+      "region": "us-west-2",
+      "objectKey": "thoughtspot-webhooks/cluster-abc/user-123/org-0/liveboard/sales_report.pdf",
+      "uploadStatus": "SUCCESS"
+    },
+    {
+      "filename": "sales_data.csv",
+      "contentType": "text/csv",
+      "size": 512000,
+      "provider": "AWS_S3",
+      "uploadStatus": "FAILED",
+      "errorMessage": "Failed to upload to S3: AccessDenied: Access Denied"
+    }
+  ]
+}
+----
+
+[source,JSON]
+----
+{
+  "files": [
+    {
+      "filename": "sales_report.pdf",
+      "contentType": "application/pdf",
+      "size": 1024000,
+      "provider": "AWS_S3",
+      "uploadStatus": "FAILED",
+      "errorMessage": "Failed to assume role: AccessDenied"
+    }
+  ],
+  "error": "all file uploads failed (1 files): Failed to assume role: AccessDenied"
+}
+----
+
+[source,JSON]
+----
+{
+  "files": [],
+  "error": "cloud storage upload failed: failed to create cloud storage service: Unable to assume role. Verify roleArn, trust policy, externalId, and region."
+}
+----
+
+For information about resolving access denied errors, refer to the xref:webhooks-s3-storage.adoc#_troubleshooting_errors[Troubleshooting instructions].
+
+== Payload content for other destination URLs
+The payload content for other destination URLs includes metadata. File attachments are optional. Supported file formats are PDF, CSV, and XLSX.
+
+[source,JSON]
+----
+{
+  "eventId": "n.18bd8bd5-dee3-4d5c-918e-aec3ba1a090f",
+  "timestamp": "2025-08-29T09:25:32Z",
+  "eventType": "LIVEBOARD_SCHEDULE",
+  "schemaVersion": "1.0",
+  "source": {
+    "applicationName": "ThoughtSpot",
+    "applicationUrl": "https://my.thoughtspot.cloud",
+    "instanceId": "3d85f2fe-8489-11f0-bdf8-5ba90",
+    "orgId": "2100019165"
+  },
+  "actor": {
+    "actorType": "SYSTEM"
+  },
+  "metadataObject": {
+    "objectType": "LIVEBOARD",
+    "id": "c30a0d49-5747-475d-8985-e975b1c2cf6d",
+    "name": "Sample Liveboard (View: sample view name)",
+    "url": "https://my.thoughtspot.cloud/?utm_source=scheduled-pinboard&utm_medium=email#/pinboard/c30a0d49-5747-475d-8985-e975b1c2cf6d?view=a8118b21-4581-4315-8833-39b2aa5be542"
+  },
+  "data": {
+    "scheduleDetails": {
+      "scheduleId": "cffddca8-d4fc-4575-b8ec-a50e696ccdfc",
+      "name": "Sample Liveboard",
+      "creationTime": "2025-08-29T07:52:23Z",
+      "description": "Daily sales performance report",
+      "authorId": "59481331-ee53-42be-a548-bd87be6ddd4a",
+      "viewInfo": {
+        "viewId": "a8118b21-4581-4315-8833-39b2aa5be542",
+        "viewName": "sample view name"
+      },
+      "userIds": ["59481331-ee53-42be-a548-bd87be6ddd4a"],
+      "groupIds": [],
+      "runId": "29001ffd-6a84-45cd-a957-621fce89afc6",
+      "exportRequest": {
+        "object_type": "LIVEBOARD",
+        "pdf_params": {
+          "orientation": "LANDSCAPE",
+          "page_size": "A4"
+        },
+        "liveboard_params": {
+          "layout_type": "VISUALIZATION",
+          "personalised_view_id": "a8118b21-4581-4315-8833-39b2aa5be542",
+          "liveboard_viz_selection": {
+            "complete_liveboard": false,
+            "included_viz_id": [
+              "efe80e30-ca82-4b83-a9c0-7371be45d3e6",
+              "957c9e37-0352-40ca-8d07-fb056a91332d"
+            ]
+          },
+          "print_document_params": {
+            "include_cover_page": true,
+            "include_filter_page": true,
+            "pageFooterParams": {
+              "include_logo": true,
+              "include_page_number": true,
+              "text": "footer"
+            }
+          },
+          "visualization_format_options": {
+            "truncate_tables": true
+          }
+        },
+        "request_type": "SCHEDULE"
+      },
+      "fileFormat": "pdf",
+      "status": "SCHEDULED",
+      "emailIds": []
+    },
+    "recipients": [
+      {
+        "type": "USER",
+        "id": "user-123",
+        "name": "John Doe",
+        "email": "john@company.com",
+        "locale": "en_US"
+      }
+    ],
+    "viewInfo": {
+      "viewId": "a8118b21-4581-4315-8833-39b2aa5be542",
+      "viewName": "sample view name"
+    },
+    "aiHighlights": "Sales increased by 15% compared to last quarter",
+    "msgUniqueId": "2f31df6a-2623-4953-a9bb-5af9b2922474",
+    "channelID": "6dfa4d82-fdc8-4d5b-8294-a5de0dd5ede1",
+    "channelType": "webhook",
+    "communicationType": "LiveboardSchedules"
+  }
+}
+----
+
+== Payload schema
+The webhook payload uses a specific schema structure that determines the contents of the payload delivered to the webhook endpoint.
+
+=== WebhookResponse
+The `WebhookResponse` schema defines the standard response from webhook endpoints, confirming the webhook receipt and processing status.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type | Description | Required?
+| `status` | string | Status of the webhook payload processing.  | Yes
+| `message` | string | Message text about the result. For example, `Webhook received successfully`. | Yes
+| `time` | string | Timestamp when the response was generated. | Yes
+|=====
+
+=== WebhookPayload
+
+The `WebhookPayload` schema defines the structure for webhook event notifications, including event metadata, source, actor, target object, and event-specific data.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type | Description   | Required?
+
+| `eventId`  | string  | ID of each webhook event. For example, `n.820c00f9-d7ef-48e9-ab08-2ec1a48de0ab`. | Yes
+| `timestamp`  | string  | Timestamp of when the event occurred.   | Yes
+| `eventType`   | string  | Type of event that triggered the webhook payload. For example, `LIVEBOARD_SCHEDULE`.  | Yes
+| `schemaVersion` | string  | Schema version. | Yes
+| `source`  | object | Source endpoint that triggered the event. Includes the parameters defined in the xref:webhooks-payload.adoc#_webhooksourceinfo[WebhookSourceInfo] schema. | Yes
+| `actor`  | object  | Actor that initiated the event. For more information, see xref:webhooks-payload.adoc#_webhookactorinfo[WebhookActorInfo].   | Yes
+| `metadataObject` | object | Metadata object details. For more information, see xref:webhooks-payload.adoc#_webhooktargetobjectinfo[WebhookTargetObjectInfo]. | Yes
+| `data`  | object  | Data specific to the Liveboard schedule event. For more information, see xref:webhooks-payload.adoc#_liveboardscheduledata[LiveboardScheduleData]. | Yes
+|=====
+
+=== WebhookSourceInfo
+
+The `WebhookSourceInfo` schema defines the properties of the source application instance that triggered the webhook event.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type | Description | Required?
+
+| `applicationName` | string | Application name. For example, ThoughtSpot. | Yes
+| `applicationUrl`  | string | The URL of the ThoughtSpot application instance.  | Yes
+| `instanceId` | string | ID of the ThoughtSpot instance that triggered the payload.              | Yes
+| `orgId` | string | ID of the Org context in ThoughtSpot from which the event payload is triggered.| Yes
+|=====
+
+=== WebhookActorInfo
+
+The `WebhookActorInfo` schema defines the properties of the entity that initiated the event.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type  | Description  | Required?
+
+| `actorType` | string | Initiator of the event such as the API client or user. The default actor type is `SYSTEM`. | Yes
+| `id`  | string a| Unique identifier, such as a GUID or object ID. For system-generated responses, the `id` is set to `null`. | No
+| `name` | string a| Name of the actor that initiated the event. For system-generated responses, the `name` will be set as `null`.  | No
+| `email` | string a| Email of the actor that initiated the event. For system-generated responses, the `email` is set to `null`. | No
+|=====
+
+=== WebhookTargetObjectInfo
+
+The `WebhookTargetObjectInfo` schema defines the object for which the event is generated.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field | Type  | Description   | Required?
+
+| `objectType` | string | Type of object. For Liveboard schedule events, the object will be `LIVEBOARD`.  | Yes
+| `id`  | string | Unique identifier of the Liveboard. | Yes
+| `name` | string | Name of the Liveboard. | Yes
+| `url`   | string | Link to the object in the ThoughtSpot application.  | No
+|=====
+
+=== LiveboardScheduleData
+
+The `LiveboardScheduleData` schema defines event-specific data for Liveboard schedule events, including schedule details, recipients, and additional context.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field   | Type    | Description                        | Required?
+
+| `scheduleDetails`  | object  | Details of the Liveboard schedule that triggered the event. This includes the schedule ID, object type, and output format. For more information, see xref:webhooks-payload.adoc#_scheduledetails[ScheduleDetails]. | Yes
+| `recipients` | array   | Details of the ThoughtSpot users, groups, and email addresses of external users configured as subscribers to Liveboard schedule notifications and recipients of the webhook payload. For more information, see xref:webhooks-payload.adoc#_recipientinfo[RecipientInfo]. | Yes
+| `viewInfo`   | object  | Information about the Liveboard view. Applicable if the Liveboard schedule event is triggered for a personalized view of the Liveboard. For more information, see xref:webhooks-payload.adoc#_viewinfo[ViewInfo]. | No
+| `aiHighlights`  | string  | AI Highlights information. Applicable if AI highlights feature is enabled for the visualizations on the Liveboard.   | No
+| `msgUniqueId`   | string  | Unique message identifier. Unique ID of the webhook payload message. This ID can be used for traceability and deduplication on the receiving end.   | No
+| `channelID` | string  | The communication channel ID used for event dissemination. | No
+| `channelType` | string  | Type of the communication channel. The channel type used for webhook payloads is `webhook`.  | No
+| `communicationType`  | string  | Type of the messaging event. For Liveboard schedule events, the communication type will be `LiveboardSchedules`. | No
+|=====
+
+=== ScheduleDetails
+
+The `ScheduleDetails` schema defines the properties of the schedule that triggered the event, metadata, author, and export request.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|====
+| Field         | Type    | Description    | Required?
+| `scheduleId`    | string  | ID of the Liveboard schedule. | Yes
+| `name`          | string  | Name of the Liveboard schedule. | Yes
+| `creationTime`  | string  | Timestamp of when the schedule was created. | No
+| `description`   | string  | Description of the schedule.  | No
+| `authorId`      | string  | ID of the user that scheduled the Liveboard job. | No
+| `viewInfo`      | object  | Information about the Liveboard view. Applicable if the Liveboard schedule event is triggered for a personalized view of the Liveboard. For more information, see xref:webhooks-payload.adoc#_viewinfo[ViewInfo]. | No
+| `userIds`    | array   | IDs of the ThoughtSpot users that are subscribed to the scheduled Liveboard notifications.  | No
+| `groupIds`   | array   | IDs of the ThoughtSpot groups that are subscribed to the scheduled Liveboard notifications.| No
+| `runId`      | string  | Schedule run ID of the Liveboard job.  | No
+| `exportRequest` | object  | Details of the file export request. If the scheduled notification includes PDF attachment, the `exportRequest`  includes details of the Liveboard and PDF page attributes.  | No
+| `fileFormat`  | string  | File format for export. Schedule notifications generally include PDF attachments. | No
+| `status`   | string  | Status of the schedule. | No
+| `emailIds`  | array   | Email IDs of users subscribed to Liveboard job schedule. | No
+|====
+
+=== RecipientInfo
+
+The `RecipientInfo` schema defines the object properties of the recipients of the scheduled notifications.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|=====
+| Field   | Type   | Description | Required?
+
+|`type`  | string  a| Type of recipient. Valid types are:
+
+* `USER`  - For ThoughtSpot users
+* `EXTERNAL_EMAIL` - For external recipients | Yes
+
+| `id` | string | IDs of ThoughtSpot users and groups that are subscribed to the Liveboard schedule. | No
+| `name` | string | Name of the recipient.  | No
+| `email` | string | Email address of the recipient. | Yes
+| `locale`| string | Locale of the recipient. For example, `en_US`. | No
+|=====
+
+=== ViewInfo
+
+The `ViewInfo` schema defines properties of the Liveboard view for which the event is generated.
+
+[width="100%" cols="1,1,3,1"]
+[options='header']
+|======
+| Field    | Type   | Description  | Required?
+
+| `viewId`   | string | ID of the Liveboard personalized view. | Yes
+| `viewName` | string | Name of the Liveboard personalized view. | Yes
+|======
+
+== Additional resources
+
+* link:https://docs.thoughtspot.com/cloud/latest/liveboard-schedule[Scheduling Liveboard jobs^]
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fschedules%2Fcreate-schedule">Liveboard schedule REST APIs</a>+++

@@ -1,58 +1,55 @@
-= S3 storage integration for Webhook delivery
+= Deliver content to AWS S3 storage using webhooks
 :toc: true
 :toclevels: 3
 
-:page-title:  S3 storage integration for Webhook delivery
+:page-title: S3 storage integration for webhook delivery
 :page-pageid: webhooks-s3-integration
-:page-description: Configure Amazon S3 storage as destination for webhook payload delivery
+:page-description: Configure S3 storage as destination for webhook payload delivery
 
-ThoughtSpot can deliver webhook payloads, such as scheduled Answer or Liveboard exports as files written directly into your Amazon S3 bucket.
-
-This guide explains how to configure secure S3 storage for ThoughtSpot webhooks and deliver payload of up to 25 MB directly to a storage destination deployed on an AWS or GCP cluster.
-
-After integration, ThoughtSpot will deliver webhook attachments directly to your S3 bucket.
+ThoughtSpot can deliver webhook payloads, such as scheduled Answer or Liveboard exports, as files written directly to your S3 storage. When integrated, ThoughtSpot supports delivering payloads of up to 25 MB directly to the storage destination configured on your instance.
 
 == Before you begin
 
-Before you begin, review the following prerequisites and ensure that you have the required access and information to get started with the integration.
-* manage cloud infrastructure and IAM.
-* You have access to a ThoughtSpot instance. +
-Ensure that the webhook feature is enabled on your instance and your ThoughtSpot user account has the administration or *Can Manage Webhooks* role privilege.
-* You have an AWS account with the required permissions to create and manage S3 buckets, Identity and Access Management (IAM) role, and trust policies to allow ThoughtSpot to send data to your S3 bucket.
-* You have a webhook listener endpoint that can accept `POST` requests with JSON payloads.
+Before you begin, review the following prerequisites and ensure that you have the required setup for webhook configuration:
 
-== Getting started
-To enable this integration, your AWS administrator must create an IAM role and configure the S3 permissions and IAM trust policy. ThoughtSpot administrators configure the webhook with the S3 storage destination.
+* Ensure that you have access to a ThoughtSpot instance with the Webhook feature enabled.
+* Identify the environment in which your instance is deployed. Currently, S3 storage integration is supported in application instances hosted in one of the following environments: +
+** ThoughtSpot instances hosted in Amazon Web Services (AWS)
+** ThoughtSpot instances hosted in Google Cloud Platform (GCP)
 
-. xref:webhooks-s3-storage.adoc#_configure_your_aws_s3_bucket_iam_role_and_policies[Configuring your AWS S3 bucket, IAM role, trust policies]
-. xref:webhooks-s3-storage.adoc#_configure_a_webhook_with_the_s3_storage_destination[Creating a Webhook with an S3 storage destination] in ThoughtSpot.
-. xref:webhooks-s3-storage.adoc#_test_the_integration[Testing the integration]
+* Ensure that you have an AWS account where the target S3 bucket will be hosted.
+* Ensure that you have AWS permissions to:
+** manage IAM identity providers and roles, including trust policies
+** attach or edit IAM policies
+** read and write to the target S3 bucket to test and validate integration
 
-=== Configure your AWS S3 bucket, IAM role, and policies
+* To configure a webhook in ThoughtSpot, you'll need a user account with administration privileges or the *Can Manage Webhooks* role privilege.
 
-To set up your AWS S3 storage destination and to enable cross-account interaction, complete the following steps:
+== AWS-based ThoughtSpot instances
+If your ThoughtSpot instance is running in AWS, you can configure AWS cross-account access with an IAM role that AWS STS can assume by using temporary credentials.
 
-* xref:webhooks-s3-storage.adoc#_create_an_s3_bucket[Create an S3 bucket]
-* xref:webhooks-s3-storage.adoc#_create_an_iam_role[Create an IAM role]
-* xref:webhooks-s3-storage.adoc#_attach_s3_permissions_policy[Attach S3 permissions policy]
-* xref:webhooks-s3-storage.adoc#_provide_the_storage_configuration_information_to_thoughtspot[Provide storage configuration details to your ThoughtSpot administrator]
+For webhook integration, the following configuration setup is required:
 
-==== Create an S3 bucket
-To create an S3 bucket for your AWS account:
+[width="100%" cols="2,6"]
+[options='header']
+|====
+| Requirement | Description
+| AWS account ID a|The AWS account ID associated with your ThoughtSpot instance. +
 
-. In the AWS console, go to **S3** > **Buckets**.
-. Create a new bucket (recommended), or select an existing one. +
-Use a dedicated S3 bucket or prefix for ThoughtSpot exports to enhance security and simplify auditing.
-. Optionally, create a folder, for example, `thoughtspot/`, to logically separate ThoughtSpot files. This serves as the S3 prefix for webhook delivery.
+To obtain the account ID, contact your ThoughtSpot representative. +
+You must allow this ID to access your S3 resources and grant the required permissions.
+| AWS S3 bucket a| Create an S3 bucket or use an existing S3 bucket that you intend to use as a storage destination for ThoughtSpot exports.
 
-==== Create an IAM role
-To create a cross-account IAM role:
+You can also add a prefix for example, `thoughtspot/`, to logically separate ThoughtSpot files. This serves as the S3 prefix for webhook delivery.
 
-. Go to the AWS Console > **IAM** > **Roles** > **Create role**.
-. Select *Custom trust policy*. +
-The IAM role's trust policy must allow ThoughtSpot's AWS account to call `sts:AssumeRole`. The trust policy must also include an external ID and the parameters shown in this example:
+| Cross-account IAM role a| The IAM role that ThoughtSpot will assume to deliver webhook content to an S3 bucket. For example, `thoughtspot-s3-upload`. The IAM role must include the following policies:
+
+Trust policy::
+A trust policy to allow the ThoughtSpot AWS account ID obtained from ThoughtSpot to assume the role. The IAM role's trust policy must allow ThoughtSpot's AWS account to call `sts:AssumeRole`. +
+The trust policy must also include an external ID. The external ID is a unique random string that helps prevent unauthorized access.
+
 +
-[source,]
+[source,json]
 ----
 {
   "Version": "2012-10-17",
@@ -60,7 +57,7 @@ The IAM role's trust policy must allow ThoughtSpot's AWS account to call `sts:As
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": "arn:aws:iam::111111111111:root"
+        "AWS": "arn:aws:iam::YOUR-ACCOUNT-ID:root"
       },
       "Action": "sts:AssumeRole",
       "Condition": {
@@ -72,22 +69,14 @@ The IAM role's trust policy must allow ThoughtSpot's AWS account to call `sts:As
   ]
 }
 ----
+
+Permissions policy::
+A permissions policy granting only the necessary S3 actions on your chosen bucket prefix. +
 +
-. Replace the following in the above example with appropriate values:
+In the permissions policy, specify the S3 bucket name. Optionally, to restrict access to a specific folder or prefix, you can add the prefix.
 
-* `111111111111` with the ThoughtSpot AWS Account ID provided to you.
-* `YOUR-EXTERNAL-ID` with your chosen External ID (case-sensitive). The External ID is a secret string you create. Use a unique, random value to prevent unauthorized access.
-
-. Give the role a descriptive name. For example, `thoughtspot-s3-upload`.
-
-==== Attach S3 permissions policy
-In the role creation wizard:
-
-. Click **Add permissions**.
-. Select **Create policy**.
-. Select the **JSON** tab and paste the policy text from the following example:
 +
-[source,]
+[source,JSON]
 ----
 {
   "Version": "2012-10-17",
@@ -98,38 +87,105 @@ In the role creation wizard:
         "s3:PutObject",
         "s3:PutObjectAcl"
       ],
-      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/*"
+      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/thoughtspot/*"
     }
   ]
 }
 ----
-+
-. Replace `YOUR-BUCKET-NAME` with the name of your S3 bucket.
-. Optionally, to restrict to a specific folder/prefix, add the following:
-+
-----
-"Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/thoughtspot/webhooks/*"
-----
-. Save the policy and attach it to your IAM Role.
-. Copy the Role ARN from the role's Summary page; you need to provide this information to your ThoughtSpot administrator.
 
-==== Provide the storage configuration information to ThoughtSpot
-After the S3 bucket, IAM role, and trust policy are configured, provide the following information to your ThoughtSpot administrator:
+Note the IAM role ARN, bucket name, external ID, and other attributes and save the IAM policies.
+|====
 
-* IAM role ARN. For example, `arn:aws:iam::999888777666:role/thoughtspot-s3-upload`
-* External ID. For example, `ts-webhook-x7k9m2p4q1`
+== GCP-based ThoughtSpot instances
+If your ThoughtSpot instance is hosted on a GCP cluster, you must configure OIDC and AWS STS `AssumeRoleWithWebIdentity` so that ThoughtSpot can securely obtain temporary AWS credentials to upload files to your S3 bucket, without storing long-lived AWS access keys.
+
+For webhook integration, the following are required:
+
+[width="100%" cols="2,6"]
+[options='header']
+|====
+| Requirement | Description
+| ThoughtSpot service account ID a| Contact ThoughtSpot Support to obtain your account ID. This account ID is required for OIDC identity creation and trust policy configuration.
+| AWS S3 bucket a| Create an S3 bucket or use an existing S3 bucket that you intend to use as a storage destination for ThoughtSpot exports. You can also add a prefix, for example, `thoughtspot-webhooks/`, to logically separate ThoughtSpot files. This serves as the S3 prefix for webhook delivery.
+| OIDC provider URL a| Add the OIDC identity provider URL in the AWS console. For example, `accounts.google.com`.
+
+| AWS IAM role a| The IAM role that ThoughtSpot can assume via `AssumeRoleWithWebIdentity` during upload.
+
+Web Identity trust policy::
+A trust policy that allows GCP service account via the identity provider. Ensure that the IAM role’s trust policy is restricted using `sub` (subject) and `aud` (audience) attributes:
+
+** `sub`: ThoughtSpot GCP service account unique ID
+** `aud`: ThoughtSpot GCP service account unique ID
+
+[source,json]
+----
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:oidc-provider/accounts.google.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "accounts.google.com:sub": "THOUGHTSPOT_SA_UNIQUE_ID",
+          "accounts.google.com:aud": "THOUGHTSPOT_SA_UNIQUE_ID"
+        }
+      }
+    }
+  ]
+}
+----
+
+Where:
+
+* `YOUR_AWS_ACCOUNT_ID` is your AWS account ID
+* `THOUGHTSPOT_SA_UNIQUE_ID` is the ID provided by ThoughtSpot.
+
+Permission policy::
+
+A permissions policy granting only the necessary S3 actions on your chosen bucket prefix. +
+In the permission policy, specify the role ARN and S3 bucket name. Optionally, to restrict to a specific folder/prefix, you can add the prefix.
+
+[source,JSON]
+----
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectAcl"
+      ],
+      "Resource": "arn:aws:s3:::YOUR_BUCKET_NAME/thoughtspot-webhooks/*"
+    }
+  ]
+}
+----
+
+|====
+
+
+== Provide the storage configuration details to ThoughtSpot
+Provide the following information to your ThoughtSpot administrator:
+
+* AWS Role ARN. For example, `arn:aws:iam::999888777666:role/thoughtspot-s3-upload`
+* External ID. For example, `ts-webhook-x7k9m2p4q1`. Required for configuring a webhook on ThoughtSpot instances hosted in AWS. Not applicable to ThoughtSpot instances on GCP.
 * S3 bucket name. For example, `ts-data-exports`
 * S3 region. For example, `us-east-1`
 * S3 prefix for the folder (optional). For example, `thoughtspot/`.
 
-=== Configure a Webhook with the S3 storage destination
-To create a webhook channel, the webhook feature must be enabled on your instance. Users with administration privileges or the *Can Manage Webhooks* privilege can create a webhook.
-
-To configure the S3 storage properties, you'll need the IAM role, external ID, S3 bucket name, and S3 region configured for your AWS cross-account setup.
+== Configure a webhook for the S3 storage destination in ThoughtSpot
+To create a webhook in ThoughtSpot, the webhook feature must be enabled on your instance. Only ThoughtSpot users with administration privileges or the *Can Manage Webhooks* privilege are allowed to create or manage a webhook.
 
 Currently, ThoughtSpot supports webhook creation with AWS S3 storage via REST APIs only.
 
-==== Creating a Webhook
+=== Creating a Webhook
+To configure the S3 storage properties in ThoughtSpot, the IAM role, external ID, S3 bucket name, and S3 region configured in your AWS account are required.
+
 To create a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/create` API endpoint.
 
 [NOTE]
@@ -137,7 +193,7 @@ To create a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/create
 ThoughtSpot allows only one webhook per Org.
 ====
 
-===== Request parameters
+==== Request parameters
 
 [width="100%" cols="1,6"]
 [options='header']
@@ -163,12 +219,12 @@ __String__. S3 region. For example, `us-east-1`
 * `role_arn` +
 __String__. IAM role ARN. For example, `arn:aws:iam::999888777666:role/thoughtspot-s3-upload`
 * `external_id` +
-__String__. External ID. For example, `ts-webhook-x7k9m2p4q1`
+__String__. The External ID string in IAM role trust policies that grant access to your AWS resources. For example, `ts-webhook-x7k9m2p4q1`. This parameter is required for AWS-hosted instances and is not applicable to GCP-hosted ThoughtSpot instances.
 * `path_prefix` __Optional__ +
 __String__. S3 prefix for the folder. For example, `thoughtspot/`.
 |====
 
-===== API request
+==== API request
 
 [source,cURL]
 ----
@@ -198,9 +254,9 @@ curl -X POST \
 }'
 ----
 
-===== API response
+==== API response
 
-If the API request is successful, ThoughtSpot returns the Webhook configuration properties in the API response.
+If the API request is successful, ThoughtSpot returns the webhook configuration properties in the API response.
 
 [source,JSON]
 ----
@@ -243,11 +299,11 @@ If the API request is successful, ThoughtSpot returns the Webhook configuration 
 }
 ----
 
-==== Update the properties of a webhook
+=== Update the properties of a webhook
 
-To update the S3 storage details configured for a Webhook, send a `POST` request to the `/api/rest/2.0/webhooks/{webhook_identifier}/update` API endpoint.
+To update the S3 storage details configured for a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/{webhook_identifier}/update` API endpoint.
 
-===== Request parameters
+==== Request parameters
 
 Specify the `webhook_identifier` and pass it as a path parameter in the request URL.
 
@@ -268,9 +324,9 @@ S3 storage destination.
 * `storage_type` +
 Type of storage destination. Currently, only the Amazon S3 Bucket is supported as the storage destination.
 * `storage_config` +
-S3 Storage configuration parameters.
+S3 storage configuration parameters:
 
-===== API request
+==== API request
 
 The following example shows the request body for updating the name, description text, and endpoint URL of a webhook object:
 
@@ -305,35 +361,64 @@ curl -X POST \
 }'
 ----
 
-===== API response
+==== API response
 
 If the API request is successful, the API returns a 204 response code indicating a successful operation.
 
-=== Test the integration
+== Verify the integration
+
+The webhook delivery to S3 storage destination includes the following sequence of events:
+
+. ThoughtSpot requests temporary AWS credentials by calling `sts:AssumeRole` (AWS setup) or `sts:AssumeRoleWithWebIdentity` (GCP) with your specified Role ARN and External ID.
+. AWS Security Token Service (STS) checks the request against your trust policy.
+. If the request is valid, AWS STS issues temporary credentials, valid for approximately an hour.
+. ThoughtSpot uses these credentials to upload files to your designated S3 bucket.
 
 To test the integration:
 
-. Trigger a Liveboard schedule event and verify that the webhook payload is initiated.
-. Verify whether ThoughtSpot assumes your IAM role with the provided external ID. +
-When ThoughtSpot calls `sts:AssumeRole` with your Role ARN and External ID, AWS STS validates the request against your trust policy. If valid, AWS returns temporary credentials that are valid for 1 hour.
+. Trigger a Liveboard scheduled export to the configured S3 storage destination.
+. In your S3 bucket:
+* Confirm whether the webhook payload is delivered to the correct bucket and prefix.
+* Verify the attachments and timestamps in the AWS event logs.
+. If files are not delivered to your S3 bucket, check the logs for errors.
 
-. When ThoughtSpot is assuming the IAM role, and if you see the **Access Denied** error message:
-* Verify whether the ThoughtSpot account ID in your trust policy is correct.
-* Check the external ID matches. External IDs are case-sensitive.
-* Ensure the Role ARN you provided is correct.
+== Troubleshooting errors
 
-. If you see the **invalid external ID** error:
+The common causes for webhook delivery failure are:
 
-* Verify whether the external ID is valid. Ensure that it does not include extra spaces or special characters.
-* If the error persists, update the external ID both in your trust policy and ThoughtSpot.
-+
-. If access is denied when uploading to S3, check whether your permissions policy has `s3:PutObject`. +
+* Access denied errors
+* Invalid external ID
+* Webhook configuration errors in ThoughtSpot
 
-* Verify the bucket name in the Resource ARN is correct.
-* If using a prefix, ensure the Resource ARN includes it.
-* Check whether your bucket has a restrictive bucket policy.
-+
-ThoughtSpot can control which buckets can be accessed, what actions are permitted, and when to revoke access. However, ThoughtSpot cannot read files in your existing S3 storage that is not integrated with the webhook, access other buckets, list bucket contents, or delete any objects.
+=== Access denied errors
+The access denied error occurs in the following scenarios:
+
+* When the IAM role assumption fails
+* When the S3 upload fails due to permission errors
+
+To resolve IAM role assumption issues:
+
+* Ensure that the IAM trust policy includes the correct ThoughtSpot service account ID.
+For GCP clusters, the trust policy must use a federated principal. Therefore, verify that the OIDC provider URL and identity are configured for the ThoughtSpot service account ID (`THOUGHTSPOT_SA_UNIQUE_ID`).
+* Ensure that ThoughtSpot is assigned AWS credentials via `sts:AssumeRole` (for AWS) or `sts:AssumeRoleWithWebIdentity` (for GCP) for the specified Role ARN and External ID.
+
+To resolve S3 upload permission errors:
+
+Ensure that the IAM permission or S3 bucket policy allows the IAM role to write objects and has the correct S3 actions configured. To write content to the S3 bucket, the `s3:PutObject` permission is required.
+
+=== Configuration errors
+
+S3 uploads can also fail due to errors in webhook configuration in ThoughtSpot.
+
+ThoughtSpot can control which buckets can be accessed, what actions are permitted, and when to revoke access. However, ThoughtSpot cannot read files in existing S3 storage that is not integrated with webhooks, access other prefixes, or view or modify objects in the bucket.
+
+To ensure that there is no mismatch in the configuration:
+
+* Verify the external ID used in the webhook configuration. Note that external IDs are case-sensitive.
+* Ensure that the S3 bucket name and Role ARN configured in ThoughtSpot match the S3 bucket name and ARN of the IAM role in your AWS account.
+
+=== Configuration compatibility
+If you are using encryption, lifecycle policies, or special access controls, ensure that they are compatible with your webhook configuration.
 
 == Additional resources
 
