@@ -1,0 +1,355 @@
+= Integrating MCP Server in a custom application or chatbot
+:toc: true
+:toclevels: 3
+
+:page-title: Integrating MCP Server in a custom application or chatbot
+:page-pageid: custom-chatbot-integration-mcp
+:page-description: Learn how to build custom applications and chatbots that use ThoughtSpot MCP Server.
+
+If you are building a chatbot client with your own agent and orchestration logic, you can use the MCP Server to call MCP tools behind a custom web experience and integrate it with other systems or services as needed.
+
+When integrated, the agent in your custom application can:
+
+* Automatically discover ThoughtSpot MCP tools.
+* Support natural language conversation sessions for data questions.
+* Generate embeddable visualizations and programmatically create a Liveboard.
+
+[IMPORTANT]
+====
+* Currently, the MCP Server integration does not support link:https://docs.thoughtspot.com/cloud/latest/spotter-versions[Spotter 3 capabilities].
+====
+
+== Before you begin
+Before you begin, review the following prerequisites:
+
+* Node.js version 22 or later is installed and available in your environment.
+* Ensure that your setup has access to a ThoughtSpot application instance with 10.11.0.cl or a later release version.
+* Ensure that the users have the necessary permissions to view data from relevant models and tables in ThoughtSpot. Existing RLS/CLS rules on tables are enforced automatically in data source responses. To create charts or Liveboards from a conversation session, data download and content creation privileges are required.
+
+== Authenticating users
+If your own application or backend service manages user identities, and you want to implement a seamless authentication experience without redirecting users to an external OAuth flow from the chatbot host, use the trusted authentication method.
+
+=== Trusted authentication flow
+In a typical trusted authentication flow, your backend service calls the `/api/rest/2.0/auth/token/full` REST API endpoint to obtain a full access token (`TS_AUTH_TOKEN`) for a ThoughtSpot user or service account.
+
+The token generated for the user session is used as a bearer token when your backend calls ThoughtSpot APIs or when it brokers MCP tool calls.
+
+== Connecting clients
+If your custom chatbot implementation uses Claude, OpenAI, or Gemini LLM APIs to call MCP tools, ensure that your MCP Server endpoint, authentication token, and ThoughtSpot host are included in the API request.
+
+=== Claude MCP connector
+If your application uses Claude MCP connector, use the following API request format to connect Claude to the MCP Server:
+
+[source,bash]
+----
+curl https://api.anthropic.com/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: mcp-client-2025-04-04" \
+  -d '{
+    "model": "claude-3-5-sonnet-latest",
+    "max_tokens": 1000,
+    "messages": [{
+      "role": "user",
+      "content": "How do I increase my sales?"
+    }],
+    "mcp_servers": [
+      {
+        "type": "url",
+        "url": "https://agent.thoughtspot.app/bearer/mcp",
+        "name": "thoughtspot",
+        "authorization_token": "TS_AUTH_TOKEN@my-instance.thoughtspot.cloud"
+      }
+    ]
+  }'
+----
+
+In the above example, the API call includes:
+
+* The user’s message.
+* ThoughtSpot’s MCP Server endpoint `https://agent.thoughtspot.app/bearer/mcp`.
+* An `authorization_token` that encodes which ThoughtSpot instance and user/token to use.
+
+Claude uses the configured MCP Server to call ThoughtSpot MCP tools as needed, using the bearer-style token you provided.
+
+=== OpenAI Responses API
+If your application uses an OpenAI LLM, use the following API request format to connect OpenAI to the MCP Server:
+
+[source,bash]
+----
+curl https://api.openai.com/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "model": "gpt-4.1",
+    "tools": [
+      {
+        "type": "mcp",
+        "server_label": "thoughtspot",
+        "server_url": "https://agent.thoughtspot.app/bearer/mcp",
+        "headers": {
+          "Authorization": "Bearer TS_AUTH_TOKEN",
+          "x-ts-host": "my-instance.thoughtspot.cloud"
+        }
+      }
+    ],
+    "input": "How can I increase my sales?"
+  }'
+----
+
+In the above example, the API call includes the following parameters:
+
+* MCP as the tool type.
+* ThoughtSpot MCP Server URL.
+* Authentication token and ThoughtSpot host URL.
+
+The OpenAI LLM model uses the configured MCP Server, sends the provided headers on each MCP tool call, and gets the requested data from your ThoughtSpot instance under that token's identity.
+
+=== Gemini API
+
+If your application is the MCP host and Gemini is the LLM provider, use the following code example to connect Gemini to the ThoughtSpot MCP Server.
+
+[source,typescript]
+----
+import {
+  GoogleGenAI,
+  mcpToTool,
+} from '@google/genai';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+
+const transport = new StreamableHTTPClientTransport(
+  new URL("https://agent.thoughtspot.app/bearer/mcp"),
+  {
+    requestInit: {
+      headers: {
+        "Authorization": "Bearer TS_AUTH_TOKEN",
+        "x-ts-host": "my-instance.thoughtspot.cloud"
+      },
+    }
+  }
+);
+
+const mcpClient = new Client({
+  name: "example-client",
+  version: "1.0.0",
+});
+
+await mcpClient.connect(transport);
+
+const ai = new GoogleGenAI({});
+
+const response = await ai.models.generateContent({
+  model: "gemini-2.5-flash",
+  contents: `Show me last quarter's sales by region`,
+  config: {
+    tools: [mcpToTool(mcpClient)],
+  },
+});
+
+console.log(response.text);
+await mcpClient.close();
+----
+
+The above example:
+
+* Creates an MCP client and connects it to the ThoughtSpot MCP Server using `StreamableHTTPClientTransport`.
+* Sends the required headers with the authentication token and ThoughtSpot host URL in MCP requests.
+* Wraps the MCP client as a tool and passes it into `GoogleGenAI` so Gemini can call ThoughtSpot tools as part of answering a user's query.
+
+== Verifying the integration
+
+To verify the integration:
+
+. Start a chat session by asking a question and verify whether your chatbot's LLM is calling the ThoughtSpot MCP tools to generate a response. +
+A typical agentic workflow follows this pattern:
+* Calls `getRelevantQuestions` to break the request into sub-queries
+* Calls `getAnswer` to run those questions in ThoughtSpot and receive structured data and visualization metadata
+* Based on a user prompt, calls `createLiveboard` to save the results in a ThoughtSpot Liveboard.
+. Verify whether the metadata in the output includes `frame_url` to embed a visualization in an iframe or HTML snippet.
+
+== Troubleshooting errors
+
+Cannot connect to MCP Server::
+
+* Verify if the MCP Server is reachable.
+* Ensure that the correct MCP Server URL is used in API requests.
+* If the issue persists, verify the logs and contact ThoughtSpot Support for assistance.
+
+Authentication failure::
+* Ensure that the correct ThoughtSpot host URL and authentication token are in the API requests.
+* Verify whether the token used for authorizing MCP requests has expired. If the token is invalid, generate a new token and retry the API calls.
+* Verify whether the MCP Server and ThoughtSpot host are reachable.
+* Verify whether the user has the necessary privileges to view data or create content.
+
+== MCP tool calls and response output
+The following sections outline the MCP request input schema and data structure of the response.
+
+=== ping
+Runs a basic health check to validate that the MCP Server is reachable.
+
+[source,ts]
+----
+const tsPing = await callMCPTool("ping", {});
+----
+
+=== getDataSourceSuggestions
+Suggests appropriate ThoughtSpot data models for a given natural language question.
+
+
+==== Example request
+
+[source,ts]
+----
+const dsSuggestions = await callMCPTool("getDataSourceSuggestions", {
+  query: "show me sales by region" // user's query
+});
+----
+
+==== Response format
+
+Returns an object containing an array of suggestions:
+
+[source,json]
+----
+{
+  "suggestions": [
+    {
+      "header": {
+        "guid": "worksheet-guid-123",
+        "displayName": "Sales Analytics",
+        "description": "Sales performance by region, product, and channel"
+      },
+      "confidence": 0.92,
+      "llmReasoning": "This worksheet contains sales metrics and regional dimensions relevant to the query."
+    }
+  ]
+}
+----
+
+Key fields are:
+
+* `header.guid`: Unique ID for the datasource. The `datasourceId` is used in `getRelevantQuestions` and `getAnswer` calls.
+* `header.displayName`: Name of the data source.
+* `header.description`: Optional description of the data source.
+* `confidence`: Numeric score indicating the confidence of the system about a data model being the right match for the user’s query.
+* `llmReasoning`: LLM's reasoning for the suggestion.
+
+=== getRelevantQuestions
+Uses ThoughtSpot’s reasoning engine to generate AI-suggested sub-queries that help generate specific answers for a given data context.
+
+==== Example call
+
+[source,ts]
+----
+const result = await callMCPTool("getRelevantQuestions", {
+  query: "show me sales data", // User's natural language query
+  datasourceIds: ["model-guid-123"], // Array of worksheet/datasource GUIDs
+  additionalContext: "User is interested in the data for underperforming regions and products"
+});
+----
+
+==== Response example
+
+[source,json]
+----
+{
+  "questions": [
+    "What is the total sales revenue by region?",
+    "Which products have the highest revenue?",
+    "What are the top selling categories?"
+  ]
+}
+----
+
+Each returned question can then be passed individually into `getAnswer`.
+
+=== getAnswer
+Executes a natural language question for a given data context and returns the resulting data and visualization metadata. Clients can use this data and frame URL to render visualizations.
+
+==== Example call
+
+[source,ts]
+----
+const result = await callMCPTool("getAnswer", {
+  question: "Total sales by region", // Natural language question
+  datasourceId: "model-guid-123" // Worksheet/datasource GUID
+});
+----
+
+==== Response example
+
+[source,json]
+----
+{
+  "question": "Total sales by region",
+  "session_identifier": "abc-123-def-456",
+  "generation_number": 2,
+  "data": "\"Region\",\"Total Sales\"\n\"East\",100000\n...",
+  "frame_url": "https://...",
+  "fields_info": "..."
+}
+----
+
+Key fields are:
+
+* `session_identifier`: Unique session ID used to group answers. Required when creating a Liveboard from this answer using the `createLiveboard` MCP tool.
+* `generation_number`: Version number for this answer. Required for Liveboard creation.
+* `question`: The executed question; useful for display and to pass it into the `createLiveboard` request.
+* `data`: Data returned in encoded format. Contains column headers and all returned rows in comma-separated format, which can be parsed to render tables or charts in your application.
+* `frame_url`: Optional iframe URL for embedding the visualization in your UI.
+* `fields_info`: Descriptive metadata about the fields and chart, useful for explanations.
+
+=== createLiveboard
+
+Creates a ThoughtSpot Liveboard with one or more answers from the results. This is a two-step process and includes the following calls:
+
+. Call `getAnswer` to generate visualizations and obtain `session_identifier` and `generation_number`.
+. Call `createLiveboard` with those values to create the Liveboard.
+
+==== Example call
+
+[source,ts]
+----
+const answerData = JSON.parse(answerResult.result.content);
+
+const liveboardResult = await callMCPTool("createLiveboard", {
+  name: "My Sales Dashboard",
+  noteTile: "My Sales Dashboard was created by TS MCP Chat", // Description text for the Liveboard
+  answers: [{
+    question: answerData.question, // Display name for the Liveboard
+    session_identifier: answerData.session_identifier,
+    generation_number: answerData.generation_number
+  }]
+});
+----
+
+Required attributes are:
+
+* `noteTile`: Use this field for any Liveboard description or notes; a separate description field is not supported.
+* `answers`: Required array. Each item must include `question`, `session_identifier`, and `generation_number` from a prior `getAnswer` call.
+
+==== Response example
+
+[source,json]
+----
+{
+  "liveboardId": "liveboard-guid-here",
+  "name": "My Sales Dashboard",
+  "frame_url": "https://..."
+}
+----
+
+Key fields are:
+
+* `liveboardId`: GUID of the created Liveboard.
+* `name`: Name of the Liveboard.
+* `frame_url`: URL that can be embedded to display the Liveboard.
+
+== Additional resources
+
+* To view the MCP Server code, go to the link:https://github.com/thoughtspot/mcp-server[MCP Server GitHub repository, window=_blank].
+* For a chat client example, see link:https://github.com/thoughtspot/developer-examples/tree/main/mcp/python-react-agent-simple-ui[Python Agent with Simple React UI]. See also link:https://github.com/thoughtspot/mcp-server?tab=readme-ov-file#troubleshooting[troubleshooting steps, window=_blank].
+
+
