@@ -6,11 +6,12 @@
 :page-pageid: webhooks-lb-payload
 :page-description: Review the webhook payload content delivered to a target destination URL or S3 storage
 
-The payload contains metadata about the event, the source, the actor, the target object, and event-specific data. The payload is typically sent as a form field named `payload` in a `multipart/form-data` request with file attachments.
+The payload contains metadata about the event, the source, the actor, the target object, and event-specific data.
 
-== Payload content for S3 storage destination
+== Payload example for S3 storage destination
+When the schedule is configured with an S3 destination, ThoughtSpot delivers the exported file directly to S3, and the webhook payload only contains metadata JSON and the S3 object URL location. The JSON metadata includes the event type, object type, schedule name, recipients, and format.
 
-The payload intended for the S3 storage destination includes file attachments. The supported file formats are PDF, CSV, and XLSX.
+The supported file formats for webhook delivery are PDF, CSV, and XLSX.
 
 [source,JSON]
 ----
@@ -70,7 +71,7 @@ The payload intended for the S3 storage destination includes file attachments. T
 }
 ----
 
-The following content in the file attachment indicates a successful delivery to the S3 storage destination:
+The following content in the file attachment indicates successful delivery to the S3 storage destination:
 
 [source,JSON]
 ----
@@ -155,11 +156,20 @@ The following examples show a failed delivery of file attachments due to access 
 
 For information about resolving access denied errors, refer to the xref:webhooks-s3-storage.adoc#_troubleshooting_errors[Troubleshooting instructions].
 
-== Payload content for other destination URLs
-The payload content for other destination URLs includes metadata. File attachments are optional. Supported file formats are PDF, CSV, and XLSX.
+== Payload for other webhook endpoints
+
+For other webhook destinations, ThoughtSpot sends a `multipart/form-data` payload and metadata JSON. The file attachments are included as one part of the multipart request body. Your receiver must parse the multipart/form-data payload to extract the actual file content from the request body.
+
+The supported attachment file formats for webhook delivery are PDF, CSV, and XLSX.
 
 [source,JSON]
 ----
+Content-Type: multipart/form-data; boundary=------------------------boundary123
+
+--------------------------boundary123
+Content-Disposition: form-data; name="payload"
+Content-Type: application/json
+
 {
   "eventId": "n.18bd8bd5-dee3-4d5c-918e-aec3ba1a090f",
   "timestamp": "2025-08-29T09:25:32Z",
@@ -249,12 +259,21 @@ The payload content for other destination URLs includes metadata. File attachmen
     "communicationType": "LiveboardSchedules"
   }
 }
+
+--------------------------boundary123
+Content-Disposition: form-data; name="file"; filename="sales_report.pdf"
+Content-Type: application/pdf
+
+<binary pdf bytes here>
+
+--------------------------boundary123--
 ----
 
-== Payload schema
+
+=== Webhook payload structure and schema
 The webhook payload uses a specific schema structure that determines the contents of the payload delivered to the webhook endpoint.
 
-=== WebhookResponse
+==== WebhookResponse
 The `WebhookResponse` schema defines the standard response from webhook endpoints, confirming the webhook receipt and processing status.
 
 [width="100%" cols="1,1,3,1"]
@@ -266,7 +285,7 @@ The `WebhookResponse` schema defines the standard response from webhook endpoint
 | `time` | string | Timestamp when the response was generated. | Yes
 |=====
 
-=== WebhookPayload
+==== WebhookPayload
 
 The `WebhookPayload` schema defines the structure for webhook event notifications, including event metadata, source, actor, target object, and event-specific data.
 
@@ -285,7 +304,7 @@ The `WebhookPayload` schema defines the structure for webhook event notification
 | `data`  | object  | Data specific to the Liveboard schedule event. For more information, see xref:webhooks-payload.adoc#_liveboardscheduledata[LiveboardScheduleData]. | Yes
 |=====
 
-=== WebhookSourceInfo
+==== WebhookSourceInfo
 
 The `WebhookSourceInfo` schema defines the properties of the source application instance that triggered the webhook event.
 
@@ -300,7 +319,7 @@ The `WebhookSourceInfo` schema defines the properties of the source application 
 | `orgId` | string | ID of the Org context in ThoughtSpot from which the event payload is triggered.| Yes
 |=====
 
-=== WebhookActorInfo
+==== WebhookActorInfo
 
 The `WebhookActorInfo` schema defines the properties of the entity that initiated the event.
 
@@ -315,7 +334,7 @@ The `WebhookActorInfo` schema defines the properties of the entity that initiate
 | `email` | string a| Email of the actor that initiated the event. For system-generated responses, the `email` is set to `null`. | No
 |=====
 
-=== WebhookTargetObjectInfo
+==== WebhookTargetObjectInfo
 
 The `WebhookTargetObjectInfo` schema defines the object for which the event is generated.
 
@@ -330,7 +349,7 @@ The `WebhookTargetObjectInfo` schema defines the object for which the event is g
 | `url`   | string | Link to the object in the ThoughtSpot application.  | No
 |=====
 
-=== LiveboardScheduleData
+==== LiveboardScheduleData
 
 The `LiveboardScheduleData` schema defines event-specific data for Liveboard schedule events, including schedule details, recipients, and additional context.
 
@@ -349,7 +368,7 @@ The `LiveboardScheduleData` schema defines event-specific data for Liveboard sch
 | `communicationType`  | string  | Type of the messaging event. For Liveboard schedule events, the communication type will be `LiveboardSchedules`. | No
 |=====
 
-=== ScheduleDetails
+==== ScheduleDetails
 
 The `ScheduleDetails` schema defines the properties of the schedule that triggered the event, metadata, author, and export request.
 
@@ -372,7 +391,7 @@ The `ScheduleDetails` schema defines the properties of the schedule that trigger
 | `emailIds`  | array   | Email IDs of users subscribed to Liveboard job schedule. | No
 |====
 
-=== RecipientInfo
+==== RecipientInfo
 
 The `RecipientInfo` schema defines the object properties of the recipients of the scheduled notifications.
 
@@ -392,7 +411,7 @@ The `RecipientInfo` schema defines the object properties of the recipients of th
 | `locale`| string | Locale of the recipient. For example, `en_US`. | No
 |=====
 
-=== ViewInfo
+==== ViewInfo
 
 The `ViewInfo` schema defines properties of the Liveboard view for which the event is generated.
 
