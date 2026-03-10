@@ -25,10 +25,10 @@ Due to nature of API responses and Org separation, the actual order of efficient
 = JIT REST API provisioning (trusted authentication)
 All of the following may be considered for JIT provisioning, using the same REST API capabilities as provisioning ahead of time:
 
- * *User creation or adding to Org*
- * *Group assignment for users*
- ** *Group creation and updates* 
- * *RLS variable values for user*
+ * User creation or adding to Org
+ * Group assignment for users
+ ** Group creation and updates
+ * RLS variable values for user
 
 These can all be implemented as part of the *xref:trusted-auth-token-request-service.adoc[token request service]* in the trusted authentication pattern. 
 
@@ -71,7 +71,7 @@ The following details must be included in a request with `autocreate=true` to al
 * If Orgs are enabled, specify the `org_id` parameter to direct ThoughtSpot to assign the user to the specified Org.
 * Specify the `group_identifiers` parameter only if you want to enable JIT group assignment. Passing `group_identifiers: []` will set the user to be assigned to *no groups*, while excluding the `group_identifiers` parameter altogether will leave the user assigned to their existing set of groups.
 
-Users created via autocreate are identical to users created manually or via the REST APIs, except they do not have passwords in Thoughtspot; they cannot access ThoughtSpot other than through the SSO method. You can assign a password to any user later through the UI or a REST API call.
+Users created via `autocreate=true` are identical to users created manually or via the REST APIs, except they do not have passwords in Thoughtspot; they cannot access ThoughtSpot other than through the SSO method. You can assign a password to any user later through the UI or a REST API call.
 
 == Group assignment
 Groups in ThoughtSpot are used to assign a variety of attributes such as content sharing, group-based RLS, roles, and column-level security. JIT provisioning often requires a combination of updates to both the user and the groups they belong to.
@@ -97,30 +97,48 @@ You cannot set a user's groups in an Org other than the REST API request's auth 
 ----
 
 === Group assignment via Update Group REST API
+Because group membership is a relationship between a user and a group, you can also update the set of users within a group using the `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fupdate-user-group[/groups/{group_identifier}/update]` REST API endpoint.
+
+Similarly to the user update endpoint, you can choose between three operations: `ADD`, `REPLACE`, and `REMOVE` to update only the `user_identifiers` of a group without affecting other properties:
+
+[,json]
+----
+{
+  "operation": "ADD",
+  "user_identifiers": [
+    "new.user@website.com"
+  ]
+}
+----
 
 === Group assignment via token request
-The various token requests 
+The various token requests can set or update a user's group membership when `autocreate=true` is set. However, they have slightly different behaviors:
+
+* `/auth/token/full` and `/auth/token/object` do a *full replace* of the list of groups on every token request
+* `/auth/token/custom` only assigns groups *if the user is created*
 
 The list of groups should be composed of `group_name` properties, rather than `display_name`.
 
-* JIT group assignment is a full replacement of the user's set of groups.
-* Groups that do not exist will be created during the provisioning process, but a ThoughtSpot group by default provides no access control or privileges. However, you can assign privileges to the new groups via REST API update requests.
-* Groups created via JIT provisioning will have the same group name as the one used by the `ts_groups` property in any RLS rules.
+If a group name is provided that does not match any existing group name, a new group will be created during the provisioning process.
+
+Groups created via `autocreate=true` will have identical `group_name` and `display_name` properties but will otherwise be a default ThoughtSpot group, granting no access control, privileges or roles. 
+
+However, you can assign privileges or make any other adjustment to the new groups via REST API `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fupdate-user-group[/groups/{group_identifier}/update]` endpoint.
 
 
-=== Group privileges and access control via REST APIs
+== Group privileges and access control via REST APIs
+xref:api-user-management.adoc[Privileges] are either assigned directly to a group or part of roles if xref:roles.adoc[Role-based access control (RBAC)] is enabled on your instance.
 
-JIT provisioning of groups does not provide the full configuration of groups or assign access control. You can use the REST APIs to create, edit, and synchronize groups with the embedding application. For more information about group privileges, see xref:api-user-management.adoc[user and group privileges].
+Roles must be created first prior to being assigned as part of the `/groups/create` or `/groups/{group_identifier}/update` REST API request.
 
-REST API calls other than *token requests* must be performed using a ThoughtSpot user account with the appropriate level of administrative privileges. For example, you could use xref:rest-api-v2-reference.adoc#_groups[REST API v2.0] or the xref:rest-api-reference.adoc#_groups_and_privileges[REST API v1] group endpoints to implement ThoughtSpot groups that are intended for use in Row Level Security (RLS) rules.
+Access control in ThoughtSpot is based on *link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fshare-metadata[sharing content]* to groups or directly to users.
 
-For these groups, the group name must match exactly with a value in a column in the data warehouse, so the name of the group itself serves as a __data entitlement__. For more information, see xref:abac-user-parameters.adoc[Attribute-based access control].
-
-Similarly, if xref:roles.adoc[Role-based access control (RBAC)] is enabled on your instance, you must map role privileges to groups and then assign them to users.
-
+Sharing requires that the group or user exist prior to calling the sharing REST API.
 
 == RLS variable values
 RLS rules can use a user's *username*, *group membership* or *variable values* to define a filtering clause added to all queries on a table. 
+
+If using `ts_groups` in a RLS Rule, the group names must match exactly with a values in a column in the data warehouse, so the name of the group itself serves as a __data entitlement__.
 
 Variable values are used as part of the xref:abac_rls-variables.adoc[ABAC via RLS variables] pattern, which allows assigning many values to multiple variables via the xref:abac_rls-variables.adoc#create-an-abac-token-request-with-variable-attributes[Custom Token request].
 
