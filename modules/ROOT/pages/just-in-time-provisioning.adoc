@@ -16,12 +16,10 @@ The steps to JIT provisioning are conceptually:
  .. If user does not exist, create user
  . Is user in this org?
  .. If not in Org, add user to the Org
- . Update the user's current assignments within the Org (including group membership)
+ . Update the user's current provisioning within the Org (ThoughtSpot Group membership)
+ . Update any variable values for user via token request (token authentication only)
 
-When using token authentication, 
- . Update any variable values for user via token request
- . Token is returned to Visual Embed SDK for user authentication
-
+Due to nature of API responses and Org separation, the actual order of efficient steps may not follow the 
 
 
 = JIT REST API provisioning (trusted authentication)
@@ -44,10 +42,15 @@ Creating a new user requires at minimum the username, email address, display nam
 === Create User and Update User REST APIs
 If you need to update a user's details, including their group membership, the simplest method:
 
-. `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user[/users/{user-identifier}/update]`: using `operation: REPLACE` option 
-.. If update returns error, `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fcreate-user[/users/create]`:  
-. Request the preferred auth token for the user, without using any autocreate= options
+. `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user[/users/{user-identifier}/update]`: within the desired Org, using `operation: REPLACE` option 
+.. If error, use `/users/{user-identifier}/update` with an Administrator service account in the Primary Org to add the user to the desired Org, with `operation: ADD` 
+... If error, user does not exist at all in ThoughtSpot. Use `/users/add` from Primary Org to create the user and place in the desired Org(s)
+.. Retry the original `/users/{user-identifier}/update` command in the desired Org
+. Request the preferred auth token for the user, without using any `autocreate=` options
 
+Any additional changes to the Groups themselves can be managed with other REST APIs described below.
+
+You could instead check for the user's state with an Org via `/users/search`, allowing skipping an unnecessary update and error pathway.
 
 === autocreate using token request
 There are several token request endpoints, each with an `autocreate=true` option for just-in-time provisioning:
@@ -58,8 +61,10 @@ There are several token request endpoints, each with an `autocreate=true` option
 
 [NOTE]
 ----
-
+`autocreate=true` creates the user (and any new groups) with default options, which may not be preferred. Using the direct `users` and `groups` endpoints allows full control of their options 
 ----
+
+The following details must be included in a request with `autocreate=true` to allow provisioning the user:
 
 * The `auto_create: true` parameter enables the token for the JIT provisioning of the user.
 * The `display_name` and `email` parameters are also required for JIT user creation.
@@ -68,11 +73,28 @@ There are several token request endpoints, each with an `autocreate=true` option
 
 Users created via autocreate are identical to users created manually or via the REST APIs, except they do not have passwords in Thoughtspot; they cannot access ThoughtSpot other than through the SSO method. You can assign a password to any user later through the UI or a REST API call.
 
-
 == Group assignment
 Groups in ThoughtSpot are used to assign a variety of attributes such as content sharing, group-based RLS, roles, and column-level security. JIT provisioning often requires a combination of updates to both the user and the groups they belong to.
 
 === Group assignment via Update User REST API
+The `/users/{user-identifier}/update` API can update a user's Group membership within the Org, determined by the org_id of the auth token used for the REST API request:
+
+[,json]
+----
+{
+  "operation": "ADD",
+  "group_identifiers": [
+    "New Group A"
+  ]
+}
+----
+
+You can also choose `"operation" : "REPLACE"` to reset the entire set of Groups for a user.
+
+[NOTE]
+----
+You cannot set a user's groups in an Org other than the REST API request's auth token. If you create a user from the Primary Org, any `group_identifiers` provided at that time will apply only within the Primary Org, even if you add the user to multiple Orgs in the `/users/create` request
+----
 
 === Group assignment via Update Group REST API
 
@@ -84,7 +106,6 @@ The list of groups should be composed of `group_name` properties, rather than `d
 * JIT group assignment is a full replacement of the user's set of groups.
 * Groups that do not exist will be created during the provisioning process, but a ThoughtSpot group by default provides no access control or privileges. However, you can assign privileges to the new groups via REST API update requests.
 * Groups created via JIT provisioning will have the same group name as the one used by the `ts_groups` property in any RLS rules.
-
 
 
 === Group privileges and access control via REST APIs
