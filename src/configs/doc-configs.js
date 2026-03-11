@@ -19,11 +19,11 @@ module.exports = {
             'is now available. Read about the new features and enhancements.',
         // Swap this between:
         // - Pre-GA: release-specific URL (full http(s) URL), ex:
-        //   'https://developers.thoughtspot.com/docs/26.2.0.cl?pageid=whats-new'
+        //   'https://developers.thoughtspot.com/docs/26.3.0.cl?pageid=whats-new'
         // - GA: ' /docs/whats-new'
         //linkHref: '/docs/whats-new',
-        linkHref: '/docs/26.2.0.cl?pageid=whats-new',
-        linkText: 'Version 26.2.0.cl',
+        linkHref: '/docs/26.3.0.cl?pageid=whats-new',
+        linkText: 'Version 26.3.0.cl',
         openInNewTab: true,
     },
     TYPE_DOC_PREFIX: 'typedoc',
@@ -48,9 +48,22 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '10.15.0.cl',
+            label: '26.2.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
+            iframeUrl: 'https://developer-docs-26-2-0-cl.vercel.app/docs/',
+        },
+        {
+            label: '26.3.0.cl',
+            link: '26.3.0.cl',
+            subLabel: 'Cloud (Coming soon)',
+            iframeUrl: 'https://developer-docs-26-3-0-cl.vercel.app/docs/',
+        },
+        {
+            label: '10.15.0.cl',
+            link: '10.15.0.cl',
+            subLabel: 'Cloud',
+            iframeUrl: 'https://developer-docs-10-15-0-cl.vercel.app/docs/',
         },
         {
             label: '10.14.0.cl',
@@ -75,12 +88,6 @@ module.exports = {
             link: '10.1.0.sw',
             subLabel: 'Software',
             iframeUrl: 'https://visual-embed-sdk-10-1.vercel.app/docs/',
-        },
-        {
-            label: '26.2.0.cl',
-            link: '26.2.0.cl',
-            subLabel: 'Coming soon',
-            iframeUrl: 'https://developer-docs-26-2-0-cl.vercel.app/docs/',
         },
     ],
     CUSTOM_PAGE_ID: {
