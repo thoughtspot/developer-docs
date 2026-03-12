@@ -46,7 +46,7 @@ curl -X POST \
 [.widthAuto]
 image:./images/mandatory-token-filter.png[Mandatory token filter, scale=25%]
 
-* Indexing on all sensitive columns in your Tables is disabled.
+* Indexing on all sensitive columns in your tables is disabled.
 
 === Retrieve values from user properties (Optional)
 If required, you can retrieve the filter and parameter values stored for each JWT user from the user metadata via a `POST` request to the `/api/rest/2.0/users/search` API endpoint. The `access_control_properties` section of user metadata returned in the API response includes this information:
@@ -148,7 +148,7 @@ Users with administration and *Can Administer and Bypass RLS* privileges are exe
 +
 [NOTE]
 ====
-We do not recommend using the `/api/rest/2.0/users/{user_identifier}/update` endpoint to update variable values for a user. Instead, use either `/api/rest/2.0/template/variables/update-values` or `/api/rest/2.0/auth/token/custom`.
+To update variable values for a user, use the `/api/rest/2.0/auth/token/custom` or `POST /api/rest/2.0/template/variables/{identifier}/update-values` API endpoint.
 ====
 
 == Expected setup before the testing phase
@@ -297,7 +297,9 @@ After this configuration, all filtering is governed by the variable rules set fo
 image:./images/legacy-jwt-migration-test2.png[JWT migration test phase 2]
 
 === Phase 3: Remove all legacy JWT rules
-After the legacy JWT configuration values are set to allow all values for that user, subsequent calls can be made without setting the legacy JWT ABAC values. This allows you to test the payload with `variable_values`, which you ultimately will be using to generate authentication tokens in the future.
+After the legacy JWT configuration values are set to allow all values for that user, subsequent calls can be made without setting the legacy JWT ABAC values.
+
+This allows you to test the payload with `variable_values`, which you ultimately will be using to generate authentication tokens in the future.
 
 For example:
 
@@ -323,16 +325,20 @@ curl -X POST \
 }'
 ----
 
-For those users:
+After this step:
 
 * Legacy JWT ABAC GA rules are no longer in effect.
-* Their access is governed **solely** by ABAC via RLS.
+* User access is governed solely by ABAC via RLS.
 * This payload should match what you plan to use in production.
-
 
 [.bordered]
 [.widthAuto]
 image:./images/legacy-jwt-migration-test3.png[JWT migration test phase 3]
+
+[NOTE]
+====
+When you are ready to roll out the ABAC via RLS configuration, you must disable or remove the `is_mandatory_token_filter` setting from your models before going live. If this setting remains enabled, any user whose JWT does not include a filter value, or `TS_WILDCARD_ALL` to explicitly allow all values for that mandatory token filter may see no data returned, even though the new RLS-based ABAC rules are configured to allow them to see data.
+====
 
 == Examples for mapping legacy JWT ABAC GA expressions to ABAC via RLS
 
@@ -407,6 +413,6 @@ RLS rules support multi-value variables; use appropriate functions or operators 
 ====
 
 == Additional resources
-
 * For information about JWT with custom variables and RLS rules, see xref:abac_rls-variables.adoc[ABAC via RLS rules].
 * For information about RLS, see xref:rls-rules.adoc[RLS Rules] and link:https://docs.thoughtspot.com/cloud/latest/security-rls[ThoughtSpot Product Documentation, window=_blank].
+
