@@ -9,6 +9,7 @@
 When deploying embedded analytics, each organization will have defined practices for development, testing, and deployment of content to ThoughtSpot. ThoughtSpot instances act as a constantly running service, so deployment only involves publishing *ThoughtSpot content*, in the form of link:https://docs.thoughtspot.com/cloud/latest/tml[ThoughtSpot Modeling Language (TML), window=_blank] files to a given ThoughtSpot instance.
 
 The most typical pattern with ThoughtSpot involves a dev Org where content is modified by the team and then those objects are marked to form a "release" package, which then have their TML exported into a "release" branch in Git:
+
 image::./images/multi_tenant_deployment.png[Multi-tenant Database Deployment SDLC Pattern]
 
 The TML files in the "release" branch are then moved into other "deployment branches" via pull/merge request.
@@ -22,10 +23,69 @@ NOTE: Any example workflow you see within this document has been implemented and
 ////
 
 == Pre-requisites
-For TML files to be portable between any Org on any instance, the objects must have *obj_ids* and all Table and Connection objects must have been xref:metadata-parameterization.adoc[parametirized] with the appropriate xref:variables.adoc[variables] where necessary.
+For TML files to be portable between any Org on any instance, the objects must have *obj_ids* and all Table and Connection objects must have been xref:metadata-parameterization.adoc[parameterized] with the appropriate xref:variables.adoc[variables] where necessary.
 
 === obj_id
+Before implementing any deployment process, you should ensure that `obj_id` is enabled on your ThoughtSpot instance. 
 
+[NOTE]
+----
+Objects are only assigned automatic `obj_id` after the first change to the object once `obj_id` is enabled on an instance. 
+----
+
+`obj_id` for an object is available in the response from `/metadata/search` REST API as `metadata_obj_id` property:
+
+[,json]
+----
+{
+    "metadata_id":"c1e4043a-4524-4fcb-a20f-9e7aff4dc972",
+    "metadata_name":"Retail Sales RAD - KPIs",
+    "metadata_type":"LIVEBOARD",
+    "metadata_obj_id":"RetailSalesRAD-KPIs-c1e4043a"
+}
+----
+The format of `obj_id` above, with the `-{startOfGUID}` portion at the end, indicates it was an auto-generated obj_id. If the property value was `null`, then it is an object that has not been updated since the feature was enabled.
+
+The `metadata/update-obj-id` REST API endpoint can change an object's `obj_id` property based on either the `metadata_id` (GUID) or the current `metadata_obj_id`:
+
+[,json]
+----
+{
+  "metadata": [
+    {
+      "metadata_identifier": "c1e4043a-4524-4fcb-a20f-9e7aff4dc972",
+      "new_obj_id": "RetailSalesRAD-KPIs"
+      
+    }
+  ]
+}
+----
+
+or 
+
+[,json]
+----
+{
+  "metadata": [
+    {
+      
+      "current_obj_id": "RetailSalesRAD-KPIs-c1e4043a",
+      "new_obj_id": "RetailSalesRAD-KPIs"
+    }
+  ]
+}
+----
+
+The request format for `metadata/update-obj-id` is an array, allowing for updating a large number of objects at once.
+
+==== Implementing obj_id in existing environments
+Once you have decided on the appropriate `obj_id` for all the objects in your dev Org, you can use any existing GUID Mapping files to update the `obj_id` values for the equivalent objects in all your other Orgs.
+
+You only have to do this process for existing objects *one time*, and from that point forward, you can update objects in any Org using TML with obj_ids rather than GUIDs.
+
+=== TML Export with obj_id and variables
+
+=== TML Import with obj_id and variables
 
 == Overview
 The three steps to building an SDLC process with ThoughtSpot are:
