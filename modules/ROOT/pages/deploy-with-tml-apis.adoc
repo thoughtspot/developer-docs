@@ -22,6 +22,13 @@ ThoughtSpot has xref:version_control.adoc[Git integration] designed to automate 
 NOTE: Any example workflow you see within this document has been implemented and tested within the libraries available in the xref:development-and-deployment.adoc#relatedResources[Additional Resources]. We recommend that you start with these libraries and tools.
 ////
 
+== Overview
+The three steps to building an SDLC process with ThoughtSpot are:
+
+ . *xref:linkBuildRelease[Identify objects for release]*: Determine which objects in "dev Org" should become part of the "release" package
+ . *xref:linkExportSource[Export release TML into Git]*: Downloading ThoughtSpot objects as TML files into a source control system (for example, Git)
+ . *xref:linkImportRelease[Import release]*: Importing the TML files into the new environment
+
 == Pre-requisites
 For TML files to be portable between any Org on any instance, the objects must have *obj_ids* and all Table and Connection objects must have been xref:metadata-parameterization.adoc[parameterized] with the appropriate xref:variables.adoc[variables] where necessary.
 
@@ -83,10 +90,10 @@ Once you have decided on the appropriate `obj_id` for all the objects in your de
 
 You only have to do this process for existing objects *one time*, and from that point forward, you can update objects in any Org using TML with obj_ids rather than GUIDs.
 
-=== TML Export with obj_id and variables
+== Identifying release package in dev Org
 
-=== TML Import with obj_id and variables
 
+////
 == Overview
 The three steps to building an SDLC process with ThoughtSpot are:
 
@@ -149,7 +156,8 @@ The simplest pattern is to assume that releases are built exclusively from the "
 You can use the same format for your mapping file as the xref:guid-mapping.adoc[Git deploy commits API] provided by ThoughtSpot. The most important aspect is recording the source GUID along with the GUID of the equivalent object in the destination after receiving the response from the `/metadata/tml/import` REST API call.
 
 [#linkExportSource]
-== Export source process
+////
+== TML Export with obj_id and variables
 The process for exporting TML files into source control is:
 
  . Use Metadata APIs (xref:metadata-api.adoc#metadata-list[/metadata/list] in v1 or link:{{navprefix}}/restV2-playground?apiResourceId=http/api-endpoints/metadata/search-metadata[/metadata/search] in v2.0) to get a filtered list of objects
@@ -167,6 +175,7 @@ You can pass any number of GUIDs in the `export_ids` argument, although it is si
 
 The `export_associated` argument retrieves the TML objects for all related objects when used, including the GUID of each object within the headers. This is useful for dependency checking, and was valuable in versions lower than 8.9.0.cl to fill in `fqn` values. For more information, see xref:olderReleaseNotes[Notes for older releases].
 
+////
 [#linkBuildRelease]
 == Build release process
 To change the source environment TML files so that they can be imported into the destination environment, you need a process that correctly manipulates the TML files.
@@ -191,28 +200,16 @@ In TML:
 * the `guid:` property will be at the top of the file
 * `fqn:` properties are used to reference other connected objects (typically data sources) with a GUID
 
-==== Rules for create vs. update operations
-Object names are *never used* for determining an object to update, because object names are not unique within ThoughtSpot.
 
-Whether an imported TML will create a new object or update an existing object depends on:
 
-* the presence/absence of the *guid:* property in the TML file
-* whether that GUID matches an existing object on that ThoughtSpot instance
-* the `force_create=true` parameter
 
-Creation vs. update is determined by the following rules:
-
- - *No GUID* in the TML file: always creates a new object with a new GUID
- - *GUID in TML file*, where an object with the *same GUID already exists* in instance: update object
- - *GUID in TML file*, where *no object with same GUID exists* in ThoughtSpot instance: creates a new object with the GUID from the TML file
- - *Table objects* match on fully-qualified tables in the database (each Connection can only have one Table object per table in the database), not GUID: If a Table object representing the same database table is found, the GUID of the original object is maintained, but the updates are applied from the new TML file
- - *force_create=true* parameter of the TML Import API is used: every uploaded TML file results in new objects being created
 
 [NOTE]
 ====
 In versions prior to 9.0.0.cl, ThoughtSpot did not consistently use the GUID provided in the TML file for a new object when that GUID was not already in use on that ThoughtSpot instance.
 ====
-
+////
+////
 === GUID mapping and swapping
 Regardless of the other changes you make, building a release for an environment on the same instance will require swapping in the correct GUIDs. Because the presence of the *guid* property determines whether an individual TML file will cause a create or update action, you need to keep a *GUID mapping file* to determine how to adjust the TML files for upload to the new environment.
 
@@ -225,9 +222,10 @@ The *guid mapping file* is referenced when creating the final TML files for publ
  . Perform the same process for any *fqn* properties, which specify data object references. Remove the *fqn* property if the data object is being newly created, or swap it to the mapped GUID for that environment
 
 The link:https://github.com/thoughtspot/thoughtspot_tml[thoughtspot_tml library, window=_blank] provides a helper function called `disambiguate()` which implements the logic described above when provided with a Dict representing the GUID map. For information about how to use the library, see the README and examples or look at the source code if building an equivalent process yourself in another language.
+////
 
 [#linkImportRelease]
-== Import release process
+== TML Import with obj_id and variables
 The xref:tml-api#import[/metadata/tml/import] REST API endpoint is used to upload any number of TML files at one time.
 
 All details of the objects to be created or modified are specified *within the uploaded TML file*, including the GUID which determines which existing object a given TML file will update.
@@ -252,6 +250,24 @@ The best practice is to create and upload "packages" of related objects together
 * All Table objects that use the same Connection object and all Models connected to those Tables should be uploaded together in a single TML Import
 * If a data object already exists, swap out the *fqn* references to avoid the name matching heuristic
 
+==== Rules for create vs. update operations
+Object names are *never used* for determining an object to update, because object names are not unique within ThoughtSpot.
+
+Whether an imported TML will create a new object or update an existing object depends on:
+
+* the presence/absence of the *guid:* property in the TML file
+* whether that GUID matches an existing object on that ThoughtSpot instance
+* the `force_create=true` parameter
+
+Creation vs. update is determined by the following rules:
+
+ - *No GUID* in the TML file: always creates a new object with a new GUID
+ - *GUID in TML file*, where an object with the *same GUID already exists* in instance: update object
+ - *GUID in TML file*, where *no object with same GUID exists* in ThoughtSpot instance: creates a new object with the GUID from the TML file
+ - *Table objects* match on fully-qualified tables in the database (each Connection can only have one Table object per table in the database), not GUID: If a Table object representing the same database table is found, the GUID of the original object is maintained, but the updates are applied from the new TML file
+ - *force_create=true* parameter of the TML Import API is used: every uploaded TML file results in new objects being created
+
+////
 ==== Storing new GUIDs in a mapping
 To track relationships between objects in different environments, particularly on the same instance, you must store a *mapping* of the child object GUID to its source object GUID when you first publish the child object.
 
@@ -281,7 +297,7 @@ The xref:tml-api#import[import REST API endpoint] returns the GUID in the respon
 ----
 
 Update the *mapping file* with the new pair of source object GUID and destination environment object GUID, so that the release build process can do the appropriate swaps the next time the object needs to be updated.
-
+////
 
 [#relatedResources]
 == Additional Resources
@@ -293,11 +309,11 @@ Update the *mapping file* with the new pair of source object GUID and destinatio
 pip install thoughtspot_tml
 ----
 
-* The link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python[thoughtspot-rest-api-v1 module, window=_blank] is a Python module implementing the full ThoughtSpot V1 REST API. You can install it via pip:
+* The link:https://github.com/thoughtspot/thoughtspot_rest_api_python[thoughtspot-rest-api module, window=_blank] is a Python module implementing the full ThoughtSpot REST API. You can install it via pip:
 
 +
 ----
-pip install thoughtspot_rest_api_v1
+pip install thoughtspot_rest_api
 ----
 
 * The link:https://github.com/thoughtspot/ts_rest_api_and_tml_tools[ts_rest_api_and_tml_tools project, window=_blank] provides examples of workflows using the REST API and TML modification possible with the `thoughtspot_tml` and `thoughtspot_rest_api_v1` modules. This library is intended to provide working examples and is not maintained or supported by ThoughtSpot.
