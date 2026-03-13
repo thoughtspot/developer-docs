@@ -227,9 +227,9 @@ if 'edoc' in yaml_tml[0]:
 == TML Import with obj_id and variables
 The xref:tml-api#import[/metadata/tml/import] REST API endpoint is used to upload any number of TML files at one time.
 
-All details of the objects to be created or modified are specified *within the uploaded TML file*, including the GUID which determines which existing object a given TML file will update.
+All details of the objects to be created or modified are specified *within the uploaded TML file*, matching first on `obj_id` and then on `guid` if `obj_id` is not present. 
 
-The xref:linkBuildRelease[Build release process] section above describes the process for getting the TML files prepared for the import release process. The following describes the Import TML REST API call and what to do with the responses, which do feed back into the build release process in the form of the *GUID mapping file*.
+If no match is found for `obj_id` or `guid`, a new object is created, with the `obj_id` specified in the TML file (`guid` will be auto-assigned).
 
 === TML import options and responses
 
@@ -239,33 +239,37 @@ ThoughtSpot does not consider object display name for a TML file, but does use n
 All data objects are referenced as "tables" within TML, whether they are a ThoughtSpot Table, Model, View, SQL view, or any other data object type.
 
 The following heuristic is used to find matching objects by name within `tables` or `joins` sections:
-
+ 
+ . `obj_id` within other files in the same TML Import operation or existing objects in the Org
  . Data object names within the same TML Import operation: Must only be one single object with that name
- . Searches the entire ThoughtSpot instance: Must be only one single object with that name
+ . Searches the entire ThoughtSpot Org: Must be only one single object with that name
 
-The best practice is to create and upload "packages" of related objects together at once:
-
-* Give data objects within a package unique names, even though not enforced by ThoughtSpot
-* All Table objects that use the same Connection object and all Models connected to those Tables should be uploaded together in a single TML Import
-* If a data object already exists, swap out the *fqn* references to avoid the name matching heuristic
+For this reason, we recommend importing Tables and Models from the same Connection in the same Import TML request, at least on the initial import.
 
 ==== Rules for create vs. update operations
 Object names are *never used* for determining an object to update, because object names are not unique within ThoughtSpot.
 
 Whether an imported TML will create a new object or update an existing object depends on:
 
+* the presence/absence of the *obj_id:* property in the TML file
 * the presence/absence of the *guid:* property in the TML file
 * whether that GUID matches an existing object on that ThoughtSpot instance
 * the `force_create=true` parameter
 
 Creation vs. update is determined by the following rules:
 
+*obj_id* is always considered first if present. ThoughtSpot looks at org_id + obj_id to find any existing object in that Org with a match, then creates a new object if one is not found
+
+If only GUIDs are in the TML file, without obj_id, the rules are:
+
  - *No GUID* in the TML file: always creates a new object with a new GUID
  - *GUID in TML file*, where an object with the *same GUID already exists* in instance: update object
  - *GUID in TML file*, where *no object with same GUID exists* in ThoughtSpot instance: creates a new object with the GUID from the TML file
- - *Table objects* match on fully-qualified tables in the database (each Connection can only have one Table object per table in the database), not GUID: If a Table object representing the same database table is found, the GUID of the original object is maintained, but the updates are applied from the new TML file
  - *force_create=true* parameter of the TML Import API is used: every uploaded TML file results in new objects being created
 
+Table objects match on the real existence of the table in the particular database:
+
+ - *Table objects* match on fully-qualified tables in the database (each Connection can only have one Table object per table in the database), not GUID or obj_id: If a Table object representing the same database table is found, the obj_id/GUID of the original object is maintained, but the updates are applied from the new TML file
 
 
 [#relatedResources]
