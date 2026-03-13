@@ -132,12 +132,71 @@ The process for exporting TML files into source control is:
 
 
 === Best practices with TML export API
+The `/metadata/tml/export` endpoint has many options for controlling the format of the response.
+
+==== YAML or JSON
 The `formattype` argument can be set to `YAML` or `JSON`.
 
-Export in YAML for saving to disk for source control or use with the `thoughtspot_tml` library. Export in JSON when you need details from TML within a web browser or just need to read values programmatically.
+Export in YAML for saving to disk for use in Git or when using the `thoughtspot_tml` library, which is designed to handle the TML YAML format. 
+
+Export in JSON when you need details from TML within a web browser or just need to read values programmatically.
+
+==== obj_id or guid
+Once all your objects have defined `obj_id` properties, the ideal TML Export setting has the following options (you may have more or others as well):
+
+[,json]
+----
+{
+   "edoc_format": "YAML",
+   "export_associated": false,
+   "export_fqn": false,
+  "export_options": {
+    "include_obj_id": true,
+    "include_obj_id_ref": true,
+    "include_guid": false
+  }
+}
+----
+
+`"include_obj_id": true` specifies the `obj_id` at the top of the YAML file as the identifier for the object.
+
+`"include_obj_id_ref": true` specifies that any related objects referenced in the TML file have an `obj_id` property as well.
+
+The TML will end up looking like:
+
+[,YAML]
+----
+obj_id: My_Connection__DATA_CHALLENGE__SALES
+table:
+  name: SALES
+  db: ${dc_db}
+  schema: ${dc_schema}
+  db_table: SALES
+  connection:
+    name: My Connection
+    obj_id: My_Connection
+----
+
+If any of the objects do not have `obj_id` set, the TML will be exported with the `guid` property at the top, or the `fqn:` property for a reference, which will be the referenced object's GUID:
+
+[,YAML]
+----
+guid: c1e4043a-4524-4fcb-a20f-9e7aff4dc972
+table:
+  name: SALES
+  db: ${dc_db}
+  schema: ${dc_schema}
+  db_table: SALES
+  connection:
+    name: My Connection
+    fqn: 75b717da-94b6-42ae-ab93-110c677703fb
+----
 
 
+==== export_associated
 The `export_associated` argument retrieves the TML objects for all related objects when used, including the GUID of each object within the headers. This is useful for dependency checking, but results in longer request times and bigger responses, and possibly exporting the same object over and over.
+
+=== File and directory naming pattern
 
 
 [#linkImportRelease]
@@ -188,7 +247,7 @@ Creation vs. update is determined by the following rules:
 [#relatedResources]
 == Additional Resources
 
-* The link:https://github.com/thoughtspot/thoughtspot_tml[thoughtspot-tml module, window=_blank] is written in Python providing classes to work with the TML files as Python objects. You can install it via pip:
+* The link:https://github.com/thoughtspot/thoughtspot_tml[thoughtspot_tml library, window=_blank] is written in Python providing classes to work with the TML files as Python objects. You can install it via pip:
 
 +
 ----
@@ -206,84 +265,3 @@ pip install thoughtspot_rest_api
 
 * The link:https://github.com/thoughtspot/ts_rest_api_and_tml_tools/blob/main/examples/tml_and_sdlc/[examples/tml_and_sdlc/, window=_blank] directory includes many different example scripts for these TML-based workflows.
 +
-////
-Within the examples directory, the link:https://github.com/thoughtspot/ts_rest_api_and_tml_tools/blob/main/examples/tml_and_sdlc/tml_download.py[tml_download.py, window=_blank] script is a simple example of exporting all TML objects to disk for use with Git or another source control system.
-////
-* For command-line administration tools including many pre-built TML-based workflows, the link:https://github.com/thoughtspot/cs_tools[cs_tools project, window=_blank] is available.
-
-////
-== Notes for older releases (8.9.0.cl or earlier versions)
-
-[#olderReleaseNotes]
-=== Add FQNs of associated objects in TML
-Prior to ThoughtSpot 8.9.0.cl, TML files did not include the GUIDs of associated objects on export. However, you can use the `export_associated=true` argument to retrieve the GUIDs of the associated objects, then programmatically add the `fqn` property to the downloaded TML with the correct GUIDs. Including the GUIDs in the saved files on disk allows you to substitute the GUIDs for the equivalent objects in another environment.
-
-For example, in these earlier versions, the items in the `tables:` list of this example worksheet TML only include a `name:` property, representing the name of the ThoughtSpot *table* object (as opposed to the table's name in the data warehouse).
-
-If there are *table* objects with duplicate names, specify the GUID of the object using the `fqn:` property. This will distinguish the correct object when importing the TML back.
-
-When you set `export_associated=true` in the TML export command, the first item in the response will be the object you requested in the export:
-
-[source,yaml]
-----
-guid: 0a0bb654-b0e8-482c-a6c8-9ed396d1cb92
-worksheet:
-  name: Markspot 2 Worksheet
-  tables:
-  - name: DIM_CUSTOMERS_2
-  table_paths:
-  - id: DIM_CUSTOMERS_2_1
-    table: DIM_CUSTOMERS_2
-    join_path:
-    - {}
-...
-----
-
-The overall response will be structured as a JSON array, with an `edoc` property representing the TML document itself and an `info` section providing basic metadata information, but more importantly the `name` and `id` properties.
-
-[source,json]
-----
-{
-  "object": [
-    {
-      "edoc":  "<string of the TML doc>"
-        ,
-        "info": {
-          "id": "<object guid>",
-          "name": "<object name>",
-           ...
-        }
-      },
-     ...
-  ]
-}
-----
-
-Parse through this array and record a simple mapping of name to `guid`:
-
-.Python example of this process
-[source,python]
-----
-name_guid_map = {}
-
-for obj in objs:
-    name_guid_map[obj['info']['name']] = obj['info']['id']
-----
-
-Because we know that these are the GUIDs that match the name values in this particular TML file, we can now use the map we created to add in the `fqn` properties, to result in the *worksheet* TML looking like this:
-
-[source,yaml]
-----
-guid: 0a0bb654-b0e8-482c-a6c8-9ed396d1cb92
-worksheet:
-  name: Markspot 2 Worksheet
-  tables:
-  - name: DIM_CUSTOMERS_2
-    fqn: 3b87cea1-7767-4fd8-904f-23255d4ba7b3
-  table_paths:
-  - id: DIM_CUSTOMERS_2_1
-    table: DIM_CUSTOMERS_2
-    join_path:
-    - {}
-----
-////
