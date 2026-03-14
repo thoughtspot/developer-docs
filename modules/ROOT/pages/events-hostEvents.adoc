@@ -1,0 +1,277 @@
+= Using host events
+:toc: true
+:toclevels: 2
+
+:page-title: Host events
+:page-pageid: host-events
+:page-description: Events allow the host application to trigger actions in or payloads from the embedded ThoughtSpot components.
+
+[#host-events]
+Host events provide programmatic entry points to actions that your host or embedding application can trigger into the embedded ThoughtSpot iframe to perform the same operations a user can perform in the UI, such as opening filters, editing, saving, pinning, drilling, or navigating to an answer.
+
+Host events use the `.trigger()` method to send the event message to embedded ThoughtSpot components in the `.trigger(hostEvent, data)` format. The host events are part of the *HostEvent* object; for example, `HostEvent.SetVisibleTabs`.
+
+== Event categories
+
+Host events can be categorized based on their schema and what they do:
+
+* Navigation events that can move the user to a different object or change what’s visible in their current view. For example, `HostEvent.SetVisibleTabs`, `HostEvent.Explore`.
+* Filter events that can get, open, and update filters programmatically without relying on the user to open filter panels. For example, `HostEvent.UpdateRuntimeFilters`, `HostEvent.GetFilters`, `HostEvent.OpenFilter`.
+* Query control events that can control the search string, prompt, or query that ThoughtSpot runs, instead of relying on the user to type or edit it in the UI. For example, `HostEvent.Search`, `HostEvent.EditLastPrompt`.
+* Object creation and management events that trigger actions such as save, pin, copy, edit, present, delete, and more, either by opening a UI modal or executing directly via parameters. For example, `HostEvent.Pin`, `HostEvent.SaveAnswer`, `HostEvent.Present`.
+* Data retrieval events that return information about the current state or objects, such as a Liveboard tab, answer session. This information can be sent as the response payload to the host application to drive custom workflows. For example, `HostEvent.GetTabs`, `HostEvent.GetAnswerSession`. `HostEvent.GetIframeUrl`.
+* Other utility events that trigger workflows, such as `HostEvent.EditTML`, and `HostEvent.ExportTML` in the embed view.
+
+== Host event behavior in single-layer and multi-layer UI scenarios
+In single‑layer UI, such as a single visualization embed, Spotter embed, or Liveboards listing page in full application embed, a host event call typically results in a single visible action. However, in multi-modal or multi-layer UI, such as Spotter on Liveboard embed, a visualization opened from a Liveboard, or any experience with dialogs on top of a base page, a host event call can trigger multiple handlers at once. For example, the `HostEvent.OpenFilter` can open filters on both the visualization page in the overlay and the underlying Liveboard.
+
+For context-aware routing and per‑context payload validation, we recommend using the host events framework with page context. For more information, see xref:events-context-aware-routing.adoc[Context‑aware routing of HostEvents].
+
+== Configuring host events
+
+To configure a host event, use the `.trigger()`.
+
+The following example uses `HostEvent.SetVisibleTabs` to show specific tabs whose IDs are specified in the payload. Any tabs whose IDs are not included in this array are hidden.
+
+[source,TypeScript]
+----
+import { HostEvent } from '@thoughtspot/visual-embed-sdk';
+
+// Example: show only specific tabs on a Liveboard
+liveboardEmbed.trigger(HostEvent.SetVisibleTabs, [
+  '430496d6-6903-4601-937e-2c691821af3c',
+  'f547ec54-2a37-4516-a222-2b06719af726',
+]);
+----
+
+When a host event is triggered, an event bridge inside the embed iframe receives the event, finds matching handlers, and executes the action specified in the host event payload. Host events can also be assigned to a Call To Action (CTA) button or menu action in ThoughtSpot UI or a custom button to initiate the specified action.
+
+[#hostEventParameterization]
+=== Using parameterized events to trigger actions without opening a UI modal
+In your host events implementation, you can choose to trigger an action without a payload and let ThoughtSpot run the standard UI workflow, such as opening a modal or using the current selection. For events such as `HostEvent.Pin` and `HostEvent.SaveAnswer`, you can also pre-define the `vizId`, `liveboardId`, and `tabId` parameter values in the host event payload and trigger actions directly without relying on the UI workflow or modal.
+
+==== Parameters for HostEvent.Pin
+
+The *Pin* action is available on the charts and tables generated from a search query, saved Answers, and visualizations on a Liveboard. Generally, when a user initiates the pin action, the *Pin to Liveboard* modal opens, and the user is prompted to specify the Liveboard to pin the object. The modal also allows the user to add or edit the title text of the visualization and create a new Liveboard if required.
+
+With `HostEvent.Pin`, you can automate the pin workflow to programmatically add an Answer or visualization to a Liveboard. For example, to pin an object to an existing Liveboard, use the following parameters in the host event object:
+
+* `vizId` +
+__String__. GUID of the saved Answer or visualization to pin to a Liveboard. Note that after you pin an Answer to a Liveboard, ThoughtSpot creates a copy of the Answer with a new GUID, which is independent of the original Answer object. Optional for pinning a new chart or table generated from a Search query.
+* `liveboardId` +
+__String__. GUID of the Liveboard to pin the Answer. If there is no Liveboard, you must specify the `newLiveboardName` to create a new Liveboard.
+* `newVizName` +
+__String__. Name string for the Answer that will be added as a visualization to the Liveboard. Note that each time the user clicks, a new visualization object with a new GUID is generated.
+* `tabId` +
+__String__. GUID of the Liveboard tab. Adds the Answer to the Liveboard tab specified in the code.
+* `newLiveboardName`
+__String__. Name string for the new Liveboard. Creates a new Liveboard object with the specified name.
+* `newTabName` +
+__String__. Name string for the new Liveboard tab. Adds a new tab to the Liveboard specified in the code.
+* `newVizName` +
+__String__. Name string for the visualization. When specified, it adds a new visualization or creates a copy of the Answer or visualization specified in `vizId`.
+
+In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to add a specific visualization to a specific Liveboard tab:
+
+[source,JavaScript]
+----
+ const pinResponse = await appEmbed.trigger(HostEvent.Pin, {
+    vizId: "8fbe44a8-46ad-4b16-8d39-184b2fada490",
+    newVizName: "sales by item type",
+    liveboardId: "fa68ae91-7588-4136-bacd-d71fb12dda69",
+    tabId: "c135113c-fba0-4220-8e14-7a5f14e0e69f",
+ })
+----
+
+In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to add a new visualization to a Liveboard:
+
+[source,JavaScript]
+----
+ const pinResponse = await searchEmbed.trigger(HostEvent.Pin, {
+     newVizName: `Sales by region`,
+     liveboardId: "5eb4f5bd-9017-4b87-bf9b-8d2bc9157a5b",
+ })
+----
+
+In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to create a new Liveboard with a tab, and then pin the Answer or visualization to it.
+
+[source,JavaScript]
+----
+ const pinResponse = await appEmbed.trigger(HostEvent.Pin, {
+     newVizName: "Sales by item type for Arizona",
+     newLiveboardName: "Sales",
+     newTabName: "Southwest",
+ })
+----
+
+If `HostEvent.Pin` does not include any parameters, the event triggers the *Pin* action and opens the *Pin to Liveboard* modal.
+
+[source,JavaScript]
+----
+searchEmbed.trigger(HostEvent.Pin);
+----
+
+==== Parameters for HostEvent.SaveAnswer
+
+For `HostEvent.SaveAnswer`, you can pass the pre-defined attributes such as name and description of the Answer to save the Answer programmatically without showing the *Describe your Answer* prompt to the user.
+
+* `name` +
+__String__. Name string for the Answer object.
+* `description` +
+__String__. Description text for the Answer
+
+[source,JavaScript]
+----
+const saveAnswerResponse = await searchEmbed.trigger(HostEvent.SaveAnswer, {
+    name: "Sales by states",
+    description: "Total sales by states in the Midwest region",
+});
+----
+
+If `HostEvent.SaveAnswer` does not include any parameters, the event triggers the *Save* action and opens the *Describe your Answer* modal.
+
+[source,JavaScript]
+----
+searchEmbed.trigger(HostEvent.SaveAnswer);
+----
+
+=== Using vizId to target a specific visualization
+If a host event allows the `vizId` parameter, you can use it to target a specific visualization. For example, to trigger the *Edit* action on a specific visualization in an embedded Liveboard, you can specify the `vizId` parameter in the host event payload.
+
+In the following example, the host event triggers the **Edit** action on the specified visualization in a Liveboard embed:
+
+[source,JavaScript]
+----
+// Import the HostEvent enum
+import { HostEvent } from '@thoughtspot/visual-embed-sdk';
+
+// Trigger the 'Edit' action on a specific visualization within the embedded Liveboard.
+liveboardEmbed.trigger(HostEvent.Edit, {
+  vizId: '730496d6-6903-4601-937e-2c691821af3c' // The GUID of the visualization to edit.
+});
+----
+
+If `vizId` is not specified, the edit action is triggered at the Liveboard level, instead of the visualization layer.
+
+In Spotter embed, `vizId` is a required parameter for several host events. If it is not specified in the host event, the event trigger fails and results in an error indicating that the visualization context is missing.
+
+==== Visibility of visualizations in the viewport
+In a Liveboard embed, visualizations load incrementally as the user scrolls the Liveboard. Even if the Liveboard view is configured to load all visualizations simultaneously, the host events are triggered only on visualizations that are currently loaded and visible in the viewport.
+
+In the above example, if the visualization with the `730496d6-6903-4601-937e-2c691821af3c` `vizId` is not currently loaded and visible on the user’s screen, the host event will not trigger any action, indicating that the `vizId` is unknown or not currently loaded.
+
+=== Retrieving and updating filters
+
+The SDK provides the following events for filter retrieval and updates:
+
+* `HostEvent.GetFilters` to get the filters that are currently applied on an embedded Liveboard. You can use this event to inspect the current filter state or to retrieve filter values.
+* `HostEvent.UpdateFilters` to update the filters applied on an embedded Liveboard.
+* `HostEvent.OpenFilter` to open the filter panel for the specified column.
+* `HostEvent.UpdateRuntimeFilters` to update xref:runtime-filters.adoc[Runtime filters]. +
+Runtime filters are applied at runtime, that is, when loading the embedded ThoughtSpot content. Runtime filters can also be updated after the load time using `HostEvent.UpdateRuntimeFilters`. You can add a UI option or button in your embedding app and assign the `HostEvent.UpdateRuntimeFilters` to trigger the `UpdateRuntimeFilters` event when that button is clicked.
++
+In this example, the host event is assigned to a button that updates runtime filters when clicked. When `HostEvent.UpdateRuntimeFilters` is triggered, the filters are updated with the attributes specified in the code.
++
+[source,JavaScript]
+----
+ document.getElementById('updateFilters').addEventListener('click', e => {
+     liveboardEmbed.trigger(HostEvent.UpdateRuntimeFilters, [{
+             columnName: "state",
+             operator: RuntimeFilterOp.EQ,
+             values: ["michigan"]
+         },
+         {
+             columnName: "item type",
+             operator: RuntimeFilterOp.EQ,
+             values: ["Jackets"]
+         }
+     ]);
+ });
+----
+
+=== Filtering from the selection
+Filtering from a selection on a chart or table can be implemented by combining the `EmbedEvent.VizPointClick` or `EmbedEvent.VizPointDoubleClick` events with the `HostEvent.UpdateRuntimeFilters` event.
+
+The callback function from the `VizPointClick` event will need to read the response, parse out the attributes from the response that will be sent to the Runtime Filters object, and then send the attributes and their target fields in the format used by `UpdateRuntimeFilters`.
+
+== Configuring host events for React components
+
+To trigger events on ThoughtSpot components embedded in a React app, use the `useEmbedRef` hook and set the ref to `embedRef` constructor prop with the `.trigger` method.
+
+[source,TypeScript]
+----
+import { LiveboardEmbed, HostEvent, useEmbedRef } from '@thoughtspot/visual-embed-sdk/react';
+
+// ..
+const embedRef = useEmbedRef < typeof LiveboardEmbed > ();
+
+const resetFilter = () => {
+    embedRef.current.trigger(HostEvent.UpdateRuntimeFilters, [{
+            columnName: "state",
+            operator: "EQ",
+            values: []
+        },
+        {
+            columnName: "product type",
+            operator: "EQ",
+            values: []
+        }
+    ]);
+};
+----
+
+== Try it out in the Visual Embed Playground
+
+To explore the host event functionality in the Playground, follow these steps:
+
+* Go to *Develop* > *Visual Embed SDK* > *Playground*.
+* Select the feature to embed, for example, Search.
+* Select the objects to load in the Playground.
+* In the event handler code, add a host event as shown in the following example:
++
+[source,JavaScript]
+----
+document.getElementById('tryBtn').addEventListener('click', e => {
+  embed.trigger(HostEvent.DownloadAsPng)
+});
+----
+* Click *Run*.
+* Click *Try Event* to trigger the action.
+
+The following video shows how to register `HostEvent.RemoveColumn` and remove a column from the search query string using the *Try* button:
+
+[div videoContainer]
+--
+video::./images/hostEvent.mp4[width=100%,options="autoplay,loop"]
+--
+
+++++
+<a href="{{previewPrefix}}/playground/liveboard" id="preview-in-playground" target="_blank">Try it out in Playground</a>
+</div>
+++++
+
+== Event enumerations and examples
+For information about the supported event objects and examples, see xref:HostEvent.adoc[HostEvent].
+
+
+////
+
+Verify the text for accuracy. QueryChanged can be fired on SageEmbed and SpotterEmbed as well.
+
+==  SearchEmbed Events
+There are several events that fire only on the `SearchEmbed` component:
+
+* `DataSourceSelected`
++
+Fires when a change occurs in the data sources, including the initial load of the `SearchEmbed` component. Can be used to hide a loader screen. Return object contains an array of the selected column GUIDs (accessible using `LOGICAL_COLUMN` type within metadata REST API commands).
+
+* `QueryChanged`
++
+Fires when a change occurs in the search bar, including the initial load of the `SearchEmbed` component. The returned object includes a `data.search` property with the TML search query from the search box.
+////
+
+== Related resources
+
+* See xref:EmbedEvent.adoc[EmbedEvent] and xref:HostEvent.adoc[HostEvent] SDK documentation.
+* For information about triggering events on React components, see xref:tutorials:react-components/react-components_lesson-04.adoc[Event listeners for React components].
+
