@@ -1209,7 +1209,7 @@ The following example defines instructions to coach Spotter on how to interpret 
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/set'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/set'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN} \
@@ -1251,7 +1251,7 @@ The following example shows the request body for retrieving NL instructions conf
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/set'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/set'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN} \
@@ -1275,6 +1275,102 @@ If the instructions are configured on the Model specified in the API request, Th
       "scope": "GLOBAL"
     }
   ]
+}
+----
+
+== Spotter coaching access
+
+ThoughtSpot supports publishing Spotter coaching information to other Orgs.Coaching changes from the primary Org are synchronized with the data models published in secondary Orgs.
+
+=== Assign Spotter coaching access privilege
+
+To allow users and groups to access spotter coaching information in data models, assign the `SPOTTER_COACHING_PRIVILEGE` via `POST` request to the `/api/rest/2.0/security/metadata/manage-object-privilege` API endpoint.
+
+In the API request, specify the data model, user, group, and ensure that the object privilege is set to `SPOTTER_COACHING_PRIVILEGE`.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/security/metadata/manage-object-privilege'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization:  Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "operation": "ADD",
+  "metadata_type": "LOGICAL_TABLE",
+  "object_privilege_types": [
+    "SPOTTER_COACHING_PRIVILEGE"
+  ],
+  "metadata_identifiers": [
+    "62f3e9b5-4fcc-4352-b8ad-fdddc2287506"
+  ],
+  "principals": [
+    {
+      "identifier": "UserA",
+      "type": "USER"
+    }
+  ]
+}'
+----
+
+If the request is successful, the API returns the 204 response code.
+
+=== Get a list of users or groups with Spotter coaching privilege
+
+To get a list of users and groups with the Spotter coaching privilege for a specific data model or all data models, send a `POST` request to the `/api/rest/2.0/security/metadata/fetch-object-privileges` API endpoint.
+
+In the API request, specify the user or the group for which you want to retrieve the object privilege details.
+
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/security/metadata/fetch-object-privileges'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata": [
+    {
+      "identifier": "53141e3b-331d-4a74-80a2-e4322f9d8339",
+      "type": "LOGICAL_TABLE"
+    }
+  ],
+  "record_offset": 0,
+  "record_size": 20,
+  "principals": [
+    {
+      "identifier": "UserA",
+      "type": "USER"
+    }
+  ]
+}'
+----
+
+If the request is successful, ThoughtSpot returns the object privilege details in the API response:
+
+[source,JSON]
+----
+{
+   "metadata_object_privileges":[
+      {
+         "metadata_id":"53141e3b-331d-4a74-80a2-e4322f9d8339",
+         "metadata_name":"Model_formula_variable",
+         "metadata_type":"WORKSHEET",
+         "principal_object_privilege_info":[
+            {
+               "principal_type":"USER",
+               "principal_object_privileges":[
+                  {
+                     "principal_id":"0000083e-e253-10af-aa97-5e45d512ebbd",
+                     "principal_name":"rani.gangwar@thoughtspot.com",
+                     "principal_sub_type":"OIDC_USER",
+                     "object_privileges":"[SPOTTER_COACHING_PRIVILEGE]"
+                  }
+               ]
+            }
+         ]
+      }
+   ]
 }
 ----
 

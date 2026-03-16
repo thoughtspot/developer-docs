@@ -1,21 +1,22 @@
-= ABAC via tokens (Legacy method)
+= ABAC via JWT with filter rules and parameters
 :toc: true
 :toclevels: 2
 
-:page-title: ABAC via tokens
+:page-title: ABAC via JWT with filter rules and parameters
 :page-pageid: abac-user-parameters
 :page-description: Attribute-based access control pattern can be achieved via user parameters sent in the login token
 
-ThoughtSpot's Attribute-Based Access Control (ABAC) implementation allows administrators to send user-specific security entitlements as attributes at session creation via JSON Web Token (JWT) tokens.
 
 [IMPORTANT]
 ====
-The ABAC feature is disabled by default on ThoughtSpot instances. To implement ABAC with data security in ThoughtSpot, refer to the instructions in the xref:abac_rls-variables.adoc[ABAC via RLS with  template variables] documentation.
+Attribute-Based Access Control (ABAC) implementation via JSON Web Token (JWT) with filter rules and parameters is deprecated in 26.3.0.cl and will be removed from ThoughtSpot in a future release. For all new ABAC implementations, use the xref:abac_rls-variables.adoc[ABAC via RLS with template variables]. Your existing implementations with filter rules and parameter values will continue to work until further notice. We recommend xref:abac-migration-from-jwt-ga.adoc[migrating your existing implementation with filter rules] to ABAC via RLS method with custom variables.
 ====
 
 == Overview
 
-To generate JWT tokens for ABAC implementation, you must use the `/api/rest/2.0/auth/token/custom` REST API endpoint.
+ThoughtSpot's ABAC implementation allows administrators to send user-specific security entitlements as attributes at session creation via JWT.
+
+To generate JWT with security entitlements for ABAC implementation, use the `/api/rest/2.0/auth/token/custom` REST API endpoint.
 
 [NOTE]
 ====
@@ -30,20 +31,20 @@ To create an easier implementation of data security for your application users, 
 Administrators can set the following attributes for a user via the authentication token, along with the capability to assign the user to ThoughtSpot groups:
 
 * Filter rules +
-This method uses xref:runtime-filters.adoc[runtime filters] (`filter_rules`) in the token to create data security rules. It can filter multiple values of any data type and binds to any Column in any Model with a matching column name in ThoughtSpot.
+This method uses xref:runtime-filters.adoc[runtime filters] (`filter_rules`) in the token to create data security rules. It can filter multiple values of any data type and binds to any Column in any model with a matching column name in ThoughtSpot.
 
 * Parameter values +
-This method uses xref:runtime-parameters.adoc[runtime Parameters] (`parameter_values`) in the token to create data security rules. It binds a single value to any Parameter in any Model by Parameter Name and Type match. Parameters can be used in *Formulas* and then as *Filters* in  Models.
+This method uses xref:runtime-parameters.adoc[runtime Parameters] (`parameter_values`) in the token to create data security rules. It binds a single value to any Parameter in any model by Parameter Name and Type match. Parameters can be used in *Formulas* and then as *Filters* in  Models.
 
 === Mandatory token filters
 
-The `is_mandatory_token_filter: true` setting in object TML enforces that a filter rule must be provided for a specific column. When this attribute is set on a column in a Model, ThoughtSpot will deny all data access for users who do not have a corresponding filter rule for that column in their ABAC token.
+The `is_mandatory_token_filter: true` setting in object TML enforces that a filter rule must be provided for a specific column. When this attribute is set on a column in a model, ThoughtSpot will deny all data access for users who do not have a corresponding filter rule for that column in their ABAC token.
 
-When setting filter rules within the token, you must place the `is_mandatory_token_filter: true` property on every column in a Model where a filter rule is expected. This setting will deny any access to data if a user has not been assigned values for the expected set of fields.
+When setting filter rules within the token, you must place the `is_mandatory_token_filter: true` property on every column in a model where a filter rule is expected. This setting will deny any access to data if a user has not been assigned values for the expected set of fields.
 
 [#column-name-warning]
-The filter rules require passing the *exact* column name as defined in the Model. Otherwise, the values will not bind to any column. You must coordinate between the team that maintains the data objects and the team that builds the xref:trusted-auth-token-request-service.adoc[token request service] to know if any changes will be made to a Model and to ensure column names remain consistent. +
-For this reason, end users of an embedded app must not be granted edit access to any Model using ABAC rules via tokens. Setting the `is_mandatory_token_filter: true` property on every column where a filter rule is expected ensures that no data is returned for users when column names change.
+The filter rules require passing the *exact* column name as defined in the model. Otherwise, the values will not bind to any column. You must coordinate between the team that maintains the data objects and the team that builds the xref:trusted-auth-token-request-service.adoc[token request service] to know if any changes will be made to a model and to ensure column names remain consistent. +
+For this reason, end users of an embedded app must not be granted edit access to any model using ABAC rules via tokens. Setting the `is_mandatory_token_filter: true` property on every column where a filter rule is expected ensures that no data is returned for users when column names change.
 
 [NOTE]
 ====
@@ -188,7 +189,7 @@ Filters and parameters must be *persisted* for them to apply to user sessions wh
 
 |`NONE`
 |Cookie-based Trusted Authentication
-|Attributes assigned to the token will not be considered. The user logs in using a session cookie and  the properties from the previous session persist.
+|Attributes assigned to the token will not be considered. The user logs in using a session cookie and the properties from the previous session persist.
 
 |`APPEND` or `REPLACE`
 |Cookieless Trusted Authentication
@@ -221,9 +222,9 @@ See the xref:trusted-authentication.adoc[trusted authentication] documentation f
 The ABAC via tokens pattern allows for setting arbitrary filters and overriding the values of existing Worksheet parameters. These two capabilities can be combined in various ways to create secure and unbreakable RLS.
 
 === Deny all by default
-Starting in ThoughtSpot 10.4.0.cl, you can add `is_mandatory_token_filter: true` to the TML definition of any column in a Worksheet or Model.
+You can add `is_mandatory_token_filter: true` to the TML definition of any column in a model.
 
-ThoughtSpot checks to see if the logged-in user has any `filter_rules` defined for a column marked with `is_mandatory_filter: true`, and denies access to any data if a filter rule for the matching column is not found.
+ThoughtSpot checks to see if the logged-in user has any `filter_rules` defined for a column marked with `is_mandatory_token_filter: true`, and denies access to any data if a filter rule for the matching column is not found.
 
 === Show All
 The way to show all values for a column protected by `is_mandatory_token_filter: true` is to pass the special keyword `["TS_WILDCARD_ALL"]` as the value for the column in the `filter_rules`.
@@ -234,12 +235,12 @@ Columns without `is_mandatory_token_filter: true` will show all values if there 
 The xref:trusted-auth-token-request-service.adoc[token request service] must have the following to build a token request for ABAC:
 
 1. Filter rules for defining multi-value conditions on columns
-2. Parameter values for use in Worksheet or Model formulas
+2. Parameter values for use in model formulas
 
 The filter rules must be built by:
 
 1. Retrieving user data entitlements
-2. Translating entitlements into ThoughSpot `filter_rules`
+2. Translating entitlements into ThoughtSpot `filter_rules`
 
 ==== Retrieve entitlements
 The value of the ABAC pattern is that you can send different combinations of filters for different types of users.
@@ -304,12 +305,12 @@ The following is a request where a different user can see all `Region`, but stil
    {
      "column_name" : "Customer ID",
      "operator": "EQ",
-     "values": ["492810"],
+     "values": ["492810"]
   },
    {
      "column_name": "Product Type",
      "operator": "IN",
-     "values": ["Shirts", "Swimwear"],
+     "values": ["Shirts", "Swimwear"]
    }
  ]
 ----
@@ -317,7 +318,7 @@ The following is a request where a different user can see all `Region`, but stil
 Because the `filter_rules` section is entirely within the control of the *token request service*, you have full flexibility to generate any set of filters for any type of user within the token.
 
 == Parameters to filter via formulas
-The basic pattern for using a Parameter to filter a Worksheet or Model includes these steps:
+The basic pattern for using a Parameter to filter a model includes these steps:
 
 . Create link:https://docs.thoughtspot.com/cloud/latest/parameters-create[Parameters, window=_blank] in Worksheet
 . Make link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, window=_blank] that evaluates the Parameter's default value and the expected values from the token
@@ -327,7 +328,7 @@ link:https://docs.thoughtspot.com/cloud/latest/parameters-create[Parameters, tar
 
 You can also add `is_hidden: true` to a Parameter definition using TML, which allows the flexibility to use as many parameters as desired for any type of formula to be used as a Worksheet filter, without cluttering the visible UI.
 
-To use a Parameter, you'll create a link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, window=_blank] on the Worksheet or Model. link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[Worksheet filters, window=_blank] can reference Worksheet formulas once they have been created, which creates the security layer out of the result derived from the formula.
+To use a Parameter, you'll create a link:https://docs.thoughtspot.com/cloud/latest/formulas[formula, window=_blank] on the model. link:https://docs.thoughtspot.com/cloud/latest/filters#_worksheet_filters[Worksheet filters, window=_blank] can reference Worksheet formulas once they have been created, which creates the security layer out of the result derived from the formula.
 
 All of these Worksheet-level features are set by clicking *Edit* on the Worksheet, then expanding the menu on the left sidebar:
 

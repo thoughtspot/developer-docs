@@ -1,0 +1,507 @@
+= Context-based execution of host events
+:toc: true
+:toclevels: 2
+
+:page-title: HostEvents in multi‑modal contexts
+:page-pageid: context-aware-event-routing
+:page-description: Using the page context feature in the Visual Embed SDK, you can now implement context-aware routing of host events in a multi-modal embedding experience
+
+This guide explains how developers embedding ThoughtSpot in their applications can use the page context stack and payload validation to achieve precise control and predictable handling of host events in a multi-layered embed UI experience.
+
+== Overview
+Host events in a single‑layer UI, such as a standalone visualization, Answer, or Liveboard page, typically result in a single visible action. Because only one surface is available to  handle a given host event, the events are effectively routed to that page; for example, `HostEvent.OpenFilter` in a single‑layer Liveboard or Search embed opens the filter panel for the specified column on that page.
+
+In a multi‑layer UI, such as a visualization or Spotter overlay opened on top of a Liveboard,some host events can lead to ambiguous results. Multiple components may register handlers for the same event type, so a single call can invoke more than one handler or may return errors. Some examples of the multi-layer UI scenarios include:
+
+* An embedded Liveboard with multiple visualizations, each with its own menu and actions.
+* Spotter overlay on top of a Liveboard, with its own visualization and menu actions.
+* Embedded visualizations with a Spotter overlay.
+* Embedded full application experience with  multiple pages, dialogs, or overlays.
+
+In these scenarios, the same action can exist on multiple layers. For example, the embedded Liveboard, Answer, and Spotter pages include dialogs or overlays that expose similar actions such as save, edit, pin, and download. A host event, such as `HostEvent.OpenFilter`, can therefore open filters both for the Answer in the overlay and the underlying Spotter or Liveboard, leading to ambiguous behavior.
+
+For precise and predictable handling of events in such scenarios, the SDK provides the v2 host event framework with context–aware event routing capability. When enabled, the framework uses the current page context (or an explicitly specified context) to route each host event to exactly one appropriate UI layer.
+
+== Using page context in host events
+
+The page context framework in the SDK enables tracking the current navigation state of a user interaction within the embedded application. It tracks the page, dialog, or the overlay UI that a user is viewing in the embedded application, which can be used for routing events to the active layer or specific target context.
+
+The v2 framework with context-based routing is in beta and disabled by default on ThoughtSpot embedded instances. To enable this feature, set the `useHostEventsV2` attribute as shown in this example:
+
+[source,TypeScript]
+----
+// Enables v2 host event framework in full application embed.
+const embed = new AppEmbed('#tsEmbed', {
+   ... // other embed view config
+   useHostEventsV2: true, // enables new host events v2 framework
+})
+----
+
+When enabled, developers can use the page context feature for the following purposes:
+
+* xref:events-context-aware-routing.adoc#_getting_current_context_and_page_stack_details[Get current context] via the `getCurrentContext()` function.
+* xref:events-context-aware-routing.adoc#_specifying_target_context_in_host_events[Set context] to target host event triggers in a particular UI layer.
+
+=== Getting current context and page stack details
+ThoughtSpot maintains an ordered stack of active contexts for embedded interfaces. Every page component or overlay registers its context when it mounts and unregisters it when it unmounts. The current context is always at the top of the stack.
+
+Developers can use the `getCurrentContext()` function to retrieve context details and apply host events accordingly. The `getCurrentContext()` method in the SDK allows retrieving information about the current page, open dialogs, and object IDs to determine the expected behavior and construct valid calls for event routing.
+
+The following examples show how to fetch the current context:
+
+[source,JavaScript]
+----
+liveboardEmbed.getCurrentContext().then((ctx) => {
+  console.log('Current context:', ctx);
+});
+----
+
+[source,JavaScript]
+----
+async function logCurrentContext() {
+  // Log the current (top-most) context object
+  const context = await embed.getCurrentContext();
+  // - context.currentContext: the top (active) context
+  // - context.stack: the full page context stack
+  console.log('Current context:', context);
+}
+logCurrentContext();
+----
+
+The available contexts are:
+
+* `liveboard` - The Liveboard layer
+* `search` - Search data or the saved answer page.
+* `spotter` - Spotter interface.
+* `answer` - The Explore or Drill dialogs opened from a visualization or search Answer.
+* `other` - Fallback for generic or app-level interactions not tied to a specific context. For example, the home page and list pages in a full application embed.
+
+==== Page context stack in an embedded Liveboard
+The Visual Embed SDK maintains an ordered page context stack for each embedded interface. Every page component or overlay registers its context when it mounts and unregisters when it unmounts.
+
+The following examples show the page context transition as the user navigates to different UI layers:
+
+. **When a user opens a Liveboard**
++
+[source,JSON]
+----
+{
+
+  "stack": [
+    {
+      "name": "liveboard",
+      // Specifies the context type. For example, page, dialog
+      "type": "page",
+      // IDs for the Liveboard and its visualizations.
+      "objectIds": {
+        // Liveboard ID
+        "liveboardId": "lb-123",
+        // Array of visualization IDs visible in the Liveboard.
+        "vizIds": ["v1", "v2"]
+      }
+    }
+  ],
+  // Currently active page or view.
+  "currentContext": {
+    "name": "liveboard",
+    "type": "page",
+    "objectIds": {
+      "liveboardId": "lb-123",
+      "vizIds": ["v1", "v2"]
+    }
+  }
+}
+----
+
+. **When a user opens the Spotter dialog on the Liveboard**
++
+When a user navigates to a Liveboard, and then opens Spotter as a dialog on top of it, and finally runs a search from Spotter that opens an answer, the page context stack changes as shown in this example:
++
+[source,JSON]
+----
+{
+  "stack": [
+    {
+      // First entry in the stack: a Liveboard page
+      "name": "liveboard",
+      "type": "page",
+      "objectIds": {
+        "liveboardId": "lb-123",
+        "vizIds": ["v1","v2"]
+      }
+    },
+    {
+      // Second entry: a Spotter dialog
+      "name": "spotter", // Spotter layer
+      "type": "dialog",  // modal or overlay
+      "objectIds": {
+        "dataModelIds": ["ws-456"] // Data model ID used in Spotter.
+      }
+    }
+  ],
+  // Currently active layer
+  "currentContext": {
+    "name": "spotter",
+    "type": "dialog",
+    "objectIds": {
+      "dataModelIds": ["ws-456"]
+    }
+  }
+}
+----
+
+. **When Spotter generates a visualization**
++
+[source,JSON]
+----
+{
+  "stack": [
+    {
+      // Base page context: a Liveboard is open.
+      "name": "liveboard",
+      "type": "page",
+      "objectIds": {
+        "liveboardId": "lb-123", // ID of the Liveboard currently in view.
+        "vizIds": ["v1", "v2"]  // IDs of visualizations available on this Liveboard.
+      }
+    },
+    {
+      // Overlay context: Spotter layer is opened on top of the Liveboard page
+      "name": "spotter",
+      "type": "dialog",  // Overlay above the page
+      "objectIds": {
+        "dataModelIds": ["ws-456"],  // Data model IDs used by Spotter.
+        "vizIds": ["ans-1"] // IDs of visualizations in the Spotter layer.
+      }
+    }
+  ],
+  // Current active layer
+  "currentContext": {
+    "name": "spotter",
+    "type": "dialog",
+    "objectIds": {
+      "dataModelIds": ["ws-456"],
+      "vizIds": ["ans-1"]
+    }
+  }
+}
+----
+
+. **When the user closes the Spotter dialog on a Liveboard**
++
+[source,JSON]
+----
+{
+  "stack": [
+    {
+      // Liveboard page view
+      "name": "liveboard",
+      "type": "page",
+      "objectIds": {
+        "liveboardId": "lb-123", // GUID of the Liveboard in current view.
+        "vizIds": ["v1", "v2"] // IDs of visualizations visible in the Liveboard
+      }
+    }
+  ],
+  // Current active layer
+  "currentContext": {
+    "name": "liveboard",
+    "type": "page",
+    "objectIds": {
+      "liveboardId": "lb-123",
+      "vizIds": ["v1", "v2"]
+    }
+  }
+}
+----
+
+=== Routing events to the current context in real-time
+
+In a Liveboard embed, if the Spotter modal is open on top of a Liveboard layer, the current context changes to Spotter. If a matching handler exists in the Spotter layer, the SDK triggers the event.
+
+[source,JavaScript]
+----
+import { HostEvent } from '@thoughtspot/visual-embed-sdk';
+
+// Trigger search in Spotter by sending a query and executing search
+spotterEmbed.trigger(HostEvent.SpotterSearch, {
+  query: 'revenue',
+  executeSearch: true,
+});
+
+// Trigger a CSV download for a specific Spotter visualization
+liveboardEmbed.trigger(HostEvent.DownloadAsCsv, {
+  vizId: 'spotter-viz-id', // ID of the Spotter visualization/answer
+});
+----
+
+To automatically route events to the current context, you call `getCurrentContext()` on your embed instance to fetch the current context, and then use that information in your own routing logic before triggering a host event.
+
+The following example routes the download event only if the current context is Spotter in a Liveboard embed:
+
+[source,JavaScript]
+----
+async function triggerDownloadForSpotter() {
+  // Fetch the current context
+  const context = await liveboardEmbed.getCurrentContext(); // returns ContextObject
+  // Trigger DownloadAsCsv if the current layer is Spotter.
+  if (context?.currentContext?.name === 'spotter') {
+    liveboardEmbed.trigger(HostEvent.DownloadAsCsv, {
+      vizId: 'spotter-viz-id',
+    });
+  }
+}
+----
+
+[IMPORTANT]
+====
+* The host application cannot directly modify or inject context. It can only read the current context. The host application can trigger events such as updating filters or changing tabs, but the underlying page context is managed by the embedded component.
+* Only the top-most (current) context is considered active for event routing. Actions cannot be triggered in inactive layers, unless explicitly targeted in the host event definition.
+====
+
+=== Setting target context in host events
+Developers can target an event subscription to a specific context, so that when the host application triggers an event, only the handler registered for that context is executed. This prevents the same action from being triggered multiple times across UI layers and overlays, and ensures that host events behave as users would expect in the product interface.
+
+To trigger the event only in a specific layer, specify the context explicitly in the host event. You can set the context type to one of the following values as required:
+
+* `ContextType.Liveboard` - For a Liveboard page.
+* `ContextType.Search` - For Search data or the saved answer page.
+* `ContextType.Spotter` - For the Spotter layer.
+* `ContextType.Answer` - For the Explore or Drill dialog opened from a visualization or search Answer.
+//* `ContextType.Other` - For generic or app-level events not tied to a specific context.
+
+In the following example, `HostEvent.Edit` is explicitly assigned to the Spotter context in a Liveboard embed:
+
+[source,JavaScript]
+----
+import { HostEvent, ContextType } from '@thoughtspot/visual-embed-sdk';
+
+liveboardEmbed.trigger(
+  HostEvent.Edit,  // Trigger Edit action
+  {
+    vizId: '730496d6-6903-4601-937e-2c691821af3c', // ID of the visualization
+  },
+  // Route this event only to the Spotter context if the other UI layers in the stack have a matching handler.
+  ContextType.Spotter,
+);
+----
+
+=== Context resolution in single-layer and multi-modal UI
+
+In embedded interfaces with single-layer interactions, event execution does not lead to ambiguous results. If the embedded view has multi-modal UI with more than one matching interface element or handler, explicit context setting may be required for precise execution.
+
+The following table describes how the SDK resolves context for host events in different scenarios:
+
+[cols="30,35,35", options="header"]
+|=====
+| | Single-layer UI | Multi-layer UI
+
+| UI scenario
+| A standalone visualization, Answer, or Liveboard page
+| An Answer opened on top of a Liveboard, a Spotter layer on a Liveboard, or overlapping Liveboard and Answer layers in a full application embed
+
+| Behavior in v1 legacy framework
+a| *Event routing*: Only one surface is present, so the event is effectively handled by that page. +
+*Outcome*: The event executes the intended action if a matching handler is available.
+a| *Event routing*: Does not support active layer detection or context resolution. All handlers for that event type may be called. +
+*Outcome*: A single event call can trigger multiple actions, such as filter updates in both Answer and Liveboard layers.
+
+| V2 host events framework +
+(without explicit target context)
+a| *Event routing*: The event is routed to the active layer in the user’s current context.  Because this scenario has only one surface, the context resolves to the current page in the embed. +
+*Outcome*: The event executes the intended action if a matching handler is found in the active layer; otherwise, it returns an error.
+a| *Event routing*: The event is routed to the top-most active layer in the user’s current context. +
+*Outcome*: Only the top-most active layer handles the event. Background or underlying layers are ignored. The event executes the intended action if a matching handler is found in this layer; otherwise, it returns an error.
+
+| V2 host events framework +
+(with explicit target context)
+a| *Event routing*: If the UI layer matches the target context specified in the host event, the event is routed. +
+*Outcome*: The event executes the intended action if the UI layer matches the target context and a handler is available in this layer; otherwise, it returns an error.
+a| *Event routing*: The event is routed to the specified target context and executed only if that layer exists and a matching handler is found in that layer. +
+*Outcome*: The event executes the intended action in the layer that matches the target context; otherwise, it returns an error.
+|||
+|=====
+
+=== Host event examples with context-aware routing
+
+==== Opening filter panel
+`HostEvent.OpenFilter` opens a filter panel for the specified column in Search, Spotter or Liveboard embeds.
+
+If the new host events framework is enabled, only one layer handles the event. If the target context is set as Liveboard and the Spotter layer is the current active layer, the call fails with a context error instead of opening filters on the wrong layer.
+
+The following example routes the event to the top-most active page in the user's current context:
+
+[source,TypeScript]
+----
+// Implicit context: top‑most active page (For example, the visualization page on top of Liveboard)
+liveboardEmbed.trigger(HostEvent.OpenFilter, {
+  column: {
+    columnId: '<column-GUID>'
+  },
+});
+----
+
+The following example explicitly sets the target context to route the event trigger to the Liveboard layer:
+
+[source,TypeScript]
+----
+// Explicit context: force filters to open on the underlying Liveboard
+appEmbed.trigger(
+  HostEvent.OpenFilter, {
+    column: {
+      columnId: '<column-GUID>'
+    }
+  },
+  ContextType.Liveboard,
+);
+----
+
+==== Updating runtime filters
+`HostEvent.UpdateRuntimeFilters` updates the runtime filters applied on a Liveboard or Answer. This event is typically routed to Liveboard in Liveboard embed or Answer page in Search or Spotter embed.
+
+In full application embedding with Liveboards and saved Answers, you may want to explicitly set the target context or let the SDK determine the top-most active layer and the current context and route the event.
+
+The following example routes the event to top-most active page. The filter update action is executed only if the top-most active layer has matching runtime filters.
+
+[source,TypeScript]
+----
+// Implicit context: current active page with runtime filters
+liveboardEmbed.trigger(HostEvent.UpdateRuntimeFilters, [
+  {
+    columnName: 'state',
+    operator: RuntimeFilterOp.EQ,
+    values: ['michigan'],
+  },
+  {
+    columnName: 'item type',
+    operator: RuntimeFilterOp.EQ,
+    values: ['Jackets'],
+  },
+]);
+----
+
+The following example explicitly sets the target context to route the event trigger to a specific Answer layer:
+
+[source,TypeScript]
+----
+// Explicit context: update runtime filters in the Answer layer
+appEmbed.trigger(
+  HostEvent.UpdateRuntimeFilters,
+  [
+    {
+      columnName: 'state',
+      operator: RuntimeFilterOp.EQ,
+      values: ['michigan'],
+    },
+  ],
+  ContextType.Answer,
+);
+----
+
+==== Adding a visualization to a Liveboard
+`HostEvent.Pin` triggers the *Pin* action to add the current Answer to a Liveboard. The event payload allows specifying visualization, Liveboard and tab IDs to programmatically complete the pinning action without opening the **Pin to Liveboard** modal.
+
+The following example shows implicit context in a single-layer UI:
+
+[source,TypeScript]
+----
+// Implicit context: pin from the current page
+spotterEmbed.trigger(HostEvent.Pin);
+----
+
+The following example shows how to explicitly set the target context to route the event to the Liveboard layer:
+
+[source,TypeScript]
+----
+// Parameterized with explicit context: pin a visualization from a Liveboard layer
+appEmbed.trigger(
+  HostEvent.Pin,
+  {
+    vizId: '8fbe44a8-46ad-4b16-8d39-184b2fada490',
+    newVizName: 'Sales by item type',
+    liveboardId: 'fa68ae91-7588-4136-bacd-d71fb12dda69',
+    tabId: 'c135113c-fba0-4220-8e14-7a5f14e0e69',
+  },
+  ContextType.Liveboard,
+);
+----
+
+==== Setting visible visualizations
+In Liveboard embedding, `HostEvent.SetVisibleVizs` is triggered at the Liveboard level to show a specific set of visualizations in the Liveboard view.
+
+[source,JavaScript]
+----
+import { HostEvent } from '@thoughtspot/visual-embed-sdk';
+
+// Trigger a host event in the embedded Liveboard
+liveboardEmbed.trigger(
+  HostEvent.SetVisibleVizs, // show only the specified visualizations
+  [
+    'viz1', // GUID of the first visualization
+    'viz2', // GUID of the second visualization
+  ],
+);
+----
+
+However, in full application embed, the same event (`HostEvent.SetVisibleVizs`) is routed to the active Liveboard layer in the user's current context.
+
+[source,JavaScript]
+----
+import { HostEvent } from '@thoughtspot/visual-embed-sdk';
+
+// Trigger a host event in a full application embed
+appEmbed.trigger(
+  HostEvent.SetVisibleVizs, // show only the specified visualizations
+  [
+    'viz1', // ID of the first visualization
+    'viz2', // ID of the second visualization
+  ],
+);
+----
+
+== Validation and error handling
+Ensure that the xref:EmbedEvent.adoc#_error[EmbedEvent.Error] is subscribed in your embed. This allows your embed to emit an event when an error occurs. Verify the error type and code for host event validation errors. For more information, see xref:EmbedErrorDetailsEvent.adoc[EmbedErrorDetailsEvent].
+
+Your host events may return errors in the following scenarios:
+
+* When a matching handler is not present in the specified context. +
+Verify the host event type, payload, and context type.
+* If a required attribute is missing, for example, `vizId` in Spotter context. Add the `vizId` and retry.
+* Verify the visualizations and objects specified in the host event are present and visible in the embed view. If not, adjust the UI experience (scroll, navigate, open a dialog) before calling the host event.
+
+== Best practices and recommendations
+
+When building integrations that rely on context and app interactions via host events, consider the following recommendations:
+
+* Include type, data, and context in the event definition as appropriate:
+** type - Host event type. For example, `HostEvent.Edit`.
+** data - Event payload with parameters for the host event execution. For example, `{ vizId?: string; ... }`.
+** `context`: The UI context for event handling. For example, `ContextType.Liveboard`.
+
+* For visualization‑level actions, pass `vizId` in the host event payload to target a specific visualization. Ensure that the target visualization is rendered and visible in the viewport.
+* For events where parameters such as `vizId` are optional, not specifying the parameter causes the action to apply to the current object in that embed context. For example, if `vizId` is not defined in `HostEvent.Pin`, the Pin modal is invoked for the Answer the user is currently viewing.
+* In Spotter embed, the `vizId` is a required parameter to trigger actions such as Pin, Download, or Edit. If the required parameter is not specified in the event payload, the event execution fails.
+* For Liveboard or page‑level actions, use the event‑specific attributes such as `liveboardId`, `tabId`, and other fields instead of `vizId` where appropriate. For precise control, specify the context in the host event.
+* Adjust target contexts as required.
+** When a context is specified, the event is routed to that context.
+** If no context is defined and multiple UI layers with matching handlers are open, ThoughtSpot automatically routes the event to the current top-most active UI layer.
+** The SDK executes handlers only for the resolved context. If the event is invalid for that context or no handler exists, it returns an error.
+* Log or surface error messages from host events during development and testing.
+
+////
+==== Listening to context changes
+You can also listen to the context changes via EmbedEvent.EmbedPageContextChanged and retrieve the current context from a user session.
+
+[source,JavaScript]
+----
+liveboardEmbed.on(EmbedEvent.EmbedPageContextChanged, (payload) => {
+console.log("Current context:", payload.currentContext);
+console.log("Full stack:", payload.stack);
+});
+----
+////
+
+== Related resources
+
+* For information about host events and the supported enumeration members in the SDK, see xref:events-hostEvents.adoc[Using host events] and xref:HostEvent.adoc[HostEvent].
+* For information about triggering actions in React embed components, see xref:tutorials:react-components/react-components_lesson-04.adoc[Event listeners for React components].
