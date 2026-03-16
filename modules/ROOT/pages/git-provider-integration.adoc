@@ -29,12 +29,12 @@ The two fundamental workflows are *xref:deploy-with-tml-apis.adoc#tml-export-wit
  . `git checkout {branch-name}`: switch to existing remote branch or create local branch
  . `git pull`: bring down latest from remote of branch
  . Script to find desired objects then Export TML, saving TML files to disk with regular save command using name pattern `{obj_id}.{type}.tml`
- . `git commit`
+ . `git diff-index --quiet HEAD || git commit -a -m "{commit msg}"`
  . `git push`: Send changes to remote
 
 [NOTE]
 ====
-If there are no changes, `git commit` will fail. `git diff-index --quiet HEAD || git commit -a -m "{commit msg}"` avoids this issue.
+If there are no changes to any files, `git commit` will throw an error. `git diff-index --quiet HEAD || git commit -a -m "{commit msg}"` avoids this issue.
 ====
 
 The script that actually downloads the TML should also have capabilities for xref:deploy-with-tml-apis.adoc#linkBuildRelease[filtering items to just the release package]. The same download script can handle pure version control (downloading all items) as well as downloading only the items of the release package.
@@ -94,7 +94,22 @@ Version control for prod Orgs:
 * customer_orgs(s): version control branch for each Single Tenant Org
 
 == Local branches, copies and edits
+ThoughtSpot itself is the "living source of truth", with TML only a representation of the current state of the object in the system at the time of TML Export or the desired state to bring the system to via TML Import.
 
+A TML Import will cause the existing object in ThoughtSpot with the same identifier (`obj_id` or `guid` if no `obj_id` is present) to update to match the state described in the imported TML file. 
+
+You can edit a TML file in a *local branch*, but using TML Import to see the result in the originating Org will cause the object to be updated.
+
+There are two options:
+
+* Create a new Org to represent the local branch, to test the new TML
+* Create a copy object in the original org, with a different identifier
+
+The final step would be to change the identifer in the copy object's TML to match the orginal identifer, then TML Import the file back into the original Org.
+
+image::./images/copy_edit_change_obj_id.png[Copy/edit change obj_id pattern]
+
+Actions like this can be performed in git however your team feels most comfortable with. The resulting changes in the "dev Org" then become part of the release package files that are exported and moved through the deployment stages like normal. 
 
 == Other sync actions
 
