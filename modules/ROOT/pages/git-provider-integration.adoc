@@ -10,6 +10,8 @@ Git providers such as GitHub, GitLab, Azure DevOps and BitBucket can run scripts
 
 This allows the Git provider to become the centralized control service for deployment processes to ThoughtSpot.
 
+The combination of Git commands and ThoughtSpot REST API calls allows for controlled synchronization of the Git repo and the various ThoughtSpot Orgs that represent environments within the software deployment lifecycle.
+
 [NOTE]
 ====
 The legacy GitHub REST APIs are used through ThoughtSpot and are tied to GitHub exclusively. The Git provider integration pattern provides more flexibility and control.
@@ -52,6 +54,9 @@ To make the process more quick and efficient, you can implement a method for onl
 
 
 == Setup
+Each Git provider has its own mechanisms for doing the following, but the overall pattern described should be possible in any of them.
+
+Essentially, the Git provider will store the necessary details and secrets to make REST API calls to the ThoughtSpot instance(s). 
 
 === Secrets and variables
 The following should be stored within the Git provider for use within any automated workflows:
@@ -93,5 +98,20 @@ Version control for prod Orgs:
 
 == Other sync actions
 
+=== Deleting objects
+When an object is deleted in the dev Org, you’ll need to decide how to register this within the git release branch
+
+One solution would be an “audit existing objects” script that looks at whether the filenames (matching obj_id) in the dev branch of the git directory continue to exist via `/metadata/search` REST API command. If not found, issue `git rm` to remove the TML file, then `git commit` and `git push` to update the origin/branch.
+
+Objects live within ThoughtSpot Orgs, and orgs that are “upstream” of dev Org may contain objects that do not exist in the dev Org (end user created content for example)
+
+The git rm command on files in release branch will flow through merge commands, removing files from upstream branches / tags
+
+However, you cannot simply remove objects that do not have equivalent TML files in the git directory
+
+=== obj_id updates
+The `obj_id` property is simple enough to change within an Org, however the files in the repo are typically named after the `obj_id` of the object at the time of export. There will also be objects in the other Orgs with the same `obj_id`. 
+
+An `obj_id` update should thus be *initiated from the Git provider* to rename the existing file and perform the ThoughtSpot REST API commands to update the `obj_id` across all Orgs with a copy of the object.
 
 == GitHub Actions example
