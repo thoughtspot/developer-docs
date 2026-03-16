@@ -18,8 +18,56 @@ The legacy GitHub REST APIs are used through ThoughtSpot and are tied to GitHub 
 == Overview
 The Git provider integration pattern is based on storing the necessary secrets in the Git provider to allow ThoughtSpot REST API commands to be run by the Git provider when accomplishing tasks on demand or on a schedule.
 
-All imports and exports of ThoughtSpot TML files to and from branches, along with the commits and merges are controlled entirely in git using the Git provider's capabilities.  
+All imports and exports of ThoughtSpot TML files to and from branches, along with the commits and merges are controlled entirely in git using the Git provider's capabilities. 
+
+The two fundamental workflows are *xref:deploy-with-tml-apis.adoc#tml-export-with-obj_id-and-variables[TML Export] to branch from Org* and *TML Import from branch to Org*:
+
+=== TML Export to branch from Org
+
+
+ . git checkout {branch-name}: switch to existing remote branch or create local branch
+ . git pull: bring down latest from remote of branch
+ . Script to find desired objects then Export TML, saving TML files to disk with regular save command using name pattern {obj_id}.{type}.tml
+ . git commit
+ . git push: Send changes to remote
+
+=== TML Import from branch to Org
 
 == Setup
+
+=== Secrets and variables
+The following should be stored within the Git provider for use within any automated workflows:
+
+* TS_SERVER
+* TS_SECRET_KEY
+* TS_INSTANCE_ADMIN_USERNAME
+* TS_DOWNLOAD_USERNAME
+* TS_IMPORT_USERNAME
+
+Some of these, such a `TS_DOWNLOAD_USERNAME` and `TS_IMPORT_USERNAME` may vary at a branch / environment level. Even `TS_SERVER` and `TS_SECRET_KEY` may have variations per branch if you are using multiple ThoughtSpot instances.
+
+=== Branches
+Due to the nature of ThoughtSpot TML, you'll want to separate deployment branches for the release package from any "pure version control" branches.
+
+Pull requests / merges should be possible smoothly from "release" -> "test_deploy" -> "uat_deploy" -> "prod_deploy"
+
+The following is an example branch scheme, you are welcome to adjust the names to match your prefernces:
+
+* main / master: Actions / workflows / other shared assets, but no TML files from any Org
+* dev_vc: Version Control for all content on Dev Org
+* release: Branch for Specific Content to go through deployment to other Orgs
+* test_deploy: Import TML from 'release' and do other Actions to Test Org
+* test_vc: Version control for all content on Test Org
+* Optional UAT / etc.:
+** uat_deploy: Import TML from 'release' and do other Actions to UAT Org
+** uat_vc: Version control for all content on UAT Org
+* prod_deploy Import TML from 'release' and do other Actions to Prod Org(s)
+
+Version control for prod Orgs:
+
+* prod_vc: if single Prod, version control of all Content
+* customer_orgs(s): version control branch for each Single Tenant Org
+
+
 
 == GitHub Actions example
