@@ -103,6 +103,35 @@ When an object is deleted in the dev Org, you’ll need to decide how to registe
 
 One solution would be an “audit existing objects” script that looks at whether the filenames (matching obj_id) in the dev branch of the git directory continue to exist via `/metadata/search` REST API command. If not found, issue `git rm` to remove the TML file, then `git commit` and `git push` to update the origin/branch.
 
+The following is git and REST API portion of a GitHub workflow that cleans up files that do not have a matching object in the Org any longer. 
+
+The `files_with_no_obj_on_org.py` script is using the `/metadata/search` REST API to get the list of existing objects, then looking at all the files in the git branch to see which files (which are all named based on `obj_id` when they were exported and saved originally):
+
+[,yaml]
+----
+run: |
+        git config --local user.email "${{ github.actor_id }}+${{ github.triggering_actor }}@users.noreply.github.com"
+        git config --local user.name "${{ github.triggering_actor }}"
+        python .github/workflows/files_with_no_obj_on_org.py > files_to_remove.txt
+        if [ -s "files_to_remove.txt" ]; then
+        echo "Files found in Org: ${{ vars.TS_ORG_NAME }} for removal:"
+        cat files_to_remove.txt
+        if [ "${{ github.event.inputs.DELETE_FLAG }}" = "DELETE" ]; then
+        echo "Deleting the files"
+        cat files_to_remove.txt | xargs git rm
+        rm files_to_remove.txt
+        git add *
+        git diff-index --quiet HEAD || git commit -a -m "Run ID ${{ github.run_id }}/${{github.run_attempt}} cleanup files from Org ${{ vars.TS_ORG_NAME }}"
+        git push
+        fi
+        else
+        echo "No files found to remove"
+        rm files_to_remove.txt
+        fi
+----
+
+
+
 Objects live within ThoughtSpot Orgs, and orgs that are “upstream” of dev Org may contain objects that do not exist in the dev Org (end user created content for example)
 
 The git rm command on files in release branch will flow through merge commands, removing files from upstream branches / tags
@@ -113,5 +142,37 @@ However, you cannot simply remove objects that do not have equivalent TML files 
 The `obj_id` property is simple enough to change within an Org, however the files in the repo are typically named after the `obj_id` of the object at the time of export. There will also be objects in the other Orgs with the same `obj_id`. 
 
 An `obj_id` update should thus be *initiated from the Git provider* to rename the existing file and perform the ThoughtSpot REST API commands to update the `obj_id` across all Orgs with a copy of the object.
+
+The following is the git and REST API portion of example of a workflow in GitHub Action syntax to handle the rename of an object in the dev Org and release branch:
+
+[,yaml]
+----
+    - name: Change obj_id and rename file
+      env:
+       TS_SERVER: ${{ secrets.TS_SERVER }}
+       TS_SECRET_KEY: ${{ secrets.TS_SECRET_KEY }}
+       TS_USERNAME: ${{ secrets.TS_INSTANCE_ADMIN_USERNAME }}
+       OLD_OBJ_ID: ${{ github.event.inputs.OLD_OBJ_ID }}
+       NEW_OBJ_ID : ${{ github.event.inputs.NEW_OBJ_ID }}
+      run: |
+        git config --local user.email "${{ github.actor_id }}+${{ github.triggering_actor }}@users.noreply.github.com"
+        git config --local user.name "${{ github.triggering_actor }}"
+        echo "Import to Org_ID $ORG_ID rename $OLD_OBJ_ID to: $NEW_OBJ_ID"
+        if find . -name "${{ github.event.inputs.OLD_OBJ_ID }}*" -print -quit | grep -q .; then 
+        echo "file for ${{ github.event.inputs.OLD_OBJ_ID }} found" 
+        echo "Updating obj_id in org from ${{ github.event.inputs.OLD_OBJ_ID }} to ${{ github.event.inputs.NEW_OBJ_ID }}"
+        python .github/workflows/update_obj_id.py
+        echo "obj_id updated, now renaming file in repo"
+        O_FILE=$(find . -name "${{ github.event.inputs.OLD_OBJ_ID }}*" -print)
+        N_FILE="${O_FILE//${{ github.event.inputs.OLD_OBJ_ID }}/${{ github.event.inputs.NEW_OBJ_ID }}}"
+        echo "$O_FILE rename to $N_FILE"
+        git mv $O_FILE $N_FILE
+        git diff-index --quiet HEAD || git commit -a -m "Run ID ${{ github.run_id }}/${{github.run_attempt}} changed obj_id"
+        git push
+        echo "File rename succesful"
+        else 
+        echo "no file found matching ${{ github.event.inputs.OLD_OBJ_ID }}, no action taken"
+        fi
+----
 
 == GitHub Actions example
