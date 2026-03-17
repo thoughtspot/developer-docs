@@ -1,0 +1,110 @@
+= Connecting MCP Server to MCP clients
+:toc: true
+:toclevels: 3
+
+:page-title: Connecting MCP Server to MCP clients
+:page-pageid: connect-mcp-server-to-clients
+:page-description: Learn how to connect Claude, ChatGPT, Gemini, and other MCP-aware clients to ThoughtSpot MCP Server with minimal configuration.
+
+If your application already has an AI-native experience or supports MCP-aware agents and LLMs, you can integrate ThoughtSpot analytics directly into your app's agentic experience by connecting the MCP Server to your client.
+
+In this plug-and-play integration, your application's chat interface and LLM orchestrate conversation sessions. The MCP Server exposes ThoughtSpot's analytics capabilities as tools, which your agent or LLM can invoke as needed. This approach allows you to bring ThoughtSpot analytics into your own AI-native experience and use it as a data and analytics provider through the MCP Server, while your system controls user interaction and orchestration logic.
+
+When your MCP client is connected to the ThoughtSpot MCP Server, the AI agent/LLM can:
+
+* Automatically discover ThoughtSpot MCP tools.
+* Call the MCP tools to determine the data context and answer data questions.
+* Create a Liveboard with the visualizations generated during the interaction.
+
+
+[IMPORTANT]
+====
+* Currently, the MCP Server integration does not support link:https://docs.thoughtspot.com/cloud/latest/spotter-versions[Spotter 3 capabilities].
+* In the plug-and-play integration mode, embedding visualizations is not supported.
+====
+
+== Before you begin
+Before you begin, review the following prerequisites:
+
+* Ensure that your setup has access to a ThoughtSpot application instance with 10.11.0.cl or a later release version.
+* Ensure that the users have the necessary permissions to view data from relevant models and tables in ThoughtSpot. Existing RLS/CLS rules on tables are enforced automatically in data source responses. To create charts or Liveboards from a conversation session, data download and content creation privileges are required.
+
+=== Connecting clients that support remote MCP servers
+To connect to a client that supports remote MCP servers natively, add the MCP Server endpoint to your client's configuration settings.
+
+`\https://agent.thoughtspot.app/mcp`
+
+For clients that require a bearer token for authentication, use the following URL format:
+
+`\https://agent.thoughtspot.app/bearer/mcp`
+
+For OpenAI MCP and Responses API integration, use the following URL:
+
+`\https://agent.thoughtspot.app/openai/mcp`
+
+For additional information about how to register a remote MCP Server, refer to your client's documentation.
+
+=== Connecting MCP Server to local MCP clients
+For MCP clients that do not natively support configuring a remote MCP Server URL, you must use the `mcp-remote` component. For desktop clients that rely on local MCP components, ensure that Node.js version 22 or later is installed on your system.
+
+[source,json]
+----
+{
+  "mcpServers": {
+    "ThoughtSpot": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://agent.thoughtspot.app/mcp"
+      ]
+    }
+  }
+}
+----
+
+== Authenticating users
+In a plug-and-play integration, the most common way to authenticate users is through OAuth tokens. This method allows you to leverage your existing IdP or SSO configuration for ThoughtSpot login and rely on the platform to initiate a browser-based sign-in flow.
+
+=== OAuth flow
+In a typical OAuth flow:
+
+* The ThoughtSpot MCP Server is configured as a connector/tool in the MCP client.
+* When the user connects, the client redirects the user to ThoughtSpot to sign in.
+* After successful login, the client stores the issued OAuth tokens and includes them with each MCP tool call to the ThoughtSpot MCP Server, which then calls ThoughtSpot on behalf of that user.
+
+=== OAuth client registration
+OAuth clients can be registered in one of the following ways:
+
+* For MCP hosts that support Dynamic Client Registration (DCR), the OAuth client is registered automatically.
+* For MCP hosts that do not support dynamic registration or that require static client credentials, you must manually register an OAuth client, obtain the OAuth client ID and OAuth client secret, and then configure these in the MCP host when adding ThoughtSpot as an MCP connector. The generated client details are only shown once and cannot be retrieved later.
++
+To register a client, visit link:https://agent.thoughtspot.app/clients[ThoughtSpot MCP OAuth Client Registration, window=_blank]. When registering the OAuth client, add your ThoughtSpot instance URL to the appropriate field. This ensures that users are not prompted to enter the instance URL during the OAuth flow, and the OAuth redirect returns correctly to your ThoughtSpot environment after login.
+
+
+== Verifying integration
+After the MCP Server is connected, some clients show *ThoughtSpot Data Sources* under a *Resources* or *Datasets* section.
+
+To verify the integration:
+
+. Start a chat session with the agent and verify the response.
+. Verify that xref:mcp-integration.adoc#_mcp_tools_and_resources[MCP tools are being called] to generate responses.
+. Prompt the agent to create a Liveboard from a query response and verify whether a Liveboard is added to your ThoughtSpot application.
+
+== Troubleshooting errors
+
+MCP Server is not connected::
+
+* Verify if the MCP Server is reachable.
+* Ensure that you have access to a ThoughtSpot instance.
+* Ensure that there are no configuration errors.
+* If the issue persists, verify the logs and contact ThoughtSpot Support for assistance.
+
+Authentication failure::
+If user authentication fails, or if the server returns HTTP 500, 401, or 403 status codes:
+* Verify whether the MCP Server endpoint and ThoughtSpot host are correctly configured in your client and are reachable.
+* Verify if the user session has expired. Log in to your ThoughtSpot application to start a new session.
+* Verify whether the user has the necessary privileges to view data or create content.
+
+== Additional resources
+* For information about the MCP Server features and architecture, see xref:mcp-integration.adoc[MCP Server integration].
+* To view the MCP Server code, go to the link:https://github.com/thoughtspot/mcp-server[MCP Server GitHub repository, window=_blank].
