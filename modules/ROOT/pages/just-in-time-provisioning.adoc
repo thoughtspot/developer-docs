@@ -1,53 +1,180 @@
 = Just-in-time provisioning
 :toc: true
-:toclevels: 1
+:toclevels: 2
 
 :page-title: Just-in-time provisioning of users and groups
 :page-pageid: just-in-time-provisioning
 :page-description: Just-in-time provisioning using SSO
 
-ThoughtSpot can use the SSO process to create users and assign them to ThoughtSpot groups. 
+Just-in-time (JIT) provisioning in ThoughtSpot refers to creating or updating authentication and authorization at the time a user signs in to ThoughtSpot.
 
-The capabilities are the same between SAML, OIDC, and trusted authentication methods, but the implementations of each are slightly different.
+Due to the variety of options in ThoughtSpot, there are often several ways to accomplish JIT provisioning.
 
-== User creation
-Just-in-time provisioning (JIT) allows creating a user if they do not already exist at the time of SSO sign-in.
+The steps to JIT provisioning are conceptually:
 
-Creating a new user requires the assertion containing the username, email address, display name, groups, and org details if your instance has Orgs.
+ . Does the user exist in ThoughtSpot?
+ .. If the user does not exist, create the user.
+ . Is the user in this Org?
+ .. If not in the Org, add the user to the Org.
+ . Update the user's current provisioning within the Org (ThoughtSpot Group membership).
+ . Update any variable values for the user via token request (token authentication only).
 
-Users created via JIT provisioning are identical to users created manually or via the REST APIs, except they do not have passwords in Thoughtspot; they cannot access ThoughtSpot other than through the SSO method. You can assign a password to any user later through the UI or a REST API call.
+Due to the nature of API capabilities and error responses, along with restrictions around Org separation, the actual order of efficient steps may not follow the order listed above.
 
-== Group assignment
-Users can be assigned to ThoughtSpot groups via JIT as well. The list of groups should be composed of `group_name` properties, rather than `display_name`.
 
-* JIT group assignment is a full replacement of the user's set of groups.
-* Groups that do not exist will be created during the provisioning process, but a ThoughtSpot group by default provides no access control or privileges. However, you can assign privileges to the new groups via REST API update requests.
-* Groups created via JIT provisioning will have the same group name as the one used by the `ts_groups` property in any RLS rules.
+== JIT REST API provisioning (trusted authentication)
+All of the following may be considered for JIT provisioning, using the same REST API capabilities as provisioning ahead of time:
 
-== JIT provisioning and authentication token generation via REST APIs
-Both REST API V1 and V2 tokens support just-in-time provisioning of users.
+ * User creation or adding to Org
+ * Group assignment for users
+ ** Group creation and updates
+ * RLS variable values for user
 
-=== REST API v2 (Recommended)
-Both `/api/rest/2.0/auth/token/full' and `/api/rest/2.0/auth/token/object` API endpoints allow getting an authentication token for the user being provisioned just-in-time.
+These can all be implemented as part of the *xref:trusted-auth-token-request-service.adoc[token request service]* in the trusted authentication pattern. 
+
+The *token request service* will need access to both the `secret_key` for the token requests and a *service account* with the appropriate administrator privileges to run the other REST API commands.
+
+== User creation or adding to Org
+For a login token to be requested, the user must exist in ThoughtSpot in the Org the token is being requested for.
+
+Creating a new user requires at minimum the username, email address, display name, and org IDs to create them in.
+
+=== Create user and update user REST APIs
+If you need to update a user's details, including their group membership, the simplest method is to use:
+
+. `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user[/users/{user-identifier}/update]` in the target Org with the `operation: REPLACE` option.
+
+.. If you receive an error, retry the `/users/{user-identifier}/update` request with an Administrator service account in the Primary Org to add the user to the desired Org, with `operation: ADD`.
+.. If you still receive an error, the user does not exist in ThoughtSpot. Use `/users/create` from the Primary Org to create the user and place in the desired Org(s).
+.. Retry the original `/users/{user-identifier}/update` command in the desired Org.
+. Request the preferred auth token for the user, without using any `autocreate=` options.
+
+You could instead check for the user's state with an Org via `/users/search`. and  avoiding unnecessary updates and error handling steps.
+
+Any additional changes to the Groups themselves can be managed with other REST APIs described in the following section.
+
+=== autocreate using token request
+There are several token request endpoints, each with an `autocreate=true` option for just-in-time provisioning:
+
+* `/api/rest/2.0/auth/token/full`
+* `/api/rest/2.0/auth/token/custom`
+* `/api/rest/2.0/auth/token/object` 
+
+[NOTE]
+====
+`autocreate=true` creates the user (and any new groups) with default options, which may not be preferred. Using the direct `users` and `groups` endpoints allows full control of their options.
+====
+
+The following details must be included in a request with `autocreate=true` to allow provisioning the user:
 
 * The `auto_create: true` parameter enables the token for the JIT provisioning of the user.
 * The `display_name` and `email` parameters are also required for JIT user creation.
 * If Orgs are enabled, specify the `org_id` parameter to direct ThoughtSpot to assign the user to the specified Org.
 * Specify the `group_identifiers` parameter only if you want to enable JIT group assignment. Passing `group_identifiers: []` will set the user to be assigned to *no groups*, while excluding the `group_identifiers` parameter altogether will leave the user assigned to their existing set of groups.
 
-For more information, see xref:authentication.adoc#_just_in_time_provisioning[Just-in-time provisioning via REST v2 API].
+Users created via `autocreate=true` are identical to users created manually or via the REST APIs, except they do not have passwords in ThoughtSpot; they cannot access ThoughtSpot other than through the SSO method. You can assign a password to any user later through the UI or a REST API call.
 
+== Group assignment
+Groups in ThoughtSpot are used to assign a variety of attributes such as content sharing, group-based RLS, roles, and column-level security. JIT provisioning often requires a combination of updates to both the user and the groups they belong to.
+
+=== Group assignment via Update User REST API
+The `/users/{user-identifier}/update` API can update a user's Group membership within the Org, determined by the org_id of the auth token used for the REST API request:
+
+[,json]
+----
+{
+  "operation": "ADD",
+  "group_identifiers": [
+    "New Group A"
+  ]
+}
+----
+
+You can also choose `"operation" : "REPLACE"` to reset the entire set of Groups for a user.
+
+[NOTE]
+====
+You cannot set a user's groups in an Org other than the REST API request's auth token. If you create a user from the Primary Org, any `group_identifiers` provided at that time will apply only within the Primary Org, even if you add the user to multiple Orgs in the `/users/create` request.
+====
+
+=== Group assignment via Update Group REST API
+Because group membership is a relationship between a user and a group, you can also update the set of users within a group using the `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fupdate-user-group[/groups/{group_identifier}/update]` REST API endpoint.
+
+Similarly to the user update endpoint, you can choose between three operations: `ADD`, `REPLACE`, and `REMOVE` to update only the `user_identifiers` of a group without affecting other properties:
+
+[,json]
+----
+{
+  "operation": "ADD",
+  "user_identifiers": [
+    "new.user@website.com"
+  ]
+}
+----
+
+=== Group assignment via token request
+The various token requests can set or update a user's group membership when `autocreate=true` is set. However, they have slightly different behaviors:
+
+* `/auth/token/full` and `/auth/token/object` do a *full replace* of the list of groups on every token request
+* `/auth/token/custom` only assigns groups *if the user is created*
+
+The list of groups should be composed of `group_name` properties, rather than `display_name`.
+
+If a group name is provided that does not match any existing group name, a new group will be created during the provisioning process.
+
+Groups created via `autocreate=true` will have identical `group_name` and `display_name` properties but will otherwise be a default ThoughtSpot group, granting no access control, privileges or roles. 
+
+However, you can assign privileges or make any other adjustment to the new groups via REST API `link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fupdate-user-group[/groups/{group_identifier}/update]` endpoint.
+
+
+== Group privileges and access control via REST APIs
+xref:api-user-management.adoc[Privileges] are either assigned directly to a group or part of roles if xref:roles.adoc[Role-based access control (RBAC)] is enabled on your instance.
+
+Roles must be created first prior to being assigned as part of the `/groups/create` or `/groups/{group_identifier}/update` REST API request.
+
+Access control in ThoughtSpot is based on *link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fshare-metadata[sharing content]* to groups or directly to users.
+
+Sharing requires that the group or user exist prior to calling the sharing REST API.
+
+== RLS variable values
+RLS rules can use a user's *username*, *group membership* or *variable values* to define a filtering clause added to all queries on a table. 
+
+If using `ts_groups` in a RLS Rule, the group names must match exactly with the values in a column in the data warehouse, so the name of the group itself serves as a __data entitlement__.
+
+Variable values are used as part of the xref:abac_rls-variables.adoc[ABAC via RLS variables] pattern, which allows assigning many values to multiple variables via the xref:abac_rls-variables.adoc#_create_an_abac_token_request_with_variable_attributes[Custom Token request].
+
+There is also a direct xref:variables.adoc#_update_variable_values[variable values update REST API] for more complex or bulk updates.
+
+
+
+
+
+////
+=== JIT provisioning and authentication token generation via REST APIs
+Both REST API V1 and V2 tokens support just-in-time provisioning of users.
+
+=== REST API v2 (Recommended)
+////
+
+////
 === REST API v1
 The `/tspublic/v1/session/auth/token` API endpoint can provision a new user by setting the `autocreate` property to `true`.
 
 For more information, see xref:session-api.adoc#session-authToken[Session API].
-
+//// 
+////
 == Org IDs
 If the Orgs feature is enabled on your instance, you do need to specify the Org ID when creating a user. Org IDs are integers that are created automatically when a cluster administrator creates an Org. Administrators can get the Org IDs configured on a ThoughtSpot instance via `/tspublic/v1/org/search` or `/api/rest/2.0/orgs/search` API endpoint.
 
 To know the Org ID of your current Org, send a `GET` request to the `/tspublic/v1/session/orgs` API endpoint within the browser.
 
 For more information about Org APIs, see xref:org-manage-api.adoc[Org administration].
+////
+
+== IdP assertion provisioning
+Due to the nature of assertions returned from an IdP, the JIT provisioning capabilities are more limited. The REST APIs available within the trusted authentication workflow described above can still be used for provisioning and updates, but must be made prior to IdP assertion.
+
+In general, the IdP assertion can create a user and add them to existing ThoughtSpot groups within existing ThoughtSpot Orgs.
 
 == SAML SSO authentication
 For SAML SSO users, you can link:https://docs.thoughtspot.com/cloud/latest/authentication-integration#_enable_saml_authentication[enable SAML authentication, window=_blank] and *Automatically add SAML users to ThoughtSpot upon first authentication*.
@@ -61,11 +188,4 @@ OIDC SSO can be configured for JIT user creation, as the necessary properties sh
 
 JIT group assignment xref:configure-oidc.adoc#group-synchronization[can be enabled for OIDC via a support ticket].
 
-== Group privileges and access control via REST APIs
 
-JIT provisioning of groups does not provide the full configuration of groups or assign access control. You can use the REST APIs to create, edit, and synchronize groups with the embedding application. For more information about group privileges, see xref:api-user-management.adoc[user and group privileges].
-
-REST API calls other than *token requests* must be performed using a ThoughtSpot user account with the appropriate level of administrative privileges. For example, you could use xref:rest-api-v2-reference.adoc#_groups[REST API v2.0] or the xref:rest-api-reference.adoc#_groups_and_privileges[REST API v1] group endpoints to implement ThoughtSpot groups that are intended for use in Row Level Security (RLS) rules.
-For these groups, the group name must match exactly with a value in a column in the data warehouse, so the name of the group itself serves as a __data entitlement__. For more information, see xref:abac-user-parameters.adoc[Attribute-based access control].
-
-Similarly, if xref:roles.adoc[Role-based access control (RBAC)] is enabled on your instance, you must map role privileges to groups and then assign them to users.
