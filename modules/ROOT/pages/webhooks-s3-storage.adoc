@@ -225,6 +225,21 @@ __String__. IAM role ARN. For example, `arn:aws:iam::999888777666:role/thoughtsp
 __String__. The External ID string in IAM role trust policies that grant access to your AWS resources. For example, `ts-webhook-x7k9m2p4q1`. This parameter is required for AWS-hosted instances and is not applicable to GCP-hosted ThoughtSpot instances.
 * `path_prefix` __Optional__ +
 __String__. S3 prefix for the folder. For example, `thoughtspot/`.
+
+|`additional_headers` +
+__Optional__ a|__Array of key-value pairs__. Allows including custom HTTP headers in every outbound webhook HTTP request that ThoughtSpot sends to the configured destination URL. When configured, ThoughtSpot sends these headers in addition to the authentication headers and standard HTTP headers such as `Content-Type`, `User-Agent`.
+
+You can use this parameter to pass arbitrary headers with custom metadata in key-value pairs, as required by the webhook receiver endpoint:
+
+[source,JSON]
+----
+"additional_headers": [
+   {
+      "key":"X-Custom-Header",
+      "value":"custom_value"
+   }
+]
+----
 |====
 
 ==== API request
@@ -302,7 +317,149 @@ If the API request is successful, ThoughtSpot returns the webhook configuration 
 }
 ----
 
-=== Update the properties of a webhook
+=== View webhook configuration details
+
+To view the webhook configuration details, send a `POST` request to the `/api/rest/2.0/webhooks/search` API endpoint.
+
+If the API request is sent without parameters in the request body, ThoughtSpot returns the webhooks configured for the Org context in ThoughtSpot.
+
+==== Example request
+
+The following example shows the request body to fetch webhook properties:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "org_identifier": "testOrg1",
+  "webhook_identifier": "3791ad80-70e8-4222-bf11-fb8a5f1b5bf4",
+  "event_type": "LIVEBOARD_SCHEDULE"
+}'
+----
+
+==== Example response
+If the webhook ID is valid, the API returns the following response:
+
+[source,JSON]
+----
+{
+   "webhooks":[
+      {
+         "id":"3791ad80-70e8-4222-bf11-fb8a5f1b5bf4",
+         "name":"webhook_s3",
+         "description":null,
+         "org":{
+            "id":"2100019165",
+            "name":"docstest"
+         },
+         "url":"https://webhook.site/6643eba5-9d3e-42a1-85e0-bb686ba1524d",
+         "url_params":null,
+         "events":[
+            "LIVEBOARD_SCHEDULE"
+         ],
+         "authentication":null,
+         "signature_verification":null,
+         "additional_headers":null,
+         "creation_time_in_millis":1772127694740,
+         "modification_time_in_millis":1772127859128,
+         "created_by":{
+            "id":"08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
+            "name":"shashikala.subramanya@thoughtspot.com"
+         },
+         "last_modified_by":{
+            "id":"08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
+            "name":"shashikala.subramanya@thoughtspot.com"
+         },
+         "storage_destination":{
+            "storage_type":"AWS_S3",
+            "storage_config":{
+               "aws_s3_config":{
+                  "bucket_name":"my-company-data-exports",
+                  "region":"us-east-1",
+                  "role_arn":"arn:aws:iam::999888777666:role/thoughtspot-s3-upload",
+                  "external_id":"ts-webhook-x7k9m2p4q1",
+                  "path_prefix":"thoughtspot/"
+               }
+            }
+         }
+      }
+   ],
+   "pagination":{
+      "record_offset":0,
+      "record_size":50,
+      "total_count":1,
+      "has_more":false
+   }
+}
+----
+
+=== Validate webhook channel configuration
+To validate the communication channel configuration, use the `/api/rest/2.0/system/communication-channels/validate` API endpoint.
+
+For this API request, you'll need the webhook channel ID. To get the webhook ID, use the `/api/rest/2.0/webhooks/search` API endpoint.
+
+==== Example request
+The following example sends validation request for a specific webhook channel with the S3 storage configuration.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{{ThoughtSpot-Host}}/api/rest/2.0/system/communication-channels/validate'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "channel_type": "WEBHOOK",
+  "channel_identifier": "3791ad80-70e8-4222-bf11-fb8a5f1b5bf4",
+  "event_type": "LIVEBOARD_SCHEDULE"
+}'
+----
+
+==== Example response
+
+If the webhook ID is valid, the API returns the validation status for the specified webhook channel.
+
+The following response shows the validation errors for a webhook channel that has the AWS S3 storage destination configured:
+
+[source,JSON]
+----
+{
+   "channel_type":"WEBHOOK",
+   "channel_id":"52314c1c-8d1d-40d1-8dba-3f77d219b41a",
+   "channel_name":"nebula-webhooks-gcp-05012026-webhook1",
+   "event_type":"LIVEBOARD_SCHEDULE",
+   "job_id":"n.validation-37688eaf-6cb1-4f7e-a6f2-0658c1d678eb",
+   "result_code":"PARTIAL_SUCCESS",
+   "details":[
+      {
+         "validation_step":"STORAGE_FILE_UPLOAD_CHECK",
+         "status":"FAILED",
+         "http_status":null,
+         "error_message":"failed to assume role 'arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole': operation error STS: AssumeRole, https response error StatusCode: 403, RequestID: 8ba1a7a1-65c2-4901-8d4a-bf150687e92c, api error AccessDenied: User: arn:aws:sts::418295724037:assumed-role/cell-89b3a1c7-coms-lambda-role/cell-89b3a1c7-coms-api is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole. Ensure the role's trust policy allows ThoughtSpot and the External ID matches",
+         "aws_s3_info":{
+            "bucket_name":"my-webhook-files",
+            "file_name":"validation_dummy_20260330_131030.pdf",
+            "object_key":null
+         }
+      },
+      {
+         "validation_step":"HTTP_CONNECTION_CHECK",
+         "status":"SUCCESS",
+         "http_status":200,
+         "error_message":null,
+         "aws_s3_info":null
+      }
+   ]
+}
+----
+
+If the API returns validation errors, check your webhook configuration and update the S3 storage properties. For more information about configuration errors, see the xref:webhooks-s3-storage.adoc#_configuration_errors[troubleshooting] section.
+
+=== Update the webhook configuration properties
 
 To update the S3 storage details configured for a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/{webhook_identifier}/update` API endpoint.
 
@@ -376,6 +533,7 @@ Webhook delivery to an S3 storage destination includes the following sequence of
 . AWS Security Token Service (STS) checks the request against your trust policy.
 . If the request is valid, AWS STS issues temporary credentials, valid for approximately an hour.
 . ThoughtSpot uses these credentials to upload files to your designated S3 bucket.
+
 
 To test the integration:
 

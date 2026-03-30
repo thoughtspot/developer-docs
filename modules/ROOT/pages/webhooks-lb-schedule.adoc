@@ -101,6 +101,20 @@ Hash algorithm used for signature verification.
 Shared secret used for HMAC signature generation.
 | `storage_destination` +
 __Optional__ | Configuration parameters for the S3 storage destination. For more information, see xref:webhooks-s3-storage.adoc[Deliver content to AWS S3 storage using webhooks].
+|`additional_headers` +
+__Optional__ a|__Array of key-value pairs__. Allows including custom HTTP headers in every outbound webhook HTTP request that ThoughtSpot sends to the configured destination URL. When configured, ThoughtSpot sends these headers in addition to the authentication headers and standard HTTP headers such as `Content-Type`, `User-Agent`.
+
+You can use this parameter to pass arbitrary headers with custom metadata in key-value pairs, as required by the webhook receiver endpoint:
+
+[source,JSON]
+----
+"additional_headers": [
+   {
+      "key":"X-Custom-Header",
+      "value":"custom_value"
+   }
+]
+----
 |=====
 
 ==== Example request
@@ -155,7 +169,28 @@ __Integer__. Specifies the starting point (index) from which records should be r
 * `record_size` +
 __Integer__. Specifies the number of records to return in the response. Default is 50.
 | `sort_options` +
-__Optional__| Enables sorting of the API response by a specific field in ascending or descending order. Specify the `field_name` and define the desired sort order.
+__Optional__ a| Enables sorting of the API response by a specific field in ascending or descending order.
+
+To define a sorting criteria for the webhook records in API response, set the `field_name` to one of the following options:
+
+* `CREATED` +
+Sorts the records by the webhook creation timestamp.
+* `MODIFIED` +
+Sorts the webhook object by the last modified timestamp.
+* `NAME` +
+Sorts the records alphabetically.
+
+To specify the sort order, set `order` to `ASC` for ascending order, or `DESC` for descending order.
+
+For example:
+
+[source,JSON]
+----
+"sort_options": {
+   "field_name":"CREATED",
+   "order":"ASC"
+}
+----
 |=====
 
 ==== Example request
@@ -170,8 +205,6 @@ curl -X POST \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
-  "record_offset": 0,
-  "record_size": 50,
   "org_identifier": "testOrg1",
   "event_type": "LIVEBOARD_SCHEDULE"
 }'
@@ -184,40 +217,39 @@ If the API request is successful, ThoughtSpot returns the webhook configuration 
 [source,JSON]
 ----
 {
-  "webhooks": [
-    {
-      "id": "873dd4e2-6493-490d-a649-ba9ea66b11f5",
-      "name": "webhook-lb-event",
-      "description": "Webhook for Liveboard schedule",
-      "org": {
-        "id": "2100019165",
-        "name": "testOrg1"
-      },
-      "url": "https://webhook.site/view/6643eba5-9d3e-42a1-85e0-bb686ba1524d/29c02fc2-c1c6-4b20-8d62-e8d51cf8dfb3",
-      "url_params": null,
-      "events": [
-        "LIVEBOARD_SCHEDULE"
-      ],
-      "authentication": null,
-      "signature_verification": null,
-      "creation_time_in_millis": 1761050197164,
-      "modification_time_in_millis": 1761051944507,
-      "created_by": {
-        "id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-        "name": "UserA@UserA@example.com"
-      },
-      "last_modified_by": {
-        "id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-        "name": "UserA@UserA@example.com"
+   "webhooks":[
+      {
+         "id":"27997a8a-cd33-485d-a039-b40b71d191a8",
+         "name":"webhook-lb-event",
+         "description": "Webhook for Liveboard schedule",
+         "org":{
+            "id":"2100019165",
+            "name":"testOrg1"
+         },
+         "url":"https://webhook-test-server-263n.onrender.com/",
+         "url_params":null,
+         "events":[
+            "LIVEBOARD_SCHEDULE"
+         ],
+         "authentication":null,
+         "signature_verification":null,
+         "additional_headers":null,
+         "creation_time_in_millis":1773824614455,
+         "modification_time_in_millis":1773824614455,
+         "created_by":{
+            "id":"4e6e5692-667e-487d-9672-f301ccc2ea77",
+            "name":"UserA@example.com"
+         },
+         "last_modified_by":null,
+         "storage_destination":null
       }
-    }
-  ],
-  "pagination": {
-    "record_offset": 0,
-    "record_size": 50,
-    "total_count": 1,
-    "has_more": false
-  }
+   ],
+   "pagination":{
+      "record_offset":0,
+      "record_size":50,
+      "total_count":1,
+      "has_more":false
+   }
 }
 ----
 
@@ -245,6 +277,8 @@ Events subscribed to the webhook. In the current release, ThoughtSpot supports o
 Authentication method and credentials that ThoughtSpot will use when sending HTTP requests to the webhook endpoint.
 * `signature_verification` +
 Signature verification parameters for the webhook endpoint to verify the authenticity of incoming requests.
+* `additional_headers` +
+Optional and custom HTTP headers in the webhook request triggered by ThoughtSpot.
 
 ==== Example request
 
@@ -330,13 +364,15 @@ If the API request is successful, the webhook is deleted, and the API returns th
       ],
       "authentication": null,
       "signature_verification": null,
+      "additional_headers":null,
       "creation_time_in_millis": 1761184185887,
       "modification_time_in_millis": 1761184185887,
       "created_by": {
         "id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-        "name": "UserA@UserA@example.com"
+        "name": "UserA@example.com"
       },
-      "last_modified_by": null
+      "last_modified_by": null,
+      "storage_destination":null
     }
   ],
   "failed_webhooks": []

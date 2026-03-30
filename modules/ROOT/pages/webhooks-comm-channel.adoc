@@ -14,6 +14,7 @@ Use the following REST APIs to set and view communication channel preferences:
 
 * `POST /api/rest/2.0/system/preferences/communication-channels/configure`
 * `POST /api/rest/2.0/system/preferences/communication-channels/search`
+* `POST /api/rest/2.0/system/communication-channels/validate`
 
 [NOTE]
 ====
@@ -29,7 +30,6 @@ Check your application environment for the following prerequisites:
 
 * Ensure that you have access to a ThoughtSpot instance with the required permissions to set communication channel preferences, create and manage webhooks, and schedule Liveboard jobs.
 * Ensure that the REST APIs for setting communication channel preferences and configuring webhooks are enabled on your instance. If the APIs are not available on your instance, contact ThoughtSpot Support.
-
 
 == Configure a webhook communication channel
 
@@ -268,6 +268,209 @@ The following example shows the preferences returned for a specific Org:
       ]
     }
   ]
+}
+----
+
+
+== Validate communication channel configuration
+To ensure that a communication channel configuration is properly configured and can receive events, use the `/api/rest/2.0/system/communication-channels/validate` API endpoint and validate the communication channel configuration.
+
+=== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`channel_type` a|__String__. Type of communication channel to validate. Specify `WEBHOOK`.
+|`channel_identifier`|__String__. ID of name of the communication channel. For webhook channels, specify the webhook ID. You can retrieve the webhook ID via an API request to the `POST /api/rest/2.0/webhooks/search` endpoint.
+|`event_type` |__String__. Event type associated with the specified channel. For webhook channels, the supported event type is `LIVEBOARD_SCHEDULE`.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{{ThoughtSpot-Host}}/api/rest/2.0/system/communication-channels/validate'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "channel_type": "WEBHOOK",
+  "channel_identifier": "3791ad80-70e8-4222-bf11-fb8a5f1b5bf4",
+  "event_type": "LIVEBOARD_SCHEDULE"
+}'
+----
+
+=== Example response
+
+If the validation is successful, the API returns a response indicating the webhook channel validation state.
+
+The following response shows validation status for a webhook channel:
+
+[source,JSON]
+----
+{
+   "channel_type":"WEBHOOK",
+   "channel_id":"9185f9be-f237-42bf-b452-c2dc897e1673",
+   "channel_name":"Zapier",
+   "event_type":"LIVEBOARD_SCHEDULE",
+   "job_id":"n.validation-0e55b1de-8c30-48d1-8c73-2f0365e03641",
+   "result_code":"SUCCESS",
+   "details":[
+      {
+         "validation_step":"HTTP_CONNECTION_CHECK",
+         "status":"SUCCESS",
+         "http_status":200,
+         "error_message":null,
+         "aws_s3_info":null
+      }
+   ]
+}
+----
+
+The following response shows the validation success and failure errors for a webhook channel with AWS s3 storage configuration:
+
+[source,JSON]
+----
+{
+   "channel_type":"WEBHOOK",
+   "channel_id":"52314c1c-8d1d-40d1-8dba-3f77d219b41a",
+   "channel_name":"nebula-webhooks-gcp-05012026-webhook1",
+   "event_type":"LIVEBOARD_SCHEDULE",
+   "job_id":"n.validation-37688eaf-6cb1-4f7e-a6f2-0658c1d678eb",
+   "result_code":"PARTIAL_SUCCESS",
+   "details":[
+      {
+         "validation_step":"STORAGE_FILE_UPLOAD_CHECK",
+         "status":"FAILED",
+         "http_status":null,
+         "error_message":"failed to assume role 'arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole': operation error STS: AssumeRole, https response error StatusCode: 403, RequestID: 8ba1a7a1-65c2-4901-8d4a-bf150687e92c, api error AccessDenied: User: arn:aws:sts::418295724037:assumed-role/cell-89b3a1c7-coms-lambda-role/cell-89b3a1c7-coms-api is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole. Ensure the role's trust policy allows ThoughtSpot and the External ID matches",
+         "aws_s3_info":{
+            "bucket_name":"my-webhook-files",
+            "file_name":"validation_dummy_20260330_131030.pdf",
+            "object_key":null
+         }
+      },
+      {
+         "validation_step":"HTTP_CONNECTION_CHECK",
+         "status":"SUCCESS",
+         "http_status":200,
+         "error_message":null,
+         "aws_s3_info":null
+      }
+   ]
+}
+----
+
+== Search channel history and job status
+To monitor job status for communication channels such as webhook, use the `/api/rest/2.0/jobs/history/communication-channels/search` API endpoint.
+
+
+=== Request parameters
+In the API request, you must provide channel details such as channel type, ID, and event type, or specify the job ID.
+
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`channel_type` a|__String__. Type of communication channel to validate. Specify `WEBHOOK` for webhook channels.
+|`job_ids` |__Array of strings__. One or more IDs of the job. To get the ID for a given webhook channel, check the API response from the `/api/rest/2.0/system/communication-channels/validate` endpoint.
+
+Required parameter if no channel identifier and event ID are specified in the API request.
+|`channel_identifiers`|__String__. IDs of name of the communication channel. Required if no job ID is not specified.
+For webhook channels, specify the webhook ID. You can retrieve the webhook IDs from the `/api/rest/2.0/webhooks/search` API endpoint via an API request.
+|`channel_status` |__String__. Status of the channel or the job. Specify one of the following values:
+
+* `PENDING` +
+Gets a list of all pending webhook deliveries that are currently queued but not yet attempted.
+* `RETRY` +
+Gets a list of webhook delivery jobs that are in the retry state.
+* `SUCCESS` +
+Gets a list of jobs that were delivered successfully.
+* `FAILED` +
+Gets a list of failed job deliveries.
+
+
+|`events` +
+__Optional__ | Allows filtering API response by event type and ID.
+
+* `type` +
+Event type for which the webhook delivery is triggered. Default is `LIVEBOARD_SCHEDULE`.
+* ìdentifier` +
+ID of the event.
+
+|`start_epoch_time_in_millis` |__Decimal__. Allows filtering API response by records that were created on or after the specified epoch milliseconds.
+|=====
+
+
+=== Example request
+The following example shows the sample request with job ID.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{{ThoughtSpot-Host}}/api/rest/2.0/jobs/history/communication-channels/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer c2****************==' \
+  --data-raw '{
+  "channel_type": "WEBHOOK",
+  "job_ids": [
+    "n.validation-0e55b1de-8c30-48d1-8c73-2f0365e03641"
+  ]
+}'
+----
+
+=== Example response
+If your request is successful, the API returns the job details for the specified job or channel ID.
+
+[source,JSON]
+----
+{
+   "jobs":[
+      {
+         "id":"n.validation-0e55b1de-8c30-48d1-8c73-2f0365e03641",
+         "status":"SUCCESS",
+         "creation_time_in_millis":1774876441988,
+         "event":{
+            "type":"LIVEBOARD_SCHEDULE",
+            "id":"validation-9185f9be-f237-42bf-b452-c2dc897e1673",
+            "name":null,
+            "run_id":null
+         },
+         "recipients":null,
+         "detail":"",
+         "try_count":1
+      }
+   ]
+}
+----
+
+If the webhook channel has the S3 storage configured, the API returns job details for the specified webhook.
+
+[source,JSON]
+----
+{
+   "jobs":[
+      {
+         "id":"n.validation-900ea028-5254-4d38-a03c-26fb41aa632b",
+         "status":"FAILED",
+         "creation_time_in_millis":1774890524301,
+         "event":{
+            "type":"LIVEBOARD_SCHEDULE",
+            "id":"validation-52314c1c-8d1d-40d1-8dba-3f77d219b41a",
+            "name":null,
+            "run_id":null
+         },
+         "recipients":null,
+         "detail":"STORAGE_FILE_UPLOAD_CHECK (bucket: my-webhook-files): failed to assume role 'arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole': operation error STS: AssumeRole, https response error StatusCode: 403, RequestID: 25182019-58ca-4003-8048-6713bd7d7d4e, api error AccessDenied: User: arn:aws:sts::418295724037:assumed-role/cell-89b3a1c7-coms-lambda-role/cell-89b3a1c7-coms-api is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole. Ensure the role's trust policy allows ThoughtSpot and the External ID matches",
+         "try_count":1
+      }
+   ]
 }
 ----
 
