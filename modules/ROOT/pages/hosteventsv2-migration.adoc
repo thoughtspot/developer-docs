@@ -1,0 +1,165 @@
+= Migrating Host Event v1 implementation to the Host Events v2 framework
+:toc: true
+:toclevels: 2
+
+:page-title: Migrating from Host Events v1 to Host Events v2 framework
+:page-pageid: hostEventsV2-migration
+:page-description: Using the page context feature in the Visual Embed SDK, you can now implement context-aware routing of host events in a multi-modal embedding experience
+
+This guide explains how developers can migrate their existing host events implementation to the new Host Events v2 framework.
+
+== Overview
+
+Host Events v2 is an enhanced, xref:events-context-aware-routing.adoc[context‑aware event framework] for ThoughtSpot Embed. It introduces stricter payload validation, standardized event structure and payload, and better routing for complex embedded UX flows, while remaining backward compatible with most existing v1 integrations.
+
+When you migrate your host event implementation to the Host Events v2 framework, it enables the following:
+
+* Enforces xref:events-context-aware-routing.adoc#_using_page_context_in_host_events[context‑aware routing], so that events are routed to the appropriate UI layer in embedded experiences with multi-layered UI contexts.
++
+The V2 framework supports the page context feature, which allows developers to explicitly set a target context for host event execution or automatically route the event to the top-most active UI layer based on the user's current context.
+
+* Validates event payloads more strictly; for example, types, required fields, allowed values.
+* Standardizes event structures to reduce ambiguity and improve compatibility.
+
+[NOTE]
+====
+Currently, the Host Events V2 framework is in beta and not enabled by default on ThoughtSpot Embedded instances.
+====
+
+=== Host Events v1 and v2 comparison
+The following table lists the host event behaviour in v1 and v2 framework:
+
+[cols="30,35,35", options="header"]
+|====
+|Area|Host Events V1 behaviour|Host Events V2 behaviour
+
+|**Payload Validation**| Events with missing fields or ambiguous attributes may result in silent failures or inconsistent behaviour.
+|Enforces strict payload validation.
+|*Context‑aware routing*|Events may fire regardless of the current UI context. |Events are routed only from valid contexts.
+|*Event schema and naming*|Non-standardized.|Event names and payloads are standardized: Enforces clear top‑level fields, such as +eventType+, +context+, +payload+  and consistent format across embed types.
+|====
+
+== Migration steps
+To get started with the migration:
+
+* xref:hosteventsv2-migration.adoc#_plan_your_migration_and_rollout[Plan your migration and rollout]
+* xref:hosteventsv2-migration.adoc#_enable_host_events_v2[Update your code to use the v2 framework]
+* xref:hosteventsv2-migration.adoc#_validate_event_execution_and_routing[Validate event execution and routing]
+* xref:hosteventsv2-migration.adoc#_roll_out_the_changes[Roll out the changes to production environments]
+
+=== Plan your migration and rollout
+
+Migrating your implementation from Host Events V1 to V2 framework does not introduce breaking changes. Your existing implementation may continue to work after migration depending on the complexity of workflows and customizations in your setup.However, you may notice the following changes:
+
+* Stricter runtime validation errors in the browser console if payloads are malformed.
+* Events may fail to process or produce errors when the active context doesn't match the event's requirements, or when no handler exists for the event in the current context. +
+
+Invalid configuration example::
+In a Liveboard embed, if you try to pin a visualization by sending its `vizId` while a Spotter modal is open, the event will not work. This is because the context switches to Spotter, and the **Pin** action is executed in the Spotter context, where the provided `vizId` is not available.
+
+No matching handler example::
+In a Liveboard embed, if you trigger an event that has no handler in the current context, for example, `HostEvent.LiveboardInfo`, while a Spotter modal or any other modal is open, the event will not be processed because the handler does not exist in that context.
+
+Missing context example::
+In a Liveboard embed, if you trigger `HostEvent.Pin` without parameters or context, the event will execute the intended action only if the top-most active layer is a visualization or Spotter page. If the top-most layer is the Liveboard page, the **Pin** action will fail because it requires a valid context, such as a visualization or Answer layer. Without this, the framework cannot determine what to pin, leading to an error or no action taken.
+
+Therefore, ThoughtSpot recommends creating an inventory of host events configured in your embed and reviewing the implementation.
+
+=== Update your code to use the v2 framework
+
+Enable Host Events v2 in a non‑production environment by setting the `useHostEventsV2` to `true` in your embed code.
+
+[source,]
+----
+const embed = new appEmbed('#tsEmbed', {
+   // other embed view config
+   useHostEventsV2: true
+})
+----
+
+=== Validate event execution and routing
+Validate host events execution in embedded view, in single-layer and multi-layer UI interactions. For example:
+
+. Open an embedded search, run queries, view answers.
+. If you have configured `HostEvent.OpenFilter`, `HostEvent.Pin`, or other such events, switch between the Liveboard, Answer, and Spotter views and verify the host event execution and payload.
+. Validate custom integrations such as delivering a payload to an external application or interactions triggered via custom buttons and actions,
+. Note the events that do not execute. If the event triggers a payload, you may want to validate the structure of the payload to ensure that there are no changes that might affect or break your integration.
+
+==== Adjust your configuration
+During validation, if you find the events that do not execute:
+
+. Try setting an explicit target context and validate the workflow.
+. Check console log for validation errors.
+. Update your code.
+. Adjust your configuration to include required parameters and context definitions.
++
+For example, if your embed triggers `HostEvent.Pin` without specifying a visualization ID, after migrating to the V2 framework, the **Pin** action will only execute if the top-most active layer is a visualization or Spotter page. To execute the *Pin* action from the Liveboard layer, you must specify the visualization ID and set the target context to Liveboard.
+
++
+[source,]
+----
+import {
+    HostEvent,
+    ContextType
+} from '@thoughtspot/visual-embed-sdk';
+
+appEmbed.trigger(
+    HostEvent.Pin, {
+        vizId: '8fbe44a8-46ad-4b16-8d39-184b2fada490',
+        newVizName: 'Sales by item type',
+        liveboardId: '2ed8192a-1e9d-47d1-810d-52b14cb0e9fe',
+    },
+    ContextType.Liveboard,
+);
+----
+
+.. Add error handling or logging around failed validations where needed.
+.. If you still see breaking changes, contact ThoughtSpot Support.
+
+===== Additional examples
+
+Some host events such as `HostEvent.OpenFilter` support multiple contexts. You can explicitly set the context to target event execution on a specific UI layer, or let the SDK apply the event to the top-most active layer if a matching handler is found:
+
+[source,JavaScript]
+----
+import {
+    HostEvent,
+    ContextType
+} from '@thoughtspot/visual-embed-sdk';
+
+// Trigger the OpenFilter host event to open the filter panel for a specific column in the Liveboard context.
+
+appEmbed.trigger(
+    HostEvent.OpenFilter,
+    { column: { columnId: '<column-GUID>' } },
+    ContextType.Liveboard
+);
+----
+
+If you want to set a specific `vizId` as the target object for events such as `HostEvent.Save`, ensure that the ID matches the object in specified context; otherwise, the event may not execute as expected.
+
+[source,JavaScript]
+----
+import {
+    HostEvent,
+    ContextType
+} from '@thoughtspot/visual-embed-sdk';
+
+appEmbed.trigger(
+    HostEvent.Save,
+    { vizId: <vizId> }, // ID of the visualization.
+    ContextType.Liveboard // Executes the save action in the Liveboard context.
+);
+----
+
+=== Roll out the changes
+To roll out the new changes to your production environment:
+
+. After testing, enable `useHostEventsV2` in production via your embed configuration.
+. Copy code changes from your dev/testing environment to production instance.
+. Monitor client-side logs and browser console to ensure the events are processed without any validation errors.
+
+== Related resources
+
+* For information about host events and the supported enumeration members in the SDK, see xref:events-hostEvents.adoc[Using host events] and xref:HostEvent.adoc[HostEvent].
+* For information about triggering actions in React embed components, see xref:react-components_lesson-04.adoc[Event listeners for React components].
