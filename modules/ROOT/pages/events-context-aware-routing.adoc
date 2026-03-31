@@ -76,6 +76,17 @@ The available contexts are:
 * `answer` - The Explore or Drill dialogs opened from a visualization or search Answer.
 * `other` - Fallback for generic or app-level interactions not tied to a specific context. For example, the home page and list pages in a full application embed.
 
+You can also retrieve current context by listening to the `EmbedEvent.EmbedPageContextChanged`.
+
+[source,JavaScript]
+----
+liveboardEmbed.on('EmbedPageContextChanged', (payload) => {
+    console.log('Context changed:', payload);
+    const { currentContext, stack } = payload.data
+    console.log('Current page:', currentContext.name);
+});
+----
+
 ==== Page context stack in an embedded Liveboard
 The Visual Embed SDK maintains an ordered page context stack for each embedded interface. Every page component or overlay registers its context when it mounts and unregisters when it unmounts.
 
@@ -472,14 +483,30 @@ appEmbed.trigger(
 ----
 
 == Validation and error handling
+
 Ensure that the xref:EmbedEvent.adoc#_error[EmbedEvent.Error] is subscribed in your embed. This allows your embed to emit an event when an error occurs. Verify the error type and code for host event validation errors. For more information, see xref:EmbedErrorDetailsEvent.adoc[EmbedErrorDetailsEvent].
 
-Your host events may return errors in the following scenarios:
+When the Host Events v2 framework is enabled, the event execution returns errors in the following scenarios,
 
-* When a matching handler is not present in the specified context. +
-Verify the host event type, payload, and context type.
+* No matching handler for the event type in the current context. +
+Verify if the action is available in the context and if required, specify the target context in the host event object.
+* Missing required parameters. Verify the host event type, payload, and context type.
 * If a required attribute is missing, for example, `vizId` in Spotter context. Add the `vizId` and retry.
 * Verify the visualizations and objects specified in the host event are present and visible in the embed view. If not, adjust the UI experience (scroll, navigate, open a dialog) before calling the host event.
+
+////
+==== Listening to context changes
+
+You can also listen to the context changes via `EmbedEvent.EmbedPageContextChanged` and retrieve the current context from a user session.
+
+[source,JavaScript]
+----
+liveboardEmbed.on(EmbedEvent.EmbedPageContextChanged, (payload) => {
+console.log("Current context:", payload.currentContext);
+console.log("Full stack:", payload.stack);
+});
+----
+////
 
 == Best practices and recommendations
 
@@ -500,18 +527,7 @@ When building integrations that rely on context and app interactions via host ev
 ** The SDK executes handlers only for the resolved context. If the event is invalid for that context or no handler exists, it returns an error.
 * Log or surface error messages from host events during development and testing.
 
-////
-==== Listening to context changes
-You can also listen to the context changes via EmbedEvent.EmbedPageContextChanged and retrieve the current context from a user session.
 
-[source,JavaScript]
-----
-liveboardEmbed.on(EmbedEvent.EmbedPageContextChanged, (payload) => {
-console.log("Current context:", payload.currentContext);
-console.log("Full stack:", payload.stack);
-});
-----
-////
 
 == Related resources
 
