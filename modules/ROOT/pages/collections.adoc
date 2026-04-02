@@ -1,0 +1,315 @@
+= Collections [beta betaBackground]^Beta^
+:toc: true
+:toclevels: 1
+:page-title: Collections
+:page-pageid: collections
+:page-description: group different ThoughtSpot objects into Collections to manage them more easily.
+
+
+ThoughtSpot now provides REST APIs that enable developers to organize different ThoughtSpot objects into an organizational container called *Collections*. These objects can be Liveboards, Answers, data models, tables, and even other Collections.
+Collections provide a powerful way to manage your data assets, making discovery and collaboration easier, while ensuring the integrity of embedded workflows.
+
+[NOTE]
+====
+The Collections APIs are in Beta and disabled by default on ThoughtSpot instances. To enable these APIs on your instance, contact ThoughtSpot Support.
+====
+
+== Before you begin
+
+* For REST API v2 operations, the Org context is determined based on the authentication token used in your API requests. Ensure you log in to the appropriate Org context from which you want to send API requests.
+* Once enabled for your ThoughtSpot instance, Collections can be created by any user, and needs no special user privileges.
+
+
+== Create a Collection
+To create a new Collection, send a `POST` request to the  `POST /api/rest/2.0/collections/create` API endpoint, with the following parameters in the request body.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`name` a|__String__. Required. Specify a name for the Collection.
+|`description` a|__String__. Optional. A short description for the Collection.
+|`metadata` a|__Array__. Required. The details for the metadata objects to be added to the Collection.
+
+* `type` +
+Metadata type. Select one of the following values:
+** `LIVEBOARD`
+** `ANSWER`
+** `LOGICAL_TABLE`
+** `COLLECTION`
++
+To create nested collections, assign the `COLLECTION` metadata to a Collection.
+
+* `identifiers` +
+List of unique IDs or names of metadata objects.
+|=====
+
+==== Example request
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/collections/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "name": "Demo Collection",
+  "metadata": [
+    {
+      "type": "LIVEBOARD",
+      "identifiers": [
+        "Retail sales (Sample)",
+        "fe307a35-5242-445f-b3cb-b84cd1fc339c"
+      ]
+    },
+    {
+      "type": "COLLECTION",
+      "identifiers": [
+        "Collection A"
+      ]
+    }
+  ],
+  "description": "For testing"
+}'
+
+----
+
+==== API response
+
+If the API request is successful, a Collection with the given metadata objects will be created.
+
+== Search for a Collection
+To get a list of Collections, send a  `POST` request to the `POST /api/rest/2.0/collections/search` API endpoint.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`name_pattern` a|__String__. Optional. Specify any case agnostic pattern to match the name of a Collection. Use `%` to perform a wildcard search by name.
+|`record_offset` a|__Number__. Optional. The index of the first record to be included. Default value is 0.
+|`record_size` a|__Number__. Optional. The total number of records to be searched. Default value is 10. Set to -1 to search across all available collections.
+|`collection_identifiers` a|__Array__. Optional. GUID of the Collection(s) to be searched. `name_pattern` takes precedence over the `collection_identifiers`.
+|`created_by_user_identifiers` a|__Array__. Optional. Searches for Collections by the name of the author.
+|`include_metadata` a|__Boolean__. Optional. When set to `true`, includes the metadata objects within each Collection in the response.
+|`sort_options` a|__Array__. Optional. To sort the search results, specify the field to apply the sort on `field_name`, and the sort order `order`.
+|=====
+
+==== Example request
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/collections/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "record_offset": 2,
+  "record_size": 15,
+  "include_metadata": false,
+  "name_pattern": "%",
+  "sort_options": {
+    "field_name": "NAME",
+    "order": "ASC"
+  }
+}'
+----
+
+==== API response
+
+If the API request is successful, it will return a list of Collection(s) matching the search criteria.
+
+== Update a Collection
+To update an existing Collection, send a  `POST` request to the `POST /api/rest/2.0/collections/{collection_identifier}/update` API endpoint.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`collection_identifier` a| Required. GUID of the Collection to be updated. `collection_identifier` is passed as a parameter in the API request.
+|`name` a|__String__. Optional. New name for the Collection.
+|`description` a|__String__. Optional. Updated or a newly added description for the Collection.
+|`metadata` a|__Array__. Required. The details for the metadata objects to be added, removed, or replaced in the Collection.
+
+* `type`
+* `identifiers`
+|`operation` a|__Enum__. Required. Specify the nature of the update. Select one of the following values:
+
+* ADD: Adds the specified metadata objects to the existing Collection without removing the current objects.
+* REMOVE: Removes only the specified metadata objects from the Collection.
+* REPLACE. __Default__: This replaces all existing objects in the Collection with the objects specified in this replace request.
+|=====
+
+==== Example request
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/collections/0e5fd958-cb2b-43f0-b67f-13ac5c805bad/update'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "operation": "ADD",
+  "metadata": [
+    {
+      "type": "LIVEBOARD",
+      "identifiers": [
+        "6fee1adb-1c50-4c15-8d49-4fe0503d0b34"
+      ]
+    }
+  ]
+}'
+----
+==== API response
+
+If the API request is successful, the object specified in the API request gets added to the Collection.
+
+==== Example request
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/collections/0e5fd958-cb2b-43f0-b67f-13ac5c805bad/update'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "operation": "REMOVE",
+  "metadata": [
+    {
+      "type": "LIVEBOARD",
+      "identifiers": [
+        "6fee1adb-1c50-4c15-8d49-4fe0503d0b34"
+      ]
+    }
+  ]
+}'
+----
+
+==== API response
+
+If the API request is successful, the object specified in the API request gets removed from the Collection.
+
+==== Example request
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/collections/0e5fd958-cb2b-43f0-b67f-13ac5c805bad/update'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "operation": "REPLACE",
+  "metadata": [
+    {
+      "type": "LIVEBOARD",
+      "identifiers": [
+        "6fee1adb-1c50-4c15-8d49-4fe0503d0b34",
+        "87328d32-2bf0-4fc4-ac51-a738712d7e79"
+      ]
+    },
+    {
+      "type": "COLLECTION",
+      "identifiers": [
+        "6d85c77c-4822-42ba-8074-6306a90ba8e1"
+      ]
+    }
+  ]
+}'
+----
+
+
+==== API response
+
+If the API request is successful, the objects of the Collection get replaced with the objects in this API request.
+
+== Delete a Collection
+To remove an existing Collection, send a `POST` request to the `POST /api/rest/2.0/collections/delete` API endpoint.
+
+=== Request parameters
+In your `POST` request body, include the following parameters:
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`collection_identifiers` a|__String__. Required. GUID of the Collection to be deleted.
+|`delete_children` a|__String__. Optional. Set to `true` to delete child objects in the Collection where the user has permission. Any objects without delete access will be ignored.
+|`dry_run` a|__String__. Optional.  Set to `true` to see a preview of the deletion operation without actually deleting anything. The response shows what would be deleted, allowing you to review before actual deletion.
+|=====
+
+==== Example request
+To review your deletion request without actually deleting the Collection and its objects, set `dry_run` to `true` and `delete_children` to `true`.
+
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/collections/delete'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "collection_identifiers": [
+    "6996b262-8733-4af6-8f8e-8d7faefb5be0"
+  ],
+  "delete_children": true,
+  "dry_run": true
+}'
+----
+
+==== API response
+
+If the API request is successful, it gives you a preview of the deletion operation without actually deleting anything.
+
+* `metadata_deleted`: List of metadata objects that will be deleted
+* `metadata_skipped`: List of metadata objects that will not be deleted for lack of permissions or other constraints
+
+[source,JSON]
+----
+{"metadata_deleted":[{"type":"COLLECTION","identifiers":[{"id":"6996b262-8733-4af6-8f8e-8d7faefb5be0","name":"Docs Collection"}]},{"type":"LIVEBOARD","identifiers":[{"id":"278d2313-ac3a-44bb-b842-a4c9dff84e68","name":"Demo-lb"},{"id":"1bcdb2c1-e960-4f6b-bbf9-64f3e0cd33b9","name":"Demo-lb1"}]}],"metadata_skipped":[]}
+----
+
+==== Example request
+To delete the Collection and the objects within it, set `dry_run` to `false` and `delete_children` to `true`.
+
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/collections/delete'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "collection_identifiers": [
+    "6996b262-8733-4af6-8f8e-8d7faefb5be0"
+  ],
+  "delete_children": true,
+  "dry_run": false
+}'
+----
+
+==== API response
+If the API request is successful, it deletes the Collection and all objects within it for which you have delete permission.
+
+[source,JSON]
+----
+{"metadata_deleted":[{"type":"COLLECTION","identifiers":[{"id":"6996b262-8733-4af6-8f8e-8d7faefb5be0","name":"Docs Collection"}]},{"type":"LIVEBOARD","identifiers":[{"id":"278d2313-ac3a-44bb-b842-a4c9dff84e68","name":"Demo-lb"},{"id":"1bcdb2c1-e960-4f6b-bbf9-64f3e0cd33b9","name":"Demo-lb1"}]}],"metadata_skipped":[]}
+----
+
+== Additional references
+
+
+* link:https://docs.thoughtspot.com/cloud/latest/collections[Collections]
+
+
