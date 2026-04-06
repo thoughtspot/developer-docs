@@ -35,7 +35,7 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
         {
-            label: '10.10.0.sw',
+            label: '26.3.0.sw',
             link: ' ',
             subLabel: 'Software (Latest)',
         },
