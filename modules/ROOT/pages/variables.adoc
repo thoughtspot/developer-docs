@@ -41,13 +41,13 @@ The following REST API endpoints are available for variable creation and managem
 * `POST /api/rest/2.0/template/variables/create` +
 xref:variables.adoc#_create_a_variable[Creates a variable].
 * `POST /api/rest/2.0/template/variables/{identifier}/update` +
-Allows xref:variables.adoc#_update_properties_of_a_variable[updating the properties of a specific variable].
-* `POST /api/rest/2.0/template/variables/update-values` +
-Allows xref:variables.adoc#_update_variable_values[assigning values to one or several variables].
+Allows xref:variables.adoc#_update_variable_name[updating variable name].
+* `POST /api/rest/2.0/template/variables/{identifier}/update-values` +
+Allows xref:variables.adoc#_update_variable_values[assigning values to a variable].
 * `POST /api/rest/2.0/template/variables/search` +
 xref:variables.adoc#_get_details_of_variables[Retrieves the variables available in your Org context].
-* `POST /api/rest/2.0/template/variables/{identifier}/delete` +
-xref:variables.adoc#_delete_a_variable[Deletes the variable] specified in the API request.
+* `POST /api/rest/2.0/template/variables/delete` +
+xref:variables.adoc#_delete_a_variable[Deletes the variables] specified in the API request.
 
 
 [NOTE]
@@ -55,6 +55,7 @@ xref:variables.adoc#_delete_a_variable[Deletes the variable] specified in the AP
 * Variable APIs for creating, deleting, searching, and assigning values can only be used by the ThoughtSpot instance administrator.
 * These APIs can only be used from the primary Org.
 ====
+
 ////
 [NOTE]
 ====
@@ -111,27 +112,7 @@ Date with time stamp. If you are creating a formula variable for specific timest
 +
 [NOTE]
 The `data_type` is required only for formula variables and is not supported for other variable types.
-
 |=====
-
-////
-|`values` __Optional__ a|__Array of strings__. Define the variable attributes. Although it's optional, make sure that you set the value for an Org before publishing content to that Org.
-
-The `values` array includes the following attributes:
-
-* `value` __String__ +
-The value for the variable. For the primary Org, you can define the variable value as `Primary`. For destination Orgs, specify a separate value, for example, `Org1`.
-
-* `org_identifier` __String__ +
-ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0.
-
-* `principal_type` and `principal_identifier`  __Optional__ +
-Applicable if the variable type is set as `CONNECTION_PROPERTY_PER_PRINCIPAL`. Specify the principal type and the ID or principal to set connection properties per user or user group.
-* `priority` __Optional__ +
-Applicable if the variable type is set as `CONNECTION_PROPERTY_PER_PRINCIPAL`. The priority assigned to this value. If there are two matching values, the one with a higher priority will be used.
-|=====
-
-////
 
 
 === Example request
@@ -225,49 +206,18 @@ If the API request is successful, ThoughtSpot returns the variable details in th
 Note the variable ID and name for variable edits.
 The API returns an empty array for values because the values are not assigned to the variable.
 
-* To assign values, use the `POST  /api/rest/2.0/template/variables/update-values` API endpoint.
+* To assign values, use the `/api/rest/2.0/template/variables/{identifier}/update-values` API endpoint.
 * To include formula variables in a JSON Web Token (JWT) token for xref:abac_rls-variables.adoc[ABAC implementation], use the `/api/rest/2.0/auth/token/custom` API endpoint.
++
+[NOTE]
+====
+In ABAC implementation, you can assign the variable values during token generation. Before configuring variable values for JWT generation, ensure that the variables are already available in ThoughtSpot and check whether their scope and values via a xref:variables.adoc#_get_variables[variable search API request].
+====
 
-== Update properties of a variable
+== Update variable name
 
-To update the properties of a variable, send a `POST` request to the `api/rest/2.0/template/variables/{identifier}/update` API endpoint with the following parameters in the request body. In your API request, specify the variable ID in the `{identifier}` path parameter.
+To update the properties the name of variable, use the `/api/rest/2.0/template/variables/{identifier}/update` API endpoint. In your API request, specify the variable ID in the `{identifier}` path parameter and the new name in the `POST` request body.
 
-=== Request parameters
-
-In your `POST` request body, include the following parameters:
-
-[width="100%" cols="1,1,4"]
-[options='header']
-|=====
-|Parameter|Type|Description
-|`identifier` |Path |__String__. Name or ID of the variable to update.
-|`name` |Form parameter|__String__. Name of the variable.
-|=====
-
-////
-|`identifier` __String__| ID or name of the variable. Include the variable ID as a path parameter in the request body.
-|`name` __String__ | New name for the variable. Specify a name if you want to rename the variable.
-|`Operation` __String__ a| Specify the update operation type. The following options are available:
-
-* `ADD` +
-Adds new values. Use this operation type if you want to add new attributes to the variable.
-* `REMOVE` +
-Removes the values assigned to the variable specified in the API request.
-* `REPLACE` +
-Replaces the existing attributes with new values.
-|values +
-__Optional__ a|__Array of strings__. Modify the values of the variable specified in the API request. The `values` array includes the following attributes:
-
-* `value` __String__ +
-The new value for the variable. for example, `staging1`.
-* `org_identifier` __String__ +
-ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0.
-* `principal_type` and `principal_identifier`  __Optional__ +
-Principal attributes such as user and user group. These attributes are applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
-* `priority` __Optional__ +
-The priority assigned to this value. Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
-|=====
-////
 === Example request
 The following example shows the request body for updating the name of a variable:
 
@@ -284,52 +234,53 @@ curl -X POST \
 
 If the update operation is successful, the API returns a 204 response to indicate that the variable was updated successfully.
 
-== Define values and scope for variables
+== Assign or update variable values
 
-To assign values to variables, use the `/api/rest/2.0/template/variables/update-values` API endpoint.
-
-The API allows you to configure variable properties based on the type of variable you are trying to edit. For example, you can assign formula variables for a specific Org, Model, or user context. Similarly, for the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type, you can specify the principal type as user or user group and the ID of the principal object.
+To assign values to a variable, use the `/api/rest/2.0/template/variables/{identifier}/update-values` API endpoint. For example, you can assign values for a formula variable and limit its scope to a specific Org, Model, or user context. Similarly, for the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type, you can define the principal type as user or user group, and specifiy the ID of the principal object.
 
 The API also allows you to edit, replace, or reset the values and scope assigned to a variable.
 
 [NOTE]
 ====
-In ABAC implementation, you can assign the variable values during token generation. Before configuring the token properties and variable values, verify the variables and their assignment status using the xref:variables.adoc#_get_variables[variable search API request].
+The `/api/rest/2.0/template/variables/{identifier}/update-values` API endpoint replaces the legacy `/api/rest/2.0/template/variables/update-values` endpoint. The legacy endpoint is deprecated in 26.4.0.cl and later.
 ====
 
 === Request parameters
 
-In your `POST` request body, you can include the following parameters:
-
-[width="100%" cols="1,2,5"]
+[width="100%" cols="2,6"]
 [options='header']
 |=====
-|Parameter|Properties|Description
-.4+|`variable_assignment` 2+| Includes parameters for setting values for a variable . This allows the same variable to have different values depending on which entity is being referenced.
-|`variable_identifier` a| __Array of strings__. Specify the name or ID of the variable to which you want to assign values.
-|`variable_values` a|__Array of strings__. Specify the values to assign. For example, `staging1`.
-|`operation` a| Specify the update operation type. The following values are available:
+|Parameter|Description
+|`identifier` a| __String__. ID of the variable to assign values. This is path parameter and must be passed in the request URL.
+|`operation`  a| Specify the update operation type. The following values are available:
 
 * `ADD` +
 Adds new values. Use this operation type to assign values to the variable.
-* `REPLACE` +
-Replaces the existing attributes with new values.
 * `REMOVE` +
 Removes the values assigned to the variable. For example, you can remove the values assigned to a variable configured for an Org.
+* `REPLACE` +
+Replaces the existing attributes with new values.
 * `RESET` +
 Resets all values at the variable level. For example, if a variable is assigned to multiple entities such as Org, user, or user group, the reset operation clears the values assigned to the variable for all entities.
 
-.5+|`variable_value_scope` 2+| Set the scope for variable values. These properties determine the entity level, such as Org, user, or user-group, for which the values will apply.
-| `org_identifier` a|__String__ +
-ID or name of the Org. For primary Org, specify `primaryOrg` or Org 0. Applicable to `TABLE_MAPPING`, `FORMULA_VARIABLE`, and `CONNECTION_PROPERTY` variable types.
-|`principal_type` and `principal_identifier` +
-__Optional__  a|__String__. Principal attributes such as user and user group. These attributes are applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
-|`model_identifier` a| ID or name of the Model to which the variables configuration must be applied. Applicable to formula variables.
-| `priority` +
-__Optional__ a|
-The priority assigned to this value. Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type. +
-Priority refers to the order of precedence when updating variable values for multiple entities in a single operation. If more than one entity matches the conditions during variable resolution,the system determines which entity’s value takes effect based on the value assigned to the `priority` parameter.
-For example, if a variable is configured for both the user and their group, the system determines which value to based on the assigned priority.
+|`variable_assignment`  a|__Array of variable values__. You can assign one or several set of values, and define the scope and constraints for each set of variable values.
+
+Assign values::
+To assign variable values, specify the values in the `assigned_values` array.
+
+Define scope::
+To set the scope for these variable values, define the following properties. These properties determine the entity level, such as Org, user, or user-group, for which the values will apply.
+
+* `org_identifier`: __Optional__. ID or name of the Org. +
+For primary Org, specify `primaryOrg` or Org 0. Applicable to `TABLE_MAPPING`, `FORMULA_VARIABLE`, and `CONNECTION_PROPERTY` variable types.
+
+* `principal_type` and `principal_identifier`: __Optional__. Principal attributes such as user and user group.
+Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type.
+
+* `model_identifier`: __Optional__. ID or name of the Model to which the variables configuration must be applied. Applicable to formula variables.
+
+* `priority`: __Optional__. Priority assigned to this value. If more than one entity matches the conditions during variable resolution, the system determines which entity’s value takes effect based on the value assigned to the `priority` parameter. For example, if a variable is configured for both the user and their group, the system determines which value to based on the assigned priority. +
+Applicable to the `CONNECTION_PROPERTY_PER_PRINCIPAL` variable type. +
 ||
 |=====
 
@@ -342,42 +293,35 @@ The following example shows the request parameters to assign values to `TABLE_MA
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/update-values'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/table_var/update-values'  \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "variable_assignment": [
     {
-      "variable_identifier": "schema_var",
-      "variable_values": [
-        "SALES_SCHEMA_A"
+      "assigned_values": [
+        "SALES_SCHEMA_A",
       ],
-      "operation": "ADD"
+      "org_identifier": "Primary"
     },
     {
-      "variable_identifier": "db_var",
-      "variable_values": [
+      "assigned_values": [
         "SALES_DB_A"
       ],
-      "operation": "ADD"
+      "org_identifier": "Primary"
     },
     {
-      "variable_identifier": "table_var",
-      "variable_values": [
+      "assigned_values": [
         "SALES_TABLE_A"
       ],
-      "operation": "ADD"
+      "org_identifier": "Primary"
     }
   ],
-  "variable_value_scope": [
-    {
-      "org_identifier": "OrgA"
-    }
-  ]
+  "operation": "ADD"
 }'
 ----
 
-If the variable update operation is successful, you can use these variables in the Table TML or to xref:metadata-parameterization.adoc[parameterize Table properties].
+If the values are assigned successfully, the API returns 204 response code. You can use these variables in the Table TML or for xref:metadata-parameterization.adoc[parameterizing Table properties].
 
 ==== Connection property variables
 The following example shows the request parameters to assign values to the `CONNECTION_PROPERTY` variables and set the variable scope to a specific Org:
@@ -385,125 +329,73 @@ The following example shows the request parameters to assign values to the `CONN
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/update-values'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/account_name_var/update-values'  \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "variable_assignment": [
     {
-      "variable_identifier": "account_name_var",
-      "variable_values": [
+      "assigned_values": [
         "orgA_account"
       ],
-      "operation": "ADD"
-    },
-    {
-      "variable_identifier": "warehouse_var",
-      "variable_values": [
-        "WH_A"
-      ],
-      "operation": "ADD"
-    },
-    {
-      "variable_identifier": "role_var",
-      "variable_values": [
-        "analyst"
-      ],
-      "operation": "ADD"
-    }
-  ],
-  "variable_value_scope": [
-    {
       "org_identifier": "OrgA"
-    }
-  ]
+    },
+    {
+      "assigned_values": [
+        "OrgB_account"
+      ],
+      "org_identifier": "OrgB"
+    },
+  ],
+  "operation": "ADD"
 }'
 ----
 
-If the variable update operation is successful, you can use these variables in the Connection TML or to xref:metadata-parameterization.adoc[parameterize connection properties].
+If the values are assigned successfully, the API returns 204 response code. You can use these variables in the Connection TML or for xref:metadata-parameterization.adoc[parameterizing connection properties].
 
 ==== Formula variables
-The following example shows the request parameters to assign values to formula variables and set their scope to a specific Org and data Model:
+Formula variables assigned to Primary Org can be used across all Orgs.
+
+To avoid invalid data type errors, ensure that the values you assign to formula variables match the data type configured during variable creation.
 
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/update-values'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/country_var/update-values'  \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "variable_assignment": [
     {
-      "variable_identifier": "region_var",
-      "variable_values": [
-        "West"
+      "assigned_values": [
+        "Germany",
+        "Switzerland"
       ],
-      "operation": "ADD"
+      "org_identifier": "Primary"
     },
     {
-      "variable_identifier": "state_var",
-      "variable_values": [
-        "california",
-        "nevada"
+      "assigned_values": [
+        "Singapore",
+        "Japan"
       ],
-      "operation": "ADD"
+      "org_identifier": "OrgA"
     },
     {
-      "variable_identifier": "category_var",
-      "variable_values": [
-        "all"
+      "assigned_values": [
+        "Canada",
+        "Mexico"
       ],
-      "operation": "ADD"
-    },
-    {
-      "variable_identifier": "min_quantity_var",
-      "variable_values": [
-        "10"
-      ],
-      "operation": "ADD"
-    },
-    {
-      "variable_identifier": "start_date_var",
-      "variable_values": [
-        "1711933200"
-      ],
-      "operation": "ADD"
-    },
-    {
-      "variable_identifier": "end_date_var",
-      "variable_values": [
-        "1743469200"
-      ],
-      "operation": "ADD"
+      "org_identifier": "OrgB"
     }
   ],
-  "variable_value_scope": [
-    {
-      "org_identifier": "Org_NA",
-      "model_identifier": "80c969e7-3a36-48b7-923e-e2fb5c3fe88f",
-      "principal_type": "USER",
-      "principal_identifier": "tsuser"
-
-    },
-    {
-      "org_identifier": "Org_Sales",
-      "model_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-      "principal_type": "USER",
-      "principal_identifier": "tsuser"
-    }
-  ]
-}'
+  "operation": "ADD"
+}
 ----
 
-To avoid invalid data type errors, ensure that the values you assign to formula variables match the data type configured during variable creation.
+If the variable update is successful, the API returns 204 response code. you can use these variables in link:https://docs.thoughtspot.com/cloud/latest/rls-variables-reference[RLS rules, window=_blank].
 
-Formula variables assigned to Primary Org can be used across all Orgs.
+You can also assign values and set the scope when creating a JWT for a given user. For more information, see xref:abac_rls-variables.adoc[ABAC via RLS with variables].
 
-If the formula variable update is successful, you can use these variables in link:https://docs.thoughtspot.com/cloud/latest/rls-variables-reference[RLS rules, window=_blank] and xref:abac_rls-variables.adoc[ABAC via RLS with variables].
-
-=== Example response
-
-If the update operation is successful, the API returns a 204 response to indicate that the variable was updated successfully.
 
 == Get variables
 To get a list of variables or the details of a specific variable, send a `POST` request to the `+++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fsearch-variables">/api/rest/2.0/template/variables/search</a>+++` API endpoint.
@@ -512,8 +404,8 @@ To search for a variable, specify the following parameters in your API request:
 
 * variable details +
 Details such as variable type, ID, and name pattern. For name pattern search, specify the partial name of the variable. For wildcard search, use `%`.
-* variable value +
-Variable parameters such as Org ID, Model ID, and ID and type of Principal object.
+* value scope +
+Attributes such as Org ID, Model ID, and ID and type of Principal object, which determine the scope of the variable values.
 * output format for response content +
 Specify one of the following values for output format:
 ** `METADATA_ONLY` (default) +
@@ -536,10 +428,20 @@ curl -X POST \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "record_offset": 0,
-  "record_size": -1,
-  "output_format": "METADATA",
+  "record_size": 10,
+  "response_content": "METADATA",
+  "value_scope": [
+    {
+      "org_identifier": "primary"
+    }
+  ],
   "variable_details": [
     {
+      "identifier": "table_var",
+      "type": "TABLE_MAPPING"
+    },
+    {
+      "identifier": "schema_var",
       "type": "TABLE_MAPPING"
     }
   ]
@@ -555,14 +457,14 @@ If the request is successful, the API returns the variable data in the response:
 [
   {
     "id": "f658cfd5-fa6f-4c33-a12f-ea46fa799666",
-    "name": "Table_var",
+    "name": "table_var",
     "variable_type": "TABLE_MAPPING",
     "sensitive": false,
     "values": null
   },
   {
     "id": "7f52d7b1-38f1-4127-ad5a-a2a7f58064df",
-    "name": "Schema_var",
+    "name": "schema_var",
     "variable_type": "TABLE_MAPPING",
     "sensitive": false,
     "values": null
@@ -572,18 +474,31 @@ If the request is successful, the API returns the variable data in the response:
 
 == Delete a variable
 
-To delete a variable, send a `POST` request to the `/api/rest/2.0/template/variables/{identifier}/delete` API endpoint, with the variable ID in the path parameter.
-
-Note that you can delete only one variable at a time.
+To delete one or more variables, use the `/api/rest/2.0/template/variables/delete` API endpoint.
 
 The API does not allow deleting formula variables if they are used in Models, RLS rules, user properties, or ABAC tokens. If the variable is used by an object in ThoughtSpot, make sure to remove the variable assignments and references before deleting it from ThoughtSpot.
+
+
+[NOTE]
+====
+The legacy delete endpoint `/api/rest/2.0/template/variables/{identifier}/delete` is deprecated in 26.4.0.cl and later versions, and is replaced with the `/api/rest/2.0/template/variables/delete` endpoint. You can use the new endpoint to delete multiple variables in a single API request.
+====
+
 
 === Example request
 [source,cURL]
 ----
 curl -X POST \
---url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/180a9cd3-8605-445b-8b70-aa0bcef5dfb0/delete' \
--H 'Authorization: Bearer {AUTH_TOKEN}'
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/delete'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "identifiers": [
+    "table_var_1",
+    "table_var_2",
+    "table_var_3"
+  ]
+}
 ----
 
 If the API request is successful, ThoughtSpot returns a 204 response code.
