@@ -16,7 +16,7 @@ When integrated, the MCP Server equips your AI agent/LLM with the following capa
 * Automatic discovery of ThoughtSpot MCP tools
 * Natural language queries and responses
 * Programmatic creation of Liveboards and visualizations
-* Generating embeddable visualizations for custom chatbot workflows
+* Generating embeddable visualizations
 
 === Supported use cases
 
@@ -33,6 +33,156 @@ If you are building an MCP-based chatbot or application with your own orchestrat
 Your integration choice depends on where the conversational UI is presented to the user and whether your application relies on ThoughtSpot, a third-party AI agent, or your own agentic AI to orchestrate the analytics workflow.
 
 Regardless of the integration mode, you can leverage ThoughtSpot’s semantic layer, data context, object-level, row-level, and column-level security to ensure trusted, governed analytics for your users.
+
+=== MCP Server versions
+ThoughtSpot MCP Server is currently available in two versions with different MCP tools and integration capabilities. For a side-by-side comparison of the current and new ThoughtSpot MCP Server versions, refer to the following table:
+
+[cols="2, 2,2", options="header"]
+|===
+||Legacy MCP Server |New MCP Server
+|Functionality
+|* Limited capabilities for complex analysis and context integration.
+* Does not support Spotter 3 capabilities
+a|
+* Supports link:https://docs.thoughtspot.com/cloud/latest/spotter-versions[Spotter 3, window=_blank] with advanced analytics, forecasting, and deep research capabilities.
+* Supports asynchronous streaming, session-based conversations and context integration.
+* The new version uses a different MCP Server URL and supports new MCP tools.
+
+For information about the MCP tools and URLs, see the following sections.
+
+|Recommended for
+|Maintaining existing integrations only.
+|All new integrations
+
+|Integration pattern and session model
+|Synchronous and stateless integration pattern. +
+Each tool call is independent. +
+handles each question with a single call and returns the full response at once.
+
+|Asynchronous and stateful sessions. Allows multiple follow-up questions within a session. Responses are streamed with intermediate updates, including thinking narration and clarifications.
+
+|Embedded visualizations in (MCP Apps)
+|Not supported in turnkey platforms; requires additional development work in custom apps.
+|Supports direct embedding of charts in supported MCP clients and custom apps.  Every answer includes an `iframe_url` that renders as an interactive ThoughtSpot visualization directly inside the conversation.
+|===
+
+[IMPORTANT]
+====
+The legacy MCP Server will be deprecated in an upcoming version. Existing integrations with the legacy MCP Server URL and tools will continue to work until further notice. For new integrations or if you want to integrate MCP Server with Spotter 3 capabilities for advanced analytics, forecasting, or deep research, ThoughtSpot recommends switching to the new version of MCP server.
+====
+
+=== Using new MCP Server
+With the new MCP server, your application users will receive smarter, more reasoned answers with inline charts from their chat sessions.
+
+If you are an administrator
+IT admins / platform owners — Update the MCP client configuration to point to the new URL. Authentication, hosting, and account setup remain unchanged.
+Developers with existing integrations — Your current integration continues to work at the legacy URL until it is deprecated. To migrate, update the MCP client URL and rewrite tool-calling logic to use the new asynchronous/polling model and updated tool names.
+Developers building new integrations — Use the new MCP Server version and tools from the start. Do not implement the legacy tools in new projects.
+
+
+ What's New / Release Notes Blurb
+New MCP Server Version: Spotter 3 Integration and Enhanced Analytics
+
+ThoughtSpot MCP Server now supports a new version powered by the Spotter 3 engine, bringing advanced analytics including "why" questions, forecasting, and multi-step deep research. Additional capabilities include real-time response streaming, session-based follow-up conversations, and inline chart visualizations within MCP-aware clients such as Claude.
+
+What this means for you:
+
+End users — Receive smarter, more reasoned answers with inline charts. No workflow changes required.
+IT admins / platform owners — Update the MCP client configuration to point to the new URL. Authentication, hosting, and account setup remain unchanged.
+Developers with existing integrations — Your current integration continues to work at the legacy URL until it is deprecated. To migrate, update the MCP client URL and rewrite tool-calling logic to use the new asynchronous/polling model and updated tool names.
+Developers building new integrations — Use the new MCP Server version and tools from the start. Do not implement the legacy tools in new projects.
+
+
+
+|Migration path per tool
+a|
+[cols="1,1", options="header"]
+!===
+! Current Tool ! New Tool
+! `ping` ! `check_system_readiness`
+! `getDataSourceSuggestions` ! `data_source_id` param on `create_analysis_session`
+! `getRelevantQuestions` ! `send_session_message` + `get_session_updates` loop
+! `getAnswer` ! `get_session_updates` loop
+! `createLiveboard` ! `create_dashboard`
+!===
+|N/A
+|===
+
+[NOTE]
+====
+*Important:* The unversioned OAuth URL (`https://agent.thoughtspot.app/mcp`) currently
+points to the current-version tools but will be migrated to the new version at a future date.
+*Pin `?api-version` in production environments* to avoid unintended behavior changes when
+this migration occurs. See xref:connect-mcp-server-to-clients.adoc[Connect MCP Server to Clients]
+for full versioning guidance.
+====
+
+
+
+=== MCP Server URLs
+
+
+
+
+==== OAuth Apps
+
+|===
+|*URL*|*Behavior*
+
+|https://agent.thoughtspot.app/mcp|Still points to “old” MCP tools for now (*Note:* Once I migrate current customers to the new tools, we will update to the new MCP tools and this will need to be updated)
+|https://agent.thoughtspot.app/mcp?api-version=YYYY-MM-DD|New version parameter introduced. Points to the version released on or before the specified date.
+|===
+==== Bearer Token Apps
+
+|===
+|*URL*|*Behavior*
+
+|https://agent.thoughtspot.app/token/mcp|New URL is introduced for bearer token apps. This will always point to the *latest version*.
+|https://agent.thoughtspot.app/token/mcp?api-version=YYYY-MM-DD|Points to the version released on or before the specified date.
+|===
+*Date-based versioning behavior:* - Specifying a date returns the most recent official (non-beta) version released *on or before* that date. - _Example:_ If versions exist for May 1 and June 15, a user specifying +api-version=2026-06-01+receives the May 1 version.
+
+==== URLs to deprecate
+
+|===
+|*URL*|*Behavior*
+
+|https://agent.thoughtspot.app/openai/mcp|This will still point to *old tools*; please mark this as deprecated (Note: will be removed after the standard deprecation period expires)
+|https://agent.thoughtspot.app/bearer/mcp|Still points to *old tools*; please mark this as deprecated  (Note: will be removed after the standard deprecation period expires)
+|===
+
+
+
+
+3+^h| *MCP Server URLs*
+
+|OAuth Apps
+|`https://agent.thoughtspot.app/mcp` +
+_Currently, this URL uses the MCP tools from legacy version._ +
+|`https://agent.thoughtspot.app/mcp?api-version={YYYY-MM-DD}` +
+
+|OAuth Apps — versioned URL
+|`https://agent.thoughtspot.app/mcp?api-version=YYYY-MM-DD` +
+_(specify a date on or before the current version's release date)_
+|`https://agent.thoughtspot.app/mcp?api-version=YYYY-MM-DD` +
+_(specify a date on or after the new version's GA release date)_
+
+|Bearer Token Apps — primary URL
+|`https://agent.thoughtspot.app/bearer/mcp` +
+⚠️ *Deprecated — migrate immediately*
+|`https://agent.thoughtspot.app/token/mcp` +
+_(new URL; always points to latest version)_
+
+|Bearer Token Apps — versioned URL
+|Not available
+|`https://agent.thoughtspot.app/token/mcp?api-version=YYYY-MM-DD`
+
+|Deprecated URLs _(do not use for new integrations)_
+a|
+* `https://agent.thoughtspot.app/openai/mcp` ⚠️ *Deprecated*
+* `https://agent.thoughtspot.app/bearer/mcp` ⚠️ *Deprecated*
+|N/A — new version uses the URLs above
+
 
 === Architecture and roles
 The MCP Server integration and orchestration layer includes the following core components:
@@ -92,6 +242,99 @@ Executes those analytical questions and returns structured data and answers.
 * `createLiveboard` +
 Creates a ThoughtSpot Liveboard from a list of answers/questions, typically at the end of a conversation. It turns the conversational analysis into a Liveboard with visualizations.
 
+
+
+
+
+
+3+^h| MCP tools
+
+|Connectivity test
+|`ping` +
+_Tests connectivity and authentication._
+|`ping` +
+_Tests connectivity and authentication._
+
+|Data source selection
+|`getDataSourceSuggestions` +
+_Standalone tool — must be called separately to retrieve source suggestions, then pass +
+the result to other tools.
+|Built into `create_analysis_session` via optional `data_source_id` parameter +
+If the parameter omitted, ThoughtSpot auto-selects the most relevant source from the question.
+
+|Session/conversation initiation
+|No session concept. Tools are stateless.
+|`create_analysis_session` +
+Creates a stateful session and returns `analytical_session_id`, which is required for subsequent calls.
+
+|Query submission
+|`getRelevantQuestions` +
+Breaks a query into questions ThoughtSpot analytics can answer. Returns answers directly
+in the same call.
+
+|`send_session_message` +
+Sends a question or follow-up message in natural language. Does not  return the answer, but triggers async processing. Returns only the `success` message.
+
+|Answer retrieval
+|Returned directly from `getRelevantQuestions` or `getAnswer` in a single synchronous call, with full answer in the response.
+|`get_session_updates` is called in a loop until `is_done: true`.
+Polls for streamed updates across multiple calls and accumulates updates from every poll.
+
+|Follow-up questions
+|`getRelevantQuestions` with `additionalContext` parameter. Requires prior context on each follow-up call.
+|`send_session_message` with the same `analytical_session_id`. The session retains context automatically. Optionally, the  `additional_context` parameter can be included to
+inject new external context per follow-up question/message.
+
+|Liveboard creation
+|`createLiveboard` +
+Creates a liveboard from a list of answers.
+|`create_dashboard` +
+Creates a dashboard from `answer_id` values collected from the session update type `answer`. Requires a `note_tile` HTML summary tile.
+
+
+
+3+^h| *Tool Inputs & Outputs — Key Differences*
+
+|Data source input
+|Required as explicit tool call to `getDataSourceSuggestions` +
+before passing to other tools
+|Optional `data_source_id` on `create_analysis_session`; +
+auto-inferred if omitted
+
+|Answer return mechanism
+|Inline in tool response — result available immediately
+|Via `get_session_updates` polling — result accumulates +
+across multiple calls; final result only when `is_done: true`
+
+|Intermediate thinking / reasoning
+|Not exposed
+|Exposed as `text` and `text-chunk` update types in +
+`get_session_updates` — should be shown to users +
+during polling to maintain engagement
+
+|Visualization output
+|Not included in tool responses
+|`iframe_url` field in `answer`-type `session_update` objects +
+returned by `get_session_updates`
+
+|Answer identifier
+|Not available
+|`answer_id` in each `answer`-type `session_update` — +
+required input to `create_dashboard`
+
+|Dashboard input — answers
+|List of answers (format unversioned)
+|List of `{ answer_id, title }` objects — +
+`answer_id` values sourced from `answer`-type updates
+
+|Dashboard input — summary tile
+|Not required
+|`note_tile` (required) — single-line HTML string rendered +
+as a styled summary tile on the dashboard; +
+must use `<br>` for spacing, no line breaks
+
+
+
 === How it works
 
 The agentic interactions in an orchestrated environment typically include these steps:
@@ -121,6 +364,32 @@ ThoughtSpot creates a Liveboard and returns identifiers and a `frame_url` for th
 During this interaction, users typically see a natural-language summary. When a Liveboard is created, a link to open the corresponding Liveboard in ThoughtSpot is generated.
 +
 In custom applications, you can embed the visualizations generated from the interaction, load them inside iframe elements, and render interactive charts directly in your webpage. You can also add your own buttons or links, such as 'Save as Liveboard' or 'Pin this analysis', which call `createLiveboard` to create or persist a Liveboard that contains your current charts and analysis.
+
+
+
+3+^h| *Integration Pattern Comparison*
+
+|Step 1
+|Call `getDataSourceSuggestions` to retrieve available sources _(optional but common)_
+|Call `create_analysis_session` _(required)_ — optionally pass `data_source_id`
+
+|Step 2
+|Call `getRelevantQuestions` with the user's question — answer returned directly
+|Call `send_session_message` with the question — returns only `success`
+
+|Step 3
+|_(optional)_ Call `getAnswer` for a specific sub-question
+|Call `get_session_updates` in a loop until `is_done: true` — accumulate all updates
+
+|Step 4
+|_(optional)_ Call `createLiveboard` with answers
+|_(optional)_ Collect `answer_id` values from `answer`-type updates, +
+call `create_dashboard`
+
+|Follow-up
+|Repeat from Step 2 with full context re-injected via `additionalContext`
+|Call `send_session_message` again on the *same session* — +
+return to Step 3 to poll the follow-up response
 
 == Getting access to the MCP Server
 
