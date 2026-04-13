@@ -14,7 +14,13 @@ To embed Spotter, you need the following access and setup:
 
 * Access to a ThoughtSpot instance with the Spotter feature. If you want a specific version of Spotter enabled, work with your ThoughtSpot administrator to enable the xref:embed-ai-analytics.adoc#_feature_status_and_availability_in_embed_mode[required features and settings] on your instance.
 * Your host application domain is added to xref:security-settings.adoc[ThoughtSpot CSP and CORS allowlists].
-* Your application project has access to the xref:api-changelog.adoc[latest version of the Visual Embed SDK].
+* Your application project has access to the xref:api-changelog.adoc[latest version of the Visual Embed SDK]. +
+
+[NOTE]
+====
+For Spotter embedding that uses cookieless authentication, use the Visual Embed SDK v1.45.0 or later with ThoughtSpot Cloud 26.2.0.cl or a later version. To enable proactive token refresh, set the `refreshAuthTokenOnNearExpiry` parameter to `true`. +
+Spotter workflows can run longer, so set the authentication token expiry to at least 10 minutes to avoid authorization errors.
+====
 
 == Import the SDK package
 Import the `SpotterEmbed` SDK library to your application environment:
@@ -175,6 +181,7 @@ image::./images/spotter3-leagcy-interface-automode.png[Spotter 3 interface]
 When Auto mode is enabled, **Preview data** and **Data Model instructions** options will not be available.
 ====
 
+
 ==== New chat interface
 
 Spotter 3 experience is available with a new prompt interface that includes additional features and user elements to enrich your Spotter experience.
@@ -190,40 +197,40 @@ const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
 });
 ----
 
-==== Chat history panel
-
-You can also include the *Chat history* panel to allow your users to access the chat history from their previous sessions. To enable chat history features, set the `enablePastConversationsSidebar` attributes to `true`.
-
-////
-Additionally, you can customize the chat history sidebar using the settings available in the xref:SpotterSidebarViewConfig.adoc[SpotterSidebarViewConfig] interface and `spotterSidebarConfig` properties.
-
-
-[source,JavaScript]
-----
-const embed = new SpotterEmbed('#tsEmbed', {
-   // ...other embed view configuration options
-   // Configuration for the Spotter sidebar UI
-   spotterSidebarConfig: {
-       enablePastConversationsSidebar: true, // Show chat history sideabr
-       spotterSidebarTitle: 'My Conversations', // Set the title of the sidebar
-       spotterSidebarDefaultExpanded: true, // Expand Spotter chat history sidebar by default on load
-   },
-})
-----
-////
-
-[source,JavaScript]
-----
-const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
-    // Enable the sidebar for accessing past Spotter conversations
-    enablePastConversationsSidebar: true
-});
-----
-
-
 [.widthAuto]
 [.bordered]
 image::./images/spotter3-new-interface.png[Spotter 3 new interface]
+
+==== Chat history panel
+
+You can also include the *Chat history* panel to allow your users to access the chat history from their previous sessions.
+
+To enable chat history features, set the `enablePastConversationsSidebar` attributes to `true`. Additionally, you can also customize the appearance and contents of the chat history panel using the configuration parameters available in the xref:SpotterSidebarViewConfig.adoc[`SpotterSidebarViewConfig`] interface and the xref:SpotterEmbedViewConfig#_spottersidebarconfig[spotterSidebarConfig] object.
+
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    SpotterEmbedViewConfig,
+    SpotterSidebarViewConfig
+} from '@thoughtspot/visual-embed-sdk';
+
+const embed = new SpotterEmbed('#tsEmbed', {
+    // ...other embed view configuration options
+    // Configuration for the Spotter sidebar UI
+    spotterSidebarConfig: {
+        enablePastConversationsSidebar: true, // Show chat history sidebar
+        spotterSidebarTitle: 'My Conversations', // Update the title of the sidebar
+        spotterSidebarDefaultExpanded: true, // Expand Spotter chat history sidebar by default on load
+    },
+})
+----
+
+[NOTE]
+====
+The standalone `enablePastConversationsSidebar` attribute is deprecated in v1.47.0 and can no longer be used to enable or disable the chat history.
+====
+
 
 ==== MCP connectors and resource selection icon
 A connector is an external MCP server or tool, such as Google Drive, Slack, Notion, Confluence, or Jira, which can be used as a data source in Spotter sessions. ThoughtSpot administrators can configure connectors to enable Spotter users to include both structured and unstructured data in their conversation sessions.
@@ -338,9 +345,35 @@ The following figures show the customized Spotter icon:
 [.bordered]
 image::./images/spotter-icon-customization.png[Spotter icon customization]
 
-=== Hiding the Spotter icon and ThoughtSpot branding in the reasoning interface
-If you want to hide the Spotter icon from the prompt response page and reasoning interface, or if you want to remove ThoughtSpot branding, you can use the CSS rules with selectors, as shown in this example:
+=== Hiding the Spotter icon and ThoughtSpot branding chat interface
+To hide the Spotter logo and branding in the chat interface, use the following parameters in the `SpotterChatViewConfig` interface:
 
+* `hideToolResponseCardBranding` +
+When set to `true`, hides the ThoughtSpot logo and icon in tool response cards. The branding label prefix is controlled separately via `toolResponseCardBrandingLabel`.
+
+* `toolResponseCardBrandingLabel` +
+Custom label to replace the `ThoughtSpot` prefix in tool response cards. Set to an empty string (`''`) to hide the prefix entirely.
+
+Example::
++
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    SpotterEmbedViewConfig,
+    SpotterChatViewConfig
+} from '@thoughtspot/visual-embed-sdk';
+
+spotterChatConfig: {
+    //Hide the default logo and label on tool response cards in Spotter chat UI
+    hideToolResponseCardBranding: true,
+    // Set a custom label to display as the branding on tool response cards
+    toolResponseCardBrandingLabel: 'CompanyName',
+}
+----
+
+
+////
 [source,JavaScript]
 ----
 init({
@@ -370,6 +403,7 @@ init({
   }
 });
 ----
+////
 
 [#spotterMenuActions]
 === Customizing menu actions and elements
