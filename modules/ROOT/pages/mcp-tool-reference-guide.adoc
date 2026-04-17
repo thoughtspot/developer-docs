@@ -1,0 +1,487 @@
+= MCP tool reference
+:toc: true
+:toclevels: 3
+
+:page-title: ThoughtSpot MCP tool reference guide
+:page-pageid: mcp-tool-reference
+:page-description: Refer to this guide to learn which MCP tools are supported, input parameters used for tool calls, and the response format.
+
+ThoughtSpot MCP Server provides specialized tools that enables the AI agent in your application to access ThoughtSpot Analytics. This page lists all supported MCP tools and describes how to call these tools and analyze responses. Refer to the following sections for more information:
+
+* xref:mcp-tool-reference-guide.adoc#_mcp_server_with_spotter_3[MCP Server version with Spotter 3] [tag greenBackground]#NEW#
+* xref:mcp-tool-reference-guide.adoc#_legacy_mcp_server_setup[MCP Server with legacy tools]
+
+== MCP Server with Spotter 3
+The new ThoughtSpot MCP integration exposes a three-tool workflow for running natural language analytics queries against your ThoughtSpot data sources. The pattern is always: **create a session** → **send a message** → **poll for updates**.
+
+=== create_analysis_session
+Start an analytical session with ThoughtSpot's analytics agent. This is the required first step before sending any questions.
+
+Sessions are conversational. Once created, you can send multiple follow-up questions to the same session without calling `create_analysis_session` again.
+
+==== Input parameter
+The `data_source_id` is optional. Provide this when the user has specified or confirmed a data source, or when context makes a particular source obvious. Omit to let ThoughtSpot automatically select the most relevant source based on the question.
+
+==== Example call
+
+[source,javascript]
+----
+const session = await callMCPTool("create_analysis_session", {
+    data_source_id: "model-guid-123" // Optional — GUID of the ThoughtSpot worksheet or model to query. Omit to let ThoughtSpot automatically select the most relevant data source.
+});
+----
+
+[source,python]
+----
+call_mcp_tool(
+    "create_analysis_session",
+    {
+        "data_source_id": "model-guid-123"  # Optional — GUID of the ThoughtSpot worksheet or model to query.
+    },
+)
+----
+
+==== Response
+
+[source,json]
+----
+{
+"analytical_session_id": "session-guid-abc123"
+}
+----
+
+* `analytical_session_id`:  Session ID. Pass this to `send_session_message` and `get_session_updates`.
+
+* Always capture the returned `analytical_session_id`. It is required for all subsequent calls.
+
+=== send_session_message
+Send a natural language analytical question or follow-up to an existing session. The agent processes requests asynchronously, so this tool does not return the answer directly, use `get_session_updates` to retrieve the response.
+
+==== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`analytical_session_id` | The session to send the message to. Obtained from the  `create_analysis_session` call.
+|`message`|A natural language analytical question or follow-up to send to the ThoughtSpot agent.
+|`additional_context` +
+__Optional__|Can be used to provide external information relating to the question. For example, “The user’s fiscal year starts in April”, or “The user is a manager of the West region”.
+|====
+
+==== Example call
+
+[source,javascript]
+----
+const sendMessage = callMCPTool("send_session_message", {
+    analytical_session_id: "sess_abc123", // Session ID from create_analysis_session.
+    message: "What were total sales by region last quarter?", // User's natural language question.
+    additional_context: "The user's fiscal year starts in April. " +
+        "Focus on underperforming regions only." // Optional — external information to influence the analysis.
+});
+----
+
+[source,python]
+----
+call_mcp_tool(
+    "send_session_message",
+    {
+        "analytical_session_id": "sess_abc123",  # Session ID from create_analysis_session.
+        "message": "What were total sales by region last quarter?", # User's natural language question.
+        "additional_context": (  # Optional — external information
+            "The user's fiscal year starts in April."
+            "Focus on underperforming regions only." # to influence the analysis.
+        ),
+    },
+)
+----
+
+==== Response
+
+[source,json]
+----
+{
+  "success": true
+}
+----
+
+* `success`: Confirms whether the message was successfully received by the agent.
+
+[NOTE]
+====
+* After a successful send, immediately begin polling with `get_session_updates`.
+* Do not send a second message until `get_session_updates` returns `is_done: true`. The agent processes one message at a time per session.
+* To ask a follow-up question, reuse the same `analytical_session_id`. There is no need to create a new session.
+====
+
+=== get_session_updates
+
+Poll for the latest response from a ThoughtSpot analytics session. Call this repeatedly after `send_session_message` until `is_done` is `true`.
+
+**Important**: A single call to `get_session_updates` will rarely contain the full response. Spotter streams its work incrementally, including intermediate thinking steps, across multiple polling calls. You must accumulate updates from every poll and combine them to get the complete picture.
+
+==== Input parameters
+Send the `analytical_session_id` to specify the session to retrieve updates for.
+
+==== Example call
+
+[source,typescript]
+----
+const updates = await callMCPTool("get_session_updates", {
+    analytical_session_id: "session-guid-abc123" // Session ID from the `create_analysis_session` call.
+});
+----
+
+[source,python]
+----
+call_mcp_tool(
+    "get_session_updates",
+    {"analytical_session_id": "sess_abc123"},  # Session ID from create_analysis_session.
+)
+----
+
+==== Response
+
+Poll returning intermediate updates:
+
+[source,json]
+----
+{
+  "is_done": false,
+  "session_updates": [
+    {
+      "type": "text-chunk",
+      "text": "Let me look at your sales data broken down by region..."
+    }
+  ]
+}
+----
+
+Poll returning final updates:
+
+[source,json]
+----
+{
+   "is_done": true,
+   "session_updates":[
+      {
+         "type":"text-chunk",
+         "text":"Let me look at your sales data broken down by region..."
+      },
+      {
+         "type":"text",
+         "text":"I'm interpreting 'last quarter' as Q4 2025 (October–December), based on a fiscal year starting in April."
+      },
+      {
+         "type":"answer",
+         "answer_title":"Total Sales by Region — Q4 2025",
+         "answer_query":"total sales by region last quarter",
+         "iframe_url":"https://your-instance.thoughtspot.cloud/embed/...",
+         "answer_id":"answer-guid-xyz789"
+      }
+   ]
+}
+----
+
+==== Handling streamed responses
+Spotter queries are processed asynchronously and streamed in real time. This means the full response is never contained in a single `get_session_updates` call.
+
+Each call to `get_session_updates` returns only the updates produced since the previous call. On any given poll, `session_updates` might be empty (when Spotter is still thinking), contain a few chunks, or contain several updates at once. These arrive as +text+ or +text-chunk+ updates before the final +answer+ update appears. This intermediate content gives insight into how Spotter arrived at its result and should be preserved and presented to the user. As it works through a question, it emits intermediate content that reflects its reasoning process. A typical response sequence might look like:
+
+. Thinking narration: `text-chunk` updates describing what Spotter is doing. For example, "Let me look at your sales data broken down by region..."
+. Clarifications or caveats: `text` updates explaining assumptions, filters applied, or potential ambiguities in the question.
+. Intermediate conclusions: partial results or contextual notes before the final answer.
+. The final answer: one or more `answer` updates containing the visualization title, the underlying query, and the embeddable iframe URL.
+
+This means a complete response might span between 5–20+ `get_session_updates` calls and contain many `session_update` objects before `is_done` becomes `true`. All of this content, the thinking, narration, and the final answer, should be accumulated and presented together to give the user the full picture.
+
+==== Type definition: session_update
+
+Each item in the `session_updates` list is a `session_update` object. The `type` field determines which other fields are present.
+
+[cols="2,2,4", options="header"]
+|====
+|Field|Type|Description
+.3+|`type`
+|`"text"`|A complete natural language message from the agent.
+|`"text-chunk"` | A streaming chunk of a longer message. Concatenate all chunks to reconstruct the full text.
+|`"answer"`|Populates `answer_title`, `answer_query`, `iframe_url` fields. A data visualization result with a title, the underlying query, and an embeddable URL.
+|`text`|__String__|The text content of the message. Present only when `type` is `"text"` or `"text-chunk"`. For `"text-chunk"` updates, concatenate all chunks in order to form the complete message.
+|`answer_title`|__String__|A human-readable title describing what the answer shows. Present only when `type` is `"answer"`.
+|`answer_query`|__String__|The search query ThoughtSpot used to generate the answer. Present only when `type` is `"answer"`. Useful for explaining to users what data was queried or for diagnosing unexpected results.
+|`iframe_url`|__String__|An embeddable URL for rendering the answer as an interactive visualization. Present only when `type` is `"answer"`. Use this to display a live chart or table if your environment supports iframes.
+|====
+
+
+=== create_dashboard
+
+Create a ThoughtSpot dashboard from answers generated in an analysis session.
+
+* Call this only after `get_session_updates` returns `is_done: true`, because you need the `answer_id` values from completed answer updates.
+* Collect all updates where type is answer across every poll of `get_session_updates`. Each one produces an `answer_id` you can include in the dashboard.
+* The `note_tile` should summarize the full analysis. It is the first thing a viewer sees on the dashboard.
+* Multiple answers from the same session or across multiple sessions can be combined into a single dashboard.
+
+==== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`title` |Required. Title of the dashboard to be created.
+|`answers`|Required. List of answer objects to add to the dashboard. Each answer requires an `answer_id` (from `get_session_updates` where `type` is `answer`) and a `title`.
+|`note_tile`| Required. An HTML summary of the analysis and answers, rendered as a styled tile on the dashboard. Must be a single line with no line breaks. Use `<br>` for spacing within the HTML. Include emojis, colors, and a `"Generated on <date> <time>"` header.
+||
+|====
+
+
+==== Example call
+
+[source,typescript]
+----
+const dashboard = await callMCPTool("create_dashboard", {
+    title: "Q4 2025 Regional Sales Analysis",
+    answers: [{
+            answer_id: "ans_xyz789", // answer_id from each answer-type update returned by get_session_updates.
+            title: "Total Sales by Region — Q4 2025"
+        },
+        {
+            answer_id: "ans_xyz790",
+            title: "Underperforming Regions — Q4 2025 vs Q4 2024"
+        }
+    ],
+    note_tile: "<h2 style='text-align:center;'> Q4 2025 Regional Sales Analysis</h2>" +
+        "<p>Analysis of total sales by region for Q4 2025, highlighting " +
+        "top-performing and underperforming regions.<br>" +
+        "Generated on 2026-04-16 10:00 AM</p>" // Required — single-line HTML string rendered as a styled summary tile at the top of the dashboard.
+});
+----
+
+[source,python]
+----
+dashboard = call_mcp_tool(
+    "create_dashboard",
+    {
+        "title": "Q4 2025 Regional Sales Analysis",
+        "answers": [
+            {
+                "answer_id": "ans_xyz789", # answer_id from each answer-type update returned by get_session_updates.
+                "title": "Total Sales by Region — Q4 2025",
+            },
+            {
+                "answer_id": "ans_xyz790",
+                "title": "Underperforming Regions - Q4 2025 vs Q4 2024",
+            },
+        ],
+        "note_tile": (
+            "<h2 style='text-align:center;'> Q4 2025 Regional Sales Analysis</h2>"
+            "<p>Analysis of total sales by region for Q4 2025, highlighting "
+            "top-performing and underperforming regions.<br>"
+            "Generated on 2026-04-16 10:00 AM</p>"  # Required. single-line HTML string rendered as a styled summary tile at the top of the dashboard.
+        ),
+    },
+)
+----
+
+==== Response
+
+[cols="2,4", options="header"]
+|====
+|*Field*|*Description*
+
+|`dashboard_id`|The unique identifier of the created dashboard.
+|`dashboard_url`|A link to the newly created dashboard in ThoughtSpot.
+|====
+
+=== Visualizations embedded in iframe
+When displaying the embedded visualization using the `iframe_url` property, the following user interaction features will be included by default:
+
+* Hover on data points to view details
+* Switch between chart and table mode
+* Click on table/axis headers to sort the visualization
+* Hover on search tokens to view details about the column or keyword
+* Make a copy (open Answer/Visualization page)
+* Download data (PNG, CSV, etc.)
+* Custom actions configured via Visual Embed SDK.
+
+The following features are not supported directly. However, you can use the *Make a Copy* option to get access to these capabilities:
+
+* Drill down
+* Changing filters
+* Changing chart type or chart config
+* Show underlying data, view query SQL or query visualizer
+* SpotIQ analysis
+
+== Legacy MCP Server setup
+The following sections outline the MCP request input schema and data structure of the response.
+
+=== ping
+Runs a basic health check to validate that the MCP Server is reachable.
+
+[source,ts]
+----
+const tsPing = await callMCPTool("ping", {});
+----
+
+=== getDataSourceSuggestions
+Suggests appropriate ThoughtSpot data models for a given natural language question.
+
+==== Example call
+
+[source,ts]
+----
+const dsSuggestions = await callMCPTool("getDataSourceSuggestions", {
+  query: "show me sales by region" // user's query
+});
+----
+
+==== Response
+
+Returns an object containing an array of suggestions:
+
+[source,json]
+----
+{
+  "suggestions": [
+    {
+      "header": {
+        "guid": "worksheet-guid-123",
+        "displayName": "Sales Analytics",
+        "description": "Sales performance by region, product, and channel"
+      },
+      "confidence": 0.92,
+      "llmReasoning": "This worksheet contains sales metrics and regional dimensions relevant to the query."
+    }
+  ]
+}
+----
+
+Key fields are:
+
+* `header.guid`: Unique ID for the datasource. The `datasourceId` is used in `getRelevantQuestions` and `getAnswer` calls.
+* `header.displayName`: Name of the data source.
+* `header.description`: Optional description of the data source.
+* `confidence`: Numeric score indicating the confidence of the system about a data model being the right match for the user’s query.
+* `llmReasoning`: LLM's reasoning for the suggestion.
+
+=== getRelevantQuestions
+Uses ThoughtSpot’s reasoning engine to generate AI-suggested sub-queries that help generate specific answers for a given data context.
+
+==== Example call
+
+[source,ts]
+----
+const result = await callMCPTool("getRelevantQuestions", {
+  query: "show me sales data", // User's natural language query
+  datasourceIds: ["model-guid-123"], // Array of worksheet/datasource GUIDs
+  additionalContext: "User is interested in the data for underperforming regions and products"
+});
+----
+
+==== Response
+
+[source,json]
+----
+{
+  "questions": [
+    "What is the total sales revenue by region?",
+    "Which products have the highest revenue?",
+    "What are the top selling categories?"
+  ]
+}
+----
+
+Each returned question can then be passed individually into `getAnswer`.
+
+=== getAnswer
+Executes a natural language question for a given data context and returns the resulting data and visualization metadata. Clients can use this data and frame URL to render visualizations.
+
+==== Example call
+
+[source,ts]
+----
+const result = await callMCPTool("getAnswer", {
+  question: "Total sales by region", // Natural language question
+  datasourceId: "model-guid-123" // Worksheet/datasource GUID
+});
+----
+
+==== Response
+
+[source,json]
+----
+{
+  "question": "Total sales by region",
+  "session_identifier": "abc-123-def-456",
+  "generation_number": 2,
+  "data": "\"Region\",\"Total Sales\"\n\"East\",100000\n...",
+  "frame_url": "https://...",
+  "fields_info": "..."
+}
+----
+
+Key fields are:
+
+* `session_identifier`: Unique session ID used to group answers. Required when creating a Liveboard from this answer using the `createLiveboard` MCP tool.
+* `generation_number`: Version number for this answer. Required for Liveboard creation.
+* `question`: The executed question; useful for display and to pass it into the `createLiveboard` request.
+* `data`: Data returned in encoded format. Contains column headers and all returned rows in comma-separated format, which can be parsed to render tables or charts in your application.
+* `frame_url`: Optional iframe URL for embedding the visualization in your UI.
+* `fields_info`: Descriptive metadata about the fields and chart, useful for explanations.
+
+=== createLiveboard
+
+Creates a ThoughtSpot Liveboard with one or more answers from the results. This is a two-step process and includes the following calls:
+
+. Call `getAnswer` to generate visualizations and obtain `session_identifier` and `generation_number`.
+. Call `createLiveboard` with those values to create the Liveboard.
+
+==== Example call
+
+[source,ts]
+----
+const answerData = JSON.parse(answerResult.result.content);
+
+const liveboardResult = await callMCPTool("createLiveboard", {
+  name: "My Sales Dashboard",
+  noteTile: "My Sales Dashboard was created by TS MCP Chat", // Description text for the Liveboard
+  answers: [{
+    question: answerData.question, // Display name for the Liveboard
+    session_identifier: answerData.session_identifier,
+    generation_number: answerData.generation_number
+  }]
+});
+----
+
+Required attributes are:
+
+* `noteTile`: Use this field for any Liveboard description or notes; a separate description field is not supported.
+* `answers`: Required array. Each item must include `question`, `session_identifier`, and `generation_number` from a prior `getAnswer` call.
+
+==== Response
+
+[source,json]
+----
+{
+  "liveboardId": "liveboard-guid-here",
+  "name": "My Sales Dashboard",
+  "frame_url": "https://..."
+}
+----
+
+Key fields are:
+
+* `liveboardId`: GUID of the created Liveboard.
+* `name`: Name of the Liveboard.
+* `frame_url`: URL that can be embedded to display the Liveboard.
+
+
+
+
+
+== Additional resources
+
+* To view the MCP Server code, go to the link:https://github.com/thoughtspot/mcp-server[MCP Server GitHub repository, window=_blank].
+* For a chat client example, see link:https://github.com/thoughtspot/developer-examples/tree/main/mcp/python-react-agent-simple-ui[Python Agent with Simple React UI].
+
+
