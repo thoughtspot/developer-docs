@@ -25,6 +25,7 @@ In the ABAC via RLS with variables method, administrators add formula variables 
 ////
 
 === Implementation steps
+
 [NOTE]
 ====
 Formula variables are available on ThoughtSpot starting from 10.15.0.cl. If this feature is not enabled on your instance, contact ThoughtSpot Support.
@@ -46,7 +47,6 @@ Several features within ThoughtSpot, such as autocompletion in Search on values 
 
 * Disable indexing for columns and fields that must be restricted by ABAC. You may also want to disable indexing on all sensitive columns.
 * Define an RLS rule on those fields, since RLS is enforced at the indexing layer and will secure suggestions and sample values.
-
 
 == Create formula variables
 Formula variables must be defined in ThoughtSpot before they can be used in any RLS rule via the `ts_var()` formula.
@@ -101,14 +101,6 @@ RLS rules must always evaluate logically to SQL boolean `TRUE` or `FALSE`.
 
 If a user has no variable values for a given formula variable, this results in `FALSE`.
 
-There is a special wildcard value `['TS_WILDCARD_ALL']` that a formula variable can be set to represent "Allow all".
-
-In this example, `customer` represents the `customer` column in the table, and `customer_var` represents a variable. If the value of `customer_var` is set to `TS_WILDCARD_ALL`, the user can access all customers in the column.
-
-----
-customer = ts_var(customer_var)
-----
-
 ==== RLS rule with a single variable reference
 In this formula example, `country` refers to the "country" column in the data table, and `country_var` is the variable.
 
@@ -144,7 +136,7 @@ In this example, users can access data if they are in the "data developers" grou
 'data developers' in ts_groups OR Department = ts_var(department_var)
 ----
 
-==== Variables with numeric and Date data types
+==== Variables with numeric and date data types
 
 The following rule enforces a numeric threshold and restricts access to rows where the Revenue value is less than or equal to the value provided by the `revenue_cap_var` variable.
 
@@ -198,34 +190,26 @@ __Array of strings or numeric values__. When assigning values, ensure the data f
 
 All values are passed into the token as *arrays of strings*, even if the column is a numeric or date type in ThoughtSpot and the database. The column data type will be respected in the query issued to the database.
 
-==== Allow all wildcard value
+==== Using wildcard values
+ThoughtSpot provides the following wildcard values that simplify "allow all" and "deny all" patterns without changing your RLS rules:
 
-To allow all values for a given field, set the formula variable value to an array using the wildcard: `["TS_WILDCARD_ALL"]`.
+* `TS_WILDCARD_ALL` +
+Assigns all values in the column, providing access to all data. Ensure that the RLS rules are clearly defined to avoid unintended data exposure.
+* `TS_WILDCARD_NONE` +
+Resolves the rule as false and denies access to data.
 
-In this example, the user is allowed all access for one variable, while for the other, specific values are set.
+To "allow all" but restrict access to specific data, you can use these wildcards in the following way:
 
-[source,JSON]
-----
-"variable_values": [
-    {
-      "name": "product_var",
-      "values": ["TS_WILDCARD_ALL"]
-    },
-    {
-      "name": "country_var",
-      "values": [
-        "Japan",
-        "Singapore",
-        "Australia"
-      ]
-    }
-  ]
-----
+* `in_department_var = TS_WILDCARD_ALL`. Allows access to all data.
+* `not_department_var = ['Sales', 'Engineering']`. The user is allowed to access all data except the departments specified in the variable values.
 
-If `TS_WILDCARD_ALL` is set for variable attributes, ensure that the RLS rules are defined clearly on the Table to avoid unintended data exposure.
+Similarly, you can deny access to all data and allow access only to specific departments:
 
-==== Deny all by default
-For every variable included in the token request, you can assign one or more values. All variables referenced in RLS rules are required. If a variable is not assigned any value, query generation fails with the following error:
+* `in_department_var = ['Sales', 'Engineering']`. The user is allowed to access all the departments specified in the rule.
+* `not_department_var = TS_WILDCARD_NONE`. The user cannot access any data except the allowed departments.
+
+==== Denying all by default
+For every variable included in the token request, you can assign one or more values. All variables referenced in RLS rules are required. If a variable is not assigned any value or if its value is set to `TS_WILDCARD_NONE`, query generation fails with the following error:
 
 [source,text]
 ----
@@ -257,7 +241,7 @@ If you don't want to append or replace any attribute values, do not pass any det
 ====
 * The ABAC implementation with RLS and formula variables does not support session-based rules. Do not use the legacy `persist_option` value of `NONE`.
 * `"persist_option": "RESET"` attribute is also a legacy value and is not supported.
-*  When creating a token request with `"persist_option": "REPLACE"`, the presence or absence of specific keys in your JSON payload determines whether the existing security rules are retained, updated, or deleted.
+* When creating a token request with `"persist_option": "REPLACE"`, the presence or absence of specific keys in your JSON payload determines whether the existing security rules are retained, updated, or deleted.
 ====
 
 === Resetting a user or a variable
@@ -291,8 +275,8 @@ A formula variable exists across all Orgs in ThoughtSpot, but the values are rec
   ]
 }
 ----
-The above command results in `jane.smith@company.com` being denied any access when `country_var` is used in an RLS rule.
 
+The above command results in `jane.smith@company.com` being denied any access when `country_var` is used in an RLS rule.
 
 [NOTE]
 ====
@@ -309,7 +293,6 @@ This approach ensures that Liveboard schedule attachments enforce security rules
 
 You can simplify user provisioning and programmatically manage user creation and deletion workflows using ThoughtSpot's REST APIs.
 
-
 === Variable scope
 To restrict the scope of variable attributes and rules to a specific Org context and object, define `org_identifier` and `objects`.
 
@@ -320,7 +303,6 @@ To apply variable entitlements to a specific object, specify the object IDs in t
 ----
 "objects": [
    {
-     // example of the format
      "type": "{OBJECT_TYPE}",
      "identifier": "{id or name of the object}"
    },
