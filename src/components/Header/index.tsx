@@ -5,7 +5,7 @@ import { RiMoonClearLine } from '@react-icons/all-files/ri/RiMoonClearLine';
 import { FiSun } from '@react-icons/all-files/fi/FiSun';
 import { RiDiscordLine } from '@react-icons/all-files/ri/RiDiscordLine';
 import { FiGithub } from '@react-icons/all-files/fi/FiGithub';
-import { FiChevronDown } from '@react-icons/all-files/fi/FiChevronDown';
+import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown';
 import { FiUsers } from '@react-icons/all-files/fi/FiUsers';
 import { FiHelpCircle } from '@react-icons/all-files/fi/FiHelpCircle';
 import { FiExternalLink } from '@react-icons/all-files/fi/FiExternalLink';
@@ -102,8 +102,17 @@ const Header = (props: {
                             >
                                 Docs
                             </a>
+                        </nav>
+                    )}
 
-                            {/* Resources dropdown */}
+                    <div className="header-right">
+                        <Dropdown
+                            location={props.location}
+                            isMobile={isMaxMobileResolution}
+                        />
+
+                        {/* Resources dropdown */}
+                        {isMaxMobileResolution && (
                             <div className="header-dropdown" ref={resourcesRef}>
                                 <button
                                     className="header-nav-link header-dropdown-trigger"
@@ -113,7 +122,7 @@ const Header = (props: {
                                 >
                                     Resources
                                     <IconContext.Provider value={{ className: 'header-chevron' }}>
-                                        <FiChevronDown />
+                                        <AiOutlineCaretDown />
                                     </IconContext.Provider>
                                 </button>
                                 {resourcesOpen && (
@@ -143,14 +152,7 @@ const Header = (props: {
                                     </div>
                                 )}
                             </div>
-                        </nav>
-                    )}
-
-                    <div className="header-right">
-                        <Dropdown
-                            location={props.location}
-                            isMobile={isMaxMobileResolution}
-                        />
+                        )}
 
                         {/* Light / Dark toggle only — Auto applied silently on first load */}
                         {isMaxMobileResolution && (

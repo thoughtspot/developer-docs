@@ -4,6 +4,7 @@ import './index.scss';
 
 export type DocCategory =
     | 'all'
+    | 'guides'
     | 'embedding'
     | 'mcp-server'
     | 'spottercode'
@@ -12,6 +13,7 @@ export type DocCategory =
 
 export const CATEGORY_LABELS: Record<DocCategory, string> = {
     all: 'All docs',
+    guides: 'Guides',
     embedding: 'Embedding',
     'mcp-server': 'MCP server',
     spottercode: 'SpotterCode',
@@ -25,10 +27,11 @@ export const CATEGORY_LABELS: Record<DocCategory, string> = {
  */
 export const CATEGORY_LANDING: Record<DocCategory, string> = {
     all: '/introduction',
-    embedding: '/introduction',
-    'mcp-server': '/mcp-ts-server',
-    spottercode: '/spottercode',
-    'apis-sdk': '/rest-api-v2',
+    guides: '/introduction',
+    embedding: '/getting-started',
+    'mcp-server': '/mcp-integration',
+    spottercode: '/SpotterCode',
+    'apis-sdk': '/VisualEmbedSdk',
     'whats-new': '/whats-new',
 };
 
@@ -45,8 +48,9 @@ export const CATEGORY_LANDING: Record<DocCategory, string> = {
  */
 export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
     all: [],
+    guides: ['introduction'],
     embedding: [
-        'introduction', 'embed-sdk', 'full-embed', 'search-embed', 'liveboard-embed',
+        'embed-sdk', 'full-embed', 'search-embed', 'liveboard-embed',
         'viz-embed', 'app-embed', 'natural-language-search-embed', 'embed-events',
         'custom-actions', 'authentication', 'trusted-auth', 'saml-sso', 'oidc',
         'security-settings', 'custom-styles', 'runtime-filters', 'runtime-sort',
@@ -69,7 +73,7 @@ const SecondaryHeader = (props: {
     const { activeCategory, onCategoryChange } = props;
 
     const categories: DocCategory[] = [
-        'embedding', 'mcp-server', 'spottercode', 'apis-sdk', 'whats-new',
+        'guides', 'embedding', 'mcp-server', 'spottercode', 'apis-sdk', 'whats-new',
     ];
 
     const handleClick = (cat: DocCategory) => {

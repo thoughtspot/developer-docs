@@ -10,7 +10,7 @@ const Docmap = (props: {
 }) => {
     const [toc, setToc] = useState('');
     useEffect(() => {
-        // GraphQL doesn't provide any seperate html for Table of Content. It is included in the document itself.
+        // GraphQL doesn't provide any separate html for Table of Content. It is included in the document itself.
         // To extract the TOC from document, we first create a temporary element to set the document as it's innerHTML.
         // Them we search for TOC using querySelector on the temporary element and then set the obtained TOC to display in the UI.
         const doc = document.createElement('div');
