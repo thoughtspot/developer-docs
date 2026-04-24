@@ -4,6 +4,8 @@ import { customizeDocContent, addScrollListener } from './helper';
 import Footer from '../Footer';
 import Breadcrums from '../Breadcrums';
 import LinkableHeader from '../LinkableHeader';
+import WasThisHelpful from '../WasThisHelpful';
+import CopyPageDropdown from '../CopyPageDropdown';
 import { HOME_PAGE_ID } from '../../configs/doc-configs';
 import parse, { HTMLReactParserOptions, domToReact, attributesToProps } from 'html-react-parser';
 
@@ -12,8 +14,9 @@ const Document = (props: {
     docTitle: string;
     docContent: string;
     isPublicSiteOpen: boolean;
-    shouldShowRightNav: boolean
+    shouldShowRightNav: boolean;
     breadcrumsData: any;
+    markdownBody?: string;
 }) => {
     useEffect(() => {
         customizeDocContent();
@@ -29,26 +32,32 @@ const Document = (props: {
                 ['h2', 'h3', 'h4'].includes(domNode.name) &&
                 !domNode.parent?.attribs?.class?.includes('non-link')
             ) {
-                const props = attributesToProps(domNode.attribs);
-                return (<LinkableHeader {...props} tag={domNode.name} id={domNode.attribs.id}>
+                const nodeProps = attributesToProps(domNode.attribs);
+                return (<LinkableHeader {...nodeProps} tag={domNode.name} id={domNode.attribs.id}>
                     {domToReact(domNode.children, options)}
                 </LinkableHeader>)
             }
+            return undefined;
         }
     };
+
+    const isHomePage = props.pageid === HOME_PAGE_ID;
 
     return (
         <div
             className="documentWrapper"
-            style={{
-                width: !props.shouldShowRightNav ? '100%' : null,
-            }}
+            style={!props.shouldShowRightNav ? { width: '100%' } : undefined}
         >
-            {props.pageid !== HOME_PAGE_ID && (
+            {!isHomePage && (
                 <Breadcrums
                     breadcrumsData={props.breadcrumsData}
                     pageid={props.pageid}
                 />
+            )}
+            {!isHomePage && (
+                <div className="document-toolbar">
+                    <CopyPageDropdown pageTitle={props.docTitle} markdownBody={props.markdownBody} />
+                </div>
             )}
             <div
                 id={props.docTitle}
@@ -56,6 +65,9 @@ const Document = (props: {
             >
                 {parse(props.docContent, options)}
             </div>
+            {!isHomePage && props.isPublicSiteOpen && (
+                <WasThisHelpful />
+            )}
             {props.isPublicSiteOpen && <Footer />}
         </div>
     );
