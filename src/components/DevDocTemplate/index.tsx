@@ -633,6 +633,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             : { height: '0px' }
                     }
                 ></div>
+                <SecondaryHeader
+                    activeCategory={activeCategory}
+                    onCategoryChange={setActiveCategory}
+                />
                 {shouldShowAnnouncementBanner() && (
                     <AnnouncementBanner
                         enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
@@ -667,10 +671,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         }
                     />
                 )}
-                <SecondaryHeader
-                    activeCategory={activeCategory}
-                    onCategoryChange={setActiveCategory}
-                />
                 <main
                     className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}

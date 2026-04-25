@@ -13,11 +13,11 @@ export type DocCategory =
 
 export const CATEGORY_LABELS: Record<DocCategory, string> = {
     all: 'All docs',
-    guides: 'Guides',
-    embedding: 'Embedding',
+    guides: 'Developer Guides',
+    embedding: 'Embedded analytics',
     'mcp-server': 'MCP server',
     spottercode: 'SpotterCode',
-    'apis-sdk': 'APIs & SDK',
+    'apis-sdk': 'APIs & SDK Reference',
     'whats-new': "What's new",
 };
 

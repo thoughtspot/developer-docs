@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { useResizeDetector } from 'react-resize-detector';
 import { IconContext } from '@react-icons/all-files';
 import { RiMoonClearLine } from '@react-icons/all-files/ri/RiMoonClearLine';
@@ -9,6 +9,7 @@ import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown
 import { FiUsers } from '@react-icons/all-files/fi/FiUsers';
 import { FiHelpCircle } from '@react-icons/all-files/fi/FiHelpCircle';
 import { FiExternalLink } from '@react-icons/all-files/fi/FiExternalLink';
+import { FiBook } from '@react-icons/all-files/fi/FiBook';
 
 import TSLogo from '../../assets/svg/ts-logo-white-developer.svg';
 import t from '../../utils/lang-utils';
@@ -22,20 +23,8 @@ const Header = (props: {
     isDarkMode: boolean;
 }) => {
     const { width, ref } = useResizeDetector();
-    const [resourcesOpen, setResourcesOpen] = useState(false);
-    const resourcesRef = useRef<HTMLDivElement>(null);
 
     const isMaxMobileResolution = !(width < MAX_MOBILE_RESOLUTION);
-
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (resourcesRef.current && !resourcesRef.current.contains(e.target as Node)) {
-                setResourcesOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
     const handleThemeToggle = () => {
         const newDark = !props.isDarkMode;
@@ -46,25 +35,36 @@ const Header = (props: {
 
     const resourceLinks = [
         {
-            name: 'Community',
-            link: 'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers-embedding',
-            icon: FiUsers,
-        },
-        {
-            name: 'Support',
-            link: 'https://www.thoughtspot.com/support',
-            icon: FiHelpCircle,
+            name: 'Docs',
+            sub: 'ThoughtSpot Analytics product documentation',
+            link: 'https://docs.thoughtspot.com/home',
+            icon: FiBook,
         },
         {
             name: 'GitHub',
+            sub: 'Visual Embed SDK source code',
             link: 'https://github.com/thoughtspot/visual-embed-sdk',
             icon: FiGithub,
         },
         {
             name: 'Discord',
+            sub: 'Chat with the dev community',
             link: 'https://discord.gg/YBWP65W6te',
             icon: RiDiscordLine,
         },
+        {
+            name: 'Community',
+            sub: 'Connect with other developers',
+            link: 'https://community.thoughtspot.com/customers/s/topic/0TO3n000000erVyGAI/developers-embedding',
+            icon: FiUsers,
+        },
+        {
+            name: 'Support',
+            sub: 'Get help from ThoughtSpot',
+            link: 'https://www.thoughtspot.com/support',
+            icon: FiHelpCircle,
+        },
+
     ];
 
     return (
@@ -74,7 +74,7 @@ const Header = (props: {
                 ref={ref as React.RefObject<HTMLDivElement>}
             >
                 <div className="headerWrapper">
-                    {/* Logo — retained as-is */}
+                    {/* Logo */}
                     <div className="header-logo">
                         <h2 className="m-0 d-inline-block logo">
                             <a
@@ -91,42 +91,19 @@ const Header = (props: {
                         </h2>
                     </div>
 
-                    {isMaxMobileResolution && (
-                        <nav className="header-nav" aria-label="Primary navigation">
-                            {/* Docs link — points to product docs home */}
-                            <a
-                                href="https://docs.thoughtspot.com/home"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="header-nav-link"
-                            >
-                                Docs
-                            </a>
-                        </nav>
-                    )}
-
+                    {/* Right side: Resources | Version | Toggle */}
                     <div className="header-right">
-                        <Dropdown
-                            location={props.location}
-                            isMobile={isMaxMobileResolution}
-                        />
-
-                        {/* Resources dropdown */}
+                        {/* Resources — hover-driven (CSS), consistent with Version dropdown */}
                         {isMaxMobileResolution && (
-                            <div className="header-dropdown" ref={resourcesRef}>
-                                <button
-                                    className="header-nav-link header-dropdown-trigger"
-                                    onClick={() => setResourcesOpen(!resourcesOpen)}
-                                    aria-expanded={resourcesOpen}
-                                    aria-haspopup="true"
-                                >
+                            <div className="header-dropdown">
+                                <button className="header-nav-link header-dropdown-trigger">
                                     Resources
                                     <IconContext.Provider value={{ className: 'header-chevron' }}>
                                         <AiOutlineCaretDown />
                                     </IconContext.Provider>
                                 </button>
-                                {resourcesOpen && (
-                                    <div className="header-dropdown-menu" role="menu">
+                                <div className="header-dropdown-menu">
+                                    <div className="header-dropdown-menu-panel" role="menu">
                                         {resourceLinks.map((item) => {
                                             const Icon = item.icon;
                                             return (
@@ -137,12 +114,14 @@ const Header = (props: {
                                                     rel="noopener noreferrer"
                                                     className="header-dropdown-item"
                                                     role="menuitem"
-                                                    onClick={() => setResourcesOpen(false)}
                                                 >
                                                     <IconContext.Provider value={{ className: 'dropdown-item-icon' }}>
                                                         <Icon />
                                                     </IconContext.Provider>
-                                                    {item.name}
+                                                    <span className="dropdown-item-text">
+                                                        <span className="dropdown-item-name">{item.name}</span>
+                                                        <span className="dropdown-item-sub">{item.sub}</span>
+                                                    </span>
                                                     <IconContext.Provider value={{ className: 'external-link-icon' }}>
                                                         <FiExternalLink />
                                                     </IconContext.Provider>
@@ -150,11 +129,17 @@ const Header = (props: {
                                             );
                                         })}
                                     </div>
-                                )}
+                                </div>
                             </div>
                         )}
 
-                        {/* Light / Dark toggle only — Auto applied silently on first load */}
+                        {/* Version dropdown */}
+                        <Dropdown
+                            location={props.location}
+                            isMobile={isMaxMobileResolution}
+                        />
+
+                        {/* Theme toggle */}
                         {isMaxMobileResolution && (
                             <button
                                 className="theme-toggle-btn"
