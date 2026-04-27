@@ -92,9 +92,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const initialNavContentData = passThroughHandler(navNode.html, params);
     const [navContent, setNavContent] = useState(initialNavContentData || '');
-    const [breadcrumsData, setBreadcrumsData] = useState(
-        fetchChild(initialNavContentData) || [],
-    );
+    // breadcrumsData is derived after processedNavMap is built (see useMemo below)
     const [activeCategory, setActiveCategory] = useState<DocCategory>('guides');
     const [showSearch, setShowSearch] = useState(false);
     const [leftNavOpen, setLeftNavOpen] = useState(false);
@@ -126,6 +124,16 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     // navMap is static (from pageContext); params is stable after mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []);
+
+    // Breadcrumb data built from master nav + all category navs for full coverage
+    const breadcrumsData = React.useMemo(() => {
+        if (typeof window === 'undefined') return [];
+        const allHtmls = [
+            initialNavContentData,
+            ...Object.values(processedNavMap as Record<string, string>),
+        ];
+        return allHtmls.flatMap((html) => fetchChild(html));
+    }, [processedNavMap]);
 
     // Pick the right sidebar content for the active category
     const activeNavContent = React.useMemo(() => {
@@ -671,7 +679,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     className="headerPlaceholder"
                     style={
                         isPublicSiteOpen
-                            ? { height: '65px' }
+                            ? { height: '60px' }
                             : { height: '0px' }
                     }
                 ></div>

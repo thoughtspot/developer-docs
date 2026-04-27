@@ -10,6 +10,7 @@ import { FiUsers } from '@react-icons/all-files/fi/FiUsers';
 import { FiHelpCircle } from '@react-icons/all-files/fi/FiHelpCircle';
 import { FiExternalLink } from '@react-icons/all-files/fi/FiExternalLink';
 import { FiBook } from '@react-icons/all-files/fi/FiBook';
+import { FiBookOpen } from '@react-icons/all-files/fi/FiBookOpen';
 
 import TSLogo from '../../assets/svg/ts-logo-white-developer.svg';
 import t from '../../utils/lang-utils';
@@ -33,7 +34,7 @@ const Header = (props: {
         localStorage.setItem('themeMode', newDark ? 'dark' : 'light');
     };
 
-    const resourceLinks = [
+    const learnLinks = [
         {
             name: 'Docs',
             sub: 'ThoughtSpot Analytics product documentation',
@@ -41,11 +42,14 @@ const Header = (props: {
             icon: FiBook,
         },
         {
-            name: 'GitHub',
-            sub: 'Visual Embed SDK source code',
-            link: 'https://github.com/thoughtspot/visual-embed-sdk',
-            icon: FiGithub,
+            name: 'Training',
+            sub: 'ThoughtSpot Embedded learning paths',
+            link: 'https://training.thoughtspot.com/path/thoughtspot-embedded',
+            icon: FiBookOpen,
         },
+    ];
+
+    const connectLinks = [
         {
             name: 'Discord',
             sub: 'Chat with the dev community',
@@ -64,7 +68,6 @@ const Header = (props: {
             link: 'https://www.thoughtspot.com/support',
             icon: FiHelpCircle,
         },
-
     ];
 
     return (
@@ -91,8 +94,15 @@ const Header = (props: {
                         </h2>
                     </div>
 
-                    {/* Right side: Resources | Version | Toggle */}
+
+                    {/* Right side: Version |  Resources | GitHub | Toggle */}
                     <div className="header-right">
+                        {/* Version dropdown */}
+                        <Dropdown
+                            location={props.location}
+                            isMobile={isMaxMobileResolution}
+                        />
+
                         {/* Resources — hover-driven (CSS), consistent with Version dropdown */}
                         {isMaxMobileResolution && (
                             <div className="header-dropdown">
@@ -104,40 +114,83 @@ const Header = (props: {
                                 </button>
                                 <div className="header-dropdown-menu">
                                     <div className="header-dropdown-menu-panel" role="menu">
-                                        {resourceLinks.map((item) => {
-                                            const Icon = item.icon;
-                                            return (
-                                                <a
-                                                    key={item.name}
-                                                    href={item.link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="header-dropdown-item"
-                                                    role="menuitem"
-                                                >
-                                                    <IconContext.Provider value={{ className: 'dropdown-item-icon' }}>
-                                                        <Icon />
-                                                    </IconContext.Provider>
-                                                    <span className="dropdown-item-text">
-                                                        <span className="dropdown-item-name">{item.name}</span>
-                                                        <span className="dropdown-item-sub">{item.sub}</span>
-                                                    </span>
-                                                    <IconContext.Provider value={{ className: 'external-link-icon' }}>
-                                                        <FiExternalLink />
-                                                    </IconContext.Provider>
-                                                </a>
-                                            );
-                                        })}
+                                        <div className="header-dropdown-section">
+                                            <div className="header-dropdown-section-label">Learn</div>
+                                            {learnLinks.map((item) => {
+                                                const Icon = item.icon;
+                                                return (
+                                                    <a
+                                                        key={item.name}
+                                                        href={item.link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="header-dropdown-item"
+                                                        role="menuitem"
+                                                    >
+                                                        <IconContext.Provider value={{ className: 'dropdown-item-icon' }}>
+                                                            <Icon />
+                                                        </IconContext.Provider>
+                                                        <span className="dropdown-item-text">
+                                                            <span className="dropdown-item-name">{item.name}</span>
+                                                            <span className="dropdown-item-sub">{item.sub}</span>
+                                                        </span>
+                                                        <IconContext.Provider value={{ className: 'external-link-icon' }}>
+                                                            <FiExternalLink />
+                                                        </IconContext.Provider>
+                                                    </a>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="header-dropdown-col-divider" />
+                                        <div className="header-dropdown-section">
+                                            <div className="header-dropdown-section-label">Connect</div>
+                                            {connectLinks.map((item) => {
+                                                const Icon = item.icon;
+                                                return (
+                                                    <a
+                                                        key={item.name}
+                                                        href={item.link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="header-dropdown-item"
+                                                        role="menuitem"
+                                                    >
+                                                        <IconContext.Provider value={{ className: 'dropdown-item-icon' }}>
+                                                            <Icon />
+                                                        </IconContext.Provider>
+                                                        <span className="dropdown-item-text">
+                                                            <span className="dropdown-item-name">{item.name}</span>
+                                                            <span className="dropdown-item-sub">{item.sub}</span>
+                                                        </span>
+                                                        <IconContext.Provider value={{ className: 'external-link-icon' }}>
+                                                            <FiExternalLink />
+                                                        </IconContext.Provider>
+                                                    </a>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Version dropdown */}
-                        <Dropdown
-                            location={props.location}
-                            isMobile={isMaxMobileResolution}
-                        />
+
+                        {/* GitHub nav link */}
+                        {isMaxMobileResolution && (
+                            <a
+                                href="https://github.com/thoughtspot/visual-embed-sdk"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="header-nav-link"
+                                title="Visual Embed SDK on GitHub"
+                            >
+                                <IconContext.Provider value={{ className: 'header-nav-icon' }}>
+                                    <FiGithub />
+                                </IconContext.Provider>
+                                GitHub
+                            </a>
+                        )}
+
 
                         {/* Theme toggle */}
                         {isMaxMobileResolution && (
