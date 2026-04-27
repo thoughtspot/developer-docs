@@ -55,16 +55,8 @@ const CopyPageDropdown = (props: CopyPageDropdownProps) => {
             await navigator.clipboard.writeText(md);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
-        } catch {
-            /* Fallback */
-            const ta = document.createElement('textarea');
-            ta.value = getPageMarkdown();
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.warn('Clipboard write failed:', err);
         }
         setOpen(false);
     };
