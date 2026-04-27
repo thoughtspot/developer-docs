@@ -26,7 +26,7 @@ type FloatingAssistantProps = {
     pageId?:string
 };
 
-const CLOUDFLARE_URL = 'http://spotter-code.thoughtspot-485.workers.dev';
+const CLOUDFLARE_URL = 'https://spotter-code.thoughtspot-485.workers.dev';
 
 async function* parseSseStream(
     response: Response,
