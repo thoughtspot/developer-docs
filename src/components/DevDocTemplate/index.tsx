@@ -14,7 +14,7 @@ import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
 import Header from '../Header';
-import SecondaryHeader, { DocCategory, CATEGORY_PAGEIDS } from '../SecondaryHeader';
+import SecondaryHeader, { DocCategory, CATEGORY_PAGEIDS, CATEGORY_NAV_ID } from '../SecondaryHeader';
 import LeftSidebar from '../LeftSidebar';
 import Docmap from '../Docmap';
 import Document from '../Document';
@@ -58,7 +58,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
         data,
         location,
-        pageContext: { namePageIdMap },
+        pageContext: { namePageIdMap, navMap = {} },
     } = props;
     const isBrowser = () => typeof window !== 'undefined';
 
@@ -95,7 +95,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [breadcrumsData, setBreadcrumsData] = useState(
         fetchChild(initialNavContentData) || [],
     );
-    const [activeCategory, setActiveCategory] = useState<DocCategory>('embedding');
+    const [activeCategory, setActiveCategory] = useState<DocCategory>('guides');
     const [showSearch, setShowSearch] = useState(false);
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
@@ -114,6 +114,25 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return prefersDark;
     });
     const [key, setKey] = useState('');
+
+    // Pre-process all category nav HTMLs once ({{navprefix}} substitution applied to each)
+    const processedNavMap = React.useMemo(() =>
+        Object.fromEntries(
+            Object.entries(navMap as Record<string, string>).map(([cat, html]) => [
+                cat,
+                passThroughHandler(html, params) || '',
+            ]),
+        ),
+    // navMap is static (from pageContext); params is stable after mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []);
+
+    // Pick the right sidebar content for the active category
+    const activeNavContent = React.useMemo(() => {
+        const navId = CATEGORY_NAV_ID[activeCategory];
+        const mapKey = navId.startsWith('nav-') ? navId.slice(4) : null;
+        return (mapKey && processedNavMap[mapKey]) || navContent;
+    }, [activeCategory, processedNavMap, navContent]);
 
     const isCustomPage = _.values(CUSTOM_PAGE_ID).some(
         (pageId: string) => pageId === params[TS_PAGE_ID_PARAM],
@@ -140,14 +159,37 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
+    /* Build pageId → category map by parsing hrefs from each category's nav HTML.
+     * This means writers only need to update nav-*.adoc — no TypeScript changes needed. */
+    const pageIdToCategoryMap = React.useMemo(() => {
+        if (typeof window === 'undefined') return {};
+        const map: Record<string, DocCategory> = {};
+        Object.entries(processedNavMap).forEach(([cat, html]) => {
+            const doc = new DOMParser().parseFromString(html as string, 'text/html');
+            doc.querySelectorAll('a[href]').forEach((a) => {
+                const href = a.getAttribute('href') || '';
+                // hrefs are like /docs/pageid or /pageid — extract the last segment
+                const pageId = href.split('?')[0].split('/').filter(Boolean).pop();
+                if (pageId) map[pageId] = cat as DocCategory;
+            });
+        });
+        return map;
+    }, [processedNavMap]);
+
     /* Detect active category from current page ID */
     useEffect(() => {
         const currentPageId = curPageNode.pageAttributes.pageid;
+        // First try the auto-derived map from nav files
+        if (pageIdToCategoryMap[currentPageId]) {
+            setActiveCategory(pageIdToCategoryMap[currentPageId]);
+            return;
+        }
+        // Fall back to the static CATEGORY_PAGEIDS for any pages not yet in a nav file
         const found = (Object.entries(CATEGORY_PAGEIDS) as [DocCategory, string[]][]).find(
             ([, pageIds]) => pageIds.includes(currentPageId),
         );
         if (found) setActiveCategory(found[0]);
-    }, [curPageNode.pageAttributes.pageid]);
+    }, [curPageNode.pageAttributes.pageid, pageIdToCategoryMap]);
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -423,7 +465,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 <LeftSidebar
                     backLink={getParentBackButtonLink()}
                     navTitle={navTitle}
-                    navContent={navContent}
+                    navContent={activeNavContent}
                     docWidth={width}
                     location={location}
                     setLeftNavOpen={setLeftNavOpen}

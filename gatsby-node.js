@@ -95,12 +95,23 @@ exports.createPages = async function ({ actions, graphql }) {
     `);
 
     const namePageIdMap = {};
+    // Collect per-category nav HTMLs keyed by category name (pageid minus 'nav-' prefix)
+    const navMap = {};
+    const NAV_PARTIAL_PREFIX = 'nav-';
+
     data.allAsciidoc.edges.forEach((e) => {
         const {
             sourceInstanceName: sourceName,
             relativePath: relPath,
         } = e.node.parent;
         const pageId = e.node.pageAttributes.pageid;
+
+        // Collect nav-* files into the navMap (not content pages)
+        if (pageId && pageId.startsWith(NAV_PARTIAL_PREFIX)) {
+            navMap[pageId.slice(NAV_PARTIAL_PREFIX.length)] = e.node.html;
+            return;
+        }
+
         if (sourceName === 'tutorials') {
             const relPathSplit = relPath.split('/');
             const pageIdSplit = pageId.split('__');
@@ -122,13 +133,16 @@ exports.createPages = async function ({ actions, graphql }) {
     data.allAsciidoc.edges.forEach((edge) => {
         const { pageid: pageId } = edge.node.pageAttributes;
 
+        // Skip nav partial files — they are sidebar data, not content pages
+        if (pageId && pageId.startsWith(NAV_PARTIAL_PREFIX)) return;
+
         const docPath = getDocLinkFromEdge(edge);
         actions.createPage({
             path: docPath,
             component: require.resolve(
                 './src/components/DevDocTemplate/index.tsx',
             ),
-            context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+            context: { pageId, navId: DOC_NAV_PAGE_ID, navMap, namePageIdMap },
         });
 
         if (pageId === 'introduction') {
@@ -137,7 +151,7 @@ exports.createPages = async function ({ actions, graphql }) {
                 component: require.resolve(
                     './src/components/DevDocTemplate/index.tsx',
                 ),
-                context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
+                context: { pageId, navId: DOC_NAV_PAGE_ID, navMap, namePageIdMap },
             });
         }
     });
