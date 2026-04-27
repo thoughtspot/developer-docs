@@ -1,0 +1,503 @@
+= Configure, validate and monitor communication channels
+:toc: true
+:toclevels: 3
+
+:page-title: Configure webhook communication channel
+:page-pageid: webhooks-comm-channel
+:page-description: Configure communication channels for webhook delivery
+
+[beta betaBackground]^Beta^
+
+To provide flexibility and programmatic control for ThoughtSpot administrators and developers who want to customize notifications and automate workflows based on Liveboard scheduling events, use the webhook communication channel.
+
+This document describes the steps to xref:webhooks-comm-channel.adoc#_configure_communication_channel_preferences[configure communication channel preferences], xref:webhooks-comm-channel.adoc#_validate_communication_channel_configuration[validate configuration], and xref:webhooks-comm-channel.adoc#_monitor_webhook_delivery_and_job_status[monitor the health and status of communication channels] using REST APIs.
+
+[NOTE]
+====
+* REST APIs support webhook channel configuration for `LIVEBOARD_SCHEDULE` events only.
+* You can configure only one webhook per Org for the Liveboard schedule event.
+====
+
+== Before you begin
+
+Check your application environment for the following prerequisites:
+
+* Ensure that you have access to a ThoughtSpot instance with the required permissions to set communication channel preferences, create and manage webhooks, and schedule Liveboard jobs.
+* Ensure that the REST APIs for setting communication channel preferences and configuring webhooks are enabled on your instance. If the APIs are not available on your instance, contact ThoughtSpot Support.
+
+== Configure communication channel preferences
+
+To create a webhook channel, configure channel preferences, and retrieve the channel settings, use the following REST APIs:
+
+* xref:webhooks-comm-channel.adoc#_create_a_webhook_communication_channel[`POST /api/rest/2.0/system/preferences/communication-channels/configure`] +
+* xref:webhooks-comm-channel.adoc#_view_the_communication_channel_preferences[`POST /api/rest/2.0/system/preferences/communication-channels/search`]
+
+=== Create a webhook communication channel
+
+To create the webhook communication channel and set messaging preferences, send a `POST` request to the `/api/rest/2.0/system/preferences/communication-channels/configure` API endpoint. You can set preferences at the cluster level for all Orgs or at the Org level. When both are configured, the preferences set at the Org level take precedence.
+
+==== Request parameters
+
+[width="100%" cols="1,2,6"]
+[options='header']
+|=====
+|Parameter|Description |
+.3+| `cluster_preferences` 2+|__Array of objects__. Sets default preferences for all Orgs in the instance. You must specify the following parameters:
+
+| `event_type`
+a|__String__. Type of event for which communication channels are configured. For the Liveboard schedule event, set the parameter value to `LIVEBOARD_SCHEDULE`.
+
+| `channels` a|
+__Array of strings__. Communication channels for the event type specified in the request. Valid values are: +
+
+* `EMAIL`
+* `WEBHOOK`
+
+To create a webhook channel for the Liveboard schedule event, specify `WEBHOOK`.
+
+.5+| `org_preferences` 2+|__Array of objects__. By default, preferences configured at the cluster level apply to all Orgs in the instance. To override default preferences for your Org, set Org-specific preferences:
+
+| `org_identifier`  a|
+__String__. Name or ID of the Org.
+| `preferences` a|
+__Array of objects__. Define the following parameters to set communication channel preferences for the Org. If preferences are not set, the Org inherits the default preferences applied at the cluster level.
+
+* `event_type` +
+__String__. Type of the event for which communication channels are configured. For the Liveboard schedule event, set the parameter value as `LIVEBOARD_SCHEDULE`.
+* `channels` +
+__Array of strings__. Communication channels for the event type specified in the request. Valid values are: +
+** `EMAIL`
+** `WEBHOOK`
+
++
+To set up a webhook channel for the Liveboard schedule event, specify `WEBHOOK`.
+
+| `operation` a|__String__. Type of operation to perform. The following options are available:
+
+** `REPLACE` - To replace default preferences.
+** `RESET` - To restore default preferences. For a reset operation, you must also specify the event type. Note that this operation removes any Org-specific overrides and restores the default preferences configured at the cluster level.
+
+| `reset_events` a|__Array of strings__. For `RESET` operations, specify the event type to reset. Note that the reset operation removes Org-specific configuration for the events specified in `reset_events`.
+|=====
+
+==== Example request
+
+The following example shows the request body for setting a communication channel preference at the cluster level.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/configure'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "cluster_preferences": [
+    {
+      "event_type": "LIVEBOARD_SCHEDULE",
+      "channels": [
+        "WEBHOOK"
+      ]
+    }
+  ]
+}'
+----
+
+The following example shows the request body for setting a communication channel preference at the Org level.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/configure'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "org_preferences": [
+    {
+      "org_identifier": "testOrg1",
+      "operation": "REPLACE",
+      "preferences": [
+        {
+          "event_type": "LIVEBOARD_SCHEDULE",
+          "channels": [
+            "WEBHOOK"
+          ]
+        }
+      ]
+    }
+  ]
+}'
+----
+
+==== API response
+If the request is successful, the API returns a 204 response.
+
+=== View the communication channel preferences
+
+To review and audit the communication channel preferences set on your instance, send a `POST` request to the `/api/rest/2.0/system/preferences/communication-channels/search` API endpoint.
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`cluster_preferences` +
+__Optional__ a|__Array of strings__. To filter the API response by event type, specify the event type for which the communication channel preference is set at the cluster level.
+| `org_preferences` +
+__Optional__ a|__Array of strings__. To filter the API response by Org-specific overrides, specify the following parameters:
+
+* `org_identifier`  +
+__String__. Name or ID of the Org.
+* `event_types` +
+__Array of strings__. Event types to search for. To get channel preferences for Liveboard schedule events, specify `LIVEBOARD_SCHEDULE`.
+|=====
+
+==== Example request
+
+The following request fetches channel preferences configured for the Liveboard schedule event at the cluster level:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "cluster_preferences": [
+    "LIVEBOARD_SCHEDULE"
+  ]
+}'
+----
+
+The following request fetches channel preferences configured for the Liveboard schedule event at the Org level:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/preferences/communication-channels/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "org_preferences": [
+    {
+      "org_identifier": "testOrg1",
+      "event_types": [
+        "LIVEBOARD_SCHEDULE"
+      ]
+    }
+  ]
+}'
+----
+
+==== Example response
+
+If the request is successful, the API returns the channel preference details.
+
+The following example shows the communication channel preferences configured for the specified event type at the cluster level:
+
+[source,JSON]
+----
+{
+  "cluster_preferences": [],
+  "org_preferences": [
+    {
+      "org": {
+        "id": "0",
+        "name": "Primary"
+      },
+      "preferences": []
+    },
+    {
+      "org": {
+        "id": "1532970882",
+        "name": "testOrg"
+      },
+      "preferences": [
+        {
+          "event_type": "LIVEBOARD_SCHEDULE",
+          "channels": [
+            "EMAIL",
+            "WEBHOOK"
+          ]
+        }
+      ]
+    },
+    {
+      "org": {
+        "id": "2100019165",
+        "name": "testOrg1"
+      },
+      "preferences": [
+        {
+          "event_type": "LIVEBOARD_SCHEDULE",
+          "channels": [
+            "WEBHOOK"
+          ]
+        }
+      ]
+    }
+  ]
+}
+----
+
+The following example shows the preferences returned for a specific Org:
+
+[source,JSON]
+----
+{
+  "cluster_preferences": [],
+  "org_preferences": [
+    {
+      "org": {
+        "id": "2100019165",
+        "name": "testOrg1"
+      },
+      "preferences": [
+        {
+          "event_type": "LIVEBOARD_SCHEDULE",
+          "channels": [
+            "WEBHOOK"
+          ]
+        }
+      ]
+    }
+  ]
+}
+----
+
+== Validate communication channel configuration
+To ensure that a communication channel configuration is properly configured and can receive events, use the `/api/rest/2.0/system/communication-channels/validate` API endpoint and validate the communication channel configuration.
+
+=== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`channel_type` a|__String__. Type of communication channel to validate. Specify `WEBHOOK`.
+|`channel_identifier`|__String__. ID or name of the communication channel. For webhook channels, specify the webhook ID. You can retrieve the webhook ID via an API request to the `POST /api/rest/2.0/webhooks/search` endpoint.
+|`event_type` |__String__. Event type associated with the specified channel. For webhook channels, the supported event type is `LIVEBOARD_SCHEDULE`.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/communication-channels/validate'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "channel_type": "WEBHOOK",
+  "channel_identifier": "3791ad80-70e8-4222-bf11-fb8a5f1b5bf4",
+  "event_type": "LIVEBOARD_SCHEDULE"
+}'
+----
+
+=== Example response
+
+If the validation is successful, the API returns a response indicating the webhook channel validation state.
+
+The following response shows validation status for a webhook channel:
+
+[source,JSON]
+----
+{
+   "channel_type":"WEBHOOK",
+   "channel_id":"9185f9be-f237-42bf-b452-c2dc897e1673",
+   "channel_name":"Zapier",
+   "event_type":"LIVEBOARD_SCHEDULE",
+   "job_id":"n.validation-0e55b1de-8c30-48d1-8c73-2f0365e03641",
+   "result_code":"SUCCESS",
+   "details":[
+      {
+         "validation_step":"HTTP_CONNECTION_CHECK",
+         "status":"SUCCESS",
+         "http_status":200,
+         "error_message":null,
+         "aws_s3_info":null
+      }
+   ]
+}
+----
+
+The following response shows the validation success and failure errors for a webhook channel with AWS s3 storage configuration:
+
+[source,JSON]
+----
+{
+   "channel_type":"WEBHOOK",
+   "channel_id":"52314c1c-8d1d-40d1-8dba-3f77d219b41a",
+   "channel_name":"nebula-webhooks-gcp-05012026-webhook1",
+   "event_type":"LIVEBOARD_SCHEDULE",
+   "job_id":"n.validation-37688eaf-6cb1-4f7e-a6f2-0658c1d678eb",
+   "result_code":"PARTIAL_SUCCESS",
+   "details":[
+      {
+         "validation_step":"STORAGE_FILE_UPLOAD_CHECK",
+         "status":"FAILED",
+         "http_status":null,
+         "error_message":"failed to assume role 'arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole': operation error STS: AssumeRole, https response error StatusCode: 403, RequestID: 8ba1a7a1-65c2-4901-8d4a-bf150687e92c, api error AccessDenied: User: arn:aws:sts::418295724037:assumed-role/cell-89b3a1c7-coms-lambda-role/cell-89b3a1c7-coms-api is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole. Ensure the role's trust policy allows ThoughtSpot and the External ID matches",
+         "aws_s3_info":{
+            "bucket_name":"my-webhook-files",
+            "file_name":"validation_dummy_20260330_131030.pdf",
+            "object_key":"webhooks/cluster-abc/org-1/user-123/liveboard/report.pdf"
+         }
+      },
+      {
+         "validation_step":"HTTP_CONNECTION_CHECK",
+         "status":"SUCCESS",
+         "http_status":200,
+         "error_message":null,
+         "aws_s3_info":null
+      }
+   ]
+}
+----
+
+== Monitor webhook delivery and job status
+To monitor job status for communication channels such as webhook, use the `/api/rest/2.0/jobs/history/communication-channels/search` API endpoint.
+
+
+=== Request parameters
+In the API request, you must provide channel details such as channel type, ID, and event type, or specify the job ID.
+
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter|Description
+
+|`channel_type` a|__String__. Type of communication channel to validate. Specify `WEBHOOK` for webhook channels.
+|`job_ids` |__Array of strings__. One or more IDs of the job. To get the ID for a given webhook channel, check the API response from the `/api/rest/2.0/system/communication-channels/validate` endpoint.
+
+Required parameter if no channel identifier and event ID are specified in the API request.
+|`channel_identifiers`|__String__. IDs or names of the communication channel. Required if no job ID is specified.
+For webhook channels, specify the webhook ID. You can retrieve the webhook IDs from the `/api/rest/2.0/webhooks/search` API endpoint via an API request.
+|`channel_status` a|__String__. Status of the channel or the job. Specify one of the following values:
+
+* `PENDING` +
+Gets a list of all pending webhook deliveries that are currently queued but not yet attempted.
+* `RETRY` +
+Gets a list of webhook delivery jobs that are in the retry state.
+* `SUCCESS` +
+Gets a list of jobs that were delivered successfully.
+* `FAILED` +
+Gets a list of failed job deliveries.
+
+
+|`events` +
+__Optional__ a| Allows filtering API response by event type and ID.
+
+* `type` +
+Event type for which the webhook delivery is triggered. Default is `LIVEBOARD_SCHEDULE`.
+* `identifier` +
+ID of the event.
+
+|`start_epoch_time_in_millis` |__Decimal__. Allows filtering API response by records that were created on or after the specified epoch milliseconds.
+|=====
+
+
+=== Example request
+The following example shows the sample request with job ID.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/jobs/history/communication-channels/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer c2****************==' \
+  --data-raw '{
+  "channel_type": "WEBHOOK",
+  "job_ids": [
+    "n.validation-0e55b1de-8c30-48d1-8c73-2f0365e03641"
+  ]
+}'
+----
+
+=== Example response
+If your request is successful, the API returns the job details for the specified job or channel ID.
+
+[source,JSON]
+----
+{
+   "jobs":[
+      {
+         "id":"n.validation-0e55b1de-8c30-48d1-8c73-2f0365e03641",
+         "status":"SUCCESS",
+         "creation_time_in_millis":1774876441988,
+         "event":{
+            "type":"LIVEBOARD_SCHEDULE",
+            "id":"validation-9185f9be-f237-42bf-b452-c2dc897e1673",
+            "name":null,
+            "run_id":null
+         },
+         "recipients":null,
+         "detail":"",
+         "try_count":1
+      }
+   ]
+}
+----
+
+For failed jobs, the status is set to `FAILED`, and the `detail` parameter in the API response contains the error details.
+
+[source,JSON]
+----
+{
+   "jobs":[
+      {
+         "id":"n.validation-900ea028-5254-4d38-a03c-26fb41aa632b",
+         "status":"FAILED",
+         "creation_time_in_millis":1774890524301,
+         "event":{
+            "type":"LIVEBOARD_SCHEDULE",
+            "id":"validation-52314c1c-8d1d-40d1-8dba-3f77d219b41a",
+            "name":null,
+            "run_id":null
+         },
+         "recipients":null,
+         "detail":"STORAGE_FILE_UPLOAD_CHECK (bucket: my-webhook-files): failed to assume role 'arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole': operation error STS: AssumeRole, https response error StatusCode: 403, RequestID: 25182019-58ca-4003-8048-6713bd7d7d4e, api error AccessDenied: User: arn:aws:sts::418295724037:assumed-role/cell-89b3a1c7-coms-lambda-role/cell-89b3a1c7-coms-api is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::123456789012:role/ThoughtSpotDeliveryRole. Ensure the role's trust policy allows ThoughtSpot and the External ID matches",
+         "try_count":1
+      }
+   ]
+}
+----
+
+////
+If the webhook channel has the S3 storage configured, the API returns the job status details for the specified webhook.
+
+[source,JSON]
+----
+{
+   "jobs":[
+      {
+         "id":"n.validation-900ea028-5254-4d38-a03c-26fb41aa632b",
+         "status":"SUCCESS",
+         "creation_time_in_millis":1774890524301,
+         "event":{
+            "type":"LIVEBOARD_SCHEDULE",
+            "id":"validation-52314c1c-8d1d-40d1-8dba-3f77d219b41a",
+            "name":null,
+            "run_id":null
+         },
+         "recipients":null,
+         "detail":"",
+         "try_count":1
+      }
+   ]
+}
+----
+////
+
+
+== Additional resources
+
+* xref:webhooks-lb-schedule.adoc[Deliver Liveboard reports to an external application].
+* xref:webhooks-s3-storage.adoc[Deliver Liveboard reports to AWS S3 storage bucket].

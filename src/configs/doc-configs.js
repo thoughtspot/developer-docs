@@ -13,6 +13,19 @@ module.exports = {
     NOT_FOUND_PAGE_ID: '404-error',
     HOME_PAGE_ID: 'introduction',
     NOT_FOUND_GO_HOME_PAGE_ID: 'introduction',
+    HOME_ANNOUNCEMENT_BANNER: {
+        enabled: true,
+        message:
+            'is now available. Read about the new features and enhancements.',
+        // Swap this between:
+        // - Pre-GA: release-specific URL (full http(s) URL), ex:
+        //   'https://developers.thoughtspot.com/docs/26.3.0.cl?pageid=whats-new'
+        // - GA: ' /docs/whats-new'
+        //linkHref: '/docs/whats-new',
+        linkHref: '/docs/26.4.0.cl?pageid=whats-new',
+        linkText: 'Version 26.4.0.cl',
+        openInNewTab: true,
+    },
     TYPE_DOC_PREFIX: 'typedoc',
     DEFAULT_HOST: 'https://try-everywhere.thoughtspot.cloud',
     DEFAULT_PREVIEW_HOST: 'https://try-everywhere.thoughtspot.cloud/v2',
@@ -34,22 +47,29 @@ module.exports = {
         DEV: 'dev',
     },
     VERSION_DROPDOWN: [
-        {
-            label: '10.14.0.cl',
-            link: ' ',
+	    {
+            label: '26.4.0.cl',
+            link: '26.4.0.cl',
             subLabel: 'Cloud (Latest)',
+            iframeUrl: 'https://developer-docs-26-4-0-cl.vercel.app/docs/',
+        },
+	    {
+            label: '26.3.0.cl',
+            link: '26.3.0.cl',
+            subLabel: 'Cloud',
+            iframeUrl: 'https://developer-docs-26-3-0-cl.vercel.app/docs/',
         },
         {
-            label: '10.13.0.cl',
-            link: '10.13.0.cl',
+            label: '26.2.0.cl',
+            link: '26.2.0.cl',
             subLabel: 'Cloud',
-            iframeUrl: 'https://developer-docs-10-13-0-cl.vercel.app/docs/',
+            iframeUrl: 'https://developer-docs-26-2-0-cl.vercel.app/docs/',
         },
         {
-            label: '10.12.0.cl',
-            link: '10.12.0.cl',
+            label: '10.15.0.cl',
+            link: '10.15.0.cl',
             subLabel: 'Cloud',
-            iframeUrl: 'https://developer-docs-10-12-0-cl.vercel.app/docs/',
+            iframeUrl: 'https://developer-docs-10-15-0-cl.vercel.app/docs/',
         },
         {
             label: '10.10.0.sw',
@@ -63,30 +83,6 @@ module.exports = {
             subLabel: 'Software',
             iframeUrl: 'https://visual-embed-sdk-10-1.vercel.app/docs/',
         },
-        //{
-        //    label: '10.11.0.cl',
-        //    link: '10.11.0.cl',
-        //    subLabel: 'Cloud',
-        //    iframeUrl: 'https://developer-docs-10-11-0-cl.vercel.app/docs/',
-        //},
-        //{
-        //    label: '10.10.0.cl',
-        //     link: '10.10.0.cl',
-        //    subLabel: 'Cloud',
-        //    iframeUrl: 'https://developer-docs-10-10-0-cl.vercel.app/docs/',
-        //},
-        //{
-        //     label: '10.9.0.cl',
-        //     link: '10.9.0.cl',
-        //     subLabel: 'Cloud',
-        //     iframeUrl: 'https://developer-docs-10-9-0-cl.vercel.app/docs/',
-        //},
-        //{
-        //     label: '10.8.0.cl',
-        //     link: '10.8.0.cl',
-        //     subLabel: 'Cloud',
-        //     iframeUrl: 'https://developer-docs-10-8-0-cl.vercel.app/docs',
-        //},
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',

@@ -1,0 +1,407 @@
+= JWT ABAC Beta implementation -> ABAC via RLS
+:toc: true
+:toclevels: 2
+
+:page-title: Migrating JWT ABAC Beta implementation to ABAC via RLS
+:page-pageid: jwt-abac-beta-migration-guide
+:page-description: Steps for migrating JWT ABAC Beta implementation to ABAC via RLS
+
+In this migration scenario, we'll migrate your xref:abac-user-parameters-beta.adoc[JWT ABAC Beta implementation] to ABAC via RLS.
+
+== Scope and prerequisites
+
+This document assumes that you are currently using the `/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` endpoints for ABAC token generation, and provides instructions to migrate your ABAC implementation to the `/api/rest/2.0/auth/token/custom` API endpoint. These migration steps apply only if:
+
+* Your implementation has used the legacy method of generating JWT tokens via `/api/rest/2.0/auth/token/full` or `/api/rest/2.0/auth/token/object` API endpoint.
+* Your instance has the necessary configuration settings enabled for migrating JWT token generation process from the `/api/rest/2.0/auth/token/full` to the `/api/rest/2.0/auth/token/custom` API endpoint.
+//refer to the xref:jwt-migration.adoc[JWT ABAC Beta migration guide].
+
+[IMPORTANT]
+====
+The legacy JWT ABAC Beta implementation is deprecated and is not recommended for ABAC implementations.
+====
+
+== Migration steps
+To migrate JWT ABAC Beta implementation to the ABAC via RLS rules method, complete the following steps:
+
+* xref:abac-migration-from-jwt-beta.adoc#_review_your_jwt_abac_beta_implementation[Review your JWT ABAC Beta implementation]
+* xref:abac-migration-from-jwt-beta.adoc#_set_up_abac_via_rls[Set up ABAC via RLS]
+* xref:abac-migration-from-jwt-beta.adoc#_review_the_configuration[Review the configuration]
+* xref:abac-migration-from-jwt-beta.adoc#_test_the_migration[Test the migration]
+* Roll out and decommission legacy JWT ABAC
+
+== Review your JWT ABAC Beta implementation
+
+A typical JWT ABAC Beta implementation includes the following:
+
+JWT generation via `POST /api/rest/2.0/auth/token/full`, with `runtime_filters` and other attributes populated for creating data security rules. Depending on user requirements, the values may be set on all models or on specific models.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/full'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "secured_user",
+  "secret_key": "{secret_key}",
+  "user_parameters": {
+    "runtime_filters": [
+      {
+        "column_name": "Country",
+        "operator": "IN",
+        "values": ["Germany", "Australia"],
+        "persist": true
+      }
+    ],
+    "parameters": [
+      {
+        "name": "Secured",
+        "values": ["f65fee3a-75f4-4e6e-a801-995113566d68"],
+        "persist": true
+      }
+    ]
+  }
+}'
+----
+
+You may also be using a `parameter` property to pass a validation in the data model and ensure that the model is secured by default, as shown in the following token request example:
+
+[.bordered]
+[.widthAuto]
+image:./images/jwt-beta-parameter-security.png[JWT Beta migration test]
+
+Ensure that indexing is disabled on all sensitive columns in your tables.
+
+=== Retrieve values stored for each user (Optional)
+If required, you can retrieve the values previously stored for each user after token generation. To do so, get user metadata via the `/api/rest/2.0/users/search` API endpoint. The response from this call provides a list of filter and variable values in the `user_parameters` section of the output.
+
+For example:
+
+[source,JSON]
+----
+[{
+	"id": "0000084b-1e75-d506-8258-0b6abbb863ed",
+	"name": "testjwtuser",
+	"display_name": "testjwtuser",
+	[...]
+	"user_parameters": {
+		"<org_id>": {
+          "runtimeFilters": [{
+            "columnName": "Country",
+			"operator": "IN",
+			"values": ["Germany", "Australia"]
+          }],
+        }
+	},
+	"variable_values": {}
+}]
+----
+
+This can be helpful when you design equivalent ABAC via RLS rules and want to validate that the same logic will be enforced.
+
+== Set up ABAC via RLS
+Configure ABAC via RLS while keeping the legacy Beta JWT ABAC in place.
+
+[.lead]
+
+* Create variables (type `FORMULA_VARIABLE`) using `/api/rest/2.0/template/variables/create`. These variables will be referenced in your RLS security rules.
+* link:https://docs.thoughtspot.com/cloud/latest/rls-variables-reference#_defining_a_row_level_security_rule_with_variables[Create RLS rules on tables and reference these variables in the rules, window=_blank].
+
+[.bordered]
+[.widthAuto]
+image:./images/jwt-rls-rule.png[RLS rules]
+
+Where applicable, replicate your existing JWT ABAC Beta logic. To add more than one condition, you can use the `AND` operator.
+
+To assign values to these variables, define the `variable_values` in your token generation request to `/api/rest/2.0/auth/token/custom`. These attributes will replace conditions defined via `runtime_filters` in your current JWT ABAC Beta implementation.
+
+[NOTE]
+====
+The variable values can be scoped to specific models, so that different security rules can be applied to different data sets in ThoughtSpot.
+====
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/custom'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "secured_user",
+  "secret_key": "{secret_key}",
+  "persist_option": "REPLACE",
+  "variable_values": [
+    {
+      "name": "country_rls_var",
+      "values": [
+        "Germany",
+        "Australia"
+      ]
+    },
+    {
+      "name": "category_rls_var",
+      "values": [
+        "Jeans",
+        "Jackets"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "type": "LOGICAL_TABLE",
+      "identifier": "model1-guid"
+    },
+    {
+      "type": "LOGICAL_TABLE",
+      "identifier": "model2-guid"
+    }
+  ]
+}'
+----
+[.lead]
+
+Keep indexing disabled on all sensitive columns.
+
+[NOTE]
+====
+* RLS can be turned on or off per model created from a table. When enabled on a model, its queries honor the table’s RLS rules; when disabled, users see all data allowed by table-level RLS.
+* ThoughtSpot administrators are exempt from RLS by default. For more information, see link:https://docs.thoughtspot.com/cloud/latest/security-rls-concept#exempt-rls[How rule-based RLS works, window=_blank].
+====
+
+=== Verify variable values for users (Optional)
+Verify that variable values are correctly assigned to users using one of the following methods:
+
+* Send a `POST` request to the `/api/rest/2.0/users/search` with user details, and explore the `variable_values` section of the response payload.
+* Send a `POST` request to the `/api/rest/2.0/template/variables/search` API endpoint with variable details. In the request body, specify the `response_content` as `METADATA_AND_VALUES`, and explore the variable values for each user in the response payload.
+
+If you want to update the values of variables, use either `/api/rest/2.0/template/variables/{identifier}/update-values` or `/api/rest/2.0/auth/token/custom` API endpoint.
+
+== Review the configuration
+Before you begin testing, your setup should have the following JWT ABAC configuration:
+
+* Your JWT ABAC Beta implementation has tokens generated for your users via `POST /api/rest/2.0/auth/token/full`, with `runtime_filters` and required parameters.
+* Variables are configured, RLS rules with variables are applied on the tables, and the values for variables are defined in the tokens generated via `/api/rest/2.0/auth/token/custom` API endpoint.
+
+== Test the migration
+
+We recommend testing the migration in three stages:
+
+. Verify user entitlements when both ABAC via RLS and JWT ABAC Beta tokens are enabled.
+. Remove filtering conditions on legacy JWT Beta tokens to test how security rules function with solely ABAC via RLS.
+. Remove legacy JWT Beta and verify the ABAC via RLS.
+
+=== Phase 1: ABAC via RLS while JWT ABAC Beta token is still active
+
+In this step, create the following token requests:
+
+* Set security rules for JWT Beta using `POST /api/rest/2.0/auth/token/full` API endpoint. For example:
++
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/full'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "secured_user",
+  "secret_key": "{secret_key}",
+  "user_parameters": {
+    "runtime_filters": [
+      {
+        "column_name": "Country",
+        "operator": "IN",
+        "values": ["Germany", "Australia"],
+        "persist": true
+      }
+    ],
+    "parameters": [
+      {
+        "name": "Secured",
+        "values": ["f65fee3a-75f4-4e6e-a801-995113566d68"],
+        "persist": true
+      }
+    ]
+  }
+}'
+----
+
+* Set variable values for ABAC via RLS using `POST /api/rest/2.0/auth/token/custom` API endpoint. For example:
++
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/custom'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "secured_user",
+  "secret_key": "{secret_key}",
+  "persist_option": "REPLACE",
+  "variable_values": [
+    {
+      "name": "country_rls_var",
+      "values": [
+        "Germany",
+        "Australia"
+      ]
+    }
+  ]
+}'
+----
+
+Since both conditions are similar, the data should be filtered uniformly as illustrated in the following diagram. If the filtering conditions differ, the resulting data should be the intersection of the two.
+
+[.bordered]
+[.widthAuto]
+image:./images/jwt-beta-migration-test1.png[JWT Beta migration 1]
+
+=== Phase 2: Bypass JWT ABAC Beta attributes
+If the test above is conclusive, the next step is to test bypassing legacy JWT Beta attributes. To achieve this:
+
+. Remove all conditions for filters and leave parameters unchanged.
++
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/full'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "secured_user",
+  "secret_key": "{secret_key}",
+  "user_parameters": {
+    "runtime_filters": [
+    ],
+    "parameters": [
+      {
+        "name": "Secured",
+        "values": ["f65fee3a-75f4-4e6e-a801-995113566d68"],
+        "persist": true
+      }
+    ]
+  }
+}'
+----
+. Verify that your users no longer have `runtime_filters` values by calling the `POST /api/rest/2.0/users/search` API. The user property must show an empty `user_parameters.runtimeFilters` property.
+
+. With your user no longer having filtering conditions applied via JWT ABAC Beta, create a login token passing security rules using `POST /api/rest/2.0/auth/token/custom` API endpoint to implement ABAC via RLS.
++
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/custom'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "secured_user",
+  "secret_key": "{secret_key}",
+  "persist_option": "REPLACE",
+  "variable_values": [
+    {
+      "name": "country_rls_var",
+      "values": [
+        "Germany",
+        "Australia"
+      ]
+    }
+  ]
+}'
+----
+
+In this configuration, filtering rules will only follow ABAC via RLS rules defined via `variable_values`, because the legacy JWT Beta token doesn't include any specific filter conditions and allows all.
+
+[.bordered]
+[.widthAuto]
+image:./images/jwt-beta-migration-test2.png[JWT Beta migration test 2]
+
+=== Phase 3: Remove all JWT ABAC Beta configuration
+After you have validated behavior with JWT ABAC Beta attributes bypassed, remove the legacy JWT check parameter from your data model.
+
+. Open the data model that you secured via JWT ABAC Beta token implementation and do the following:
+.. Delete the filter based on the security formula.
+.. Delete the security formula.
+.. Delete the security parameter.
+.. Click **Save Changes**.
+. Authenticate your users with the token generated via `/api/rest/2.0/auth/token/custom` API endpoint. Authenticate users exclusively using `POST /api/rest/2.0/auth/token/custom` API endpoint. Ensure that `variable_values` are defined in the token.
+
+This will result in the same filtering logic for that user, with the JWT ABAC Beta token no longer applied.
+
+[.bordered]
+[.widthAuto]
+image:./images/jwt-beta-migration-test3.png[JWT Beta migration test 3]
+
+
+== Examples for mapping JWT ABAC Beta expressions to ABAC via RLS
+
+The following examples show how to map common JWT ABAC Beta expressions to equivalent RLS rules.
+
+[cols="1,4,2", options="header"]
+|===
+|Operator
+|Expression in JWT ABAC Beta
+|Equivalent RLS expression (ABAC via RLS)
+
+|`EQ` (equal)
+a|[source,json]
+----
+"runtime_filters": [
+  {
+    "column_name": "Country",
+    "values": ["Germany"],
+    "operator": "EQ"
+  }
+]
+----
+|`country = ts_var(country_rls_var)`
+
+|`IN` (in)
+a|[source,json]
+----
+"runtime_filters": [
+  {
+    "column_name": "Country",
+    "values": ["Germany","Australia"],
+    "operator": "IN"
+  }
+]
+----
+|`country = ts_var(country_rls_var)` (multi-value variable)
+
+|`NE` (not equal)
+a|[source,json]
+----
+"runtime_filters": [
+  {
+    "column_name": "Country",
+    "values": ["Germany"],
+    "operator": "NE"
+  }
+]
+----
+|`country != ts_var(country_rls_var)`
+
+|`NOT_IN` (not in)
+a|[source,json]
+----
+"runtime_filters": [
+  {
+    "column_name": "Country",
+    "values": ["Germany","Australia"],
+    "operator": "NOT_IN"
+  }
+]
+----
+|`country != ts_var(country_rls_var)` (multi-value variable)
+|===
+
+[NOTE]
+====
+RLS supports multi-value variables and rich expression functions (such as `contains`). Choose the appropriate operator or function depending on how you want to evaluate lists or partial matches in your RLS rules.
+====
+
+
+== Additional resources
+
+* For information about JWT with custom variables and RLS rules, see xref:abac_rls-variables.adoc[ABAC via RLS rules].
+* For information about RLS, see xref:rls-rules.adoc[RLS Rules] and link:https://docs.thoughtspot.com/cloud/latest/security-rls[ThoughtSpot Product Documentation, window=_blank].

@@ -21,14 +21,27 @@ const VersionIframe: React.FC<VersionIframeProps> = ({
             const mainUrlParams = new URLSearchParams(window.location.search);
             if (mainUrlParams.has('pageid')) {
                 url.searchParams.set('pageid', mainUrlParams.get('pageid'));
+                const pageId = mainUrlParams.get('pageid');
+                const pageIdSplit = pageId.split('__');
+                if (pageIdSplit.length > 1) {
+                    // Tutorials module pages have pageids like {subdirectory}_{real_url_ending}, must be split to generate matching URL
+                    const completePath = `tutorials/${pageIdSplit.join('/')}/`;
+                    url.pathname += completePath;
+                } else {
+                    // Other pages are not tutorials with subdirectories, so just add the pageid
+                    url.pathname += `${pageId}/`;
+                }
             } else if (mainUrlParams.has('pageId')) {
                 url.searchParams.set('pageid', mainUrlParams.get('pageId'));
+            }
+            if (location?.hash) {
+                url.hash = location?.hash;
             }
             url.searchParams.set('_iframe', '1');
         }
 
         return url.toString();
-    }, [iframeUrl, isDarkMode, location?.search]);
+    }, [iframeUrl, isDarkMode, location?.search, location?.hash]);
 
     return (
         <div className="version-iframe-container">

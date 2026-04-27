@@ -64,9 +64,9 @@ For more information about the Liveboard embed object, classes, methods, interfa
 
 == Customize Liveboard view
 
-The second argument of the `LiveboardEmbed()` constructor is a `xref:LiveboardViewConfig.adoc[LiveboardViewConfig]` object. This object includes several attributes and properties that are frequently used to customize the `LiveboardEmbed` component to fit within the embedding app's UI experience.
+The `LiveboardEmbed` component includes the `xref:LiveboardViewConfig.adoc[LiveboardViewConfig]` object. This object provides various attributes and properties to customize the xref:css-customization.adoc[look and feel of the Liveboard page], xref:embed-actions.adoc[control the visibility of menu actions] and features, and xref:embed-events.adoc[manage interactions between the host and embedded app].
 
-The most common customization is xref:embed-actions.adoc[controlling the visibility of menu items in the embedded view] by configuring the `disabledActions`, `hiddenActions`, and `visibleActions` properties with an array of xref:Action.adoc[Action] IDs. For information about the other frequently used properties, see xref:embed-pinboard.adoc#common-customizations[common customization options].
+The most common customization is controlling the visibility of menu items in the embedded view by configuring the `disabledActions`, `hiddenActions`, and `visibleActions` properties with an array of xref:Action.adoc[Action] IDs. For information about the other frequently used properties, see xref:embed-pinboard.adoc#common-customizations[common customization options].
 
 == Register, handle, and trigger events
 
@@ -113,7 +113,7 @@ Parameters such as `hideLiveboardHeader`, `hideTabPanel`, `isLiveboardHeaderStic
 [.widthAuto]
 image::./images/liveboard_view_config_callouts_2.png[LiveboardViewConfig parameters]
 
-The `hideLiveboardHeader` property removes the entire header area above the Liveboard, including filters and the overall Liveboard menu, which is a common pattern for "read-only' use cases or rebuilding your own menus and buttons using xref:embed-events.adoc[HostEvents].
+The `hideLiveboardHeader` property removes the entire header area above the Liveboard, including filters and the overall Liveboard menu, which is a common pattern for "read-only" use cases or rebuilding your own menus and buttons using xref:embed-events.adoc[HostEvents].
 
 The following constructor will disable the __sticky header__, while showing the Liveboard title, which would be hidden by default:
 
@@ -216,199 +216,43 @@ You can also pin a visualization to a Liveboard tab using the **Pin** action on 
 
 === Customize filters
 
-To view specific data across the tables and charts on an embedded Liveboard, users can use Liveboard filter options. You can embed a Liveboard with filters already applied or xref:runtime-filters.adoc[define runtime filters] in the Visual Embed SDK and apply filters during load time.
+To view specific data across the tables and charts on an embedded Liveboard, users can use Liveboard filter options. By default, Liveboard filters cannot be applied at load. You can either embed a Liveboard that already includes filters or use the xref:runtime-filters.adoc[runtime filters] feature in the Visual Embed SDK to apply filters during load time.
 
-Embedding application users can also apply filters across visualizations using the link:https://docs.thoughtspot.com/cloud/latest/liveboard-filters-cross[cross-filter feature, window=_blank].
+==== Customizing filter visibility
+To hide filters in an embedded Liveboard, you can use the following options:
 
-The Visual Embed SDK provides the following host events to trigger an action to get or update filters:
+* Set `hideLiveboardHeader` to `true` to hide the entire header area, including filters and the Liveboard menu. You can then trigger filter interactions programmatically using host events.
++
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed', {
+  ... // other liveboard view config
+  hideLiveboardHeader:true,
+});
+----
 
-* link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_getfilters[`HostEvent.GetFilters`]
-* link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updatefilters[`HostEvent.UpdateFilters`]
-* link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updateruntimefilters[`HostEvent.UpdateRuntimeFilters`]
+* If the Liveboard compact header is enabled, set `hideIrrelevantChipsInLiveboardTabs` to `true` to hide filters that are not relevant to the current tab in an embedded Liveboard.
++
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed', {
+  ... // other liveboard view config
+  isLiveboardCompactHeaderEnabled: true,
+  hideIrrelevantChipsInLiveboardTabs: true,
+});
+----
+
+==== Updating filters
+Use the following host events in the Visual Embed SDK to update filters:
+
+* link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updatefilters[`HostEvent.UpdateFilters`] to update Liveboard filters
+* link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updateruntimefilters[`HostEvent.UpdateRuntimeFilters`] to update runtime filters
 * link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updatecrossfilter[`HostEvent.UpdateCrossFilter`]
 
-==== Date filters
+For more information and examples, see xref:filters_overview.adoc#_updating_filters_using_host_events[Updating filters] and xref:filters_overview.adoc#_updating_date_filters[Updating date filters].
 
-For `DATE` and `DATE_TIME` data types, you must provide the date and time values in the Epoch time format when xref:runtime-filters.adoc#_apply_runtime_filters_on_embedded_objects[applying or updating runtime filters] via SDK or REST API.
 
-However, when updating filters using `HostEvent.UpdateFilters`, you must include the date filter `type` along with the time period to apply any rolling or fixed time windows.
-
-[NOTE]
-====
-* For `PERIOD` filters, you must include the `datePeriod` attribute in the date filter object.
-* To specify the exact date, date range, you can use the date format such as `YYYY-MM-DD`, `YYYY/MM/DD`. If using epoch format, ensure that they are specified as numbers and not as strings. For example, `[1743465599, 1754006399]`.
-====
-
-The following table lists the supported filter types and examples for each type:
-
-[width="100%" cols="3,5,8"]
-[options='header']
-|=====
-|Type| Description | Example
-
-| `YESTERDAY`  | Specify the `type` as `YESTERDAY`. a|
-[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: [""],
-        type: "YESTERDAY"
-       }
-   });
-----
-| `TODAY` | Specify the `type` as `TODAY`. a|
-[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: [""],
-        type: "TODAY"
-       }
-   });
-----
-| `TOMORROW` | Specify the `type` as `TOMORROW`. a|
-
-[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: [""],
-        type: "TOMORROW"
-       }
-   });
-----
-
-|`EXACT_DATE` | Allows filtering column data to show details for the exact date, before or after the date. For example, to filter data for dates greater than `2023/07/31`, specify `2023/07/31` as value, with the filter operator as `GT`.  a| [source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "GT",
-        values: ["2023-07-31"],
-        type: "EXACT_DATE"
-       }
-   });
-----
-|`EXACT_DATE_RANGE` |Specify the start date and end date in the `values` array. Ensure that the start date is lower than the end date. For example, `"2023-01-31","2023-03-31"`. a|
-
-[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "BW_INC",
-        values: ["2023-01-31","2023-03-31"],
-        type: "EXACT_DATE_RANGE"
-       }
-   });
-----
-
-|`LAST_N_PERIOD` |Specify the period. You must include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are `SECOND`, `MINUTE`, `HOUR`, `DAY`, WEEK`, `MONTH`, `QUARTER`, and `YEAR`. For example, to filter column data by last 2 weeks, set `datePeriod` to `WEEK` and `values` to `2`.
-
-a|[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: [2],
-        datePeriod: "WEEK",
-        type: "LAST_N_PERIOD"
-      }
-   });
-----
-
-|`NEXT_N_PERIOD` | Specify the period. You must include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are `SECOND`, `MINUTE`, `HOUR`, `DAY`, WEEK`, `MONTH`, `QUARTER`, and `YEAR`. For example, to filter column data by next 2 months, set `datePeriod` to `MONTH` and `values` to `2`.
-
-a|[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: [2],
-        datePeriod: "MONTH",
-        type: "NEXT_N_PERIOD"
-      }
-   });
-----
-
-| `THIS_PERIOD` | Specify the period. You must include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are  `SECOND`, `MINUTE`, `HOUR`, `DAY`, WEEK`, `MONTH`, `QUARTER`, and `YEAR`.
-
-a|[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: [""],
-        datePeriod: "MONTH",
-        type: "THIS_PERIOD"
-      }
-   });
-----
-
-| `PERIOD_TO_DATE` |Specify the period. You must include the `datePeriod` attribute based on the time period specified in the filter object. Valid values for `datePeriod` are `WEEK`, `MONTH`, `QUARTER`, and `YEAR`.
-
-a|[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: [""],
-        datePeriod: "QUARTER",
-        type: "PERIOD_TO_DATE"
-      }
-   });
-----
-|`YEAR_ONLY` |Specify the year. For example, 2023.
-a|[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: ["2023"],
-        type: "YEAR_ONLY"
-      }
-   });
-----
-
-| `MONTH_YEAR` |Specify the month and year in the `values` array. For example, `"July","2023"`.
-a|[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: ["July","2023"],
-        type: "MONTH_YEAR"
-      }
-   });
-----
-
-|`QUARTER_YEAR` | Specify the quarter and year in the `values` array. For example, `"Q1","2023"`.
-
-a|[source,JavaScript]
-----
-liveboardEmbed.trigger(HostEvent.UpdateFilters, {
-    filter: {
-        column: "date",
-        oper: "EQ",
-        values: ["Q1","2023"],
-        type: "QUARTER_YEAR"
-      }
-   });
-----
-|=====
-
+////
 ==== Customize filter visibility in Liveboard tabs
 Filters and parameters that are not relevant to the visualizations in a tab can be hidden by default on an embedded Liveboard. This feature is disabled by default on ThoughtSpot embedded instances. To enable this feature, set `hideIrrelevantChipsInLiveboardTabs` to `true`.
 
@@ -430,6 +274,8 @@ const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
     // ... other embed view configuration settings
 });
 ----
+
+////
 
 
 ////
@@ -501,12 +347,26 @@ liveboardEmbed.trigger(HostEvent.UpdateFilters, {
 
 ////
 
-=== Liveboard grouping and styling [beta betaBackground]^Beta^
+=== Liveboard grouping and styling [earlyAccess eaBackground]#Early Access#
 You can now create a visual group of Answers and note tiles together in the Liveboard. You can select multiple Answers and notes in the Liveboard editor. You can also style parts of the Liveboard, groups and Answers with the new styling panel.
-To enable this feature, set `isLiveboardStylingAndGroupingEnabled` to `true`. For more information, see link:https://docs.thoughtspot.com/cloud/latest/liveboard-grouping-styling[Liveboard grouping and styling, window=_blank].
+To enable this feature, set `isLiveboardMasterpiecesEnabled` to `true`.
+It is important to note the following changes which happen in the Liveboard UI and layout when this feature is active.
+
+* All tiles on the Liveboard will now have a default border and an increased border-radius, resulting in more pronounced curved corners. This is part of the broader visualization tile customization options done to enhance the visual appearance of charts and tables.
+* For Note tiles, the default scrollbar is now hidden for long content. Users must scroll within the tile area itself, and if the tile is not sized appropriately for its content, it may appear clipped due to the new container styles. This change emphasizes the importance of properly sizing Note tiles to avoid content being visually cut off.
+* If a Liveboard is saved with Groups in the ThoughtSpot interface, but the embedding code does not have the grouping and styling feature enabled, the Liveboard will fail to load and throw an error.
++
+[.bordered]
+[.widthAuto]
+--
+image::./images/lb-grp-styling-error.png[Liveboard with groups styling error]
+--
++
+To embed a Liveboard that uses Groups, you must set `isLiveboardMasterpiecesEnabled` to `true` in your embedding configuration. This is required for compatibility with the new grouping and styling features; otherwise, the embedded Liveboard will not render correctly.
+
+For more information, see link:https://docs.thoughtspot.com/cloud/latest/liveboard-grouping-styling[Liveboard grouping and styling, window=_blank].
 
 To understand about the CSS variables for this feature, see xref:customize-css-styles.adoc#grp-style[CSS variables reference].
-
 
 === Liveboard comments
 
