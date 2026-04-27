@@ -56,7 +56,11 @@ const LeftSideBar = (props: {
         const pageid =
             removeTrailingSlash(props.location.pathname).replace(/^\/*/, '') ||
             getPageIdFromUrl(props.location.href);
-        const tag = divElement.querySelector(`a[href='/${pageid}']`);
+        const allLinks = divElement.querySelectorAll('a');
+        const tag = Array.from(allLinks).find((a) => {
+            const href = a.getAttribute('href');
+            return href === `/${pageid}` || href?.endsWith(`/${pageid}`);
+        });
         if (tag) {
             tag.classList.add('active');
         }
@@ -67,7 +71,7 @@ const LeftSideBar = (props: {
             expandedTabsRef.current,
         );
         setNavContent(updatedHTML);
-    }, [params[NAV_PREFIX], params[TS_PAGE_ID_PARAM], props.navContent]);
+    }, [params[NAV_PREFIX], params[TS_PAGE_ID_PARAM], props.navContent, props.location.pathname]);
 
     const toggleExpandOnTab = (text: string) => {
         const allTabsRef = { ...expandedTabsRef.current };
