@@ -50,6 +50,7 @@ import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import { ThemeBuilder } from './playGround/ThemeBuilder';
 import VersionIframe from '../VersionIframe';
+import FloatingAssistant from '../FloatingAssistant';
 
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
@@ -528,6 +529,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         renderDocTemplate()
                     )}
                 </main>
+                <FloatingAssistant isDarkMode={isDarkMode ?? false} pageId={curPageNode.pageAttributes.pageid} />
             </div>
         </>
     );
