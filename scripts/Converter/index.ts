@@ -399,7 +399,7 @@ class TypeDocParser {
 
         const nameNode = this.childrenNameMap[name || ''];
 
-        if (hash) {
+        if (hash && nameNode) {
             const hashNode = nameNode.children?.filter(
                 (node) => node.name === hash,
             )[0];
