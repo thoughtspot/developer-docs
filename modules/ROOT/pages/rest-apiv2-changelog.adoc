@@ -10,15 +10,68 @@ This changelog lists the features and enhancements introduced in REST API v2.0. 
 
 == Version 26.5.0.cl, May 2026
 
-=== Connections API
+=== Sync connection metadata attributes
 You can now synchronize connection metadata attributes from your Cloud Data Warehouse (CDW) with ThoughtSpot by sending a request to `POST /api/rest/2.0/connections/{connection_identifier}/resync-metadata` API endpoint.
+
+=== Spotter APIs
+
+==== New API endpoints
+
+The following new endpoints allow sending messages to an active conversation
+session with a Spotter agent.
+
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send` +
+Allows sending a message to an active Spotter AI conversation and returns a synchronous response.
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream` +
+Allows sending to an active Spotter AI conversation and returns the response as a real-time Server-Sent Events (SSE) stream.
+
+These new endpoints replace the legacy agent conversation and SSE streaming APIs.
+
+==== Deprecated endpoints [.version-badge.deprecated]#Deprecated#
+
+* `POST /api/rest/2.0/ai/agent/{conversation_identifier}/converse`  +
+Replaced by `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send`.
+
+* `POST /api/rest/2.0/ai/agent/converse/sse` +
+Replaced by `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream`
+
+These endpoints are deprecated and will be removed
+in a future release. Embedding applications and integrations using these APIs are advised to migrate to the new API endpoints for improved experience.
+
+==== Enhancements to conversation creation API [.version-badge.breaking]#Breaking#
+
+The following enhancements have been introduced for the conversation creation operation workflow with the `POST /api/rest/2.0/ai/agent/conversation/create` API endpoint:
+
+metadata_context::
+To define the conversation context, the API request must include the `metadata_context` parameter with one of the following values:
+
+* `AUTO_MODE`: Automatically discovers and selects the most relevant datasets for the user's queries.
+* `DATA_SOURCE`: Sets the target context as the data source. You must specify at least one data source ID.
+** To set a single data source object metadata context, specify a `data_source_identifier`.
+** For multi-data source context, specify the `data_source_identifiers`.
++
+[IMPORTANT]
+====
+The `data_source` and `guid` attributes are deprecated in the 26.5.0.cl release version. Integrations using these parameters in ThoughtSpot versions 26.2.0.cl through 26.4.0.cl will continue to work until further notice. However, ThoughtSpot recommends using either `AUTO_MODE` or `DATA_SOURCE` with `data_source_identifier` or `data_source_identifiers` for the metadata context.
+====
+
+Other context options::
+The `answer_context` and `liveboard_context` are removed and no longer supported. Any existing integration or embedding application passing `answer_context` or `liveboard_context` in the request body must update their workflows to use the `AUTO_MODE` or `DATA_SOURCE` option.
+
+Enable save chat::
+The `enable_save_chat` parameter, when set to `true`, saves the conversation.
+
+API response::
+The API response now returns the `conversation_identifier`, which is used in all
+subsequent send message or SSE streaming calls.
 
 === Liveboard report API enhancements [beta betaBackground]^Beta^
 The `POST /api/rest/2.0/report/liveboard` API endpoint enhances the pdf downloads by introducing the following parameters:
 
-* `page_size = CONTINUOUS` for a seamless PDF export that matches the full length of your Liveboard. Unlike the A4 format, which introduces forced page breaks between visualizations, this continuous flow maintains your exact design and intended layout.
-* `zoom_level` offers various download size options to suit the viewer's screen dimensions, thereby enhancing legibility. This can be set only when `page_size = CONTINUOUS`.
+* `"page_size": "CONTINUOUS"` for a seamless PDF export that matches the full length of your Liveboard. Unlike the A4 format, which introduces forced page breaks between visualizations, this continuous flow maintains your exact design and intended layout.
+* `zoom_level` offers various download size options to suit the viewer's screen dimensions, thereby enhancing legibility. This can be set only when `page_size` is specified as `CONTINUOUS`.
 
+For more information, see xref:data-report-v2-api.adoc#_liveboard_report_api[Liveboard Report API documentation].
 
 == Version 26.4.0.cl, April 2026
 
@@ -402,7 +455,7 @@ For more information, see xref:rest-api-java-sdk.adoc#_import_the_sdk_to_your_ap
 
 == Version 10.10.0.cl, July 2025
 
-=== Email template customization APIs:
+=== Email template customization APIs
 This release introduces the following new endpoints for email template customization:
 
 * `POST /api/rest/2.0/customization/email` +
