@@ -34,7 +34,6 @@ If your application already has an AI chat interface or agentic experience, you 
 
 **When to use**:
 Use this option if your organization requires a custom conversation flow, backend orchestration, and a tailored analytics experience for your users.
-||
 |===
 
 Regardless of integration mode, ThoughtSpot’s semantic layer, data context, and security features ensure trusted and governed analytics for all users.
@@ -46,7 +45,6 @@ ThoughtSpot MCP Server is available as an add-on with the following link:https:/
 * ThoughtSpot Embedded
 
 To learn more about subscription options, contact your ThoughtSpot sales representative.
-
 
 == Core components and roles
 The MCP Server integration and orchestration layers include the following core components:
@@ -61,7 +59,7 @@ The MCP Server integration and orchestration layers include the following core c
 |*MCP client*
 a|The MCP client discovers available tools, manages the MCP connection to the server, and passes tool calls between the LLM and the MCP Server.
 
-|*ThoughtSpot MCP Server*  a|
+|*ThoughtSpot MCP Server* a|
 The remote MCP server hosted by ThoughtSpot.
 
 - Acts as a gateway between the MCP client and ThoughtSpot.
@@ -82,55 +80,18 @@ The following figure illustrates the interaction between the user, agent, and MC
 [.widthAuto]
 image::./images/agents-mcp-server-arch.png[MCP integration]
 
-== MCP Server architecture
-ThoughtSpot MCP Server supports link:https://docs.thoughtspot.com/cloud/latest/spotter-versions[Spotter 3, window=_blank], which enables advanced analytics, forecasting, multi-step reasoning and analysis, and deep research capabilities.
-The MCP Server with Spotter 3 introduces new MCP tools, real-time streaming responses, session-based conversations, richer interactions, and direct embedding of visualizations.
+== MCP Server architecture and tools
+For more information about MCP tools, resources and workflow processing, see the following documentation:
 
-[cols="2,4,4", options="header"]
-|====
-||Legacy MCP Server setup|MCP Server with Spotter 3
-|**Functional differences**
-|Limited capabilities for complex analysis and context integration.
-a|* Supports advanced analytics, forecasting, and deep research capabilities.
-* Supports asynchronous streaming, session-based conversations, and context integration.
-* The new version uses a different MCP Server URL and supports new MCP tools.
+* xref:mcp-server-spotter3.adoc[MCP Server with Spotter 3]
+* xref:mcp-server-legacy.adoc[Legacy MCP Server architecture and tools].
 
-
-|**Recommended for**
-|Maintaining existing integrations only.
-|All new integrations
-
-|**Integration pattern +
-Session model +
-Response processing**
-|Synchronous and stateless integration pattern. Each tool call is independent. Does not support persistent sessions and requires prior context to be injected manually on every follow-up call.
-
-|Asynchronous and stateful sessions. Allows multiple follow-up questions within a session. Responses are streamed with intermediate updates, including thinking narration and clarifications. Context is retained automatically across all follow-up questions within the session.
-
-|**Data source selection**
-|Requires a separate tool call (`getDataSourceSuggestions`) to retrieve source suggestions.
-|Built into session creation. If the `data_source_id` is not explicitly specified in the query, the most relevant source is automatically selected based on user's query.
-
-|**Response delivery**
-|Returns full response in a single synchronous call.
-|Responses are streamed incrementally; updates are accumulated via polling.
-
-|**Follow-up questions**
-|Requires prior context on every follow-up call.
-|The session retains context automatically. +
-Optionally, the `additional_context` parameter can be included to inject new external context for each follow-up question/message.
+////
 
 |**Embedded visualizations**
 |Not supported in turnkey platforms; requires additional development work in custom apps.
 |Supports direct embedding of charts in MCP clients and via `iframe_url` in custom apps. Every answer includes an `iframe_url` that renders as an interactive ThoughtSpot visualization.
 
-|**API versioning support**
-|Not available.
-|Supports date-based API versioning, which is identified in the MCP Server URL as `?api-version=YYYY-MM-DD`.
-|||
-|====
-
-////
 === MCP tools and resources
 The following table
 [cols="2,2,4", options="header"]
@@ -181,88 +142,7 @@ Creates a dashboard from `answer_id` values collected from the session update ty
 |`send_session_message` with the same `analytical_session_id`. The session retains context automatically. The `additional_context` parameter can be included to inject new context for each follow-up question or message.
 ||
 |===
-
-
 ////
-=== MCP Server version with Spotter 3
-The new version introduces Spotter 3 capabilities, advanced reasoning,
-forecasting, and deep research, with a set of MCP tools built around an asynchronous, session-based architecture. In this version, the full response is streamed incrementally across multiple polling calls.
-
-The following figure illustrates the MCP architecture, tool calls, and workflow in the new MCP Server version:
-
-[.widthAuto]
-image::./images/mcp-architecture-new.png[MCP architecture new]
-
-==== Tool calls and workflow processing
-The workflow in the new MCP Server version typically includes the following stages:
-
-1. *User asks a question* +
-A user sends a query in the chat interface to get data insights. For
-example, _What were the total sales of Jackets and Bags in the Northeast
-last year?_
-
-2. *Agent calls `create_analysis_session`* +
-The agent calls `create_analysis_session` to establish a stateful analytical session with ThoughtSpot's Spotter 3 engine. ThoughtSpot returns an `analytical_session_id` that identifies the session for all subsequent calls. +
-If the user specified a data source, the agent passes it as the optional `data_source_id` parameter. If not specified, ThoughtSpot automatically selects the most relevant data source based on the question.
-
-3. *Agent calls `send_session_message`* +
-The agent calls `send_session_message` with the `analytical_session_id` and the user's question. Optionally, the agent can pass `additional_context` to provide external information that should influence the analysis. For example, `The user's fiscal year starts in April`  or `The user is a manager of the West region`. +
-ThoughtSpot confirms receipt with a `success` response and begins processing the question asynchronously. The answer is not returned in this call.
-
-4. *Agent polls `get_session_updates` for results* +
-The agent calls `get_session_updates` repeatedly in a loop until `is_done` is `true`. ThoughtSpot streams updates incrementally across multiple polls. The agent must accumulate updates from every poll. ThoughtSpot returns the following update types:
-
-* `text-chunk` - real-time thinking narration from Spotter describing what it is doing, streamed in fragments. Concatenate chunks in order to form the complete narration.
-* `text` - complete standalone messages representing clarifications, caveats, or assumptions Spotter made during analysis.
-* `answer` - a final analytical result containing:
-** `answer_title` - a human-readable description of what the answer shows.
-** `answer_query` - the ThoughtSpot search query used to generate the answer.
-** `iframe_url` - an embeddable URL for rendering an interactive ThoughtSpot visualization.
-** `answer_id` - a unique identifier for the answer, used as input for creating a dashboard.
-
-5. *A dashboard is generated from the results (optional)* +
-The user can choose to save answers from the conversation as a ThoughtSpot dashboard. For this workflow, the agent extracts the `answer_id` and `answer_title` from each `answer` type update collected during polling and calls `create_dashboard`. +
-ThoughtSpot creates a dashboard and returns a `dashboard_id` and a
-`dashboard_url`, a direct link to the dashboard in the ThoughtSpot UI.
-
-6. *User asks a follow-up question (optional)* +
-The user can ask a follow-up question in the same session. The agent calls `send_session_message` again using the `same analytical_session_id`. ThoughtSpot retains the full conversation context automatically. The agent returns to step 4 to poll for the follow-up response.
-
-For more information about the tool calls, input parameters, and response output, see xref:mcp-tool-reference-guide.adoc[MCP tool reference guide].
-
-=== Legacy MCP server setup
-The legacy MCP server setup uses synchronous architecture. Every tool call returns its result immediately in a single response. There is no session state, polling loop, or streaming, and the full answer is always returned inline.
-
-[.widthAuto]
-image::./images/mcp-architecture-legacy.png[MCP architecture legacy]
-
-==== Tool calls and workflow processing
-The workflow in the legacy MCP Server setup typically includes the following stages:
-
-. *User asks a question* +
-A user sends a query in the chat interface to get data. For example, `What were the total sales of Jackets and Bags in the Northeast last year?` +
-Optionally, the user can specify the data context to generate a response.
-
-. *Agent calls `getDataSourceSuggestions` (optional)* +
-If the user’s question doesn’t specify a data source, the agent can call `getDataSourceSuggestions` to retrieve a list of relevant ThoughtSpot data sources.
-ThoughtSpot returns candidate data sources (models) with confidence scores and reasoning.
-
-. *User's query is decomposed into sub-questions* +
-To break the user’s query into sub-questions, the agent calls `getRelevantQuestions`. ThoughtSpot returns the AI-suggested, schema-aware questions that are easier to execute analytically.
-
-. *The query is processed for generating answers* +
-For each suggested or chosen question, the agent calls `getAnswer`. ThoughtSpot returns the following: +
-* Preview data for LLM reasoning.
-* Visualization metadata, including an embeddable `frame_url`.
-* `session_identifier` and `generation_number` for charts that are used as input for creating a Liveboard.
-
-. *A Liveboard is generated from the results* (optional) +
-To save answers from the conversation sessions in a ThoughtSpot Liveboard, the agent extracts the `question`, `session_identifier`, and `generation_number` from each `getAnswer` response and calls `createLiveboard`. +
-ThoughtSpot creates a persistent Liveboard from the session's answers and returns identifiers and a `frame_url` for the Liveboard.
-
-In the legacy MCP Server setup, to ask a follow-up question, the agent calls the `getRelevantQuestions` again, because the server doesn't retain context. For follow-up questions, the agent must pass the context explicitly via `additionalContext`.
-
-For more information about the tool calls, input parameters, and response output, see xref:mcp-tool-reference-guide.adoc[MCP tool reference guide].
 
 == MCP Server versions
 
@@ -284,18 +164,18 @@ To automatically receive every new version of the MCP tools as ThoughtSpot relea
 (Plug-and-play integration)  a| * `\https://agent.thoughtspot.app/mcp` +
 Currently, this URL points to the baseline version with legacy MCP tools. It will resolve to the latest version in the near future.
 *  `\https://agent.thoughtspot.app/mcp?api-version={YYYY-MM-DD}` (Recommended) +
-Replace `{YYYY-MM-DD}` with the actual date string to point to the specified version or the closest earlier version. For example, `?api-version=2026-04-22`
+Replace `{YYYY-MM-DD}` with the actual date string to point to the specified version or the closest earlier version. For example, `?api-version=2026-04-30`
 
 |**Bearer token apps**  a| * `\https://agent.thoughtspot.app/token/mcp` +
 Always points to the latest version.
 * `\https://agent.thoughtspot.app/token/mcp?api-version={YYYY-MM-DD}` +
-Replace `{YYYY-MM-DD}` with the actual date string to point to the specified version or the closest earlier version. For example, `?api-version=2026-04-22`
+Replace `{YYYY-MM-DD}` with the actual date string to point to the specified version or the closest earlier version. For example, `?api-version=2026-04-30`
 |====
 
 [IMPORTANT]
 ====
 The `\https://agent.thoughtspot.app/openai/mcp` and `\https://agent.thoughtspot.app/bearer/mcp` are deprecated and point to the version with legacy MCP tools only.
-ThoughtSpot recommends migrating your existing MCP Server integration setup to the new version. For more information, see xref:mcp-server-changelog.adoc#_april_22_2026[MCP server changelog].
+ThoughtSpot recommends migrating your existing MCP Server integration setup to the new version. For more information, see xref:mcp-server-changelog.adoc#_april_30_2026[MCP server changelog].
 ====
 
 == Next steps
