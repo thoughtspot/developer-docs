@@ -178,7 +178,7 @@ const Header = (props: {
                         {/* GitHub nav link */}
                         {isMaxMobileResolution && (
                             <a
-                                href="https://github.com/thoughtspot/visual-embed-sdk"
+                                href="https://github.com/orgs/thoughtspot/repositories"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="header-nav-link"
