@@ -800,6 +800,7 @@ type DevDocTemplateProps = {
         namePageIdMap: {
             [key: string]: string;
         };
+        navMap?: { [key: string]: string };
         iframeUrl?: string;
     };
     location: Location;

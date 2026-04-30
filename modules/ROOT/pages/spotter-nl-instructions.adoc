@@ -1,0 +1,211 @@
+= Spotter coaching APIs
+:toc: true
+:toclevels: 2
+
+:page-title: Spotter APIs
+:page-pageid: spotter-coaching-apis
+:page-description: You can use Spotter REST APIs to receive Answers for your analytical queries sent through the conversational experience with ThoughtSpot.
+
+Administrators and data owners can guide and refine how Spotter interprets and answers user questions. The natural language (NL) instructions API allows setting instructions at the data model level. The API provides business context and preferred interpretations for specific queries or terminology to coach Spotter, but it does not train or change the underlying LLM.
+
+== Set NL instructions
+To coach and instruct the Spotter system on how to interpret queries, apply filters, select columns, handle data nuances, and present answers using the data from a specific model, you can set global rules in natural language format. Setting instructions helps Spotter generate precise and consistent responses for user queries.
+
+To set instructions for a Model, send a `POST` request to the `/api/rest/2.0/ai/instructions/set` API endpoint.
+
+[NOTE]
+====
+To set NL instructions, you'll need administration or data management privileges, or at least edit access to the data Model.
+====
+
+==== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Form parameter| Description
+|`data_source_identifier`|__String__. ID of the Model.
+|`nl_instructions_info` a|Instructions in the natural language format.
+
+* `instructions` +
+_Array of strings_. Include the rules that you want to add in the `instructions` array. Ensure that the instructions do not exceed 3000 characters.
+* `scope`
+Sets the scope for the rules. By default, the rules are applied globally for all Spotter users who can access the Model specified in the request.
+|=====
+
+=== Example request
+
+The following example defines instructions to coach Spotter on how to interpret the query:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/set'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "data_source_identifier": "71311827-31bb-48b2-8465-9a215adbc05d",
+  "nl_instructions_info": [
+    {
+      "instructions": [
+        "When I ask for last month, use ‘last 30 days’ as a filter.",
+        "Exclude orders where order_status = '\''CANCELLED-USER'\'' when calculating total revenue"
+      ],
+      "scope": "GLOBAL"
+    }
+  ]
+}'
+----
+
+=== Example response
+If the API request is successful, ThoughtSpot returns the `{"success":true}` response.
+
+== Retrieve NL instructions assigned to a Model
+
+To view the NL instructions assigned for a Model, send a `POST` request to the `/api/rest/2.0/ai/instructions/get` API endpoint.
+
+Only Spotter users with view access to the data model can retrieve instructions via API requests.
+
+=== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Form parameter| Description
+|`data_source_identifier`|__String__. ID of the Model from which you want to fetch instructions.
+|=====
+
+=== Example request
+The following example shows the request body for retrieving NL instructions configured on a Model:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/instructions/get'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+    --data-raw '{
+  "data_source_identifier": "3bbeac16-a723-4886-9eba-c4779d07fd83"
+}'
+----
+
+=== Example response
+If the instructions are configured on the Model specified in the API request, ThoughtSpot returns an array of instructions in the API response.
+
+[source,JSON]
+----
+{
+  "nl_instructions_info": [
+    {
+      "instructions": [
+        "When I ask for last month, use ‘last 30 days’ as a filter.",
+        "Exclude orders where order_status = 'CANCELLED-USER' when calculating total revenue"
+      ],
+      "scope": "GLOBAL"
+    }
+  ]
+}
+----
+
+== Spotter coaching access
+
+ThoughtSpot supports publishing Spotter coaching information to other Orgs. Coaching changes from the primary Org are synchronized with the data models published in secondary Orgs.
+
+=== Assign Spotter coaching access privilege
+
+To allow users and groups to access spotter coaching information in data models, assign the `SPOTTER_COACHING_PRIVILEGE` via `POST` request to the `/api/rest/2.0/security/metadata/manage-object-privilege` API endpoint.
+
+In the API request, specify the data model, user, group, and ensure that the object privilege is set to `SPOTTER_COACHING_PRIVILEGE`.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/security/metadata/manage-object-privilege'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization:  Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "operation": "ADD",
+  "metadata_type": "LOGICAL_TABLE",
+  "object_privilege_types": [
+    "SPOTTER_COACHING_PRIVILEGE"
+  ],
+  "metadata_identifiers": [
+    "62f3e9b5-4fcc-4352-b8ad-fdddc2287506"
+  ],
+  "principals": [
+    {
+      "identifier": "UserA",
+      "type": "USER"
+    }
+  ]
+}'
+----
+
+If the request is successful, the API returns the 204 response code.
+
+=== Get a list of users or groups with Spotter coaching privilege
+
+To get a list of users and groups with the Spotter coaching privilege for a specific data model or all data models, send a `POST` request to the `/api/rest/2.0/security/metadata/fetch-object-privileges` API endpoint.
+
+In the API request, specify the user or the group for which you want to retrieve the object privilege details.
+
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/security/metadata/fetch-object-privileges'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata": [
+    {
+      "identifier": "53141e3b-331d-4a74-80a2-e4322f9d8339",
+      "type": "LOGICAL_TABLE"
+    }
+  ],
+  "record_offset": 0,
+  "record_size": 20,
+  "principals": [
+    {
+      "identifier": "UserA",
+      "type": "USER"
+    }
+  ]
+}'
+----
+
+If the request is successful, ThoughtSpot returns the object privilege details in the API response:
+
+[source,JSON]
+----
+{
+   "metadata_object_privileges":[
+      {
+         "metadata_id":"53141e3b-331d-4a74-80a2-e4322f9d8339",
+         "metadata_name":"Model_formula_variable",
+         "metadata_type":"WORKSHEET",
+         "principal_object_privilege_info":[
+            {
+               "principal_type":"USER",
+               "principal_object_privileges":[
+                  {
+                     "principal_id":"0000083e-e253-10af-aa97-5e45d512ebbd",
+                     "principal_name":"rani.gangwar@thoughtspot.com",
+                     "principal_sub_type":"OIDC_USER",
+                     "object_privileges":"[SPOTTER_COACHING_PRIVILEGE]"
+                  }
+               ]
+            }
+         ]
+      }
+   ]
+}
+----
+
+== Additional resources
+
+* Visit the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fgetting-started%2Fintroduction">REST API v2.0 Playground</a>+++ to view the API endpoints and verify the request and response workflows.
+* For information about MCP tools, see xref:mcp-integration.adoc[MCP server integration].

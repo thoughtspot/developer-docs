@@ -33,13 +33,13 @@ const Docmap = (props: {
 
     // Track which heading is currently near the top of the viewport
     useEffect(() => {
-        if (!toc) return;
+        if (!toc) return () => {};
         visibleHeadings.current.clear();
 
         const headings = document.querySelectorAll(
             '.documentView h2[id], .documentView h3[id], .documentView h4[id]',
         );
-        if (!headings.length) return;
+        if (!headings.length) return () => {};
 
         const headingIds = Array.from(headings).map((h) => h.id);
 
