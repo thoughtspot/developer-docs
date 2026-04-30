@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { navigate } from 'gatsby';
+import { GiHamburgerMenu } from '@react-icons/all-files/gi/GiHamburgerMenu';
+import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown';
 import './index.scss';
 
 export type DocCategory =
@@ -121,6 +123,8 @@ const SecondaryHeader = (props: {
     onCategoryChange: (category: DocCategory) => void;
 }) => {
     const { activeCategory, onCategoryChange } = props;
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     const categories: DocCategory[] = [
         'guides', 'embedding', 'rest-api', 'mcp-server', 'spottercode', 'whats-new',
@@ -128,15 +132,28 @@ const SecondaryHeader = (props: {
 
     const handleClick = (cat: DocCategory) => {
         onCategoryChange(cat);
+        setMobileMenuOpen(false);
         const landing = CATEGORY_LANDING[cat];
         if (landing) {
             navigate(landing);
         }
     };
 
+    useEffect(() => {
+        if (!mobileMenuOpen) return;
+        const handler = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setMobileMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [mobileMenuOpen]);
+
     return (
         <nav className="secondary-header" aria-label="Documentation categories">
             <div className="secondary-header__inner">
+                {/* Desktop: full tab list */}
                 <ul className="secondary-header__tabs" role="tablist">
                     {categories.map((cat) => (
                         <li key={cat} role="none">
@@ -151,6 +168,48 @@ const SecondaryHeader = (props: {
                         </li>
                     ))}
                 </ul>
+
+                {/* Mobile: hamburger trigger + dropdown */}
+                <div className="secondary-header__mobile" ref={menuRef}>
+                    <button
+                        className="secondary-header__mobile-trigger"
+                        onClick={() => setMobileMenuOpen((o) => !o)}
+                        aria-expanded={mobileMenuOpen}
+                        aria-haspopup="listbox"
+                    >
+                        <GiHamburgerMenu className="secondary-header__mobile-icon" />
+                        <span className="secondary-header__mobile-label">
+                            {CATEGORY_LABELS[activeCategory]}
+                        </span>
+                        <AiOutlineCaretDown
+                            className={`secondary-header__mobile-caret${mobileMenuOpen ? ' open' : ''}`}
+                        />
+                    </button>
+                    {mobileMenuOpen && (
+                        <div className="secondary-header__mobile-dropdown" role="listbox">
+                            {categories.map((cat) => (
+                                <button
+                                    key={cat}
+                                    role="option"
+                                    aria-selected={activeCategory === cat}
+                                    className={`secondary-header__mobile-item${activeCategory === cat ? ' active' : ''}`}
+                                    onClick={() => handleClick(cat)}
+                                >
+                                    {CATEGORY_LABELS[cat]}
+                                </button>
+                            ))}
+                            <a
+                                href="/ask-docs"
+                                className="secondary-header__mobile-item"
+                                onClick={() => setMobileMenuOpen(false)}
+                            >
+                                AskDocs
+                            </a>
+                        </div>
+                    )}
+                </div>
+
+                {/* Desktop only: AskDocs link */}
                 <a
                     href="/ask-docs"
                     className="secondary-header__askdocs"

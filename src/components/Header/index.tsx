@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useResizeDetector } from 'react-resize-detector';
 import { IconContext } from '@react-icons/all-files';
 import { RiMoonClearLine } from '@react-icons/all-files/ri/RiMoonClearLine';
 import { FiSun } from '@react-icons/all-files/fi/FiSun';
 import { RiDiscordLine } from '@react-icons/all-files/ri/RiDiscordLine';
 import { FiGithub } from '@react-icons/all-files/fi/FiGithub';
+import { FiMoreVertical } from '@react-icons/all-files/fi/FiMoreVertical';
 import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown';
 import { FiUsers } from '@react-icons/all-files/fi/FiUsers';
 import { FiHelpCircle } from '@react-icons/all-files/fi/FiHelpCircle';
@@ -24,6 +25,8 @@ const Header = (props: {
     isDarkMode: boolean;
 }) => {
     const { width, ref } = useResizeDetector();
+    const [moreOpen, setMoreOpen] = useState(false);
+    const moreRef = useRef<HTMLDivElement>(null);
 
     const isMaxMobileResolution = !(width < MAX_MOBILE_RESOLUTION);
 
@@ -33,6 +36,17 @@ const Header = (props: {
         localStorage.setItem('theme', newDark ? 'dark' : 'light');
         localStorage.setItem('themeMode', newDark ? 'dark' : 'light');
     };
+
+    useEffect(() => {
+        if (!moreOpen) return;
+        const handler = (e: MouseEvent) => {
+            if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+                setMoreOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [moreOpen]);
 
     const learnLinks = [
         {
@@ -70,6 +84,36 @@ const Header = (props: {
         },
     ];
 
+    const renderDropdownItems = (
+        items: { name: string; sub: string; link: string; icon: any }[],
+        onClose?: () => void,
+    ) =>
+        items.map((item) => {
+            const Icon = item.icon;
+            return (
+                <a
+                    key={item.name}
+                    href={item.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="header-dropdown-item"
+                    role="menuitem"
+                    onClick={onClose}
+                >
+                    <IconContext.Provider value={{ className: 'dropdown-item-icon' }}>
+                        <Icon />
+                    </IconContext.Provider>
+                    <span className="dropdown-item-text">
+                        <span className="dropdown-item-name">{item.name}</span>
+                        <span className="dropdown-item-sub">{item.sub}</span>
+                    </span>
+                    <IconContext.Provider value={{ className: 'external-link-icon' }}>
+                        <FiExternalLink />
+                    </IconContext.Provider>
+                </a>
+            );
+        });
+
     return (
         <header>
             <section
@@ -94,8 +138,6 @@ const Header = (props: {
                         </h2>
                     </div>
 
-
-                    {/* Right side: Version |  Resources | GitHub | Toggle */}
                     <div className="header-right">
                         {/* Version dropdown */}
                         <Dropdown
@@ -103,8 +145,8 @@ const Header = (props: {
                             isMobile={isMaxMobileResolution}
                         />
 
-                        {/* Resources — hover-driven (CSS), consistent with Version dropdown */}
-                        {isMaxMobileResolution && (
+                        {/* Desktop: Resources hover dropdown + GitHub link */}
+                        <div className="header-desktop-nav">
                             <div className="header-dropdown">
                                 <button className="header-nav-link header-dropdown-trigger">
                                     Resources
@@ -116,67 +158,17 @@ const Header = (props: {
                                     <div className="header-dropdown-menu-panel" role="menu">
                                         <div className="header-dropdown-section">
                                             <div className="header-dropdown-section-label">Learn</div>
-                                            {learnLinks.map((item) => {
-                                                const Icon = item.icon;
-                                                return (
-                                                    <a
-                                                        key={item.name}
-                                                        href={item.link}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="header-dropdown-item"
-                                                        role="menuitem"
-                                                    >
-                                                        <IconContext.Provider value={{ className: 'dropdown-item-icon' }}>
-                                                            <Icon />
-                                                        </IconContext.Provider>
-                                                        <span className="dropdown-item-text">
-                                                            <span className="dropdown-item-name">{item.name}</span>
-                                                            <span className="dropdown-item-sub">{item.sub}</span>
-                                                        </span>
-                                                        <IconContext.Provider value={{ className: 'external-link-icon' }}>
-                                                            <FiExternalLink />
-                                                        </IconContext.Provider>
-                                                    </a>
-                                                );
-                                            })}
+                                            {renderDropdownItems(learnLinks)}
                                         </div>
                                         <div className="header-dropdown-col-divider" />
                                         <div className="header-dropdown-section">
                                             <div className="header-dropdown-section-label">Connect</div>
-                                            {connectLinks.map((item) => {
-                                                const Icon = item.icon;
-                                                return (
-                                                    <a
-                                                        key={item.name}
-                                                        href={item.link}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="header-dropdown-item"
-                                                        role="menuitem"
-                                                    >
-                                                        <IconContext.Provider value={{ className: 'dropdown-item-icon' }}>
-                                                            <Icon />
-                                                        </IconContext.Provider>
-                                                        <span className="dropdown-item-text">
-                                                            <span className="dropdown-item-name">{item.name}</span>
-                                                            <span className="dropdown-item-sub">{item.sub}</span>
-                                                        </span>
-                                                        <IconContext.Provider value={{ className: 'external-link-icon' }}>
-                                                            <FiExternalLink />
-                                                        </IconContext.Provider>
-                                                    </a>
-                                                );
-                                            })}
+                                            {renderDropdownItems(connectLinks)}
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        )}
 
-
-                        {/* GitHub nav link */}
-                        {isMaxMobileResolution && (
                             <a
                                 href="https://github.com/orgs/thoughtspot/repositories"
                                 target="_blank"
@@ -189,22 +181,70 @@ const Header = (props: {
                                 </IconContext.Provider>
                                 GitHub
                             </a>
-                        )}
+                        </div>
 
-
-                        {/* Theme toggle */}
-                        {isMaxMobileResolution && (
+                        {/* Mobile: ⋮ click dropdown with Resources + GitHub */}
+                        <div className="header-more-dropdown" ref={moreRef}>
                             <button
-                                className="theme-toggle-btn"
-                                onClick={handleThemeToggle}
-                                aria-label={props.isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                                title={props.isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                                className="header-nav-link header-more-btn"
+                                onClick={() => setMoreOpen((o) => !o)}
+                                aria-label="More resources"
+                                aria-expanded={moreOpen}
+                                aria-haspopup="true"
                             >
-                                <IconContext.Provider value={{ className: 'theme-icon' }}>
-                                    {props.isDarkMode ? <RiMoonClearLine /> : <FiSun />}
+                                <IconContext.Provider value={{ className: 'header-more-icon' }}>
+                                    <FiMoreVertical />
                                 </IconContext.Provider>
                             </button>
-                        )}
+                            {moreOpen && (
+                                <div className="header-more-panel" role="menu">
+                                    <div className="header-dropdown-section">
+                                        <div className="header-dropdown-section-label">Learn</div>
+                                        {renderDropdownItems(learnLinks, () => setMoreOpen(false))}
+                                    </div>
+                                    <div className="header-dropdown-col-divider" />
+                                    <div className="header-dropdown-section">
+                                        <div className="header-dropdown-section-label">Connect</div>
+                                        {renderDropdownItems(connectLinks, () => setMoreOpen(false))}
+                                    </div>
+                                    <div className="header-dropdown-col-divider" />
+                                    <div className="header-dropdown-section">
+                                        <div className="header-dropdown-section-label">Code</div>
+                                        <a
+                                            href="https://github.com/orgs/thoughtspot/repositories"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="header-dropdown-item"
+                                            role="menuitem"
+                                            onClick={() => setMoreOpen(false)}
+                                        >
+                                            <IconContext.Provider value={{ className: 'dropdown-item-icon' }}>
+                                                <FiGithub />
+                                            </IconContext.Provider>
+                                            <span className="dropdown-item-text">
+                                                <span className="dropdown-item-name">GitHub</span>
+                                                <span className="dropdown-item-sub">Visual Embed SDK on GitHub</span>
+                                            </span>
+                                            <IconContext.Provider value={{ className: 'external-link-icon' }}>
+                                                <FiExternalLink />
+                                            </IconContext.Provider>
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Theme toggle — always visible */}
+                        <button
+                            className="theme-toggle-btn"
+                            onClick={handleThemeToggle}
+                            aria-label={props.isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                            title={props.isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                        >
+                            <IconContext.Provider value={{ className: 'theme-icon' }}>
+                                {props.isDarkMode ? <RiMoonClearLine /> : <FiSun />}
+                            </IconContext.Provider>
+                        </button>
                     </div>
                 </div>
             </section>

@@ -32,6 +32,7 @@ export const Seo: FC<SeoProps> = ({
     return (
         <>
             <title>{seo.title}</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
             <meta name="description" content={seo.description} />
             <meta name="image" content={seo.image} />
             <meta name="og:title" content={seo.title} />
