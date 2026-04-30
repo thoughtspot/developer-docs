@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { navigate } from 'gatsby';
 import { GiHamburgerMenu } from '@react-icons/all-files/gi/GiHamburgerMenu';
+import { MdClear } from '@react-icons/all-files/md/MdClear';
 import { AiOutlineCaretDown } from '@react-icons/all-files/ai/AiOutlineCaretDown';
+import Dropdown from '../Dropdown';
 import './index.scss';
 
 export type DocCategory =
@@ -121,8 +123,11 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
 const SecondaryHeader = (props: {
     activeCategory: DocCategory;
     onCategoryChange: (category: DocCategory) => void;
+    location: Location;
+    leftNavOpen: boolean;
+    setLeftNavOpen: Function;
 }) => {
-    const { activeCategory, onCategoryChange } = props;
+    const { activeCategory, onCategoryChange, location, leftNavOpen, setLeftNavOpen } = props;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -140,7 +145,7 @@ const SecondaryHeader = (props: {
     };
 
     useEffect(() => {
-        if (!mobileMenuOpen) return;
+        if (!mobileMenuOpen) return undefined;
         const handler = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
                 setMobileMenuOpen(false);
@@ -169,15 +174,26 @@ const SecondaryHeader = (props: {
                     ))}
                 </ul>
 
-                {/* Mobile: hamburger trigger + dropdown */}
-                <div className="secondary-header__mobile" ref={menuRef}>
+                {/* Mobile: nav-toggle + category picker */}
+                <div className="secondary-header__mobile-left">
+                    <button
+                        className="secondary-header__nav-toggle"
+                        onClick={() => setLeftNavOpen((o: boolean) => !o)}
+                        aria-label={leftNavOpen ? 'Close navigation' : 'Open navigation'}
+                    >
+                        {leftNavOpen
+                            ? <MdClear className="secondary-header__nav-toggle-icon" />
+                            : <GiHamburgerMenu className="secondary-header__nav-toggle-icon" />
+                        }
+                    </button>
+
+                    <div className="secondary-header__mobile" ref={menuRef}>
                     <button
                         className="secondary-header__mobile-trigger"
                         onClick={() => setMobileMenuOpen((o) => !o)}
                         aria-expanded={mobileMenuOpen}
                         aria-haspopup="listbox"
                     >
-                        <GiHamburgerMenu className="secondary-header__mobile-icon" />
                         <span className="secondary-header__mobile-label">
                             {CATEGORY_LABELS[activeCategory]}
                         </span>
@@ -206,6 +222,12 @@ const SecondaryHeader = (props: {
                             </button>
                         </div>
                     )}
+                </div>
+                </div>{/* end mobile-left */}
+
+                {/* Mobile only: version dropdown */}
+                <div className="secondary-header__mobile-version">
+                    <Dropdown location={location} isMobile={false} />
                 </div>
 
                 {/* Desktop only: AskDocs link */}

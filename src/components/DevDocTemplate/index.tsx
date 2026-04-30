@@ -686,6 +686,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 <SecondaryHeader
                     activeCategory={activeCategory}
                     onCategoryChange={setActiveCategory}
+                    location={location}
+                    leftNavOpen={leftNavOpen}
+                    setLeftNavOpen={setLeftNavOpen}
                 />
                 {shouldShowAnnouncementBanner() && (
                     <AnnouncementBanner
