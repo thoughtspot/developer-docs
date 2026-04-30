@@ -211,7 +211,7 @@ const SecondaryHeader = (props: {
 
                 {/* Desktop only: AskDocs link */}
                 <a
-                    href="docs/ask-docs"
+                    href="/ask-docs"
                     className="secondary-header__askdocs"
                 >
                     AskDocs <span className="secondary-header__beta">Beta</span>
