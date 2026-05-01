@@ -1,4 +1,4 @@
-= ThoughtSpot MCP server changelog
+= ThoughtSpot MCP Server changelog
 :toc: true
 :toclevels: 1
 
@@ -24,107 +24,66 @@ This changelog lists the new features, enhancements, and other changes introduce
 // *Affects:* Developers, Administrators, End Users
 // ============================================================
 
-== April 30, 2026
-[div announcementBlock]
---
+
+== May 2026
+
 *API version string:* `?api-version=2026-04-30`. +
-*Status:* Now available for upgrades. +
-*Upgrade recommendation*: Recommended for new integrations. Introduces breaking changes to existing MCP Server integrations. Refer to the xref:mcp-server-changelog.adoc#_migration_guidelines[migration guidelines].
---
+*Upgrade notes*: Recommended for new integrations. Introduces breaking changes to existing MCP Server integrations. Refer to the xref:mcp-server-changelog.adoc#_migration_guidelines[migration guidelines].
 
-=== Support for Spotter 3 [.version-badge.new]#New#
+[.cl-table, cols="1,4", frame=none, grid=none]
+|====
+a|
+[.cl-label]
+*2026-05-01*
+
+a|
+
+[discrete]
+=== Support for Spotter 3
 ThoughtSpot MCP Server now supports Spotter 3, enabling advanced analytics, forecasting, multi-step reasoning, and deep research. The new MCP tools support real-time streaming, session-based conversations, richer interactions, and direct embedding of visualizations in MCP-aware apps. +
-For more information, see xref:mcp-integration.adoc#_mcp_server_architecture_and_tools[MCP Server architecture and tools] documentation.
+For more information, see xref:mcp-server-spotter3.adoc[MCP Server with Spotter 3].
 
-=== MCP tools and processing model [.version-badge.breaking]##Breaking change##
-The new Spotter 3-powered MCP tools are available at a separate MCP Server URL. +
-Existing integrations with legacy MCP tools continue to work until further notice. No tools from the previous version carry over into the new version. You must update your integrations to use the new MCP tools. Ensure that you test new MCP tools in staging before production rollout.
+---
 
-[cols="1,2,2", options="header"]
-|====
-|Legacy MCP tools |Replaced by|Notable changes
+[discrete]
+=== MCP server URL changes and API versioning [.version-badge.breaking]#Breaking#
+MCP Server URLs now support date-based versioning, defined using the `?api-version=YYYY-MM-DD` parameter. This enhancement introduces several notable changes for MCP clients using OAuth and bearer token authentication. Ensure that you update the xref:mcp-integration.adoc#_mcp_server_url[MCP Server URL].
 
-|`ping`
-|`check_system_readiness`
-|No change in functionality.
-
-|`getDataSourceSuggestions`
-|`data_source_id` parameter in `create_analysis_session`
-|No longer a standalone tool. Is built into `create_analysis_session` via optional `data_source_id` parameter. Data source is selected automatically if omitted.
-
-|`getRelevantQuestions`
-|`send_session_message` and `get_session_updates` loop
-|Split into asynchronous send message and poll pattern. Polls for streamed updates across multiple calls and accumulates updates from every poll.
-
-|`getAnswer`
-|`get_session_updates` loop
-|Is now part of the polling loop.
-
-|`createLiveboard`
-|`create_dashboard`
-|Creates a dashboard from `answer_id` values collected from the session update type `answer`. Requires a `note_tile` HTML summary tile.
-|====
-
-[IMPORTANT]
+[NOTE]
 ====
-The `send_session_message` does not return an answer. Integrations must now implement an asynchronous polling loop via `get_session_updates` until `is_done: true`. For detailed information about tools and resources, see xref:mcp-tool-reference-guide.adoc[MCP tool reference guide].
-====
-
-=== MCP server URL changes and API versioning [.version-badge.breaking]##Breaking change##
-All MCP Server URLs now support date-based versioning, defined using the `?api-version=YYYY-MM-DD` parameter. This enhancement introduces several notable changes for MCP clients using OAuth and bearer token authentication. Ensure that you update MCP Server URLs and authentication as needed.
-
-[cols="6,4", options="header"]
-|====
-|Current URL|New URL
-
-|`\https://agent.thoughtspot.app/bearer/mcp` [.version-badge.deprecated]#Deprecated# +
-Supports legacy MCP tools only; it will be removed in an upcoming release.
-
-a|**URL with the API version**:  +
-`\https://agent.thoughtspot.app/token/mcp?api-version={YYYY-MM-DD}` +
-
-**URL without the API version**: +
-`\https://agent.thoughtspot.app/token/mcp`. Always points to the latest version.
-
-|`\https://agent.thoughtspot.app/mcp` +
-Supports legacy MCP tools only. It will point to the latest version in an upcoming release. If your integration uses this URL without api-version, it will silently switch to the new tool set when migrated. To prevent unintended changes, add `?api-version` to the URL.
-
-|`\https://agent.thoughtspot.app/mcp?api-version={YYYY-MM-DD}` +
-
-|`\https://agent.thoughtspot.app/openai/mcp` [.version-badge.deprecated]#Deprecated# +
-Supports legacy MCP tools only; it will be removed in an upcoming release.
-| `\https://agent.thoughtspot.app/token/mcp?api-version={YYYY-MM-DD}`. +
-For OAuth apps, you can use `\https://agent.thoughtspot.app/mcp?api-version={YYYY-MM-DD}`.
-||
-|====
-
-[IMPORTANT]
-====
-* The MCP Server URLs without the API version always point to the latest version and may introduce changes. Pin your integration to a tested version using `?api-version={YYYY-MM-DD}` parameter. For example, `?api-version=2026-04-30`.
+* The MCP Server URLs without the API version always point to the latest version and may introduce new tools. Pin your integration to a tested version using the `?api-version={YYYY-MM-DD}` parameter. For example, `?api-version=2026-04-30`.
 * If the API version is set to a future date, the server returns the latest API version released before the date specified in the URL.
-
-* To pin your integration to a specific version, append the `?api-version={YYYY-MM-DD}` parameter to the MCP Server URL and specify the date string.
 ====
 
-=== Migration guidelines
+[discrete]
+=== MCP tools and processing model [.version-badge.breaking]#Breaking#
+The MCP URL now points to the Spotter 3-powered MCP tools. Existing integrations with legacy MCP tools continue to work until further notice. No tools from the previous version carry over into the new version. You must update your integrations to use the new MCP tools or pin a previous version to preserve your existing changes.
 
+==== Migration guidelines
 Migrating from your existing setup to the new version requires updating the MCP client configuration to point to the new URL and rewriting tool-calling logic to use the new asynchronous, polling model. There is no change in the supported authentication models, MCP clients, or the MCP Server hosting domain.
 
 To update your integration to use Spotter 3 features and the new MCP tools, follow these steps:
 
-. Update your MCP Server URL to the latest version. Replace the old URLs in all MCP client configuration files.
+. Ensure that the URL you specify points to the latest version.
 . Rewrite your integration to use the new tools. Replace the old synchronous tool-calling pattern with the new asynchronous polling pattern. For code samples and tool reference, see the xref:mcp-tool-reference-guide.adoc[MCP tool reference guide].
 . Test your integration end-to-end.
 . Roll out to production environments after validation.
 
-== April 29, 2026
-[div announcementBlock]
---
-*API version string:* `?api-version=2026-04-29` or an earlier date string +
-**Status**: Supported +
-**Upgrade recommendation**: Supports the legacy MCP tools and URLs only. Migrate your integrations to 2026-04-30 or a later version. +
---
+|====
 
+== April 2026
+*API version string:* `?api-version=2026-04-30` or an earlier date string +
+*Upgrade recommendation*: Supports the legacy MCP tools and URLs only. Upgrade your integrations to version 2026-04-30 or later.
+
+[.cl-table, cols="1,4", frame=none, grid=none]
+|====
+a|
+[.cl-label]
+*2026-04-30*
+
+a|
+
+[discrete]
 === MCP tools, processing model, and answer retrieval
 Supports the following MCP tools released in the initial version of ThoughtSpot MCP Server.
 
@@ -135,12 +94,16 @@ for a given query.
 * `getAnswer`:  Returns the answer to a specific sub-question.
 * `createLiveboard`: Creates a ThoughtSpot Liveboard from a list of answers.
 
-==== MCP Server URLs
+---
+
+[discrete]
+=== MCP Server URLs
 Supports the following URLs:
 
 * `\https://agent.thoughtspot.app/mcp` (OAuth Apps)
 * `\https://agent.thoughtspot.app/bearer/mcp` (Bearer Token Apps)
 * `\https://agent.thoughtspot.app/openai/mcp` (OpenAI-compatible clients)
 
-These URLs are deprecated in the MCP Server 2026-04-30 release. Refer to the xref:mcp-server-changelog.adoc#_mcp_server_url_changes_and_api_versioning[changelog] for more information.
+These URLs are deprecated as of the MCP Server 2026-05-01 release. Refer to the xref:mcp-server-changelog.adoc#_mcp_server_url_changes_and_api_versioning[changelog] for more information.
 
+|====
