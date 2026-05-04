@@ -248,7 +248,7 @@ liveboardEmbed.trigger(HostEvent.UpdateCrossFilter, {
 });
 ----
 
-== Updating date filters
+== Updating date filters via host events
 To update date filters in an embedded Liveboard, visualization, or saved answer, use `HostEvent.UpdateFilters`.
 
 When updating filters using `HostEvent.UpdateFilters`, you must include the date filter `type` along with the time period to apply a rolling or fixed time windows.
@@ -430,6 +430,610 @@ liveboardEmbed.trigger(HostEvent.UpdateFilters, {
    });
 ----
 |=====
+
+[#_override_filters]
+=== Overriding filters in REST API workflows
+
+The `override_filters` parameter on the Liveboard report API
+(`POST /api/rest/2.0/report/liveboard`) lets you programmatically apply or replace
+filters when exporting a Liveboard report. Filters specified here override any existing
+filters on the same columns in the Liveboard.
+
+[IMPORTANT]
+====
+This section describes how the `override_filters` field used in the REST API request. If you are building an embedded application and want to update filters using the
+Visual Embed SDK, see xref:filters_overview.adoc#_updating_filters_using_host_events[Updating date filters].
+
+The two interfaces share the same filter concepts but are structurally different:
+The Visual Embed SDK uses a `values[]` array to pass date values and the filter attribute names are in camelCase; for example, `datePeriod`.
+The REST API uses named fields (`epoch`, `number`, `date_range`) in
+`UPPER_SNAKE_CASE` type names. Do not mix examples from the two pages.
+====
+
+==== Request format
+
+The `override_filters` value is a JSON array of filter objects. Each object targets
+one column.
+
+[source,json]
+----
+"override_filters": [
+  { ... },   // filter for column A
+  { ... }    // filter for column B
+]
+----
+
+===== Filter object structure
+Each element in the array has the following top-level fields:
+
+[cols="2,1,1,4", options="header"]
+|===
+|Field
+|Type
+|Required
+|Description
+
+|`column_name`
+|__String__
+|Yes
+|Display name of the column to filter.
+
+|`date_filter`
+|Object
+|Conditional
+|Date filter definition. Use for columns with a date or date-time data type.
+Mutually exclusive with `generic_filter` on the same object.
+
+|`generic_filter`
+|Object
+|Conditional
+|Attribute or measure filter definition. Use for non-date columns.
+
+|`negate`
+|boolean
+|No
+|When `true`, inverts the filter. For `date_filter`, see the negation notes in
+<<rest-date-filter-negate>>.
+|===
+
+[IMPORTANT]
+====
+You may specify *at most one* filter object per date-type column. Providing two or more
+filter objects that target the same date column returns an error:
+
+ more than one filter objects are not allowed for date type column <column_name>
+
+Non-date columns do not have this restriction.
+====
+
+[#rest-date-filter-object]
+=== date_filter object
+
+The `date_filter` object specifies a structured date filter. Its fields map directly
+to the internal `DateFilterProto` representation.
+
+[cols="2,1,1,4", options="header"]
+|===
+|Field
+|Type
+|Required
+|Description
+
+|`type`
+|string
+|Yes
+|The date filter category. Must be one of the values in <<rest-date-filter-types>>.
+
+|`datePeriod`
+|string
+|Conditional
+|The time granularity for rolling filters. Required when `type` is `LAST_N_PERIOD`,
+`NEXT_N_PERIOD`, `THIS_PERIOD`, `LAST_PERIOD`, `NEXT_PERIOD`, or `PERIOD_TO_DATE`.
+See <<rest-date-period-values>>.
+
+|`op`
+|string
+|Yes
+|The comparison operator. Valid values depend on `type`.
+See <<rest-valid-operators-per-type>>.
+
+|`number`
+|integer
+|Conditional
+|The period count. Required when `type` is `LAST_N_PERIOD` or `NEXT_N_PERIOD`.
+Must be ≥ 0.
+
+|`epoch`
+|integer (int64)
+|Conditional
+|A specific point in time as a Unix epoch in *seconds*, in *server timezone*.
+Required when `type` is `EXACT_DATE` and `op` is an inequality (`LT`, `LE`, `GT`,
+`GE`, `NE`). For `op: EQ` with `EXACT_DATE`, `epoch` is also required.
+
+|`date_range`
+|object
+|Conditional
+|Required when `type` is `EXACT_DATE_RANGE`. Contains `low_epoch` and `high_epoch`,
+both int64 Unix epochs in *seconds*, in *server timezone*.
+`low_epoch` must be strictly less than `high_epoch`.
+
+|`year_name`
+|string
+|Conditional
+|The four-digit year as a string (e.g., `"2024"`). Required for `YEAR_ONLY`,
+`QUARTER_YEAR`, and `MONTH_YEAR`. Year value must be ≥ 1000.
+
+|`quarter_name`
+|string
+|Conditional
+|The quarter identifier. Required for `QUARTER_YEAR`.
+Valid values: `Q1`, `Q2`, `Q3`, `Q4`.
+
+|`month_name`
+|string
+|Conditional
+|The month name in uppercase. Required for `MONTH_YEAR`.
+Valid values: `JANUARY`, `FEBRUARY`, `MARCH`, `APRIL`, `MAY`, `JUNE`,
+`JULY`, `AUGUST`, `SEPTEMBER`, `OCTOBER`, `NOVEMBER`, `DECEMBER`.
+
+|`include_current_period`
+|boolean
+|No
+|For `LAST_N_PERIOD` and `NEXT_N_PERIOD` only. When `true`, includes the current
+in-progress period in the filter range. Requires the *Include Current Period*
+feature to be enabled on the cluster. Silently ignored if the feature is off.
+|===
+
+[WARNING]
+====
+Epoch values must be in *server timezone* and expressed in *seconds*, not
+milliseconds. Passing millisecond values (for example, `1710460800000` instead of
+`1710460800`) produces an incorrect date range with no error.
+====
+
+[#rest-date-filter-types]
+=== Supported type values
+
+[cols="2,4,3", options="header"]
+|===
+|`type` value
+|Description
+|Required companion fields
+
+|`YESTERDAY`
+|The full previous calendar day.
+|`op: EQ` only
+
+|`TODAY`
+|The current calendar day.
+|`op: EQ`
+
+|`TOMORROW`
+|The next calendar day. +
+⚠️ May be suppressed on clusters with future date filters disabled.
+|`op: EQ`
+
+|`LAST_PERIOD`
+|The last single period (for example, last week).
+|`datePeriod`, `op ∈ {EQ, LE, LT, GE, GT}`
+
+|`NEXT_PERIOD`
+|The next single period (for example, next month).
+|`datePeriod`, `op ∈ {EQ, LE, LT, GE, GT}`
+
+|`THIS_PERIOD`
+|The current period (for example, this quarter).
+|`datePeriod`, `op ∈ {EQ, LE, LT, GE, GT}`
+
+|`LAST_N_PERIOD`
+|The last _N_ complete periods.
+|`datePeriod`, `number ≥ 0`, `op ∈ {EQ, LE, LT, GE, GT}` +
+Optional: `include_current_period`
+
+|`NEXT_N_PERIOD`
+|The next _N_ complete periods.
+|`datePeriod`, `number ≥ 0`, `op ∈ {EQ, LE, LT, GE, GT}` +
+Optional: `include_current_period`
+
+|`PERIOD_TO_DATE`
+|From the start of the current period to now.
+|`datePeriod`, `op: EQ` only
+
+|`EXACT_DATE`
+|A specific calendar date, or an inequality relative to a date.
+|`epoch` (required for inequality ops), `op ∈ {EQ, NE, LT, LE, GT, GE}`
+
+|`EXACT_DATE_RANGE`
+|A date range between two bounds (inclusive).
+|`date_range.low_epoch`, `date_range.high_epoch`, `op: BW_INC` only
+
+|`QUARTER_YEAR`
+|A specific quarter in a specific year.
+|`quarter_name`, `year_name`, `op: EQ` only
+
+|`MONTH_YEAR`
+|A specific month in a specific year.
+|`month_name`, `year_name`, `op: EQ` only
+
+|`YEAR_ONLY`
+|An entire calendar year.
+|`year_name`, `op: EQ` only
+|===
+
+==== Unsupported type values
+
+The following `type` values exist in the underlying `DateFilterType` proto enum but are
+*not supported* by the `override_filters` API. Passing any of these values returns an
+`Unsupported date filter type` error:
+
+* `EXACT_TIME`
+* `EXACT_DATE_TIME`
+* `NOW`
+* `MONTH_ONLY`
+* `WEEKDAY_ONLY`
+* `QUARTER_ONLY`
+* `N_PERIOD_AGO`
+* `PERIOD_ONLY`
+
+[#rest-date-period-values]
+=== datePeriod values
+
+[cols="1,3", options="header"]
+|===
+|`datePeriod` value |Description
+|`DAY`     |Calendar day
+|`WEEK`    |Calendar week
+|`MONTH`   |Calendar month
+|`QUARTER` |Calendar quarter
+|`YEAR`    |Calendar year
+|`HOUR`    |Hour (for datetime columns only)
+|`MINUTE`  |Minute (for datetime columns only)
+|`SECOND`  |Second (for datetime columns only)
+|===
+
+[NOTE]
+====
+`HOUR`, `MINUTE`, and `SECOND` are valid only for columns that contain a time
+component. On clusters where `hideTimeBasedFilters` is active, sub-day periods
+are silently suppressed in the UI, but the REST API does not enforce this at the
+request level.
+====
+
+[#rest-valid-operators-per-type]
+=== Valid operators per filter type
+
+The `op` field accepts string values from the `CompareTypeProto` enum. Valid
+values depend on the `type`. Providing an invalid combination returns an
+`Invalid date filter proto` error.
+
+[cols="3,4", options="header"]
+|===
+|`type` value(s)
+|Valid `op` values
+
+|`YESTERDAY`, `TODAY`, `TOMORROW`
+|`EQ` only
+
+|`LAST_PERIOD`, `NEXT_PERIOD`, `THIS_PERIOD`, +
+`LAST_N_PERIOD`, `NEXT_N_PERIOD`
+|`EQ`, `LE`, `LT`, `GE`, `GT`
+
+|`PERIOD_TO_DATE`, `QUARTER_YEAR`, +
+`MONTH_YEAR`, `YEAR_ONLY`
+|`EQ` only
+
+|`EXACT_DATE`
+|`EQ`, `NE`, `LT`, `LE`, `GT`, `GE`
+
+|`EXACT_DATE_RANGE`
+|`BW_INC` only
+|===
+
+[#rest-date-filter-negate]
+=== Negating a date filter
+
+The top-level `negate` field in the filter object inverts the match when set to `true`.
+
+[IMPORTANT]
+====
+`negate` in the REST API is set at the *filter object* level (a sibling of
+`date_filter`), not inside the `date_filter` object.
+====
+
+[NOTE]
+====
+Old-style epoch-based date filters do not support `negate: true`. Attempting to negate
+a legacy date filter returns:
+
+ Negate not supported with old date filters
+====
+
+=== Examples
+
+==== Yesterday
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "YESTERDAY",
+    "op": "EQ"
+  }
+}
+----
+
+==== Last 3 months (rolling)
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "LAST_N_PERIOD",
+    "datePeriod": "MONTH",
+    "number": 3,
+    "op": "EQ"
+  }
+}
+----
+
+==== Last 3 months including the current partial month
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "LAST_N_PERIOD",
+    "datePeriod": "MONTH",
+    "number": 3,
+    "op": "EQ",
+    "include_current_period": true
+  }
+}
+----
+
+NOTE: `include_current_period` requires the *Include Current Period* feature to be
+enabled on the cluster. It is silently ignored if the feature flag is off.
+
+==== This quarter
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "THIS_PERIOD",
+    "datePeriod": "QUARTER",
+    "op": "EQ"
+  }
+}
+----
+
+==== Month to date
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "PERIOD_TO_DATE",
+    "datePeriod": "MONTH",
+    "op": "EQ"
+  }
+}
+----
+
+==== Exact date — on March 15, 2024
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "EXACT_DATE",
+    "op": "EQ",
+    "epoch": 1710460800
+  }
+}
+----
+
+==== Exact date — after March 15, 2024
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "EXACT_DATE",
+    "op": "GT",
+    "epoch": 1710460800
+  }
+}
+----
+
+==== Exact date range — January 1 to December 31, 2024 (inclusive)
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "EXACT_DATE_RANGE",
+    "op": "BW_INC",
+    "date_range": {
+      "low_epoch": 1704067200,
+      "high_epoch": 1735689599
+    }
+  }
+}
+----
+
+==== Specific month and year — March 2024
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "MONTH_YEAR",
+    "op": "EQ",
+    "month_name": "MARCH",
+    "year_name": "2024"
+  }
+}
+----
+
+==== Specific quarter and year — Q1 2024
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "QUARTER_YEAR",
+    "op": "EQ",
+    "quarter_name": "Q1",
+    "year_name": "2024"
+  }
+}
+----
+
+==== Specific year — 2024
+
+[source,json]
+----
+{
+  "column_name": "Order Date",
+  "date_filter": {
+    "type": "YEAR_ONLY",
+    "op": "EQ",
+    "year_name": "2024"
+  }
+}
+----
+
+
+
+==== Combining date and attribute filters in one request
+
+[source,json]
+----
+"override_filters": [
+  {
+    "column_name": "Order Date",
+    "date_filter": {
+      "type": "LAST_N_PERIOD",
+      "datePeriod": "MONTH",
+      "number": 3,
+      "op": "EQ"
+    }
+  },
+  {
+    "column_name": "Region",
+    "generic_filter": {
+      "op": "IN",
+      "values": [{ "value": "West" }, { "value": "East" }]
+    }
+  }
+]
+----
+
+[#rest-column-name-resolution]
+=== Resolving column names
+
+The `column_name` field accepts the display name of the column as it appears in the
+Liveboard's underlying data source. Matching is case-insensitive.
+
+When the same column name appears in more than one worksheet referenced by the
+Liveboard, qualify the name using the `::` separator:
+
+----
+"worksheet_name::column_name"
+----
+
+For example:
+
+[source,json]
+----
+{
+  "column_name": "Sales Metrics::Order Date",
+  "date_filter": { ... }
+}
+----
+
+If a column name matches more than one column and is not qualified, the API returns:
+
+ Unable to determine logical column from name <name> due to more than one matches
+
+[IMPORTANT]
+====
+The REST API qualifier order is *`worksheet_name::column_name`* — worksheet first,
+column second. This is the *opposite order* from the Visual Embed SDK's
+`UpdateFilters` qualifier format, which is `column_name::datasource_name`.
+See xref:filters-overview.adoc#column-name-resolution[Embed SDK: Resolving column names].
+====
+
+=== Comparison with Embed SDK date filter fields
+
+If you are familiar with the Visual Embed SDK `UpdateFilters` date filter syntax,
+the following table maps each SDK field to its REST API equivalent.
+
+[cols="2,2,3", options="header"]
+|===
+|Embed SDK field
+|REST API `date_filter` field
+|Notes
+
+|`type` (camelCase, e.g. `LastNPeriod`)
+|`type` (UPPER_SNAKE_CASE, e.g. `LAST_N_PERIOD`)
+|Different naming convention.
+
+|`datePeriod` (e.g. `Month`)
+|`datePeriod` (e.g. `MONTH`)
+|Same concept, UPPER_SNAKE_CASE in REST API.
+
+|`operator` (e.g. `EQ`)
+|`op` (e.g. `EQ`)
+|Different field name. Same value strings.
+
+|`values[0]` (for `LastNPeriod`)
+|`number`
+|SDK carries N in the `values` array; REST API uses an explicit `number` field.
+
+|`values[0]` (for `ExactDate`)
+|`epoch`
+|SDK carries epoch in `values`; REST API uses an explicit `epoch` field.
+
+|`values[0]`, `values[1]` (for `ExactDateRange`)
+|`date_range.low_epoch`, `date_range.high_epoch`
+|SDK packs both bounds into `values`; REST API uses an explicit nested object.
+
+|`values[0]` (for `MonthYear`)
+|`month_name`
+|SDK: `values: ['MARCH', '2024']`. REST API: `month_name: "MARCH"`, `year_name: "2024"`.
+
+|`values[0]` (for `QuarterYear`)
+|`quarter_name`
+|SDK: `values: ['Q1', '2024']`. REST API: `quarter_name: "Q1"`, `year_name: "2024"`.
+
+|`values[0]` (for `YearOnly`)
+|`year_name`
+|SDK: `values: ['2024']`. REST API: `year_name: "2024"`.
+
+|`negate`
+|`negate` (top-level sibling, not inside `date_filter`)
+|Same semantics, different placement.
+
+|`includeCurrentPeriod`
+|`include_current_period`
+|camelCase vs snake_case. Same semantics.
+
+|`columnName`
+|`column_name`
+|Qualifier order is reversed: SDK uses `column::datasource`; REST API uses `worksheet::column`.
+|===
 
 == Updating runtime filters
 
