@@ -1,0 +1,459 @@
+= Handling embed errors
+:toc: true
+:toclevels: 2
+
+:page-title: Embed events
+:page-pageid: handling-embed-errors
+:page-description: This document lists the best practices for handling error events.
+
+The ThoughtSpot Visual Embed SDK provides a layered approach to error
+handling. `EmbedEvent.Error` is a real-time outbound event emitted from the embedded ThoughtSpot iframe to the host application, signaling that something has gone wrong, either inside the SDK itself, inside the embedded app (the iFrame), or as a result of an invalid HostEvent payload sent by the host.
+
+Unlike most embed events, which are cached and can be replayed on late subscribers, `EmbedEvent.Error` is not cached or replayed. Every emission is independent, and a handler must be registered before an error occurs to receive it.
+
+`EmbedEvent.Error` fires on a per-embed-component basis. Any handler must be registered before `render()` is called.
+
+== Trigger sources
+Embed errors surface through distinct channels for the following failure categories:
+
+* xref:embed-event-error-best-practices.adoc#_sdk_or_configuration_validation[SDK or configuration validation]
+* xref:embed-event-error-best-practices.adoc#_hostevent_validation[HostEvent validation errors]
+* xref:embed-event-error-best-practices.adoc#_runtime_filter_or_cross_filter_errors[Runtime filter validation errors]
+* xref:embed-event-error-best-practices.adoc#_network_events[Network events]
+
+=== SDK or configuration validation
+
+When SDK or configuration errors occur, the internal `handleError(error)` method in the embed component:
+
+1. Sets `isError = true` and permanently blocks future `renderIFrame` calls on this instance.
+2. Calls `executeCallbacks(EmbedEvent.Error, { error })`.
+3. Logs via `logger.error(error)`.
+
+[cols="2,3", options="header"]
+|===
+| Condition | Error message emitted
+
+| `init()` was not called before `render()`
+| `"Looks like render was called before calling init..."`
+
+| Both `hiddenActions` and `visibleActions` passed
+| `"You cannot have both hidden actions and visible actions"`
+
+| Both `hiddenTabs` and `visibleTabs` passed
+| `"You cannot have both hidden Tabs and visible Tabs"`
+
+| `trigger()` called before `render()`
+| `"Please call render before triggering events"`
+
+| `trigger()` called with undefined event type
+| `"Host event type is undefined"`
+
+| Auth failure during `renderIFrame`
+| The caught auth/login error object
+|===
+
+=== HostEvent validation
+
+When the host sends a HostEvent with an invalid payload or a context mismatch, the event bridge validates it against the HostEvent schema. On failure, `dispatchValidationError()` is triggered to emit `EmbedEvent.Error` with code `embedErrorCodes.HOST_EVENT_VALIDATION`.
+
+[source,json]
+----
+{
+  "type":    "ValidationError",
+  "code":    "HOST_EVENT_VALIDATION",
+  "message": "<human-readable description of what field failed>"
+}
+----
+
+[IMPORTANT]
+====
+If `shouldBypassPayloadValidation: true`, validation failures are silently logged as console warnings and never reach your `EmbedEvent.Error` handler.
+====
+
+==== Runtime filter or cross-filter errors
+Filter operations can fail inside the iframe with typed errors:
+
+[cols="2,3", options="header"]
+|===
+| `eventErrorType` | Typical message pattern
+
+| `SingleValueFilter`
+| `"Filter {name}: Cannot pass multiple filtering elements to this single value filter."`
+
+| `NonExistFilter`
+| `"UpdateFilters could not update the filter on {name} as it is not an existing filter..."`
+
+| `InvalidDateValue`
+| `"UpdateFilters could not update the filter on {name} as invalid date value provided."`
+
+| `InvalidOperator`
+| `"UpdateFilters could not update the filter on {name} as invalid operator value provided."`
+
+| `WrongVizId`
+| `"UpdateCrossFilters could not update the filter as invalid VizId value provided."`
+
+| `NotAWorksheet`
+| `"UpdateCrossFilters could not update the filter as VizId does not consist any worksheet."`
+
+| `NoFilterableColumnPresent`
+| `"Could not apply CrossFilter..."`
+
+| `filterExistsOrNoAttributeColumn`
+| `"UpdateCrossFilters could not update the filter as column is not an attribute..."`
+
+| `InvalidColumnId`
+| `"Invalid ColumnId provided"`
+
+| `Fullscreen`
+| `"Failed to enable fullscreen, This may be happening because there was no user interaction..."`
+
+| `NoActivePersonalisedViewsError`
+| `"No Personalized Liveboard view is selected."`
+
+| `PersonalisedViewNotFound`
+| `"No Personalised View found matching the provided viewId or viewName."`
+|===
+
+=== Network events
+
+A global `window.offline` listener emits `EmbedEvent.Error` with a different payload shape:
+
+[source,json]
+----
+{
+  "offlineWarning": "Network not Detected. Embed is offline. Please reconnect and refresh"
+}
+----
+
+== Error types
+
+The `EmbedEvent.Error` is fired when the following types of errors occur:
+
+[cols="2,3", options="header"]
+|===
+|Error type| Description
+|`API` a| API call failure error. This error event occurs when an API request is blocked.
+Example:
+[source,JavaScript]
+----
+SearchEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "API", error: { message: '...', error: '...' } } }
+});
+----
+|`FULLSCREEN` a| Error in presenting a Liveboard or visualization in full-screen mode.
+
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "FULLSCREEN", error: {
+    //   message: "Fullscreen mode is not available",
+    // } }}
+})
+----
+|`SINGLE_VALUE_FILTER`  a| Error in updating filter values. This error occurs when a single-value filter is applied on a Liveboard and the user tries to update this filter with multiple values.
+
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "SINGLE_VALUE_FILTER", error: {
+    //  message: "Filter {filter_name}: Cannot pass multiple filtering elements to this single value filter.",
+    // } }}
+})
+----
+|`NON_EXIST_FILTER` a| Error in applying filter due to a non-existent filter.
+
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "NON_EXIST_FILTER", error: {
+    //  message: "UpdateFilters could not update the filter on {filter_name} as it is not an existing filter in the Liveboard. Please edit the Liveboard and add {filter_name} as a filter chip in order to update it programmatically.",
+    // } }}
+})
+----
+|`INVALID_DATE_VALUE`  a| Error due to an invalid date value in a filter. For example, if the column name is `Commit Date` and a correct date value is not specified, the `INVALID_DATE_VALUE` error event is fired.
+
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "INVALID_DATE_VALUE", error: {
+    //  message: "UpdateFilters could not update the filter on {filter_name} as invalid date value provided.",
+    // } }}
+})
+----
+|`INVALID_OPERATOR`  a|Error due to an invalid operator in filter properties. For example, if you try to apply filters on the `Revenue` column with the operator as `LT` and specify multiple values, it may result in an error.
+
+[source,JavaScript]
+----
+LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+    console.log(error);
+    // { type: "Error", data: { errorType: "INVALID_OPERATOR", error: {
+    //  message: "UpdateFilters could not update the filter on {filter_name} as invalid operator value provided.",
+    // } }}
+})
+----
+|===
+
+== Payload shapes
+
+[source,typescript]
+----
+// SDK / auth error
+{ error: string | Record<string, unknown> }
+
+// HostEvent validation error
+{ type: string; code: string; message: string }
+
+// Filter / runtime error (from embedded app)
+// — matches one of the eventErrorType patterns above
+
+// Network offline
+{ offlineWarning: string }
+----
+
+== How to subscribe
+
+[source,typescript]
+----
+import { LiveboardEmbed, EmbedEvent } from '@thoughtspot/visual-embed-sdk';
+
+const embed = new LiveboardEmbed('#container', {
+  liveboardId: 'your-liveboard-id',
+});
+
+// Register BEFORE render() — errors can fire during initialization
+embed.on(EmbedEvent.Error, (payload) => {
+
+  // SDK/auth error
+  if (payload?.error) {
+    console.error('[SDK Error]', payload.error);
+    return;
+  }
+
+  // HostEvent validation error (your payload is malformed)
+  if (payload?.code === 'HOST_EVENT_VALIDATION') {
+    console.error('[HostEvent validation failed]', payload.message);
+    return;
+  }
+
+  // runtime filter/action error from the iframe
+  console.warn('[Embed runtime error]', payload);
+
+  // network offline
+  if (payload?.offlineWarning) {
+    showOfflineBanner(payload.offlineWarning);
+    return;
+  }
+});
+
+embed.render();
+----
+
+
+
+////
+=== Recovery after an error
+
+Once `handleError` fires, the embed instance sets `isError = true` and all future
+`renderIFrame` calls are silently skipped. To recover, you must destroy the existing
+instance and create a new one:
+
+[source,typescript]
+----
+embed.on(EmbedEvent.Error, async (payload) => {
+  logError(payload);
+
+  if (isRecoverable(payload)) {
+    embed.destroy(); // removes window listeners and DOM node
+
+    const freshEmbed = new LiveboardEmbed('#container', viewConfig);
+    freshEmbed.on(EmbedEvent.Error, errorHandler);
+    await freshEmbed.render();
+  }
+});
+----
+////
+
+== Handling errors
+The following example shows the sample code for handling errors.
+
+[source,typescript]
+----
+import { HostEvent } from '@thoughtspot/visual-embed-sdk';
+
+try {
+  const result = await embed.trigger(HostEvent.UpdateRuntimeFilters, [
+    { columnName: 'Region', operator: 'EQ', values: ['West'] },
+  ]);
+
+  // Timeout is a resolve, not a reject — check explicitly
+  if (result instanceof Error) {
+    console.error('HostEvent timed out:', result.message);
+    return;
+  }
+
+  console.log('HostEvent succeeded:', result);
+
+} catch (err) {
+  // Rejection = iframe returned an explicit error in the response
+  console.error('HostEvent rejected by iframe:', err);
+}
+----
+
+=== Error handling guidelines
+
+[cols="2,4", options="header"]
+|===
+| Error category | Detection and recovery
+
+| SDK init config error
+
+a| Detection mechanism::
+`EmbedEvent.Error` + `logger.error`
+
+Payload/data::
+ `{ error: string }`
+
+Recovery action::
+Fix configuration. Recreate and render embed
+
+
+| Auth failure (SDK layer)
+a|
+Detection mechanism::
+`AuthStatus.FAILURE` on init emitter
+
+Payload/data::
+`AuthFailureType`
+
+Recovery action::
+Check `getAuthToken` / credentials. Use `suppressErrorAlerts` for custom UI.
+
+
+| Auth failure (iframe layer)
+
+a|
+Detection mechanism::
+`EmbedEvent.AuthFailure`
+
+Recovery action::
+Show login prompt. Recreate and render embed.
+
+| Session expired
+
+a|Detection mechanism::
+`EmbedEvent.AuthExpire`
+
+Recovery action::
+Refresh token. Use `autoLogin: true` for a transparent refresh.
+
+| Idle session timeout
+
+a|Detection mechanism::
+`EmbedEvent.IdleSessionTimeout` +
+`AuthStatus.FAILURE(IDLE_SESSION_TIMEOUT)`
+Recovery action::
+Use `autoLogin: true`. Prompt re-authentication.
+
+| Third-party cookies blocked
+a|Detection mechanism::
+`EmbedEvent.NoCookieAccess` +
+`AuthStatus.FAILURE(NO_COOKIE_ACCESS)`
+Recovery action::
+Switch to `TrustedAuthTokenCookieless`; use `ignoreNoCookieAccess: true` to suppress alert.
+
+| User logout
+a|Detection mechanism::
+`EmbedEvent.AuthLogout` + `AuthStatus.LOGOUT`
+Recovery action::
+Redirect to login or clear state
+
+| Duplicate token
+a|Detection mechanism::
+`AuthStatus.FAILURE(SDK)` + `alert()` (suppressible)
+Payload/data::
+`DUPLICATE_TOKEN_ERR` string
+Recovery action::
+Always return a fresh token from `getAuthToken`
+
+| Invalid token
+a|Detection mechanism::
+`AuthStatus.FAILURE(SDK)` +
+`logger.error`
+Payload/data::
+`INVALID_TOKEN_ERROR` string
+Recovery action::
+Verify token generation on the server
+
+| Network offline
+a|Detection mechanism::
+`EmbedEvent.Error`
+Payload/data::
+`{ offlineWarning: string }`
+Recovery action::
+Show offline UI. Reconnect and reload
+
+
+| HostEvent validation error
+a|Detection mechanism::
+`EmbedEvent.Error`
+Payload/data::
+ `{ type, code: "HOST_EVENT_VALIDATION", message }`
+Recovery action::
+Fix the `HostEvent` payload; enable `useHostEventsV2: true` in development
+
+| HostEvent timeout (30 seconds)
+a|Detection mechanism::
+ `trigger()` resolves with `Error`
+Payload/data::
+ `Error("Trigger timed-out...")`
+Recovery action::
+Check if iframe is still mounted. Call `reload()` if needed
+
+| HostEvent iframe rejection
+a|Detection mechanism::
+`trigger()` rejects
+Payload/data::
+Error from iframe
+Recovery action::
+Inspect the rejection payload; see HostEvent validation error above
+
+
+| Filter errors at runtime
+a|Detection mechanism::
+`EmbedEvent.Error`
+Payload/data::
+`eventErrorType` message string
+Recovery action::
+Fix filter parameters. Validate against current Liveboard/answer filters
+|===
+
+
+== Best practices
+
+* Always register an event listener for `EmbedEvent.Error` on your embed instance to capture and handle errors emitted by the embedded ThoughtSpot application. Register `EmbedEvent.Error` before calling `render()`.
+* Inspect and categorize error payloads. The error event provides a payload with fields such as errorType, message, and code. Do not assume that `payload.error` always exists in `EmbedEvent.Error`. Offline errors use `offlineWarning`; validation errors use `code`.
+* Provide contextual and user-friendly error messages based on the errorType and error details. Avoid exposing raw error objects or stack traces to your application users.
+* Enable `useHostEventsV2: true` in development/staging to surface `HostEvent` payload errors early.
+* Log errors for diagnostics.
+* Simulate different error scenarios during development. For example, network failures and invalid filters to ensure the error handling logic works as expected.
+* Do not set `shouldBypassPayloadValidation: true` in production environments. Validation errors become invisible console warnings.
+* Do not call `trigger()` before `render()`; calling it before `render()` returns `null`.
+
+== Try it out in the Visual Embed Playground
+Try out the embed events in the +++<a href="{{previewPrefix}}/playground/liveboard"> Visual Embed Playground </a>+++ and preview changes.
+
+[.widthAuto]
+[.bordered]
+image::./images/embed-event-playground.png[Try Embed event in Playground]
+
+== Additional resources
+
+* To identify and log errors, use the error types and error codes. For more information, see xref:EmbedErrorDetailsEvent.adoc[EmbedErrorDetailsEvent] and xref:EmbedErrorCodes.adoc[EmbedErrorCodes].
+* For information about the supported event objects and examples, see xref:EmbedEvent.adoc[EmbedEvent].
+
+
