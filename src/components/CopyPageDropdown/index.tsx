@@ -96,6 +96,7 @@ const CopyPageDropdown = (props: CopyPageDropdownProps) => {
                     <FiCopy />
                 </IconContext.Provider>
                 <span>{copied ? 'Copied!' : 'Copy page'}</span>
+                <span className="copy-page-dropdown__trigger-divider" aria-hidden="true" />
                 <IconContext.Provider value={{ className: 'copy-chevron' }}>
                     <FiChevronDown />
                 </IconContext.Provider>
@@ -113,7 +114,7 @@ const CopyPageDropdown = (props: CopyPageDropdownProps) => {
                         </IconContext.Provider>
                         <span className="copy-page-dropdown__item-text">
                             <span className="copy-page-dropdown__item-label">Copy as Markdown</span>
-                            <span className="copy-page-dropdown__item-sub">Copy page content to clipboard</span>
+                            <span className="copy-page-dropdown__item-sub">Copy page as Markdown for LLMs </span>
                         </span>
                     </button>
 
@@ -157,7 +158,7 @@ const CopyPageDropdown = (props: CopyPageDropdownProps) => {
                         </IconContext.Provider>
                         <span className="copy-page-dropdown__item-text">
                             <span className="copy-page-dropdown__item-label">View as Markdown</span>
-                            <span className="copy-page-dropdown__item-sub">Preview raw Markdown in new tab</span>
+                            <span className="copy-page-dropdown__item-sub">View this page as plain text</span>
                         </span>
                     </button>
                 </div>
