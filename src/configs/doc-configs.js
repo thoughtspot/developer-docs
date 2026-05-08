@@ -22,8 +22,8 @@ module.exports = {
         //   'https://developers.thoughtspot.com/docs/26.3.0.cl?pageid=whats-new'
         // - GA: ' /docs/whats-new'
         //linkHref: '/docs/whats-new',
-        linkHref: '/docs/26.5.0.cl?pageid=whats-new',
-        linkText: 'Version 26.5.0.cl',
+        linkHref: '/docs/26.6.0.cl?pageid=whats-new',
+        linkText: 'Version 26.6.0.cl',
         openInNewTab: true,
     },
     TYPE_DOC_PREFIX: 'typedoc',

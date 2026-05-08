@@ -662,6 +662,40 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         <>
             <Seo title={docTitle} description={docDescription} />
             <Analytics />
+            {shouldShowAnnouncementBanner() && (
+                <AnnouncementBanner
+                    enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
+                    variant="release"
+                    dismissKey={bannerDismissKey}
+                    message={
+                        <span>
+                            {HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                HOME_ANNOUNCEMENT_BANNER?.linkText && (
+                                    <a
+                                        className="announcementBanner__link"
+                                        href={HOME_ANNOUNCEMENT_BANNER.linkHref}
+                                        target={
+                                            bannerLinkOpensInNewTab ? '_blank' : undefined
+                                        }
+                                        rel={
+                                            bannerLinkOpensInNewTab
+                                                ? 'noopener noreferrer'
+                                                : undefined
+                                        }
+                                    >
+                                        {HOME_ANNOUNCEMENT_BANNER.linkText}
+                                    </a>
+                                )}
+                            {(HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                HOME_ANNOUNCEMENT_BANNER?.linkText) && ' '}
+                            {HOME_ANNOUNCEMENT_BANNER?.message ||
+                                (VERSION_DROPDOWN?.[0]?.label
+                                    ? `Version ${VERSION_DROPDOWN[0].label} is now available!`
+                                    : 'A new version is now available!')}
+                        </span>
+                    }
+                />
+            )}
             <div
                 id="wrapper"
                 className={getWrapperClassName()}
@@ -690,40 +724,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     leftNavOpen={leftNavOpen}
                     setLeftNavOpen={setLeftNavOpen}
                 />
-                {shouldShowAnnouncementBanner() && (
-                    <AnnouncementBanner
-                        enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
-                        variant="release"
-                        dismissKey={bannerDismissKey}
-                        message={
-                            <span>
-                                {HOME_ANNOUNCEMENT_BANNER?.linkHref &&
-                                    HOME_ANNOUNCEMENT_BANNER?.linkText && (
-                                        <a
-                                            className="announcementBanner__link"
-                                            href={HOME_ANNOUNCEMENT_BANNER.linkHref}
-                                            target={
-                                                bannerLinkOpensInNewTab ? '_blank' : undefined
-                                            }
-                                            rel={
-                                                bannerLinkOpensInNewTab
-                                                    ? 'noopener noreferrer'
-                                                    : undefined
-                                            }
-                                        >
-                                            {HOME_ANNOUNCEMENT_BANNER.linkText}
-                                        </a>
-                                    )}
-                                {(HOME_ANNOUNCEMENT_BANNER?.linkHref &&
-                                    HOME_ANNOUNCEMENT_BANNER?.linkText) && ' '}
-                                {HOME_ANNOUNCEMENT_BANNER?.message ||
-                                    (VERSION_DROPDOWN?.[0]?.label
-                                        ? `Version ${VERSION_DROPDOWN[0].label} is now available!`
-                                        : 'A new version is now available!')}
-                            </span>
-                        }
-                    />
-                )}
                 <main
                     className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}
