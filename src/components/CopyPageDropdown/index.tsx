@@ -113,7 +113,7 @@ const CopyPageDropdown = (props: CopyPageDropdownProps) => {
                             <FiCopy />
                         </IconContext.Provider>
                         <span className="copy-page-dropdown__item-text">
-                            <span className="copy-page-dropdown__item-label">Copy as Markdown</span>
+                            <span className="copy-page-dropdown__item-label">Copy page</span>
                             <span className="copy-page-dropdown__item-sub">Copy page as Markdown for LLMs </span>
                         </span>
                     </button>
