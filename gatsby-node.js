@@ -3,6 +3,8 @@ const {
     DOC_NAV_PAGE_ID,
     NOT_FOUND_PAGE_ID,
     VERSION_DROPDOWN,
+    SITE_URL,
+    LLMS_SECTIONS,
 } = require('./src/configs/doc-configs');
 const { getDocLinkFromEdge } = require('./src/utils/gatsby-utils.js');
 
@@ -62,11 +64,62 @@ exports.onCreateNode = ({ node, actions }) => {
     });
 };
 
-exports.onPostBuild = () => {
+exports.onPostBuild = async ({ graphql, reporter }) => {
     fsExtra.copyFileSync(
         `${__dirname}/robots.txt`,
         `${__dirname}/public/robots.txt`,
     );
+
+    try {
+        const result = await graphql(`
+            query {
+                allAsciidoc {
+                    edges {
+                        node {
+                            document { title }
+                            pageAttributes { pageid }
+                        }
+                    }
+                }
+            }
+        `);
+
+        if (result.errors) {
+            reporter.warn(`llms.txt generation: GraphQL errors — ${JSON.stringify(result.errors)}`);
+            return;
+        }
+
+        const pageMap = {};
+        result.data.allAsciidoc.edges.forEach(({ node }) => {
+            const pageid = node.pageAttributes?.pageid;
+            const title = node.document?.title;
+            if (pageid && title) pageMap[pageid] = title;
+        });
+
+        const lines = [
+            '# ThoughtSpot Developer Documentation',
+            '',
+            '> Developer documentation for ThoughtSpot Embedded — tools, APIs, and SDKs for embedding ThoughtSpot analytics into your applications.',
+            '',
+        ];
+
+        for (const section of LLMS_SECTIONS) {
+            lines.push(`## ${section.label}`);
+            for (const pageId of section.pageIds) {
+                const title = pageMap[pageId];
+                if (title) lines.push(`- [${title}](${SITE_URL}/${pageId})`);
+            }
+            lines.push('');
+        }
+
+        fsExtra.writeFileSync(
+            `${__dirname}/public/llms.txt`,
+            lines.join('\n'),
+        );
+        reporter.info(`llms.txt generated with ${Object.keys(pageMap).length} pages`);
+    } catch (err) {
+        reporter.warn(`llms.txt generation failed: ${err.message}`);
+    }
 };
 exports.createPages = async function ({ actions, graphql }) {
     const { data } = await graphql(`

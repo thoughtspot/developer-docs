@@ -192,6 +192,7 @@ module.exports = {
                     .queries,
                 // for testing add dryRun as true,
                 // dryRun: true,
+                continueOnFailure: !process.env.ALGOLIA_ADMIN_KEY,
             },
         },
         {
