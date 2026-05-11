@@ -44,7 +44,7 @@ import {
     LEFT_NAV_WIDTH_TABLET,
     MAX_MOBILE_RESOLUTION,
     MAX_CONTENT_WIDTH_DESKTOP,
-    MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
+    // MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
 } from '../../constants/uiConstants';
 import { getAllPageIds } from '../LeftSidebar/helper';
 import t from '../../utils/lang-utils';
@@ -503,18 +503,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 )} */}
                 <main
                     ref={ref as React.RefObject<HTMLDivElement>}
-<<<<<<< HEAD
                     className={getClassName()}
-                    style={{
-                        height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
-                    }}
-=======
                     style={
                         !isPublicSiteOpen
                             ? { height: '100lvh' }
                             : { height: 'calc(100lvh - 60px)' }
                     }
->>>>>>> 285a0e0f (style and note update)
                 >
                     {isPlayGround ? renderPlayGround() : renderDocTemplate()}
                 </main>
