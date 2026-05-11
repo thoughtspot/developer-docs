@@ -460,12 +460,60 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         isDarkMode={isDarkMode}
                     />
                 )}
+                <div
+                    className="headerPlaceholder"
+                    style={
+                        isPublicSiteOpen
+                            ? { height: '60px' }
+                            : { height: '0px' }
+                    }
+                ></div>
+                {shouldShowAnnouncementBanner() && (
+                    <AnnouncementBanner
+                        enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
+                        message={
+                            <span>
+                                {HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                    HOME_ANNOUNCEMENT_BANNER?.linkText && (
+                                        <a
+                                            className="announcementBanner__link"
+                                            href={HOME_ANNOUNCEMENT_BANNER.linkHref}
+                                            target={
+                                                bannerLinkOpensInNewTab ? '_blank' : undefined
+                                            }
+                                            rel={
+                                                bannerLinkOpensInNewTab
+                                                    ? 'noopener noreferrer'
+                                                    : undefined
+                                            }
+                                        >
+                                            {HOME_ANNOUNCEMENT_BANNER.linkText}
+                                        </a>
+                                    )}
+                                {(HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                    HOME_ANNOUNCEMENT_BANNER?.linkText) && ' '}
+                                {HOME_ANNOUNCEMENT_BANNER?.message ||
+                                    (VERSION_DROPDOWN?.[0]?.label
+                                        ? `Version ${VERSION_DROPDOWN[0].label} is now available!`
+                                        : 'A new version is now available!')}
+                            </span>
+                        }
+                    />
+                )}
                 <main
                     ref={ref as React.RefObject<HTMLDivElement>}
+<<<<<<< HEAD
                     className={getClassName()}
                     style={{
                         height: !docContent && MAIN_HEIGHT_WITHOUT_DOC_CONTENT,
                     }}
+=======
+                    style={
+                        !isPublicSiteOpen
+                            ? { height: '100lvh' }
+                            : { height: 'calc(100lvh - 60px)' }
+                    }
+>>>>>>> 285a0e0f (style and note update)
                 >
                     {isPlayGround ? renderPlayGround() : renderDocTemplate()}
                 </main>
