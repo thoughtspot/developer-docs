@@ -1039,7 +1039,7 @@ const main = async () => {
 
     cliOptions.typeDocFilePath = cliOptions.typeDocFilePath.replace(
         '{branch}',
-        'SCAL-298466',
+        cliOptions.branch,
     );
 
     console.log('Script options : ', cliOptions);

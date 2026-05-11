@@ -1,0 +1,94 @@
+= MCP Server with Spotter 3 capabilities
+:toc: true
+:toclevels: 3
+
+:page-title: MCP Server with Spotter 3 capabilities
+:page-pageid: mcp-server-spotter3
+:page-description: Learn about the MCP Server with Spotter 3 capabilities, including advanced analytics, streaming responses, and session-based conversations.
+
+ThoughtSpot MCP Server supports link:https://docs.thoughtspot.com/cloud/latest/spotter-versions[Spotter 3, window=_blank], which enables advanced analytics, forecasting, multi-step reasoning and analysis, and deep research capabilities.
+The MCP Server with Spotter 3 introduces new MCP tools, real-time streaming responses, session-based conversations, and richer interactions.
+
+[cols="2,4,4", options="header"]
+|====
+||Legacy MCP Server setup|MCP Server with Spotter 3
+|**Functional differences**
+|Limited capabilities for complex analysis and context integration.
+a|* Supports advanced analytics, forecasting, and deep research capabilities.
+* Supports asynchronous streaming, session-based conversations, and context integration.
+
+|**Recommended for**
+|Maintaining existing integrations only.
+|All new integrations
+
+|**Integration pattern +
+Session model +
+Response processing**
+|Synchronous and stateless integration pattern. Each tool call is independent. Does not support persistent sessions and requires prior context to be injected manually on every follow-up call.
+
+|Asynchronous and stateful sessions. Allows multiple follow-up questions within a session. Responses are streamed with intermediate updates, including thinking narration and clarifications. Context is retained automatically across all follow-up questions within the session.
+
+|**Data source selection**
+|Requires a separate tool call (`getDataSourceSuggestions`) to retrieve source suggestions.
+|Built into session creation. If the `data_source_id` is not explicitly specified in the query, the most relevant source is automatically selected based on the user's query.
+
+|**Response delivery**
+|Returns full response in a single synchronous call.
+|Responses are streamed incrementally; updates are accumulated via polling.
+
+|**Follow-up questions**
+|Requires prior context on every follow-up call.
+|The session retains context automatically. +
+Optionally, the `additional_context` parameter can be included to inject new external context for each follow-up question or message.
+
+|**API versioning support**
+|Not available.
+|Supports date-based API versioning, which is identified in the MCP Server URL as `?api-version=YYYY-MM-DD`.
+||
+|====
+
+The following figure illustrates the MCP architecture, tool calls, and workflow in the new MCP Server version:
+
+[.widthAuto]
+image::./images/mcp-architecture-new.png[MCP architecture new]
+
+== Tool calls and workflow processing
+The workflow in the MCP Server with Spotter 3 typically includes the following stages:
+
+1. *User asks a question* +
+A user sends a query in the chat interface to get data insights. For
+example, _What were the total sales of Jackets and Bags in the Northeast
+last year?_
+
+2. *Agent calls `create_analysis_session`* +
+The agent calls `create_analysis_session` to establish a stateful analytical session with ThoughtSpot's Spotter 3 engine. ThoughtSpot returns an `analytical_session_id` that identifies the session for all subsequent calls. +
+If the user specified a data source, the agent passes it as the optional `data_source_id` parameter. If not specified, ThoughtSpot automatically selects the most relevant data source based on the question.
+
+3. *Agent calls `send_session_message`* +
+The agent calls `send_session_message` with the `analytical_session_id` and the user's question. Optionally, the agent can pass `additional_context` to provide external information that should influence the analysis. For example, `The user's fiscal year starts in April` or `The user is a manager of the West region`. +
+ThoughtSpot confirms receipt with a `success` response and begins processing the question asynchronously. The answer is not returned in this call.
+
+4. *Agent polls `get_session_updates` for results* +
+The agent calls `get_session_updates` repeatedly in a loop until `is_done` is `true`. ThoughtSpot streams updates incrementally across multiple polls. The agent must accumulate updates from every poll. ThoughtSpot returns the following update types:
+
+* `text-chunk` - real-time thinking narration from Spotter describing what it is doing, streamed in fragments. Concatenate chunks in order to form the complete narration.
+* `text` - complete standalone messages representing clarifications, caveats, or assumptions Spotter made during analysis.
+* `answer` - a final analytical result containing:
+** `answer_title` - a human-readable description of what the answer shows.
+** `answer_query` - the ThoughtSpot search query used to generate the answer.
+** `iframe_url` - an embeddable URL for rendering an interactive ThoughtSpot visualization.
+** `answer_id` - a unique identifier for the answer, used as input for creating a dashboard.
+
+5. *A dashboard is generated from the results (optional)* +
+The user can choose to save answers from the conversation as a ThoughtSpot dashboard. For this workflow, the agent extracts the `answer_id` and `answer_title` from each `answer` type update collected during polling and calls `create_dashboard`. +
+ThoughtSpot creates a dashboard and returns a `dashboard_id` and a
+`dashboard_url`, a direct link to the dashboard in the ThoughtSpot UI.
+
+6. *User asks a follow-up question (optional)* +
+The user can ask a follow-up question in the same session. The agent calls `send_session_message` again using the same `analytical_session_id`. ThoughtSpot retains the full conversation context automatically. The agent returns to step 4 to poll for the follow-up response.
+
+For more information about the tool calls, input parameters, and response output, see xref:mcp-tool-reference-spotter3.adoc[MCP tool reference (Spotter 3)].
+
+== Additional resources
+* For information about MCP, see the link:https://modelcontextprotocol.io[Model Context Protocol specification, window=_blank].
+* For implementation details, see the link:https://github.com/thoughtspot/mcp-server[MCP Server GitHub repository, window=_blank].

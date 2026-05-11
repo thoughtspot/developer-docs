@@ -1,0 +1,173 @@
+= MCP tool reference (legacy version)
+:toc: true
+:toclevels: 3
+
+:page-title: ThoughtSpot MCP tool reference guide
+:page-pageid: mcp-tool-reference-legacy
+:page-description: Refer to this guide to learn which MCP tools are supported, input parameters used for tool calls, and the response format.
+
+This reference guide lists the legacy MCP tools supported by the MCP Server in versions prior to 2026-05-01 and describes the MCP request input schema and data structure of the response.
+
+== ping
+Runs a basic health check to validate that the MCP Server is reachable.
+
+[source,typescript]
+----
+const tsPing = await callMCPTool("ping", {});
+----
+
+== getDataSourceSuggestions
+Suggests appropriate ThoughtSpot data models for a given natural language question.
+
+=== Example call
+
+[source,typescript]
+----
+const dsSuggestions = await callMCPTool("getDataSourceSuggestions", {
+  query: "show me sales by region" // user's query
+});
+----
+
+=== Response
+
+Returns an object containing an array of suggestions:
+
+[source,json]
+----
+{
+  "suggestions": [
+    {
+      "header": {
+        "guid": "worksheet-guid-123",
+        "displayName": "Sales Analytics",
+        "description": "Sales performance by region, product, and channel"
+      },
+      "confidence": 0.92,
+      "llmReasoning": "This worksheet contains sales metrics and regional dimensions relevant to the query."
+    }
+  ]
+}
+----
+
+Key fields are:
+
+* `header.guid`: Unique ID for the datasource. The `datasourceId` is used in `getRelevantQuestions` and `getAnswer` calls.
+* `header.displayName`: Name of the data source.
+* `header.description`: Optional description of the data source.
+* `confidence`: Numeric score indicating the confidence of the system about a data model being the right match for the user’s query.
+* `llmReasoning`: LLM's reasoning for the suggestion.
+
+== getRelevantQuestions
+Uses ThoughtSpot’s reasoning engine to generate AI-suggested sub-queries that help generate specific answers for a given data context.
+
+=== Example call
+
+[source,typescript]
+----
+const result = await callMCPTool("getRelevantQuestions", {
+  query: "show me sales data", // User's natural language query
+  datasourceIds: ["model-guid-123"], // Array of worksheet/datasource GUIDs
+  additionalContext: "User is interested in the data for underperforming regions and products"
+});
+----
+
+=== Response
+
+[source,json]
+----
+{
+  "questions": [
+    "What is the total sales revenue by region?",
+    "Which products have the highest revenue?",
+    "What are the top selling categories?"
+  ]
+}
+----
+
+Each returned question can then be passed individually into `getAnswer`.
+
+== getAnswer
+Executes a natural language query for a given data context and returns the resulting data and visualization metadata. Clients can use this data and frame URL to render visualizations.
+
+=== Example call
+
+[source,typescript]
+----
+const result = await callMCPTool("getAnswer", {
+  question: "Total sales by region", // Natural language question
+  datasourceId: "model-guid-123" // Worksheet/datasource GUID
+});
+----
+
+=== Response
+
+[source,json]
+----
+{
+  "question": "Total sales by region",
+  "session_identifier": "abc-123-def-456",
+  "generation_number": 2,
+  "data": "\"Region\",\"Total Sales\"\n\"East\",100000\n...",
+  "frame_url": "https://...",
+  "fields_info": "..."
+}
+----
+
+Key fields are:
+
+* `session_identifier`: Unique session ID used to group answers. Required when creating a Liveboard from this answer using the `createLiveboard` MCP tool.
+* `generation_number`: Version number for this answer. Required for Liveboard creation.
+* `question`: The executed question; useful for display and to pass it into the `createLiveboard` request.
+* `data`: Data returned in encoded format. Contains column headers and all returned rows in comma-separated format, which can be parsed to render tables or charts in your application.
+* `frame_url`: Optional iframe URL for embedding the visualization in your UI.
+* `fields_info`: Descriptive metadata about the fields and chart, useful for explanations.
+
+== createLiveboard
+
+Creates a ThoughtSpot Liveboard with one or more answers from the results. This is a two-step process and includes the following calls:
+
+. Call `getAnswer` to generate visualizations and obtain `session_identifier` and `generation_number`.
+. Call `createLiveboard` with those values to create the Liveboard.
+
+=== Example call
+
+[source,typescript]
+----
+const answerData = JSON.parse(answerResult.result.content);
+
+const liveboardResult = await callMCPTool("createLiveboard", {
+  name: "My Sales Dashboard",
+  noteTile: "My Sales Dashboard was created by TS MCP Chat", // Description text for the Liveboard
+  answers: [{
+    question: answerData.question, // Display name for the Liveboard
+    session_identifier: answerData.session_identifier,
+    generation_number: answerData.generation_number
+  }]
+});
+----
+
+Required attributes are:
+
+* `noteTile`: Use this field for any Liveboard description or notes; a separate description field is not supported.
+* `answers`: Required array. Each item must include `question`, `session_identifier`, and `generation_number` from a prior `getAnswer` call.
+
+=== Response
+
+[source,json]
+----
+{
+  "liveboardId": "liveboard-guid-here",
+  "name": "My Sales Dashboard",
+  "frame_url": "https://..."
+}
+----
+
+Key fields are:
+
+* `liveboardId`: GUID of the created Liveboard.
+* `name`: Name of the Liveboard.
+* `frame_url`: URL that can be embedded to display the Liveboard.
+
+
+
+

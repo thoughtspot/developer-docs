@@ -14,6 +14,7 @@ import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
 import Header from '../Header';
+import SecondaryHeader, { DocCategory, CATEGORY_PAGEIDS, CATEGORY_NAV_ID } from '../SecondaryHeader';
 import LeftSidebar from '../LeftSidebar';
 import Docmap from '../Docmap';
 import Document from '../Document';
@@ -57,7 +58,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
         data,
         location,
-        pageContext: { namePageIdMap },
+        pageContext: { namePageIdMap, navMap = {} },
     } = props;
     const isBrowser = () => typeof window !== 'undefined';
 
@@ -91,9 +92,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const initialNavContentData = passThroughHandler(navNode.html, params);
     const [navContent, setNavContent] = useState(initialNavContentData || '');
-    const [breadcrumsData, setBreadcrumsData] = useState(
-        fetchChild(initialNavContentData) || [],
-    );
+    // breadcrumsData is derived after processedNavMap is built (see useMemo below)
+    const [activeCategory, setActiveCategory] = useState<DocCategory>('guides');
     const [showSearch, setShowSearch] = useState(false);
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
@@ -101,12 +101,46 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         if (typeof window !== 'undefined') return isPublicSite(location.search);
         return true;
     });
-    const checkout =
-        typeof window !== 'undefined'
-            ? localStorage.getItem('theme') === 'dark'
-            : null;
-    const [isDarkMode, setDarkMode] = useState(checkout);
+    const [isDarkMode, setDarkMode] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        /* themeMode is only written when the user explicitly clicks the toggle.
+           If absent, follow OS preference fresh every load. */
+        const explicitChoice = localStorage.getItem('themeMode');
+        if (explicitChoice) return explicitChoice === 'dark';
+        const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+        localStorage.setItem('theme', prefersDark ? 'dark' : 'light');
+        return prefersDark;
+    });
     const [key, setKey] = useState('');
+
+    // Pre-process all category nav HTMLs once ({{navprefix}} substitution applied to each)
+    const processedNavMap = React.useMemo(() =>
+        Object.fromEntries(
+            Object.entries(navMap as Record<string, string>).map(([cat, html]) => [
+                cat,
+                passThroughHandler(html, params) || '',
+            ]),
+        ),
+    // navMap is static (from pageContext); params is stable after mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []);
+
+    // Breadcrumb data built from master nav + all category navs for full coverage
+    const breadcrumsData = React.useMemo(() => {
+        if (typeof window === 'undefined') return [];
+        const allHtmls = [
+            initialNavContentData,
+            ...Object.values(processedNavMap as Record<string, string>),
+        ];
+        return allHtmls.flatMap((html) => fetchChild(html));
+    }, [processedNavMap]);
+
+    // Pick the right sidebar content for the active category
+    const activeNavContent = React.useMemo(() => {
+        const navId = CATEGORY_NAV_ID[activeCategory];
+        const mapKey = navId.startsWith('nav-') ? navId.slice(4) : null;
+        return (mapKey && processedNavMap[mapKey]) || navContent;
+    }, [activeCategory, processedNavMap, navContent]);
 
     const isCustomPage = _.values(CUSTOM_PAGE_ID).some(
         (pageId: string) => pageId === params[TS_PAGE_ID_PARAM],
@@ -133,6 +167,38 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
+    /* Build pageId → category map by parsing hrefs from each category's nav HTML.
+     * This means writers only need to update nav-*.adoc — no TypeScript changes needed. */
+    const pageIdToCategoryMap = React.useMemo(() => {
+        if (typeof window === 'undefined') return {};
+        const map: Record<string, DocCategory> = {};
+        Object.entries(processedNavMap).forEach(([cat, html]) => {
+            const doc = new DOMParser().parseFromString(html as string, 'text/html');
+            doc.querySelectorAll('a[href]').forEach((a) => {
+                const href = a.getAttribute('href') || '';
+                // hrefs are like /docs/pageid or /pageid — extract the last segment
+                const pageId = href.split('?')[0].split('/').filter(Boolean).pop();
+                if (pageId) map[pageId] = cat as DocCategory;
+            });
+        });
+        return map;
+    }, [processedNavMap]);
+
+    /* Detect active category from current page ID */
+    useEffect(() => {
+        const currentPageId = curPageNode.pageAttributes.pageid;
+        // First try the auto-derived map from nav files
+        if (pageIdToCategoryMap[currentPageId]) {
+            setActiveCategory(pageIdToCategoryMap[currentPageId]);
+            return;
+        }
+        // Fall back to the static CATEGORY_PAGEIDS for any pages not yet in a nav file
+        const found = (Object.entries(CATEGORY_PAGEIDS) as [DocCategory, string[]][]).find(
+            ([, pageIds]) => pageIds.includes(currentPageId),
+        );
+        if (found) setActiveCategory(found[0]);
+    }, [curPageNode.pageAttributes.pageid, pageIdToCategoryMap]);
+
     useEffect(() => {
         // based on query params set if public site is open or not
         setIsPublicSiteOpen(isPublicSite(location.search));
@@ -151,7 +217,16 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     useEffect(() => {
         if (isBrowser()) {
-            setDarkMode(localStorage.getItem('theme') === 'dark');
+            /* Correct SSR mismatch on first hydration */
+            const explicitChoice = localStorage.getItem('themeMode');
+            let isDark: boolean;
+            if (explicitChoice) {
+                isDark = explicitChoice === 'dark';
+            } else {
+                isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            }
+            setDarkMode(isDark);
             setKey('dark');
         }
     }, []);
@@ -398,7 +473,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 <LeftSidebar
                     backLink={getParentBackButtonLink()}
                     navTitle={navTitle}
-                    navContent={navContent}
+                    navContent={activeNavContent}
                     docWidth={width}
                     location={location}
                     setLeftNavOpen={setLeftNavOpen}
@@ -433,6 +508,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                                 docContent={docContent}
                                 breadcrumsData={breadcrumsData}
                                 isPublicSiteOpen={isPublicSiteOpen}
+                                markdownBody={curPageNode.fields?.markdownBody}
                             />
                         </div>
                         {shouldShowRightNav && (
@@ -487,11 +563,21 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         );
     };
 
+    const isEmbeddedContext = () => {
+        if (!isBrowser()) return false;
+        const urlParams = new URLSearchParams(location.search);
+        return urlParams.get('context') === 'embedded' || !isPublicSiteOpen;
+    };
+
     const getClassName = () => {
         let cName = isDarkMode ? 'dark ' : '';
         if (isPublicSiteOpen) cName += 'withHeaderFooter';
         if (isCustomPage) cName += ' pgHeader';
         return cName;
+    };
+
+    const getWrapperClassName = () => {
+        return isEmbeddedContext() ? 'embedded-mode' : '';
     };
 
     const getCloudLatestVersion = () => {
@@ -570,12 +656,49 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         HOME_ANNOUNCEMENT_BANNER?.linkHref,
     );
 
+    const bannerDismissKey = `announcement-${HOME_ANNOUNCEMENT_BANNER?.linkText || 'banner'}`;
+
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
             <Analytics />
+            {shouldShowAnnouncementBanner() && (
+                <AnnouncementBanner
+                    enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
+                    variant="release"
+                    dismissKey={bannerDismissKey}
+                    message={
+                        <span>
+                            {HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                HOME_ANNOUNCEMENT_BANNER?.linkText && (
+                                    <a
+                                        className="announcementBanner__link"
+                                        href={HOME_ANNOUNCEMENT_BANNER.linkHref}
+                                        target={
+                                            bannerLinkOpensInNewTab ? '_blank' : undefined
+                                        }
+                                        rel={
+                                            bannerLinkOpensInNewTab
+                                                ? 'noopener noreferrer'
+                                                : undefined
+                                        }
+                                    >
+                                        {HOME_ANNOUNCEMENT_BANNER.linkText}
+                                    </a>
+                                )}
+                            {(HOME_ANNOUNCEMENT_BANNER?.linkHref &&
+                                HOME_ANNOUNCEMENT_BANNER?.linkText) && ' '}
+                            {HOME_ANNOUNCEMENT_BANNER?.message ||
+                                (VERSION_DROPDOWN?.[0]?.label
+                                    ? `Version ${VERSION_DROPDOWN[0].label} is now available!`
+                                    : 'A new version is now available!')}
+                        </span>
+                    }
+                />
+            )}
             <div
                 id="wrapper"
+                className={getWrapperClassName()}
                 data-theme={isDarkMode ? 'dark' : 'light'}
                 key={key}
             >
@@ -590,49 +713,24 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     className="headerPlaceholder"
                     style={
                         isPublicSiteOpen
-                            ? { height: '65px' }
+                            ? { height: '60px' }
                             : { height: '0px' }
                     }
                 ></div>
-                {shouldShowAnnouncementBanner() && (
-                    <AnnouncementBanner
-                        enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
-                        message={
-                            <span>
-                                {HOME_ANNOUNCEMENT_BANNER?.linkHref &&
-                                    HOME_ANNOUNCEMENT_BANNER?.linkText && (
-                                        <a
-                                            className="announcementBanner__link"
-                                            href={HOME_ANNOUNCEMENT_BANNER.linkHref}
-                                            target={
-                                                bannerLinkOpensInNewTab ? '_blank' : undefined
-                                            }
-                                            rel={
-                                                bannerLinkOpensInNewTab
-                                                    ? 'noopener noreferrer'
-                                                    : undefined
-                                            }
-                                        >
-                                            {HOME_ANNOUNCEMENT_BANNER.linkText}
-                                        </a>
-                                    )}
-                                {(HOME_ANNOUNCEMENT_BANNER?.linkHref &&
-                                    HOME_ANNOUNCEMENT_BANNER?.linkText) && ' '}
-                                {HOME_ANNOUNCEMENT_BANNER?.message ||
-                                    (VERSION_DROPDOWN?.[0]?.label
-                                        ? `Version ${VERSION_DROPDOWN[0].label} is now available!`
-                                        : 'A new version is now available!')}
-                            </span>
-                        }
-                    />
-                )}
+                <SecondaryHeader
+                    activeCategory={activeCategory}
+                    onCategoryChange={setActiveCategory}
+                    location={location}
+                    leftNavOpen={leftNavOpen}
+                    setLeftNavOpen={setLeftNavOpen}
+                />
                 <main
                     className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}
                     style={
                         !isPublicSiteOpen
-                            ? { height: '100lvh' }
-                            : { height: 'calc(100lvh -  65px)' }
+                            ? { height: 'calc(100lvh - 44px)' }
+                            : { height: 'calc(100lvh - 65px - 44px)' }
                     }
                 >
                     {isPlayGround ? (
@@ -677,6 +775,9 @@ export const query = graphql`
                 description
             }
             html
+            fields {
+                markdownBody
+            }
         }
         navNode: asciidoc(pageAttributes: { pageid: { eq: $navId } }) {
             document {
@@ -702,6 +803,7 @@ type DevDocTemplateProps = {
         namePageIdMap: {
             [key: string]: string;
         };
+        navMap?: { [key: string]: string };
         iframeUrl?: string;
     };
     location: Location;
@@ -718,4 +820,7 @@ type AsciiDocNode = {
         description?: string;
     };
     html: string;
+    fields?: {
+        markdownBody?: string;
+    };
 };

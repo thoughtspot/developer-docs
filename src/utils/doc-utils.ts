@@ -33,11 +33,25 @@ export const fetchChild = (html: string) => {
     }
     const divElement = document.createElement('div');
     divElement.innerHTML = html;
-    const data = Array.from(
-        divElement.querySelectorAll('ul.navSection > li'),
-    ).map((element) => buildJSON(element));
 
-    return data;
+    // Prefer explicitly marked navSection ul (backward compat with tests)
+    const navSectionUl = divElement.querySelector('ul.navSection');
+    if (navSectionUl) {
+        return Array.from(navSectionUl.children)
+            .filter((el) => el.tagName === 'LI')
+            .map((el) => buildJSON(el));
+    }
+
+    // AsciiDoc wraps lists as <div class="ulist"><ul>. Find top-level ulists
+    // (not nested inside a li) and collect their direct li children.
+    const topLevelItems: Element[] = [];
+    divElement.querySelectorAll('.ulist > ul').forEach((ul) => {
+        if (!ul.parentElement?.closest('li')) {
+            ul.querySelectorAll(':scope > li').forEach((li) => topLevelItems.push(li));
+        }
+    });
+
+    return topLevelItems.map((el) => buildJSON(el));
 };
 
 // Not being used anywhere
