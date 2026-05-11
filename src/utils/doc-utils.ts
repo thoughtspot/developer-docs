@@ -34,12 +34,16 @@ export const fetchChild = (html: string) => {
     const divElement = document.createElement('div');
     divElement.innerHTML = html;
 
-    // Prefer explicitly marked navSection ul (backward compat with tests)
-    const navSectionUl = divElement.querySelector('ul.navSection');
-    if (navSectionUl) {
-        return Array.from(navSectionUl.children)
-            .filter((el) => el.tagName === 'LI')
-            .map((el) => buildJSON(el));
+    // Collect from all explicitly marked navSection uls
+    const navSectionUls = divElement.querySelectorAll('ul.navSection');
+    if (navSectionUls.length > 0) {
+        const items: Element[] = [];
+        navSectionUls.forEach((ul) => {
+            Array.from(ul.children)
+                .filter((el) => el.tagName === 'LI')
+                .forEach((el) => items.push(el));
+        });
+        return items.map((el) => buildJSON(el));
     }
 
     // AsciiDoc wraps lists as <div class="ulist"><ul>. Find top-level ulists

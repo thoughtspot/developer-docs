@@ -33,7 +33,7 @@ const Menu = (props: { config: MenuItem[] }) => {
     return (
         <div className="d-inline-block headerLink menuWrapper">
             {config?.map((c) => (
-                <div className="menu">
+                <div key={c.name} className="menu">
                     <button
                         className="menubtn"
                         onClick={() => (c.link ? handelClick({ link: c.link }) : null)}
@@ -48,6 +48,7 @@ const Menu = (props: { config: MenuItem[] }) => {
                                 (d: { label: string; link: string; external?: boolean }) => {
                                     return (
                                         <div
+                                            key={d.label}
                                             data-testid={`menu-${d?.label}`}
                                             onClick={() => handelClick(d)}
                                         >
