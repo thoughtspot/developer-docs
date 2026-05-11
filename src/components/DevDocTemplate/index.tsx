@@ -468,6 +468,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             : { height: '0px' }
                     }
                 ></div>
+                {/* AnnouncementBanner not available in this branch
                 {shouldShowAnnouncementBanner() && (
                     <AnnouncementBanner
                         enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
@@ -499,7 +500,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             </span>
                         }
                     />
-                )}
+                )} */}
                 <main
                     ref={ref as React.RefObject<HTMLDivElement>}
 <<<<<<< HEAD
