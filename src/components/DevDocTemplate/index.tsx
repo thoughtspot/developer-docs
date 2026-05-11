@@ -590,7 +590,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     className="headerPlaceholder"
                     style={
                         isPublicSiteOpen
-                            ? { height: '65px' }
+                            ? { height: '60px' }
                             : { height: '0px' }
                     }
                 ></div>
@@ -632,7 +632,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     style={
                         !isPublicSiteOpen
                             ? { height: '100lvh' }
-                            : { height: 'calc(100lvh -  65px)' }
+                            : { height: 'calc(100lvh - 60px)' }
                     }
                 >
                     {isPlayGround ? (
