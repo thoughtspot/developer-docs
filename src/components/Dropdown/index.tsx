@@ -95,7 +95,6 @@ const Dropdown = (props: { location: Location; isMobile: boolean }) => {
 
         // Handle latest version (empty or space link)
         if (link === ' ' || link === '') {
-            // If we're in /docs, stay in /docs for the latest version
             if (currentPath.startsWith('/docs')) {
                 window?.location?.assign('/docs');
             } else {
@@ -116,6 +115,26 @@ const Dropdown = (props: { location: Location; isMobile: boolean }) => {
         }
     };
 
+    const cloudVersions = options.filter((o) => o.label.endsWith('.cl'));
+    const swVersions = options.filter((o) => o.label.endsWith('.sw'));
+
+    const renderVersionItem = (d: VersionOption) => {
+        const isActive = d.label === currentVersion?.label;
+        return (
+            <div
+                key={d.link}
+                data-testid={`option-${d.label}`}
+                className={`version-item${isActive ? ' active' : ''}`}
+                onClick={() => handelClick(d)}
+            >
+                <span className="version-item-label">{d.label}</span>
+                {d.subLabel && (
+                    <span className="version-item-sub">{d.subLabel}</span>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div className="dropdownWrapper">
             <div className="dropdownContainer">
@@ -125,20 +144,21 @@ const Dropdown = (props: { location: Location; isMobile: boolean }) => {
                         <AiOutlineCaretDown className="arrowDown" />
                     </button>
                     <div className="dropdownContent">
-                        {options.map((d) => {
-                            return (
-                                <div
-                                    data-testid={`option-${d?.label}`}
-                                    key={d?.link}
-                                    onClick={() => handelClick(d)}
-                                >
-                                    {d?.label}
-                                    <div className="subLabel">
-                                        <span>{d?.subLabel}</span>
+                        <div className="version-panel">
+                            <div className="version-section">
+                                <div className="version-section-label">Cloud</div>
+                                {cloudVersions.map(renderVersionItem)}
+                            </div>
+                            {swVersions.length > 0 && (
+                                <>
+                                    <div className="version-col-divider" />
+                                    <div className="version-section">
+                                        <div className="version-section-label">Software</div>
+                                        {swVersions.map(renderVersionItem)}
                                     </div>
-                                </div>
-                            );
-                        })}
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
