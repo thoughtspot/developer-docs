@@ -723,7 +723,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             : { height: '0px' }
                     }
                 ></div>
-                {!isIframeMode && (
+                {!isIframeMode && !isVersionedIframe && (
                     <SecondaryHeader
                         activeCategory={activeCategory}
                         onCategoryChange={setActiveCategory}
@@ -738,9 +738,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     style={
                         isIframeMode
                             ? { height: '100lvh' }
-                            : !isPublicSiteOpen
-                                ? { height: 'calc(100lvh - 44px)' }
-                                : { height: 'calc(100lvh - 65px - 44px)' }
+                            : isVersionedIframe
+                                ? { height: 'calc(100lvh - 65px)' }
+                                : !isPublicSiteOpen
+                                    ? { height: 'calc(100lvh - 44px)' }
+                                    : { height: 'calc(100lvh - 65px - 44px)' }
                     }
                 >
                     {isPlayGround ? (
