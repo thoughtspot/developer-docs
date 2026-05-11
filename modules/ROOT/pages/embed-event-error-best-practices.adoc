@@ -2,12 +2,12 @@
 :toc: true
 :toclevels: 2
 
-:page-title: Embed events
+:page-title: Handling embed errors
 :page-pageid: handling-embed-errors
 :page-description: This document lists the best practices for handling error events.
 
 The ThoughtSpot Visual Embed SDK provides a layered approach to error
-handling. `EmbedEvent.Error` is a real-time outbound event emitted from the embedded ThoughtSpot iframe to the host application, signaling that something has gone wrong, either inside the SDK itself, inside the embedded app (the iFrame), or as a result of an invalid HostEvent payload sent by the host.
+handling. `EmbedEvent.Error` is a real-time outbound event emitted from the embedded ThoughtSpot iframe to the host application, signaling that something has gone wrong, either inside the SDK itself, inside the embedded app (the iframe), or as a result of an invalid HostEvent payload sent by the host.
 
 Unlike most embed events, which are cached and can be replayed on late subscribers, `EmbedEvent.Error` is not cached or replayed. Every emission is independent, and a handler must be registered before an error occurs to receive it.
 
@@ -70,7 +70,7 @@ When the host sends a HostEvent with an invalid payload or a context mismatch, t
 If `shouldBypassPayloadValidation: true`, validation failures are silently logged as console warnings and never reach your `EmbedEvent.Error` handler.
 ====
 
-==== Runtime filter or cross-filter errors
+=== Runtime filter or cross-filter errors
 Filter operations can fail inside the iframe with typed errors:
 
 [cols="2,3", options="header"]
@@ -152,7 +152,7 @@ LiveboardEmbed.on(EmbedEvent.Error, (error) => {
     // } }}
 })
 ----
-|`SINGLE_VALUE_FILTER`  a| Error in updating filter values. This error occurs when a single-value filter is applied on a Liveboard and the user tries to update this filter with multiple values.
+|`SINGLE_VALUE_FILTER`  a| Error in updating filter values. This error occurs when a single-value filter is applied to a Liveboard and the user tries to update this filter with multiple values.
 
 [source,JavaScript]
 ----
@@ -307,136 +307,110 @@ try {
 === Error handling guidelines
 
 [cols="2,4", options="header"]
-|===
+|=====
 | Error category | Detection and recovery
 
 | SDK init config error
 
-a| Detection mechanism::
-`EmbedEvent.Error` + `logger.error`
+a|**Detection mechanism**: `EmbedEvent.Error`  +
 
-Payload/data::
- `{ error: string }`
+**Payload/data**: `{ error: string }`
 
-Recovery action::
-Fix configuration. Recreate and render embed
-
+**Recovery action**: Fix configuration. Recreate and render embed.
 
 | Auth failure (SDK layer)
 a|
-Detection mechanism::
-`AuthStatus.FAILURE` on init emitter
+**Detection mechanism**: `AuthStatus.FAILURE` on init emitter
 
-Payload/data::
-`AuthFailureType`
+**Payload/data**: `AuthFailureType`
 
-Recovery action::
-Check `getAuthToken` / credentials. Use `suppressErrorAlerts` for custom UI.
-
+**Recovery action**: Check `getAuthToken` and credentials. Use `suppressErrorAlerts` for custom UI.
 
 | Auth failure (iframe layer)
 
 a|
-Detection mechanism::
-`EmbedEvent.AuthFailure`
+**Detection mechanism**:  `EmbedEvent.AuthFailure` +
 
-Recovery action::
-Show login prompt. Recreate and render embed.
+**Recovery action**: Show login prompt. Recreate and render embed.
 
 | Session expired
 
-a|Detection mechanism::
-`EmbedEvent.AuthExpire`
+a|**Detection mechanism**: `EmbedEvent.AuthExpire`
 
-Recovery action::
-Refresh token. Use `autoLogin: true` for a transparent refresh.
+**Recovery action**: Refresh token. Use `autoLogin: true` for a transparent refresh.
 
 | Idle session timeout
 
-a|Detection mechanism::
-`EmbedEvent.IdleSessionTimeout` +
-`AuthStatus.FAILURE(IDLE_SESSION_TIMEOUT)`
-Recovery action::
-Use `autoLogin: true`. Prompt re-authentication.
+a|**Detection mechanism**: `EmbedEvent.IdleSessionTimeout` and `AuthStatus.FAILURE(IDLE_SESSION_TIMEOUT)`
 
-| Third-party cookies blocked
-a|Detection mechanism::
-`EmbedEvent.NoCookieAccess` +
-`AuthStatus.FAILURE(NO_COOKIE_ACCESS)`
-Recovery action::
-Switch to `TrustedAuthTokenCookieless`; use `ignoreNoCookieAccess: true` to suppress alert.
+**Recovery action**: Use `autoLogin: true`. Prompt re-authentication.
+
+|Third-party cookies blocked
+
+a|**Detection mechanism**: `EmbedEvent.NoCookieAccess` and `AuthStatus.FAILURE(NO_COOKIE_ACCESS)`
+
+**Recovery action**: Switch to `TrustedAuthTokenCookieless`. Use `ignoreNoCookieAccess: true` to suppress alert.
 
 | User logout
-a|Detection mechanism::
-`EmbedEvent.AuthLogout` + `AuthStatus.LOGOUT`
-Recovery action::
-Redirect to login or clear state
+a|**Detection mechanism**: `EmbedEvent.AuthLogout` and  `AuthStatus.LOGOUT`
+
+**Recovery action**: Redirect to login or clear state
 
 | Duplicate token
-a|Detection mechanism::
-`AuthStatus.FAILURE(SDK)` + `alert()` (suppressible)
-Payload/data::
-`DUPLICATE_TOKEN_ERR` string
-Recovery action::
-Always return a fresh token from `getAuthToken`
+a|**Detection mechanism**: `AuthStatus.FAILURE(SDK)` and `alert()` (suppressible)
+
+**Payload/data**: `DUPLICATE_TOKEN_ERR` string
+
+**Recovery action**: Always return a fresh token from `getAuthToken`.
 
 | Invalid token
-a|Detection mechanism::
-`AuthStatus.FAILURE(SDK)` +
-`logger.error`
-Payload/data::
-`INVALID_TOKEN_ERROR` string
-Recovery action::
-Verify token generation on the server
+a|**Detection mechanism**: `AuthStatus.FAILURE(SDK)` and `logger.error`
+
+**Payload/data**: `INVALID_TOKEN_ERROR` string
+
+**Recovery action**: Verify token generation on the server.
 
 | Network offline
-a|Detection mechanism::
-`EmbedEvent.Error`
-Payload/data::
-`{ offlineWarning: string }`
-Recovery action::
-Show offline UI. Reconnect and reload
+a| **Detection mechanism**: `EmbedEvent.Error`
 
+**Payload/data**: `{ offlineWarning: string }`
+
+**Recovery action**: Show offline UI. Reconnect and reload.
 
 | HostEvent validation error
-a|Detection mechanism::
-`EmbedEvent.Error`
-Payload/data::
- `{ type, code: "HOST_EVENT_VALIDATION", message }`
-Recovery action::
-Fix the `HostEvent` payload; enable `useHostEventsV2: true` in development
+a|**Detection mechanism**: `EmbedEvent.Error`
+
+**Payload/data**: `{ type, code: "HOST_EVENT_VALIDATION", message }`
+
+**Recovery action**: Fix the `HostEvent` payload; enable `useHostEventsV2: true` in development
 
 | HostEvent timeout (30 seconds)
-a|Detection mechanism::
- `trigger()` resolves with `Error`
-Payload/data::
- `Error("Trigger timed-out...")`
-Recovery action::
-Check if iframe is still mounted. Call `reload()` if needed
+a|**Detection mechanism**: `trigger()` resolves with `Error`
+
+**Payload/data**: `Error("Trigger timed-out...")`
+
+**Recovery action**: Check if iframe is still mounted. Call `reload()` if needed
 
 | HostEvent iframe rejection
-a|Detection mechanism::
-`trigger()` rejects
-Payload/data::
-Error from iframe
-Recovery action::
-Inspect the rejection payload; see HostEvent validation error above
+a|**Detection mechanism**: `trigger()` rejects
 
+**Payload/data**: Error from iframe
+
+**Recovery action**: Inspect the rejection payload; see HostEvent validation error above
 
 | Filter errors at runtime
-a|Detection mechanism::
-`EmbedEvent.Error`
-Payload/data::
-`eventErrorType` message string
-Recovery action::
-Fix filter parameters. Validate against current Liveboard/answer filters
-|===
+a|**Detection mechanism**: `EmbedEvent.Error`
 
+**Payload/data**: `eventErrorType` message string
+
+**Recovery action**: Fix filter parameters. Validate against current Liveboard/answer filters.
+|=====
 
 == Best practices
 
 * Always register an event listener for `EmbedEvent.Error` on your embed instance to capture and handle errors emitted by the embedded ThoughtSpot application. Register `EmbedEvent.Error` before calling `render()`.
 * Inspect and categorize error payloads. The error event provides a payload with fields such as errorType, message, and code. Do not assume that `payload.error` always exists in `EmbedEvent.Error`. Offline errors use `offlineWarning`; validation errors use `code`.
+* Do not destroy the embed on errors. First, inspect the errors to determine if you need to display host fallback pages. Not all events are fatal. ThoughtSpot handles some failures internally, so only take action if necessary based on the specific error and event type.
 * Provide contextual and user-friendly error messages based on the errorType and error details. Avoid exposing raw error objects or stack traces to your application users.
 * Enable `useHostEventsV2: true` in development/staging to surface `HostEvent` payload errors early.
 * Log errors for diagnostics.
@@ -449,7 +423,7 @@ Try out the embed events in the +++<a href="{{previewPrefix}}/playground/liveboa
 
 [.widthAuto]
 [.bordered]
-image::./images/embed-event-playground.png[Try Embed event in Playground]
+image::./images/embed-event-playground.png[Try Embed events in Playground]
 
 == Additional resources
 
