@@ -157,6 +157,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             version.iframeUrl === props?.pageContext?.iframeUrl,
     );
 
+    // True when loaded inside a VersionIframe (outer shell sets ?_iframe=1).
+    // Outer shell already renders SecondaryHeader, so suppress ours to avoid duplication.
+    const isIframeMode =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(location.search).get('_iframe') === '1';
+
     const isGQPlayGround =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
     const isPlayGround =
@@ -717,20 +723,24 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             : { height: '0px' }
                     }
                 ></div>
-                <SecondaryHeader
-                    activeCategory={activeCategory}
-                    onCategoryChange={setActiveCategory}
-                    location={location}
-                    leftNavOpen={leftNavOpen}
-                    setLeftNavOpen={setLeftNavOpen}
-                />
+                {!isIframeMode && (
+                    <SecondaryHeader
+                        activeCategory={activeCategory}
+                        onCategoryChange={setActiveCategory}
+                        location={location}
+                        leftNavOpen={leftNavOpen}
+                        setLeftNavOpen={setLeftNavOpen}
+                    />
+                )}
                 <main
                     className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}
                     style={
-                        !isPublicSiteOpen
-                            ? { height: 'calc(100lvh - 44px)' }
-                            : { height: 'calc(100lvh - 65px - 44px)' }
+                        isIframeMode
+                            ? { height: '100lvh' }
+                            : !isPublicSiteOpen
+                                ? { height: 'calc(100lvh - 44px)' }
+                                : { height: 'calc(100lvh - 65px - 44px)' }
                     }
                 >
                     {isPlayGround ? (
