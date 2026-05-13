@@ -137,7 +137,7 @@ const Document = (props: {
                     pageid={props.pageid}
                 />
             )}
-            {!isHomePage && (
+            {!isHomePage && props.isPublicSiteOpen && (
                 <div className="document-toolbar">
                     <CopyPageDropdown pageTitle={props.docTitle} markdownBody={props.markdownBody} />
                 </div>
