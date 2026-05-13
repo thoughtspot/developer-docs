@@ -103,6 +103,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     });
     const [isDarkMode, setDarkMode] = useState<boolean>(() => {
         if (typeof window === 'undefined') return false;
+        // In-product (embedded) presentation always uses light mode — product UI has no theme toggle.
+        if (!isPublicSite(location.search)) return false;
         /* themeMode is only written when the user explicitly clicks the toggle.
            If absent, follow OS preference fresh every load. */
         const explicitChoice = localStorage.getItem('themeMode');
@@ -223,6 +225,12 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     useEffect(() => {
         if (isBrowser()) {
+            // In-product (embedded) presentation always uses light mode.
+            if (!isPublicSiteOpen) {
+                setDarkMode(false);
+                setKey('dark');
+                return;
+            }
             /* Correct SSR mismatch on first hydration */
             const explicitChoice = localStorage.getItem('themeMode');
             let isDark: boolean;
