@@ -51,7 +51,6 @@ import {
 } from '../../constants/uiConstants';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
-import { ThemeBuilder } from './playGround/ThemeBuilder';
 import VersionIframe from '../VersionIframe';
 
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
@@ -148,10 +147,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const isApiPlayground =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND;
 
-    const isThemeBuilder =
-        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.THEME_BUILDER;
-
-    const isVersionedIframe = VERSION_DROPDOWN.some(
+const isVersionedIframe = VERSION_DROPDOWN.some(
         (version) =>
             props?.pageContext?.iframeUrl &&
             version.iframeUrl === props?.pageContext?.iframeUrl,
@@ -168,7 +164,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const isPlayGround =
         isGQPlayGround ||
         isApiPlayground ||
-        isThemeBuilder ||
         isVersionedIframe;
 
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
@@ -546,11 +541,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 />
             );
 
-        if (isThemeBuilder) {
-            return <ThemeBuilder backLink={backLink} />;
-        }
-
-        if (isVersionedIframe) {
+if (isVersionedIframe) {
             return (
                 <VersionIframe
                     iframeUrl={props.pageContext.iframeUrl}
