@@ -53,20 +53,21 @@ export const customizeDocContent = () => {
      * Restructure code blocks to have a permanent header bar:
      *   lang label (left)  ·  copy button (right)
      *
-     * Before:  <pre class="highlight"><code data-lang="js">...</code></pre>
-     * After:   <div class="code-block-wrapper">
-     *            <div class="code-block-header">
-     *              <span class="lang">JS</span>
-     *              <button class="copyButton">...</button>
-     *            </div>
-     *            <pre class="highlight"><code>...</code></pre>
-     *          </div>
+     * Covers all listing/literal blocks regardless of [source,lang] annotation.
+     * For annotated blocks, lang is read from code[data-lang] and the code element
+     * is used as the copy source. For unannotated blocks, lang is empty and the
+     * pre element is the copy source.
      *
      * Guard against double-processing on re-render.
      */
-    document.querySelectorAll(selectors.codeBlocks).forEach((tag) => {
-        const pre = tag.parentElement;
-        if (!pre || pre.parentElement?.classList.contains('code-block-wrapper')) return;
+    document.querySelectorAll<HTMLElement>(
+        '.listingblock>.content>pre, .literalblock>.content>pre',
+    ).forEach((pre) => {
+        if (pre.parentElement?.classList.contains('code-block-wrapper')) return;
+
+        const codeEl = pre.querySelector<HTMLElement>('code[data-lang]');
+        const rawLang = codeEl?.getAttribute('data-lang') || '';
+        const copySource: HTMLElement = codeEl || pre;
 
         /* ── Header bar ── */
         const header = document.createElement('div');
@@ -74,7 +75,6 @@ export const customizeDocContent = () => {
 
         /* Language label (left) */
         const langSpan = document.createElement('span');
-        const rawLang = tag.getAttribute('data-lang') || '';
         langSpan.classList.add('lang');
         langSpan.innerText = rawLang;
         header.appendChild(langSpan);
@@ -89,7 +89,7 @@ export const customizeDocContent = () => {
         imageElement.innerHTML = getHTMLFromComponent(<FiCopy />, 'copyIcon');
         buttonElement.appendChild(imageElement);
 
-        enableCopyToClipboard(buttonElement, tag as HTMLElement);
+        enableCopyToClipboard(buttonElement, copySource);
         header.appendChild(buttonElement);
 
         /* ── Wrap pre in code-block-wrapper ── */
