@@ -1,4 +1,4 @@
-= Timezone-aware keyword filtering in embedded apps
+= Timezone-aware keyword filtering
 :toc: true
 :toclevels: 2
 
@@ -12,7 +12,7 @@
 The timezone awareness feature in ThoughtSpot allows configuring a preferred time zone for a user or at the Org level, or both, and using this timezone when generating search results for a user's query.
 
 == Overview
-In deployments where users can span across multiple regions, date and time keyword filters, such as `today`, `yesterday`, `last 7 days`, and `month-to-date`, resolve based on default timezone of the ThoughtSpot instance. Sometimes, this behavior can lead to discrepancies for users in different timezones, especially when generating reports or filtering data for specific periods. For example, for a user in the USA, `yesterday` shows as Sunday, whereas for a user in the APAC region, this could mean Monday, and they may expect data for Monday.
+In embedded deployments where users can span across multiple regions, date and time keyword filters, such as `today`, `yesterday`, `last 7 days`, and `month-to-date`, resolve based on default timezone of the ThoughtSpot instance. Sometimes, this behavior can lead to discrepancies for users in different timezones, especially when generating reports or filtering data for specific periods. For example, for a user in the USA, `yesterday` shows as Sunday, whereas for a user in the APAC region, this could mean Monday, and they may expect data for Monday.
 
 Timezone customization allows administrators to configure a timezone at the user or Org level. All relative date and time keywords will then resolve to the user’s or Org’s configured timezone, rather than the default timezone on the ThoughtSpot instance. This ensures that search results display consistent and accurate time-based data for every user, regardless of their location. It also allows each Org to maintain its independent timezone configuration, keeping the multi-Org embedded experience accurate and consistent for the users.
 
@@ -29,25 +29,22 @@ If `ts_user_timezone` does not have a value assigned at the user or Org level, T
 
 At query time, ThoughtSpot resolves the correct timezone using the following precedence order:
 
-[cols="1,2,4", options="header"]
+[cols="2,4", options="header"]
 |===
-| Priority | Timezone scope | Description
+|Timezone scope | Description
 
-| 1 (Highest)
 | User-level timezone
 | Individual override. Applies to that user only.
-A user-level value always takes precedence over the Org default.
+A user-level value always takes precedence over the Org default and has the highest priority.
 
-| 2
 | Org-level timezone
-| Default for all users in the Org if there is no user-specific override.
+| Default for all users in the Org if there is no user-specific override. An Org-level override takes precedence over the system default.
 
-| 3 (Fallback to default behavior)
 | Default timezone on the ThoughtSpot instance
-| Platform default. If `ts_user_timezone` is not configured at the user or Org level, ThoughtSpot continues to use the default timezone.
+| Platform default. If `ts_user_timezone` is not configured at the user or Org level, ThoughtSpot uses the default timezone.
 |===
 
-When a user runs a search or opens a Liveboard, ThoughtSpot evaluates this precedence chain automatically and applies the resolved timezone to all relative date calculations. Existing Models, formulas, or Liveboards do not require any configuration update.
+When a user runs a search query or opens a Liveboard, ThoughtSpot evaluates this precedence chain automatically and applies the resolved timezone to all relative date calculations.
 
 === Supported interfaces
 
@@ -223,12 +220,12 @@ The API returns a response with the values configured.
 ]
 ----
 
-== Specifying timezone in formula and pass-through functions
-If your cloud data warehouse (CDW) stores timestamps in a different timezone than the user's timezone, date and datetime keywords and filters must be applied to a derived datetime column created using a pass-through formula. The original UTC column is not used directly. Users with edit access to data model can create a pass-through function to create a derived datetime column and convert source values to the target timezone.
+== Specifying timezone in formula and passthrough functions
+If your cloud data warehouse (CDW) stores timestamps in a different timezone than the user's timezone, date and datetime keywords and filters must be applied to a derived datetime column created using a passthrough formula. The original UTC column is not used directly. Users with edit access to data model can create a passthrough function to create a derived datetime column and convert source values to the target timezone.
 
-=== Using `ts_user_timezone` variable in formula (Recommended)
+=== Using timezone variable in formula
 
-If the `ts_user_timezone` variable is configured for the Org or user, you can reference it directly inside formulas and pass-through functions to dynamically resolve the timezone to the IANA timezone string assigned to the variable for that Org or user. Using this variable eliminates the need for using hardcoded values.
+If the `ts_user_timezone` variable is configured for the Org or user, you can reference it directly inside formulas and passthrough functions to dynamically resolve the timezone to the IANA timezone string assigned to the variable for that Org or user. Using this variable eliminates the need for using hardcoded values.
 
 The following example shows the formula syntax with the `ts_user_timezone` variable:
 
@@ -237,7 +234,7 @@ The following example shows the formula syntax with the `ts_user_timezone` varia
 
 Where:
 
-* `sql_date_time_op` is the pass-through function for date/datetime operations.
+* `sql_date_time_op` is the passthrough function for date/datetime operations.
 * `"CONVERT_TIMEZONE('UTC', '{0}', {1})"` is the SQL template string.
 ** `CONVERT_TIMEZONE` is the CDW function signature. This varies per CDW. For example, `CONVERT_TIMEZONE` in Snowflake and `CONVERT_TZ` for MySQL.
 ** `UTC` indicates source timezone, the original timezone of your timestamp.
@@ -261,7 +258,7 @@ sql_date_time_op ("CONVERT_TIMEZONE ('UTC', {0}, {1}"), '<time-zone-string>', [<
 
 Where:
 
-* `sql_date_time_op` is the pass-through function for date/datetime operations.
+* `sql_date_time_op` is the passthrough function for date/datetime operations.
 * `"CONVERT_TIMEZONE('UTC', '{0}', {1})"` is the SQL template string.
 ** `CONVERT_TIMEZONE` is the CDW function signature. This varies per CDW. For example, `CONVERT_TIMEZONE` in Snowflake and `CONVERT_TZ` for MySQL.
 ** `UTC` indicates source timezone, the original timezone of your timestamp.
@@ -279,7 +276,7 @@ To verify the configuration:
 
 * Use the Variable API search endpoint (`/api/rest/2.0/template/variables/search`) to retrieve and confirm the values configured for the Org and user.
 * Query the date or datetime columns in your data and verify whether the date and time keywords resolve correctly as defined in the `ts_user_timezone` variable.
-* Verify whether the SQL pass-through function is applied to the keyword filters, such as `today`, `yesterday`, `last 7 days`, and `month-to-date`, in the data model.
+* Verify whether the SQL passthrough function is applied to the keyword filters, such as `today`, `yesterday`, `last 7 days`, and `month-to-date`, in the data model.
 * Switch to another Org which has a different timezone configured, run a search query, and verify the results.
 * Verify whether the timezone configured for the user overrides the timezone set for the Org and system default on the ThoughtSpot instance.
 * Verify the Liveboard scheduled jobs. Note that the timezone changes will be applied only to the upcoming scheduled job executions.
@@ -289,4 +286,4 @@ To verify the configuration:
 
 * For information about variable APIs, see xref:variables-api.adoc[Variable API reference] documentation and visit the link:{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fput-variable-values[REST API Playground].
 * For more information about SQL passthrough functions, see link:https://docs.thoughtspot.com/cloud/26.5.0.cl/formula-reference#passthrough-functions[Formula function reference, window=_blank].
-* https://www.iana.org/time-zones[IANA Time Zone Database^]
+* For information about the IANA timezone strings, refer to link:https://www.iana.org/time-zones[IANA Timezone Database^]
