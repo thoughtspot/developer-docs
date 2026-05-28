@@ -49,6 +49,10 @@ a|`POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/strea
 xref:spotter-agent-apis.adoc#_send_a_query_to_agent_and_get_streaming_responses[Sends one or more natural language messages] to an existing Spotter agent conversation and returns the response as a real-time Server-Sent Events (SSE) stream.
 __Replaces /api/rest/2.0/ai/agent/{conversation_identifier}/converse__.
 
+a|`POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/stop-response` [.version-badge.new]#New# +
+xref:spotter-agent-apis.adoc#_stop_an_in_progress_agent_response[Stops an in-progress Spotter agent response] for a given conversation session. The conversation session remains active after the response stops. +
+__Available on ThoughtSpot Cloud instances from 26.6.0.cl onwards.__
+
 a| `POST /api/rest/2.0/ai/data-source-suggestions` [beta betaBackground]^Beta^ +
 xref:spotter-agent-apis.adoc#_get_data_source_suggestions[Returns a list of relevant data sources], such as Models, based on a query and thus helping users and agents choose the most appropriate data source for analytics. +
 __Available on ThoughtSpot Cloud instances from 10.15.0.cl onwards__.
@@ -1031,6 +1035,58 @@ data: {
   "id": "evt-017",
   "code": "agent-interrupt",
   "message": "Generation stopped"
+}
+----
+
+[#_stop_an_in_progress_agent_response]
+== Stop an in-progress agent response
+
+The `/api/rest/2.0/ai/agent/conversation/{conversation_identifier}/stop-response` API endpoint stops a Spotter agent response that is currently in progress for a given conversation session.
+
+Use this endpoint when you want to cancel a long-running Spotter response before it completes.
+The conversation session remains active after you stop a response, so you can send a new query to the same session immediately.
+
+// TODO: verify with engineering — confirm whether stopping a streaming response emits a final SSE event (for example, agent-interrupt) or closes the stream silently
+
+=== Request parameters
+
+[width="100%", cols="2,2,4"]
+[options='header']
+|=====
+|Parameter|Type| Description
+|`conversation_identifier`|Path parameter|__String__. Required. The identifier of the active conversation session. Use the value returned by the xref:spotter-agent-apis.adoc#_create_a_conversation_session_with_spotter_agent[create conversation] API endpoint.
+|=====
+
+This endpoint does not require a request body.
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/{conversation_identifier}/stop-response' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+=== Example response
+
+If the API request is successful, ThoughtSpot stops the in-progress response and returns an HTTP `200` status.
+
+// TODO: verify with engineering — confirm exact success response body
+[source,JSON]
+----
+{}
+----
+
+If the conversation session is not found or has expired, the API returns an error:
+
+[source,JSON]
+----
+{
+  "error_code": "CONVERSATION_NOT_FOUND",
+  "message": "The specified conversation session does not exist or has expired."
 }
 ----
 

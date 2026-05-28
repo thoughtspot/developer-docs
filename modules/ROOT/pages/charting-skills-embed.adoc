@@ -1,0 +1,614 @@
+// SOURCE: SCAL-306327, SCAL-311138, SCAL-252716
+// SOURCE: PRD https://docs.google.com/document/d/1BQwTMZ2oeYe05Ca3wAuQrt4ATpZnVyGbfMuXV1sRdYc/edit
+
+
+= Chart configuration overrides in embedded deployments
+:toc: left
+:toclevels: 3
+:sectnums:
+:description: Learn how to use chart configuration overrides to control the initial visual state of charts, tables, and KPI visualizations in ThoughtSpot Embedded deployments.
+
+ThoughtSpot Embedded lets you control the initial visual state of charts, tables, and KPI visualizations programmatically, without requiring your end users to manually configure them.
+Using the `visualOverrides` object, embed developers can specify default chart settings, such as colors, data labels, number formatting, legend behavior, axis properties, table themes, and more, when a visualization loads.
+
+[NOTE]
+====
+Chart configuration overrides are available in ThoughtSpot release 26.7.0.cl and later. +
+Supported visualization libraries in Phase 1: Highcharts (charts), AG Grid (tables), and DevXtreme (pivot tables). +
+Muze native chart support is planned for a future release.
+====
+
+// TODO: verify with engineering — confirm exact Visual Embed SDK method/property name used to pass
+// `visualOverrides` for SearchEmbed or SageEmbed in the TSE integration flow.
+
+== Overview
+
+// SOURCE: PRD https://docs.google.com/document/d/1BQwTMZ2oeYe05Ca3wAuQrt4ATpZnVyGbfMuXV1sRdYc/edit
+// SOURCE: SCAL-299430
+
+Previously, embed customers had no way to specify chart type or initial chart settings when
+pre-seeding a search-data or Sage embed. End users were required to enter edit mode and manually
+adjust charts after an answer was generated. This was a significant barrier for use cases such as:
+
+* Enabling column summaries by default in every rendered table
+* Applying a brand color palette to all charts
+* Showing data labels on all new answers
+* Setting a default table theme (zebra-striped, outlined, or row-based)
+
+Chart configuration overrides solve this by exposing a `visualOverrides` object that you pass at
+load time. The overrides are applied with the highest priority—they take precedence over any
+previously saved chart state. If a user manually changes a setting, the override for that property
+is cleared, ensuring user intent is always respected.
+
+=== How overrides work
+
+// SOURCE: Design Doc https://docs.google.com/document/d/1-L4cQiAtH0TGXUUP_3g68GeMKf_uWMn11PTXfNOVFs0/edit
+// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
+
+Overrides fall into two categories:
+
+Visualization-level overrides:: Applied via the `visualOverrides` object on the front end.
+Affects settings like legend visibility, data labels, axis ranges, colors, gridlines, and
+conditional formatting.
+
+Column-level overrides:: Applied on the backend at answer-generation time. Affects number
+formatting, headline visibility, and sort order. These are resolved server-side when Spotter or
+the embed session calls the `UpdateVisualOverrides` API.
+
+[IMPORTANT]
+====
+`visualOverrides` always takes precedence over any saved `vizProp` state:
+
+`visualOverrides` > `vizProp` (stored chart state)
+
+Once a user manually changes a setting that was originally set by an override, the override for
+that specific property is cleared and the user's choice is preserved. All other overrides remain
+active.
+====
+
+== Supported settings
+
+// SOURCE: PRD https://docs.google.com/document/d/1BQwTMZ2oeYe05Ca3wAuQrt4ATpZnVyGbfMuXV1sRdYc/edit
+// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
+
+The following 16 settings are available in Phase 1 for all supported chart libraries:
+
+[cols="1,2,3",options="header"]
+|===
+|Setting |Scope |Notes
+
+|Colors
+|Per-column color and legend series colors
+|Applies to Highcharts and BYOC charts. Pass hex codes per `columnId`.
+
+|Number formatting
+|Type, decimals, units, currency
+|Applied on the backend. Column-level formatting; axis formatting is handled automatically.
+
+|Show or hide axis
+|Axis name and axis labels (boolean per axis)
+|Visualization-level override.
+
+|Axis scales and domains
+|Min and max values per axis
+|Visualization-level override.
+
+|Regression lines
+|Boolean (enabled or disabled)
+|Visualization-level override.
+
+|Show or hide data labels
+|All labels or per-column
+|To show all labels, set `allLabels: true`.
+
+|Filter data labels
+|Column-level, with operator and value
+|Supported operators: `Greater than`, `Less than`, `Equal to`, `Greater than or equal to`,
+`Less than or equal to`.
+
+|Show or hide legend
+|Boolean
+|Visualization-level override.
+
+|Legend position
+|`BOTTOM_LEGEND`, `LEFT_LEGEND`, `RIGHT_LEGEND`, `TOP_LEGEND`
+|Visualization-level override.
+
+|Display summary (column summaries)
+|Per-column or all columns
+|Table-specific. Applied on the backend.
+
+|Table theme and content density
+|Theme: `OUTLINE`, `ROW`, `ZEBRA`; Density: `COMPACT`, `REGULAR`
+|Table-specific. Visualization-level override.
+
+|KPI comparison period
+|Enum: comparison period type
+|KPI chart-specific. Visualization-level override.
+
+|Sort type
+|`Alphanumeric` or `Custom`
+|Applied on the backend.
+
+|Show or hide gridlines
+|Per axis (boolean)
+|Visualization-level override.
+
+|Conditional formatting
+|Column-level, gradient colors, operator and value
+|Visualization-level override.
+
+|Pivot table totals and subtotals
+|Row totals, column totals, row subtotals, column subtotals
+|Pivot-specific. Visualization-level override.
+|===
+
+[NOTE]
+====
+Axis configuration overrides—controlling field placement (x-axis, y-axis, slice-by-color) and
+axis type (shared, dual, combined)—are planned for a future phase and are not available in
+Phase 1.
+====
+
+== visualOverrides schema reference
+
+// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
+
+The `visualOverrides` object is included in the visualization object returned by the ThoughtSpot
+API. The schema differs by visualization type. Use the `__typename` discriminator to identify
+which schema applies.
+
+// TODO: verify with engineering — confirm whether `visualOverrides` is passed directly via the
+// Visual Embed SDK configuration object (for example, as a SearchEmbed option), or whether it
+// must be applied via a separate REST API or GraphQL call post-session-creation.
+
+=== Chart visualization (ChartVisualOverrides)
+
+[source,typescript]
+----
+visualOverrides: {
+  __typename: "ChartVisualOverrides",
+
+  // Default color palette applied across the chart
+  defaults: {
+    colorPalette: {
+      colors: string[];        // Array of hex color codes, e.g. ["#FF0000", "#00FF00"]
+    },
+  },
+
+  overrides: {
+
+    // Legend configuration
+    legendProperties: {
+      showLegend: boolean,
+      position: LegendPositionOptions,         // "BOTTOM_LEGEND" | "LEFT_LEGEND" |
+                                               // "RIGHT_LEGEND" | "TOP_LEGEND"
+      legendDataColors: SeriesColor[],         // Per-attribute-value legend colors
+    },
+
+    // Data label configuration
+    dataLabelProperties: {
+      allLabels: boolean,                      // Show labels for all columns
+      stackLabelsProperties: {
+        isVisible: boolean,
+      },
+      columnDataLabelProperties: [
+        {
+          columnId: string,                    // GUID of the column
+          properties: {
+            isVisible: boolean,
+            filter: {
+              value: number,
+              operator: FilterOperator,        // See FilterOperator enum
+            } | null,
+          },
+        },
+      ],
+    },
+
+    // Display-level properties
+    displayProperties: {
+      kpiDisplayProperties: {
+        customCompare: TupleType,              // KPI comparison period enum value
+      },
+      summariesState: {
+        showRowTotals: boolean,
+        showColumnTotals: boolean,
+        showRowGrandTotals: boolean,
+        showColumnGrandTotals: boolean,
+      },
+      regressionLineProperties: {
+        enabled: boolean,
+      },
+      gridLineProperties: {
+        xGridlineEnabled: boolean,
+        yGridlineEnabled: boolean,
+      },
+    },
+
+    // Per-axis configuration
+    axisProperties: [
+      {
+        columnId: string,                      // Column GUID identifying this axis
+        linkedColumns: string[],               // Column GUIDs sharing this axis
+        properties: {
+          isNameVisible: boolean,
+          isLabelVisible: boolean,
+          yAxisRange: {
+            min: number | null,
+            max: number | null,
+          },
+          isGridLineEnabled: boolean | null,
+        },
+      },
+    ],
+
+    // Per-column visual configuration
+    columnProperties: [
+      {
+        columnId: string,
+        properties: {
+          color: string,                       // Hex code, e.g. "#ababab"
+          conditionalFormatting: {
+            rows: ConditionalMetric[],
+            // TODO: verify with engineering — full ConditionalMetric schema
+          },
+        },
+      },
+    ],
+  },
+}
+----
+
+=== Table visualization (TableVisualOverrides)
+
+[source,typescript]
+----
+visualOverrides: {
+  __typename: "TableVisualOverrides",
+
+  overrides: {
+
+    // Per-column table settings
+    columnProperties: [
+      {
+        columnId: string,
+        columnProperty: {
+          wrapColumnText: boolean,
+          isHidden: boolean,
+          conditionalFormatting: {
+            rows: ConditionalMetric[],
+            // TODO: verify with engineering — full ConditionalMetric schema
+          },
+        },
+      },
+    ],
+
+    // Table display settings
+    displayProperties: {
+      tableTheme: TableTheme,                  // "OUTLINE" | "ROW" | "ZEBRA"
+      tableContentDensity: TableContentDensity,// "COMPACT" | "REGULAR"
+    },
+  },
+}
+----
+
+=== KPI visualization (HeadlineVisualOverrides)
+
+[source,typescript]
+----
+visualOverrides: {
+  __typename: "HeadlineVisualOverrides",
+
+  overrides: {
+    columnProperty: {
+      conditionalFormatting: {
+        rows: ConditionalMetric[],
+        // TODO: verify with engineering — full ConditionalMetric schema
+      },
+      summariesNumberFormatConfig: FormatConfig,
+      // TODO: verify with engineering — full FormatConfig schema
+    },
+  },
+}
+----
+
+=== Enum reference
+
+// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
+
+[source,typescript]
+----
+enum LegendPositionOptions {
+  BottomLegend = 'BOTTOM_LEGEND',
+  LeftLegend   = 'LEFT_LEGEND',
+  RightLegend  = 'RIGHT_LEGEND',
+  TopLegend    = 'TOP_LEGEND',
+}
+
+enum TableTheme {
+  Outline = 'OUTLINE',
+  Row     = 'ROW',
+  Zebra   = 'ZEBRA',
+}
+
+enum TableContentDensity {
+  Compact = 'COMPACT',
+  Regular = 'REGULAR',
+}
+
+enum FilterOperator {
+  LessThan             = 'Less than',
+  GreaterThan          = 'Greater than',
+  LessThanOrEqualTo    = 'Less than or equal to',
+  GreaterThanOrEqualTo = 'Greater than or equal to',
+  EqualTo              = 'Equal to',
+}
+
+enum TupleType {
+  Current                    = 'CURRENT',
+  PrevDay                    = 'PREV_DAY',
+  PrevHour                   = 'PREV_HOUR',
+  PrevWeek                   = 'PREV_WEEK',
+  PrevMonth                  = 'PREV_MONTH',
+  PrevQuarter                = 'PREV_QUARTER',
+  PrevYear                   = 'PREV_YEAR',
+  PrevAvailable              = 'PREV_AVAILABLE',
+  LastAvailable              = 'LAST_AVAILABLE',
+  Custom                     = 'CUSTOM',
+  ChartAggregatedVal         = 'CHART_AGGREGATED_VAL',
+  PreviousChartAggregatedVal = 'PREVIOUS_CHART_AGGREGATED_VAL',
+  SinglePointKpiCurrent      = 'SINGLE_POINT_KPI_CURRENT',
+  SinglePointKpiPrevious     = 'SINGLE_POINT_KPI_PREVIOUS',
+}
+----
+
+== Usage examples
+
+// SOURCE: PRD https://docs.google.com/document/d/1BQwTMZ2oeYe05Ca3wAuQrt4ATpZnVyGbfMuXV1sRdYc/edit
+// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
+
+The following examples show representative `visualOverrides` configurations for common embed
+use cases.
+
+// TODO: verify with engineering — replace the placeholder comments below with the confirmed
+// Visual Embed SDK API for setting visualOverrides on SearchEmbed or SageEmbed (for example,
+// as a top-level init parameter, embed option, or separate method call).
+
+=== Apply a brand color palette to all charts
+
+Use the `defaults.colorPalette` property to apply a fixed color sequence to all measures in the
+chart. Colors are applied in order.
+
+[source,typescript]
+----
+const visualOverrides = {
+  __typename: "ChartVisualOverrides",
+  defaults: {
+    colorPalette: {
+      colors: ["#1A73E8", "#E84235", "#FBBC04", "#34A853"],
+    },
+  },
+  overrides: {},
+};
+
+// TODO: verify with engineering — confirm SDK usage pattern
+// Pass visualOverrides via the Visual Embed SDK configuration
+----
+
+=== Enable data labels on all columns by default
+
+[source,typescript]
+----
+const visualOverrides = {
+  __typename: "ChartVisualOverrides",
+  defaults: {},
+  overrides: {
+    dataLabelProperties: {
+      allLabels: true,
+    },
+  },
+};
+----
+
+=== Show only data labels above a threshold value
+
+Show data labels only where revenue exceeds $1,000,000. Provide the `columnId` of the measure
+column.
+
+[source,typescript]
+----
+const visualOverrides = {
+  __typename: "ChartVisualOverrides",
+  defaults: {},
+  overrides: {
+    dataLabelProperties: {
+      allLabels: false,
+      columnDataLabelProperties: [
+        {
+          columnId: "<revenue-column-guid>",
+          properties: {
+            isVisible: true,
+            filter: {
+              value: 1000000,
+              operator: "Greater than",
+            },
+          },
+        },
+      ],
+    },
+  },
+};
+----
+
+=== Set legend position and assign per-series colors
+
+[source,typescript]
+----
+const visualOverrides = {
+  __typename: "ChartVisualOverrides",
+  defaults: {},
+  overrides: {
+    legendProperties: {
+      showLegend: true,
+      position: "RIGHT_LEGEND",
+      legendDataColors: [
+        { dataValue: "North", color: "#1A73E8" },
+        { dataValue: "South", color: "#E84235" },
+        { dataValue: "East",  color: "#FBBC04" },
+        { dataValue: "West",  color: "#34A853" },
+      ],
+    },
+  },
+};
+----
+
+=== Enable a regression line
+
+[source,typescript]
+----
+const visualOverrides = {
+  __typename: "ChartVisualOverrides",
+  defaults: {},
+  overrides: {
+    displayProperties: {
+      regressionLineProperties: {
+        enabled: true,
+      },
+    },
+  },
+};
+----
+
+=== Set axis range (min and max)
+
+[source,typescript]
+----
+const visualOverrides = {
+  __typename: "ChartVisualOverrides",
+  defaults: {},
+  overrides: {
+    axisProperties: [
+      {
+        columnId: "<revenue-column-guid>",
+        linkedColumns: ["<revenue-column-guid>"],
+        properties: {
+          isNameVisible: true,
+          isLabelVisible: true,
+          yAxisRange: {
+            min: 0,
+            max: 5000000,
+          },
+          isGridLineEnabled: true,
+        },
+      },
+    ],
+  },
+};
+----
+
+=== Set table theme and content density
+
+[source,typescript]
+----
+const visualOverrides = {
+  __typename: "TableVisualOverrides",
+  overrides: {
+    displayProperties: {
+      tableTheme: "ZEBRA",
+      tableContentDensity: "COMPACT",
+    },
+  },
+};
+----
+
+=== Enable pivot table totals and subtotals
+
+[source,typescript]
+----
+const visualOverrides = {
+  __typename: "ChartVisualOverrides",
+  defaults: {},
+  overrides: {
+    displayProperties: {
+      summariesState: {
+        showRowTotals: true,
+        showColumnTotals: true,
+        showRowGrandTotals: true,
+        showColumnGrandTotals: false,
+      },
+    },
+  },
+};
+----
+
+=== Set KPI comparison period
+
+[source,typescript]
+----
+const visualOverrides = {
+  __typename: "ChartVisualOverrides",
+  defaults: {},
+  overrides: {
+    displayProperties: {
+      kpiDisplayProperties: {
+        customCompare: "PREV_MONTH",
+      },
+    },
+  },
+};
+----
+
+== Override precedence and user behavior
+
+// SOURCE: Design Doc https://docs.google.com/document/d/1-L4cQiAtH0TGXUUP_3g68GeMKf_uWMn11PTXfNOVFs0/edit
+// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
+
+Understanding how `visualOverrides` interact with saved chart state and user actions is important
+for building predictable embedded experiences.
+
+[cols="1,2",options="header"]
+|===
+|Scenario |Behavior
+
+|Override set, no saved chart state
+|The override value is applied. The chart renders with the override settings.
+
+|Override set, saved chart state exists
+|The override always wins. `visualOverrides` takes precedence over any value in `vizProp`.
+
+|User changes a setting that was overridden
+|The override for that specific property is cleared. The user's manually applied value is
+respected. Other overrides remain active.
+
+|Follow-up query in Spotter (context retained)
+|Overrides are re-sent in the follow-up if the overridden property is not yet in `vizProp`,
+or if an existing `vizProp` value needs to be overridden.
+
+|Visualization is persisted (saved to Liveboard)
+|The override is resolved into `vizProp` and persisted. On reload, the chart renders from
+`vizProp`, not from `visualOverrides`.
+|===
+
+== Limitations
+
+// SOURCE: SCAL-299430
+// SOURCE: PRD https://docs.google.com/document/d/1BQwTMZ2oeYe05Ca3wAuQrt4ATpZnVyGbfMuXV1sRdYc/edit
+
+* *Muze and BYOC charts:* Native override support for Muze charts is not available in Phase 1.
+Color overrides route through `updateCustomVisualProps` for BYOC charts.
+* *Axis configuration overrides:* Field placement controls (x-axis, y-axis, slice-by-color,
+shared axis, dual axis) are not available in Phase 1. They are planned for a future release.
+* *Excel export:* When a Liveboard is exported as XLSX and some visualizations have not been
+rendered (lazy-loaded), overrides are applied at export time in the Excel exporter for
+conditional formatting and other applicable properties.
+* *Text formatting:* Axis label, data-label, and tooltip text formatting are deferred from
+Phase 1 due to cross-library inconsistencies.
+
+== Related resources
+
+* xref:embed-search.adoc[Embed ThoughtSpot search]
+// TODO: verify with engineering — add correct xref to Spotter embed page once confirmed
+* xref:visual-embed-sdk.adoc[Visual Embed SDK reference]
+* xref:chart-types.adoc[Supported chart types]
+* link:https://developers.thoughtspot.com/[ThoughtSpot Developer Portal]
