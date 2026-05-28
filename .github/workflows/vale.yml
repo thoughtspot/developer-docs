@@ -1,0 +1,36 @@
+name: Vale
+
+on:
+  pull_request:
+    branches:
+      - main
+      - release
+
+jobs:
+  vale:
+    name: Lint prose (ts-docs)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install AsciiDoc dependencies
+        run: sudo apt-get install -y asciidoctor
+
+      - name: Run Vale
+        uses: errata-ai/vale-action@v2
+        with:
+          # CI config: ts-docs rules only, error level gate.
+          # Does not run vale sync — no package downloads needed.
+          vale_flags: "--config=.vale-ci.ini"
+          # Run on all files; filter_mode=added limits PR annotations
+          # to lines added/changed in this PR only.
+          files: all
+          filter_mode: added
+          # Fail the build on errors (merge conflict markers,
+          # unfilled placeholders). Warnings are reported but
+          # do not block the PR.
+          fail_on_error: true
+          reporter: github-pr-review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
