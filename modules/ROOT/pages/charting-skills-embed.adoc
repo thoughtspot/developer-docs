@@ -1,594 +1,470 @@
-// SOURCE: SCAL-306327, SCAL-311138, SCAL-252716
-// SOURCE: PRD https://docs.google.com/document/d/1BQwTMZ2oeYe05Ca3wAuQrt4ATpZnVyGbfMuXV1sRdYc/edit
-
-
-= Chart configuration overrides in embedded deployments
+= Configuring visualization overrides
 :toc: left
 :toclevels: 3
-:sectnums:
-:description: Learn how to use chart configuration overrides to control the initial visual state of charts, tables, and KPI visualizations in ThoughtSpot Embedded deployments.
 
-ThoughtSpot Embedded lets you control the initial visual state of charts, tables, and KPI visualizations programmatically, without requiring your end users to manually configure them.
-Using the `visualOverrides` object, embed developers can specify default chart settings, such as colors, data labels, number formatting, legend behavior, axis properties, table themes, and more, when a visualization loads.
+:page-title: VisualizationOverrides
+:page-pageid: visualization-overrides
+:page-description: Visualization overrides to customize chart and table rendering in embedded ThoughtSpot experience.
 
-[NOTE]
-====
-Chart configuration overrides are available in ThoughtSpot release 26.7.0.cl and later. +
-Supported visualization libraries in Phase 1: Highcharts (charts), AG Grid (tables), and DevXtreme (pivot tables). +
-Muze native chart support is planned for a future release.
-====
-
-// TODO: verify with engineering — confirm exact Visual Embed SDK method/property name used to pass
-// `visualOverrides` for SearchEmbed or SageEmbed in the TSE integration flow.
+The Visual Embed SDK allows you to apply visual styling overrides programmatically to the charts and tables generated from Search data queries in an embedded app.
 
 == Overview
+The visualization overrides feature allows developers to pre-define the chart and table settings for their embedding application users and apply these overrides at load time. This eliminates the need for embedding application users manually adjusting charts and tables in the edit mode.
 
-// SOURCE: PRD https://docs.google.com/document/d/1BQwTMZ2oeYe05Ca3wAuQrt4ATpZnVyGbfMuXV1sRdYc/edit
-// SOURCE: SCAL-299430
+Using the `visualOverrides` object, embed application developers can preset the following properties in the new answers retrieved from a search data query:
 
-Previously, embed customers had no way to specify chart type or initial chart settings when
-pre-seeding a search-data or Sage embed. End users were required to enter edit mode and manually
-adjust charts after an answer was generated. This was a significant barrier for use cases such as:
+* Chart properties, such as the legend position, data labels, axis ranges, column colors, conditional formatting, and grid lines
+* table properties, including column visibility, text wrap, content density, and summary configuration
 
-* Enabling column summaries by default in every rendered table
-* Applying a brand color palette to all charts
-* Showing data labels on all new answers
-* Setting a default table theme (zebra-striped, outlined, or row-based)
+== Configuring visual overrides
 
-Chart configuration overrides solve this by exposing a `visualOverrides` object that you pass at
-load time. The overrides are applied with the highest priority—they take precedence over any
-previously saved chart state. If a user manually changes a setting, the override for that property
-is cleared, ensuring user intent is always respected.
+The `visualOverrides` object in the `VisualizationOverrides` interface lets you apply styling overrides to charts and tables generated in the embedded ThoughtSpot Search interface. These overrides can be categorized as:
 
-=== How overrides work
+* Visualization-level overrides that affect settings such as legend visibility, data labels, axis ranges, colors, gridlines, and conditional formatting on a chart.
+* column-level overrides applied such as number formatting, headline visibility, and sort order in a table.
 
-// SOURCE: Design Doc https://docs.google.com/document/d/1-L4cQiAtH0TGXUUP_3g68GeMKf_uWMn11PTXfNOVFs0/edit
-// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
+Within `visualOverrides`, the chart and table settings can be applied in the `chart` and `table` objects.
 
-Overrides fall into two categories:
+Make sure to import the required components and enumeration objects:
 
-Visualization-level overrides:: Applied via the `visualOverrides` object on the front end.
-Affects settings like legend visibility, data labels, axis ranges, colors, gridlines, and
-conditional formatting.
+[source,JavaScript]
+----
+import {
+    init, // Core SDK initialization function.
+    AuthType,  // for authentication type selection.
+    SearchEmbed, // Embeds the ThoughtSpot Search page into a host application.
+    ConditionalFormattingOperator, // Enum for conditional formatting comparison operators.
+    DataLabelFilterOperator, // Enum for data label filter operators.
+    ConditionalFormattingComparisonType, // Enum for conditional formatting comparison.
+    BackgroundFormatType, // Enum for the background fill type in conditional formatting rules.
+    TableTheme, // Enum for the visual theme of embedded tables.
+    TableContentDensity, // Enum for the row height and padding density of embedded tables.
+    LegendPosition, // Enum for the position of the chart legend.
+} from "@thoughtspot/visual-embed-sdk";
+----
 
-Column-level overrides:: Applied on the backend at answer-generation time. Affects number
-formatting, headline visibility, and sort order. These are resolved server-side when Spotter or
-the embed session calls the `UpdateVisualOverrides` API.
+=== Chart override settings
 
-[IMPORTANT]
-====
-`visualOverrides` always takes precedence over any saved `vizProp` state:
+For chart overrides, use the top-level object `chart` object and configure the following properties as needed:
 
-`visualOverrides` > `vizProp` (stored chart state)
-
-Once a user manually changes a setting that was originally set by an override, the override for
-that specific property is cleared and the user's choice is preserved. All other overrides remain
-active.
-====
-
-== Supported settings
-
-// SOURCE: PRD https://docs.google.com/document/d/1BQwTMZ2oeYe05Ca3wAuQrt4ATpZnVyGbfMuXV1sRdYc/edit
-// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
-
-The following 16 settings are available in Phase 1 for all supported chart libraries:
-
-[cols="1,2,3",options="header"]
+[cols="2,5a"]
 |===
-|Setting |Scope |Notes
+|Property | Description
 
-|Colors
-|Per-column color and legend series colors
-|Applies to Highcharts and BYOC charts. Pass hex codes per `columnId`.
+|`legend` __Optional__
+|Object properties for setting visibility, position, and color palette of a legend.
 
-|Number formatting
-|Type, decimals, units, currency
-|Applied on the backend. Column-level formatting; axis formatting is handled automatically.
+|`show` __Optional__
+|__Boolean__. Shows or hides the chart legend.
 
-|Show or hide axis
-|Axis name and axis labels (boolean per axis)
-|Visualization-level override.
+|`position` __Optional__
+|__String__. Position of the legend relative to the chart. Valid values include:
 
-|Axis scales and domains
-|Min and max values per axis
-|Visualization-level override.
+* `LegendPosition.Top` to position the legend above the chart. +
+* `LegendPosition.Bottom` to positions the legend below the chart. +
+* `LegendPosition.Left` to positions the legend to the left of the chart. +
+* `LegendPosition.Right` to positions the legend to the right of the chart.
 
-|Regression lines
-|Boolean (enabled or disabled)
-|Visualization-level override.
+|`colorPalette` __Optional__
+|Custom color palette properties for the legend. Overrides the default color sequence applied by ThoughtSpot. To customize color, specify the hex code in the `color` parameter.
 
-|Show or hide data labels
-|All labels or per-column
-|To show all labels, set `allLabels: true`.
+.5+|`dataLabel` __Optional__
+a|Data label visibility settings, including per-column label filters.
 
-|Filter data labels
-|Column-level, with operator and value
-|Supported operators: `Greater than`, `Less than`, `Equal to`, `Greater than or equal to`,
-`Less than or equal to`.
+a|`allLabels` +
+__Boolean__. When `true`, shows data labels on all data points across all series. +
+a| `stackLabels` +
+__Boolean__. When `true`, shows cumulative total labels on stacked chart segments. +
+a| `columnDataLabel` +
+__Boolean__. Per-column data label visibility and filter threshold settings. For column data labels, you can define the following properties: +
 
-|Show or hide legend
-|Boolean
-|Visualization-level override.
+* `name`: __String__. Required parameter. Column name to apply the data label configuration to. +
+* `visible`: __Boolean__. Optional parameter. Shows or hides data labels for this column. +
+* `filter`: Optional parameter. Sets a filter threshold. When set, the labels are displayed only for data points that meet the filter condition. Define the following attributes to set a filter:
 
-|Legend position
-|`BOTTOM_LEGEND`, `LEFT_LEGEND`, `RIGHT_LEGEND`, `TOP_LEGEND`
-|Visualization-level override.
+a|For `filter`, include the following attributes: +
 
-|Display summary (column summaries)
-|Per-column or all columns
-|Table-specific. Applied on the backend.
+* `value`: __Integer__. Threshold value for the filter comparison. +
+* `operator`: __String__. Comparison operator for the threshold filter. Valid values for this attribute are:
+** `DataLabelFilterOperator.GreaterThan` - Shows the label when value > threshold. +
+** `DataLabelFilterOperator.LessThan` - shows the label when value < threshold. +
+** `DataLabelFilterOperator.GreaterThanOrEqualTo` - shows the label when value ≥ threshold
+** `DataLabelFilterOperator.LessThanOrEqualTo` - shows the label when value ≤ threshold. +
+** `DataLabelFilterOperator.EqualTo` - shows the label when value = threshold. +
+** `DataLabelFilterOperator.NotEqualTo` - shows the label when value is not equal to the  threshold.
 
-|Table theme and content density
-|Theme: `OUTLINE`, `ROW`, `ZEBRA`; Density: `COMPACT`, `REGULAR`
-|Table-specific. Visualization-level override.
+.4+|`display` __Optional__
+|Object for chart display settings.
+a|`summaries`+
+Row and column totals and grand totals. Applies to cross-tab (pivot) charts. Enable or disable the following settings as needed:
 
-|KPI comparison period
-|Enum: comparison period type
-|KPI chart-specific. Visualization-level override.
+* `showRowTotals`: __Boolean__. Shows a totals cell at the end of each row.
+* `showColumnTotals`: __Boolean__. Shows a totals cell at the bottom of each column.
+* `showRowGrandTotals`: __Boolean__. Shows a grand total row summarizing all rows.
+* `showColumnGrandTotals`: __Boolean__. Shows a grand total column summarizing all columns.
 
-|Sort type
-|`Alphanumeric` or `Custom`
-|Applied on the backend.
+|`regressionLine` +
+__Boolean__. When `true`, overlays a statistical regression (trend) line on the chart.
 
-|Show or hide gridlines
-|Per axis (boolean)
-|Visualization-level override.
+a|`gridLine` +
+__Optional__. Shows or hides grid lines on the chart. Specify the following attributes:
 
-|Conditional formatting
-|Column-level, gradient colors, operator and value
-|Visualization-level override.
+* `x`: __Boolean__. When `true`, shows vertical grid lines along the x-axis.
+* `y`: __Boolean__. When `true`, shows horizontal grid lines along the y-axis.
 
-|Pivot table totals and subtotals
-|Row totals, column totals, row subtotals, column subtotals
-|Pivot-specific. Visualization-level override.
+.5+|`axis` __Optional__. a|Per-axis configurations. Each entry controls one axis group, identified by its linked columns.
+
+| `linkedColumns` +
+__Array of strings__. Column names bound to this axis configuration.
+| `showName` +
+__Boolean__. Shows or hides the axis name label.
+| `showLabelValue` +
+__Boolean__. Shows or hides the value labels along the axis.
+a| `yAxisRange` +
+Sets the y-axis range to a specific minimum and maximum value. Use to enforce a consistent scale across embed instances. Valid values include:
+
+* `min`: __Integer__. Minimum value of the y-axis domain.
+* `max`: __Integer__. Maximum value of the y-axis domain.
+
+.4+|`columns`
+a|Per-column overrides: series color and conditional formatting rules. Include the following attributes:
+
+| `name` +
+__String__. Column name to apply overrides to. +
+| `color` +
+__String__. Default series color for this column as a hex string. For example, `#1A73E8`.
+a| `Conditional formatting` +
+Conditional formatting rules applied to data points in this column. Specify the following properties as needed: To apply conditional formatting, set an array of rules in the `rows` object. Each rule is evaluated independently; the first matching rule is applied. For more information, see xref:charting-skills-embed.adoc#_conditional_formatting_overrides[Conditional formatting overrides].
+
+| `updateMaskPaths` |
+__Array of strings__. Field mask for partial updates. Specifies which fields to apply when updating an existing visualization. Pass an empty array `[]` to apply all provided fields.
+||
 |===
 
-[NOTE]
-====
-Axis configuration overrides—controlling field placement (x-axis, y-axis, slice-by-color) and
-axis type (shared, dual, combined)—are planned for a future phase and are not available in
-Phase 1.
-====
+=== Table overrides
+If the answers are in the table format, use the `table` object and define apply the following attributes:
 
-== visualOverrides schema reference
+[cols="2,5a"]
+|===
+|Property | Description
+.3+| `columns`
+a| Per-column overrides: visibility, text wrapping, and conditional formatting.
+| `name` +
+__String__. Column name to apply overrides to.
+|`wrapText` +
+__Boolean__. When `true`, wraps long cell content across multiple lines. When `false`, clips content to a single line.
+| `show` +
+__Boolean__. Show or hide the column in the table.
+|`Conditional formatting` +
+Conditional formatting rules applied to data points in this column. Specify the following properties as needed: To apply conditional formatting, set an array of rules in the `rows` object. Each rule is evaluated independently; the first matching rule is applied. For more information, see xref:charting-skills-embed.adoc#_conditional_formatting_overrides[Conditional formatting overrides].
 
-// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
+3+| `display`
+a|Table-level display settings: theme and content density.
 
-The `visualOverrides` object is included in the visualization object returned by the ThoughtSpot
-API. The schema differs by visualization type. Use the `__typename` discriminator to identify
-which schema applies.
+a|`tableTheme` +
+__String__. Visual theme for the table. Controls row borders, alternating row colors, and cell styling. Valid values are:
 
-// TODO: verify with engineering — confirm whether `visualOverrides` is passed directly via the
-// Visual Embed SDK configuration object (for example, as a SearchEmbed option), or whether it
-// must be applied via a separate REST API or GraphQL call post-session-creation.
+* `TableTheme.Outline` to render the table with outer border and column header borders only. +
+* `TableTheme.Row` to render the table with horizontal row dividers. +
+* `TableTheme.Zebra` to render the table with alternating row background colors.
 
-=== Chart visualization (ChartVisualOverrides)
+a|`table.display.tableContentDensity` +
+__String__. Row height and padding density of the table. +
+Accepted values: +
+`TableContentDensity.Regular` for standard row height with default padding. +
+`TableContentDensity.Compact` for reduced row height and padding; displays more rows in the same vertical space.
 
-[source,typescript]
+.3+|`displaySummaryConfig` |Controls whether column summary rows (totals and aggregations) are shown, with per-column exceptions.
+
+|`showAllSummaries` |__Boolean__. When `true`, shows summary rows (totals and aggregations) for all columns. Individual columns can be excluded using `columnVisibility`.
+|`columnVisibility` a|__Boolean__. Shows or hides the summaries for the specified string in the `columnId`. +
+
+* `visible`. __Boolean__. Shows or hides the summary for this column.
+* `columnId`. __String__. Column ID to control summary visibility for.
+
+||
+|===
+
+=== Conditional formatting overrides
+The conditional formatting properties can be configured in both chart and table override settings in the `columns` object.
+
+[cols="2,5a"]
+|===
+|Property | Description
+.4+a| `Conditional formatting` +
+Conditional formatting rules applied to data points in this column. Specify the following properties as needed: To apply conditional formatting, set an array of rules in the `rows` object. Each rule is evaluated independently; the first matching rule is applied.
+
+a|`operator`. +
+__String__. Required parameter. Comparison operator that triggers the formatting rule. Valid values are:
+
+* `ConditionalFormattingOperator.Is` to set the exact cell value. +
+* `ConditionalFormattingOperator.IsNot` to exclude a cell value. +
+* `ConditionalFormattingOperator.Contains` to set cell value to a specified string. +
+* `ConditionalFormattingOperator.DoesNotContain` to cell value does not contain the specified string. +
+* `ConditionalFormattingOperator.StartsWith` to set a specific starting string for the cell value. +
+* `ConditionalFormattingOperator.EndsWith` to set a cell value that ends with the specified string. +
+* `ConditionalFormattingOperator.GreaterThan` to set a cell value greater than the specified value. +
+* `ConditionalFormattingOperator.LessThan` to cell value is less than the specified value. +
+* `ConditionalFormattingOperator.GreaterThanEqualTo` to cell value is greater than or equal to the specified value. +
+* `ConditionalFormattingOperator.LessThanEqualTo` to cell value is less than or equal to the specified value. +
+* `ConditionalFormattingOperator.EqualTo` to set a cell value that is equal to the specified value. +
+* `ConditionalFormattingOperator.NotEqualTo` to set a cell value that is not exactly equal to the specified value. +
+* `ConditionalFormattingOperator.IsBetween` to set a cell value that is between the defined range of values of values. +
+* `ConditionalFormattingOperator.IsNull` to set a null value. +
+* `ConditionalFormattingOperator.IsNotNull` to set a value that is not null.
+
+| `value` +
+__String__. Literal value to compare against within a range of 0 to 1000000. Used when `comparisonType` is set as `ConditionalFormattingComparisonType.ValueBased` and the operator is set as `ConditionalFormattingOperator.IsBetween`.
+| `comparisonType` +
+__String__.  Determines what the `operator` compares against. Valid values are:
+
+* `ConditionalFormattingComparisonType.ValueBased` to compare the column value against a literal string in `value`. +
+* `ConditionalFormattingComparisonType.ColumnBased` to compares the column value against another column specified in `columnToCompare`. +
+* `columnToCompare`: __String__. Column name to compare against (right-hand side). Used when `comparisonType` is `ConditionalFormattingComparisonType.ColumnBased`.
+* `ConditionalFormattingComparisonType.ParameterBased` to compare the column value against a ThoughtSpot parameter specified in `comparisonParameterId`.
+* `comparisonParameterId`: __String__. Parameter ID to compare against. Used when `comparisonType` is `ConditionalFormattingComparisonType.ParameterBased`.
+
+| `plotAsBand` +
+__Boolean__. When `true`, draws a reference band across the chart area instead of coloring individual data points.
+
+| `isHighlightRow` +
+__Boolean__. When `true`, applies the formatting to the entire table row instead of just the individual cell.
+
+| `lhsColumnId` +
+__String__. The column whose value is evaluated against the rule (left-hand side of the comparison).
+| `fontProperties` +
+Text styling applied to the cell when the condition is met. Specify the following attributes:
+
+* `color`: __String__. Text color as a hex string. For example, `#ffffff`.
+* `bold`: __Boolean__. When `true`, renders the text in bold.
+* `italic`: __Boolean__. When `true`, renders the text in italic.
+* `strikeThrough`: __Boolean__. When `true`, renders the text with a strikethrough.
+* `underline`: __Boolean__. When `true`, renders the text with an underline.
+* `backgroundFormatType`: __String__. Type of background fill to apply when the condition is met. Specify one of the following attributes:
+** `BackgroundFormatType.Solid` to apply a flat solid fill color. Requires `solidBackgroundAttrs`. In the `solidBackgroundAttrs`, you can specify the fill color in the `color` attribute.
+** `BackgroundFormatType.Gradient` to applies a gradient fill. Requires `gradientBackgroundAttrs`. In the `GradientBackgroundAttrs`: +
+*** Specify an array of the Array of hex color strings defining the gradient stops in `colors`.
+*** Specify the midpoint position of the gradient with a value range between 0 and 100.
+*** Specify the numeric range values that map to the gradient color stops in `backgroundFormatRange`.
+*** To scale the gradient range to the data minimum and maximum values, set `isAutoScaled` to `true`.
+||
+|===
+
+== Code sample
+The following example shows the chart and table override settings for the new Answers generated from the embedded Search interface:
+
+[source,JavaScript]
 ----
-visualOverrides: {
-  __typename: "ChartVisualOverrides",
+import {
+    init, // Core SDK initialization function.
+    AuthType, // for authentication type selection.
+    SearchEmbed, // Embeds the ThoughtSpot Search page into a host application.
+    ConditionalFormattingOperator, // Enum for conditional formatting comparison operators.
+    DataLabelFilterOperator, // Enum for data label filter operators.
+    ConditionalFormattingComparisonType, // Enum for conditional formatting comparison.
+    BackgroundFormatType, // Enum for the background fill type in conditional formatting rules.
+    TableTheme, // Enum for the visual theme of embedded tables.
+    TableContentDensity, // Enum for the row height and padding density of embedded tables.
+    LegendPosition, // Enum for the position of the chart legend.
+} from "@thoughtspot/visual-embed-sdk";
 
-  // Default color palette applied across the chart
-  defaults: {
-    colorPalette: {
-      colors: string[];        // Array of hex color codes, e.g. ["#FF0000", "#00FF00"]
+init({
+    thoughtSpotHost: '<ThoughtSpot Host>', // Replace with your application URL
+    authType: AuthType.None,
+});
+
+const embed = new SearchEmbed('#tsEmbed', {
+    frameParams: {
+        width: '100%',
+        height: '100%',
     },
-  },
-
-  overrides: {
-
-    // Legend configuration
-    legendProperties: {
-      showLegend: boolean,
-      position: LegendPositionOptions,         // "BOTTOM_LEGEND" | "LEFT_LEGEND" |
-                                               // "RIGHT_LEGEND" | "TOP_LEGEND"
-      legendDataColors: SeriesColor[],         // Per-attribute-value legend colors
-    },
-
-    // Data label configuration
-    dataLabelProperties: {
-      allLabels: boolean,                      // Show labels for all columns
-      stackLabelsProperties: {
-        isVisible: boolean,
-      },
-      columnDataLabelProperties: [
-        {
-          columnId: string,                    // GUID of the column
-          properties: {
-            isVisible: boolean,
-            filter: {
-              value: number,
-              operator: FilterOperator,        // See FilterOperator enum
-            } | null,
-          },
-        },
-      ],
-    },
-
-    // Display-level properties
-    displayProperties: {
-      kpiDisplayProperties: {
-        customCompare: TupleType,              // KPI comparison period enum value
-      },
-      summariesState: {
-        showRowTotals: boolean,
-        showColumnTotals: boolean,
-        showRowGrandTotals: boolean,
-        showColumnGrandTotals: boolean,
-      },
-      regressionLineProperties: {
-        enabled: boolean,
-      },
-      gridLineProperties: {
-        xGridlineEnabled: boolean,
-        yGridlineEnabled: boolean,
-      },
-    },
-
-    // Per-axis configuration
-    axisProperties: [
-      {
-        columnId: string,                      // Column GUID identifying this axis
-        linkedColumns: string[],               // Column GUIDs sharing this axis
-        properties: {
-          isNameVisible: boolean,
-          isLabelVisible: boolean,
-          yAxisRange: {
-            min: number | null,
-            max: number | null,
-          },
-          isGridLineEnabled: boolean | null,
-        },
-      },
-    ],
-
-    // Per-column visual configuration
-    columnProperties: [
-      {
-        columnId: string,
-        properties: {
-          color: string,                       // Hex code, e.g. "#ababab"
-          conditionalFormatting: {
-            rows: ConditionalMetric[],
-            // TODO: verify with engineering — full ConditionalMetric schema
-          },
-        },
-      },
-    ],
-  },
-}
-----
-
-=== Table visualization (TableVisualOverrides)
-
-[source,typescript]
-----
-visualOverrides: {
-  __typename: "TableVisualOverrides",
-
-  overrides: {
-
-    // Per-column table settings
-    columnProperties: [
-      {
-        columnId: string,
-        columnProperty: {
-          wrapColumnText: boolean,
-          isHidden: boolean,
-          conditionalFormatting: {
-            rows: ConditionalMetric[],
-            // TODO: verify with engineering — full ConditionalMetric schema
-          },
-        },
-      },
-    ],
-
-    // Table display settings
-    displayProperties: {
-      tableTheme: TableTheme,                  // "OUTLINE" | "ROW" | "ZEBRA"
-      tableContentDensity: TableContentDensity,// "COMPACT" | "REGULAR"
-    },
-  },
-}
-----
-
-=== KPI visualization (HeadlineVisualOverrides)
-
-[source,typescript]
-----
-visualOverrides: {
-  __typename: "HeadlineVisualOverrides",
-
-  overrides: {
-    columnProperty: {
-      conditionalFormatting: {
-        rows: ConditionalMetric[],
-        // TODO: verify with engineering — full ConditionalMetric schema
-      },
-      summariesNumberFormatConfig: FormatConfig,
-      // TODO: verify with engineering — full FormatConfig schema
-    },
-  },
-}
-----
-
-=== Enum reference
-
-// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
-
-[source,typescript]
-----
-enum LegendPositionOptions {
-  BottomLegend = 'BOTTOM_LEGEND',
-  LeftLegend   = 'LEFT_LEGEND',
-  RightLegend  = 'RIGHT_LEGEND',
-  TopLegend    = 'TOP_LEGEND',
-}
-
-enum TableTheme {
-  Outline = 'OUTLINE',
-  Row     = 'ROW',
-  Zebra   = 'ZEBRA',
-}
-
-enum TableContentDensity {
-  Compact = 'COMPACT',
-  Regular = 'REGULAR',
-}
-
-enum FilterOperator {
-  LessThan             = 'Less than',
-  GreaterThan          = 'Greater than',
-  LessThanOrEqualTo    = 'Less than or equal to',
-  GreaterThanOrEqualTo = 'Greater than or equal to',
-  EqualTo              = 'Equal to',
-}
-
-enum TupleType {
-  Current                    = 'CURRENT',
-  PrevDay                    = 'PREV_DAY',
-  PrevHour                   = 'PREV_HOUR',
-  PrevWeek                   = 'PREV_WEEK',
-  PrevMonth                  = 'PREV_MONTH',
-  PrevQuarter                = 'PREV_QUARTER',
-  PrevYear                   = 'PREV_YEAR',
-  PrevAvailable              = 'PREV_AVAILABLE',
-  LastAvailable              = 'LAST_AVAILABLE',
-  Custom                     = 'CUSTOM',
-  ChartAggregatedVal         = 'CHART_AGGREGATED_VAL',
-  PreviousChartAggregatedVal = 'PREVIOUS_CHART_AGGREGATED_VAL',
-  SinglePointKpiCurrent      = 'SINGLE_POINT_KPI_CURRENT',
-  SinglePointKpiPrevious     = 'SINGLE_POINT_KPI_PREVIOUS',
-}
-----
-
-== Usage examples
-
-// SOURCE: PRD https://docs.google.com/document/d/1BQwTMZ2oeYe05Ca3wAuQrt4ATpZnVyGbfMuXV1sRdYc/edit
-// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
-
-The following examples show representative `visualOverrides` configurations for common embed
-use cases.
-
-// TODO: verify with engineering — replace the placeholder comments below with the confirmed
-// Visual Embed SDK API for setting visualOverrides on SearchEmbed or SageEmbed (for example,
-// as a top-level init parameter, embed option, or separate method call).
-
-=== Apply a brand color palette to all charts
-
-Use the `defaults.colorPalette` property to apply a fixed color sequence to all measures in the
-chart. Colors are applied in order.
-
-[source,typescript]
-----
-const visualOverrides = {
-  __typename: "ChartVisualOverrides",
-  defaults: {
-    colorPalette: {
-      colors: ["#1A73E8", "#E84235", "#FBBC04", "#34A853"],
-    },
-  },
-  overrides: {},
-};
-
-// TODO: verify with engineering — confirm SDK usage pattern
-// Pass visualOverrides via the Visual Embed SDK configuration
-----
-
-=== Enable data labels on all columns by default
-
-[source,typescript]
-----
-const visualOverrides = {
-  __typename: "ChartVisualOverrides",
-  defaults: {},
-  overrides: {
-    dataLabelProperties: {
-      allLabels: true,
-    },
-  },
-};
-----
-
-=== Show only data labels above a threshold value
-
-Show data labels only where revenue exceeds $1,000,000. Provide the `columnId` of the measure
-column.
-
-[source,typescript]
-----
-const visualOverrides = {
-  __typename: "ChartVisualOverrides",
-  defaults: {},
-  overrides: {
-    dataLabelProperties: {
-      allLabels: false,
-      columnDataLabelProperties: [
-        {
-          columnId: "<revenue-column-guid>",
-          properties: {
-            isVisible: true,
-            filter: {
-              value: 1000000,
-              operator: "Greater than",
+    dataSource: "<data-source-id>", // Replace with your application URL
+    visualOverrides: {
+        chart: {
+            // Show or hide the chart legend, and set its position.
+            legend: {
+                show: true,
+                position: LegendPosition.Bottom,
             },
-          },
+            // Data labels to show on chart series.
+            dataLabel: {
+                // Show labels on all data points across all series.
+                allLabels: true,
+                // Show cumulative total labels on stacked chart segments.
+                stackLabels: true,
+                // Per-column label visibility and optional value filters.
+                // Use filters to suppress labels below or above a threshold.
+                columnDataLabel: [{
+                        name: 'Ship Mode',
+                        visible: true,
+                        // Only show the data label when the value is greater than 0
+                        filter: {
+                            value: 0,
+                            operator: DataLabelFilterOperator.GreaterThan
+                        },
+                    },
+                    {
+                        name: 'Discount',
+                        // Hide data labels for this column entirely.
+                        visible: false,
+                        // No filter applied
+                        filter: null, //label is hidden regardless of value.
+                    },
+                ],
+            },
+            // chart display settings.
+            display: {
+                // Controls row/column summary rows on crosstab (pivot) charts.
+                summaries: {
+                    showRowTotals: true, // Show totals at the end of each row.
+                    showColumnTotals: false, // Hide totals at the bottom of each column.
+                    showRowGrandTotals: true, // Show the grand total row.
+                    showColumnGrandTotals: true, // Show the grand total column.
+                },
+                // Show a statistical regression (trend) line on the chart.
+                regressionLine: true,
+                // Show or hide horizontal and vertical grid lines.
+                gridLine: {
+                    x: true, // Show vertical grid lines (x-axis).
+                    y: true, // Show horizontal grid lines (y-axis).
+                },
+            },
+
+            // Each entry in this array configures one axis group. columns listed in "linkedColumns" share the same axis settings.
+            axis: [{
+                // Columns bound to this axis configuration.
+                linkedColumns: ['Total Discount', 'Ship Mode'],
+
+                // Show the axis name label.
+                showName: true,
+
+                // Show tick mark value labels along the axis.
+                showLabelValue: true,
+
+                // Fix the y-axis domain to a specific minimum/maximum range.
+                // Useful for enforcing a consistent scale across embed instances.
+                yAxisRange: {
+                    min: 0,
+                    max: 100,
+                },
+            }, ],
+            // Per-column series color and conditional formatting rules.
+            columns: [{
+                name: 'Total Discount',
+                // Default series color for this column (hex string).
+                color: '#ababab',
+                // Applies visual formatting rules to data points that meet the specified conditions. Each entry in rows[] is one rule.
+                conditionalFormatting: {
+                    rows: [{
+                        // Trigger this rule when the cell value is greater than 3300.
+                        operator: ConditionalFormattingOperator.GreaterThan,
+                        value: '3300',
+                        // When true, draws a reference band across the chart instead of coloring individual data points.
+                        plotAsBand: true,
+                        // Compare the column value against a literal value.
+                        comparisonType: `ConditionalFormattingComparisonType.ValueBased`,
+                        // The column whose value is evaluated against the rule.
+                        lhsColumnId: 'Total Discount',
+                        // Applied to cell text when the condition is met.
+                        fontProperties: {
+                            color: '#ffffff', // White text.
+                            bold: true,
+                            italic: false,
+                            strikeThrough: false,
+                            underline: false,
+                        },
+                        // Use a solid fill color or a gradient fill.
+                        backgroundFormatType: BackgroundFormatType.Solid
+                        solidBackgroundAttrs: {
+                            color: '#2E75F0', // Blue background when condition is met.
+                        },
+
+                        // For gradient fill, set "BackgroundFormatType.Gradient".
+                        // backgroundFormatType: BackgroundFormatType.Gradient,
+                        // gradientBackgroundAttrs: {
+                        //     colors: ['#000000', '#ffffff'],
+                        // },
+                    }, ],
+                },
+            }, ],
+
+            // Field mask for partial updates. An empty array applies all provided fields.
+            updateMaskPaths: [],
         },
-      ],
-    },
-  },
-};
-----
+        table: {
+            // Per-column overrides for visibility, text wrapping, and conditional formatting.
+            columns: [{
+                    name: "Total Discount", // Column name
+                    wrapText: true, //  wrap long content across multiple lines
+                    show: true,
+                    // Conditional formatting rules to cells in this column.
+                    conditionalFormatting: {
+                        rows: [{
+                            // Trigger rule based on the cell value. Compares the column value against the literal string in `value`.
+                            operator: ConditionalFormattingOperator.GreaterThan,
+                            value: "3300",
+                            // For value range-based matching condition, use `ConditionalFormattingOperator.IsBetween` and `rangeValues`
+                            // operator: ConditionalFormattingOperator.IsBetween ('IS_BETWEEN').
+                            // rangeValues: { min: 0, max: 1000000 },
+                            // Apply e formatting to the entire table row instead of just the individual cell.
+                            isHighlightRow: false,
+                            comparisonType: ConditionalFormattingComparisonType.ValueBased,
+                            // The column whose value is evaluated against the rule (left-hand side).
+                            lhsColumnId: "Total Discount",
+                            // Text styling applied to the cell when the condition is met.
+                            fontProperties: {
+                                color: "#ffffff", // White text.
+                                bold: true,
+                                italic: false,
+                                strikeThrough: false,
+                                underline: false,
+                            },
 
-=== Set legend position and assign per-series colors
+                            // Use solid or gradient fill color for background styling
+                            backgroundFormatType: BackgroundFormatType.Solid
+                            solidBackgroundAttrs: {
+                                color: "#2E75F0", //Solid fill color applied when the condition is met.
+                            },
+                        }, ],
+                    },
+                },
 
-[source,typescript]
-----
-const visualOverrides = {
-  __typename: "ChartVisualOverrides",
-  defaults: {},
-  overrides: {
-    legendProperties: {
-      showLegend: true,
-      position: "RIGHT_LEGEND",
-      legendDataColors: [
-        { dataValue: "North", color: "#1A73E8" },
-        { dataValue: "South", color: "#E84235" },
-        { dataValue: "East",  color: "#FBBC04" },
-        { dataValue: "West",  color: "#34A853" },
-      ],
-    },
-  },
-};
-----
+                // second column with no conditional formatting.
+                {
+                    name: "Ship Mode",
+                    wrapText: false,
+                    show: true,
+                },
+            ],
+            // Table-level display settings.
+            display: {
+                // Set the row height and padding density of the table.
+                tableContentDensity: TableContentDensity.Compact, // Use TableContentDensity.Regular for standard row height.
+            },
+            displaySummaryConfig: {
+                // Show summary rows for all columns by default.
+                showAllSummaries: true,
+                // Per-column exceptions to showAllSummaries.
+                columnVisibility: [{
+                        columnId: "Total Discount",
+                        visible: false
+                    },
+                    {
+                        columnId: "Total Extended Price",
+                        visible: false
+                    },
+                ],
+            },
 
-=== Enable a regression line
+            // Field mask for partial updates. An empty array applies all provided fields.
+            updateMaskPaths: [],
 
-[source,typescript]
-----
-const visualOverrides = {
-  __typename: "ChartVisualOverrides",
-  defaults: {},
-  overrides: {
-    displayProperties: {
-      regressionLineProperties: {
-        enabled: true,
-      },
-    },
-  },
-};
-----
-
-=== Set axis range (min and max)
-
-[source,typescript]
-----
-const visualOverrides = {
-  __typename: "ChartVisualOverrides",
-  defaults: {},
-  overrides: {
-    axisProperties: [
-      {
-        columnId: "<revenue-column-guid>",
-        linkedColumns: ["<revenue-column-guid>"],
-        properties: {
-          isNameVisible: true,
-          isLabelVisible: true,
-          yAxisRange: {
-            min: 0,
-            max: 5000000,
-          },
-          isGridLineEnabled: true,
         },
-      },
-    ],
-  },
-};
-----
-
-=== Set table theme and content density
-
-[source,typescript]
-----
-const visualOverrides = {
-  __typename: "TableVisualOverrides",
-  overrides: {
-    displayProperties: {
-      tableTheme: "ZEBRA",
-      tableContentDensity: "COMPACT",
     },
-  },
-};
+});
+
+embed.render();
 ----
-
-=== Enable pivot table totals and subtotals
-
-[source,typescript]
-----
-const visualOverrides = {
-  __typename: "ChartVisualOverrides",
-  defaults: {},
-  overrides: {
-    displayProperties: {
-      summariesState: {
-        showRowTotals: true,
-        showColumnTotals: true,
-        showRowGrandTotals: true,
-        showColumnGrandTotals: false,
-      },
-    },
-  },
-};
-----
-
-=== Set KPI comparison period
-
-[source,typescript]
-----
-const visualOverrides = {
-  __typename: "ChartVisualOverrides",
-  defaults: {},
-  overrides: {
-    displayProperties: {
-      kpiDisplayProperties: {
-        customCompare: "PREV_MONTH",
-      },
-    },
-  },
-};
-----
-
-== Override precedence and user behavior
-
-// SOURCE: Design Doc https://docs.google.com/document/d/1-L4cQiAtH0TGXUUP_3g68GeMKf_uWMn11PTXfNOVFs0/edit
-// SOURCE: Schema reference https://docs.google.com/document/d/1z0U4nNRNcOOJ7Aj-SeyEUkOMHAN52w2yPBz1S-cfTP8/edit
-
-Understanding how `visualOverrides` interact with saved chart state and user actions is important
-for building predictable embedded experiences.
-
-[cols="1,2",options="header"]
-|===
-|Scenario |Behavior
-
-|Override set, no saved chart state
-|The override value is applied. The chart renders with the override settings.
-
-|Override set, saved chart state exists
-|The override always wins. `visualOverrides` takes precedence over any value in `vizProp`.
-
-|User changes a setting that was overridden
-|The override for that specific property is cleared. The user's manually applied value is
-respected. Other overrides remain active.
-
-|Follow-up query in Spotter (context retained)
-|Overrides are re-sent in the follow-up if the overridden property is not yet in `vizProp`,
-or if an existing `vizProp` value needs to be overridden.
-
-|Visualization is persisted (saved to Liveboard)
-|The override is resolved into `vizProp` and persisted. On reload, the chart renders from
-`vizProp`, not from `visualOverrides`.
-|===
 
 == Limitations
 
@@ -605,10 +481,10 @@ conditional formatting and other applicable properties.
 * *Text formatting:* Axis label, data-label, and tooltip text formatting are deferred from
 Phase 1 due to cross-library inconsistencies.
 
-== Related resources
+== Additional references
 
-* xref:embed-search.adoc[Embed ThoughtSpot search]
-// TODO: verify with engineering — add correct xref to Spotter embed page once confirmed
-* xref:visual-embed-sdk.adoc[Visual Embed SDK reference]
-* xref:chart-types.adoc[Supported chart types]
-* link:https://developers.thoughtspot.com/[ThoughtSpot Developer Portal]
+* xref:embed-search.adoc[Embed Search page]
+* xref:full-embed.adoc[Embed full application]
+* xref:SearchViewConfig.adoc[SearchViewConfig]
+* xref:AppViewConfig.adoc[AppViewConfig]
+
