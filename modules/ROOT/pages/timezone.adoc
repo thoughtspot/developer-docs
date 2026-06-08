@@ -1,0 +1,302 @@
+= Timezone-aware keywords and filters
+:toc: true
+:toclevels: 2
+
+:page-title: Timezone-aware keywords and filters
+:page-pageid: timezone-aware-filtering
+:page-description: Configure per-Org and per-user timezone settings in embedded ThoughtSpot deployments using the Variable API, so that all relative date and time keywords resolve correctly for every user.
+:keywords: timezone, ts_user_timezone, Variable API, date keywords, embedded, TSE, Org timezone, user timezone
+
+[beta betaBackground]#Beta#
+
+The timezone awareness feature in ThoughtSpot allows you to configure a preferred timezone for a user or at the Org level, or both, and apply this timezone when generating search results for a user's query.
+
+== Overview
+In embedded deployments where users can span across multiple regions, date and time keyword filters, such as `today`, `yesterday`, `last 7 days`, and `month-to-date`, resolve based on the default timezone of the ThoughtSpot instance. Sometimes, this can cause discrepancies for users in different timezones, especially when generating reports or filtering data for specific periods. For example, a user in the USA sees `today` as Sunday, whereas for a user in the APAC region, this could mean Monday, and they may expect data for Monday.
+
+The timezone awareness feature eliminates timezone-based inconsistencies in multi-region embedded deployments and removes the need for custom workarounds. Using this feature, you can:
+
+* Assign a timezone for an Org using the Variable API. Each Org can maintain its own independent timezone configuration, ensuring that the multi-Org embedded experience remains accurate and consistent for all users.
+* Override the timezone for individual users without affecting anyone else in the Org.
+* Reference the timezone in passthrough formulas using `ts_var(ts_user_timezone)`, so the query results update automatically when the timezone changes.
+* Ensure that timezone-aware filtering is applied consistently across search results, Spotter responses, Liveboard filters, Liveboard scheduled jobs, KPI Alerts, and SpotIQ analysis.
+
+
+[NOTE]
+====
+The timezone awareness feature is currently in Beta and is disabled by default. To enable this feature, contact ThoughtSpot Support.
+====
+
+=== Timezone resolution
+
+Administrators can set the timezone preference for a user or an Org using the `ts_user_timezone` system variable. If `ts_user_timezone` does not have a value assigned at the user or Org level, ThoughtSpot continues to use the cluster's default timezone.
+
+At query time, ThoughtSpot resolves the correct timezone using the following precedence order:
+
+[cols="2,4", options="header"]
+|===
+| Timezone scope | Description
+
+| User-level timezone
+| Individual override. Applies to that user only.
+A user-level value always takes precedence over the Org default and has the highest priority.
+
+| Org-level timezone
+| Default for all users in the Org if there is no user-specific override. An Org-level override takes precedence over the system default.
+
+| Default timezone on the ThoughtSpot instance
+| Platform default. If `ts_user_timezone` is not configured at the user or Org level, ThoughtSpot uses the default timezone.
+|===
+
+When a user runs a search query or opens a Liveboard, ThoughtSpot evaluates this precedence chain automatically and applies the resolved timezone to all relative date calculations.
+
+=== Supported interfaces
+
+Timezone-aware filtering and display are supported across the following ThoughtSpot interfaces:
+
+* Search Data
+* Spotter
+* Charts and Liveboards
+* Liveboard filters
+* Liveboard schedules
+* KPI alerts
+* SpotIQ
+
+[#set-up-timezone-awareness]
+== Timezone configuration
+Timezone awareness is determined by the built-in system variable, `ts_user_timezone`. This variable is provisioned automatically, but it has no effect until a value is assigned via the Variable API. To set or update the values for the timezone variable via REST APIs, the API user must have the `ADMINISTRATION` privilege and the `CAN_MANAGE_VARIABLES` role privilege.
+
+=== Supported strings for timezones
+
+The timezone values assigned to the `ts_user_timezone` variable must match the link:https://www.iana.org/time-zones[IANA timezone strings^]. For example:
+
+* `America/New_York`
+* `Asia/Kolkata`
+* `Europe/London`
+* `America/Chicago`
+* `Asia/Singapore`
+
+[IMPORTANT]
+====
+UTC offset strings such as `UTC+5:30` or `GMT-8` are not supported.
+====
+
+=== Supported calendar types
+Timezone configuration can be applied to all calendar types, including standard (Gregorian), fiscal, and custom calendars.
+
+=== Supported column types
+Timezone configuration and variable assignment are applicable only to columns with the `DATE` or `DATE_TIME` data type.
+
+=== Assigning a timezone via REST API
+To configure a timezone preference for an Org, user, or both, use the `/api/rest/2.0/template/variables/{identifier}/update-values` API endpoint.
+
+Specifying the system variable::
+In your API request, specify `ts_user_timezone` as the variable `identifier` and include it as a path parameter.
+
+Supported operation type::
+To add, replace, remove, or reset the timezone value, administrators can specify the operation type to one of the following values as needed:
+
+* `ADD` - Adds new values.
+* `REMOVE` - Removes the values assigned to the variable.
+* `REPLACE` - Replaces the values assigned to the variable.
+* `RESET` - Clears the values assigned to the variable for all entities.
+
+==== Configuring timezone per Org
+To configure timezone overrides for an Org, you must specify the Org name or ID and assign a timezone value to the variable in your API request to the `/api/rest/2.0/template/variables/{identifier}/update-values` API endpoint. The value specified for the timezone must be an xref:timezone.adoc#_supported_strings_for_timezones[IANA timezone string].
+
+The following example assigns the `America/New_York` timezone for the Org specified in the request:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/ts_user_timezone/update-values'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "variable_assignment": [
+    {
+      "assigned_values": [
+        "America/New_York"
+      ],
+      "org_identifier": "OrgA"
+    }
+  ],
+  "operation": "ADD"
+}'
+----
+
+==== Configuring user-specific overrides
+
+To set a different timezone for an individual user, specify the user ID in your API request to the `/api/rest/2.0/template/variables/{identifier}/update-values` endpoint.
+
+In the following API request example, the user scope is defined in the `principal_type` and `principal_identifier` parameters, and the `Europe/London` string is set as the timezone:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/ts_user_timezone/update-values'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "variable_assignment": [
+    {
+      "assigned_values": [
+        "Europe/London"
+      ],
+      "principal_type": "USER",
+      "principal_identifier": "UserA"
+    }
+  ],
+  "operation": "REPLACE"
+}'
+----
+
+==== API response
+
+If the timezone update operation is successful, ThoughtSpot returns the 204 response code.
+
+=== Verifying timezone assignment
+To verify the values assigned to the timezone variable, send an API request to the `/api/rest/2.0/template/variables/search` API endpoint, with the variable ID as `ts_user_timezone`.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/template/variables/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "record_offset": 0,
+  "record_size": 10,
+  "response_content": "METADATA_AND_VALUES",
+  "variable_details": [
+    {
+      "identifier": "ts_user_timezone"
+    }
+  ]
+}'
+----
+
+The API returns a response with the values configured.
+
+[source,JSON]
+----
+[
+   {
+      "id":"8616932c-1c5c-4418-9fb5-4605b172780a",
+      "name":"ts_user_timezone",
+      "variable_type":"USER_PROPERTY",
+      "sensitive":false,
+      "values":[
+         {
+            "value":"America/New_York",
+            "value_list":null,
+            "org_identifier":"Primary",
+            "principal_type":null,
+            "principal_identifier":null,
+            "model_identifier":null,
+            "priority":null
+         },
+         {
+            "value":"Asia/Kolkata",
+            "value_list":null,
+            "org_identifier":"Primary",
+            "principal_type":"USER",
+            "principal_identifier":"UserA",
+            "model_identifier":null,
+            "priority":null
+         },
+         {
+            "value":"Europe/London",
+            "value_list":null,
+            "org_identifier":"OrgB",
+            "principal_type":null,
+            "principal_identifier":null,
+            "model_identifier":null,
+            "priority":null
+         },
+         {
+            "value":"Asia/Kolkata",
+            "value_list":null,
+            "org_identifier":"OrgB",
+            "principal_type":"USER",
+            "principal_identifier":"UserB",
+            "model_identifier":null,
+            "priority":null
+         }
+      ],
+      "org":{
+         "id":0,
+         "name":"Primary"
+      }
+   }
+]
+----
+
+== Specifying timezone in formulas and passthrough functions
+If your cloud data warehouse (CDW) stores timestamps in a different timezone than the user's timezone, date and datetime keywords and filters must be applied to a derived datetime column created using a passthrough formula. The original UTC column is not used directly. Users with edit access to the data model can create a passthrough function to create a derived datetime column and convert source values to the target timezone.
+
+=== Using the timezone variable in formulas
+
+If the `ts_user_timezone` variable is configured for the Org or user, you can reference it directly inside formulas and passthrough functions to dynamically resolve the timezone to the IANA timezone string assigned to the variable for that Org or user. Using this variable eliminates the need for hardcoded values.
+
+The following example shows the formula syntax with the `ts_user_timezone` variable:
+
+`sql_date_time_op ("CONVERT_TIMEZONE ('UTC', {0}, {1}"), ts_var (ts_user_timezone), [<your_datetime_column>])`
+
+
+Where:
+
+* `sql_date_time_op` is the passthrough function for date/datetime operations.
+* `"CONVERT_TIMEZONE('UTC', '{0}', {1})"` is the SQL template string.
+** `CONVERT_TIMEZONE` is the CDW function signature. This varies per CDW. For example, `CONVERT_TIMEZONE` in Snowflake and `CONVERT_TZ` for MySQL.
+** `UTC` indicates the source timezone, the original timezone of your timestamp.
+** `{0}` is the placeholder for the first argument after the template string. In this example, it will be replaced by the `ts_user_timezone` variable value set for the user.
+** `{1}` is the placeholder for the date/datetime column.
+* `ts_var (ts_user_timezone)` is the variable placeholder for dynamic timezone conversion.
+* `[<your_datetime_column>]` is the name of the date/time column for the date/datetime conversion.
+
+
+On query execution, the formula translates to:
+
+* `CONVERT_TIMEZONE('UTC', 'America/New_York', "{your_datetime_column}")` for the user in the EST timezone, for whom the `ts_user_timezone` variable value is set to `America/New_York`.
+* `CONVERT_TIMEZONE('UTC', 'Asia/Kolkata', "{your_datetime_column}")` for the user in the IST timezone, for whom the `ts_user_timezone` variable value is set to `Asia/Kolkata`.
+
+=== Using hardcoded timezone values in formulas
+In ThoughtSpot Cloud 26.5.0.cl and earlier release versions, the timezone value was hardcoded in formulas to convert source values to the user's timezone. For example:
+
+----
+sql_date_time_op ("CONVERT_TIMEZONE ('UTC', {0}, {1}"), '<time-zone-string>', [<your_datetime_column>])
+----
+
+Where:
+
+* `sql_date_time_op` is the passthrough function for date/datetime operations.
+* `"CONVERT_TIMEZONE('UTC', '{0}', {1})"` is the SQL template string.
+** `CONVERT_TIMEZONE` is the CDW function signature. This varies per CDW. For example, `CONVERT_TIMEZONE` in Snowflake and `CONVERT_TZ` for MySQL.
+** `UTC` indicates the source timezone, the original timezone of your timestamp.
+** `{0}` is the placeholder for the first argument after the template string. In this example, it indicates the target timezone and is replaced by a hardcoded timezone string.
+** `{1}` is the placeholder for the date/datetime column.
+* `<time-zone-string>` represents the hardcoded timezone string. For example, `Asia/Kolkata`.
+* `[<your_datetime_column>]` is the date/time column that you want to convert. This will replace the original date/datetime column source.
+
+On query execution, the formula converts the date/datetime values according to the hardcoded timezone string for the given date/datetime column.
+
+
+== Verifying the configuration
+
+To verify the configuration:
+
+* Use the Variable API search endpoint (`/api/rest/2.0/template/variables/search`) to retrieve and confirm the values configured for the Org and user.
+* Query the date or datetime columns in your data and verify whether the date and time keywords resolve correctly as defined in the `ts_user_timezone` variable.
+* Verify whether the SQL passthrough function is applied to the keyword filters, such as `today`, `yesterday`, `last 7 days`, and `month-to-date`, in the data model.
+* Switch to another Org that has a different timezone configured, run a search query, and verify the results.
+* Verify whether the timezone configured for the user overrides the timezone set for the Org and system default on the ThoughtSpot instance.
+* Verify the Liveboard scheduled jobs. Note that the timezone changes will be applied only to the upcoming scheduled job executions.
+
+
+== Additional resources
+
+* For information about variable APIs, see xref:variables-api.adoc[Variable API reference] and visit the link:{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fvariable%2Fput-variable-values[REST API Playground].
+* For more information about SQL passthrough functions, see link:https://docs.thoughtspot.com/cloud/latest/formula-reference#passthrough-functions[Formula function reference^].
+* For information about the IANA timezone strings, see link:https://www.iana.org/time-zones[IANA Timezone Database^].

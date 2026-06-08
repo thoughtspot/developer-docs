@@ -1,0 +1,53 @@
+# ts-docs/AsciiDocSyntax.yml
+# Flags AsciiDoc markup and convention issues that cause rendering
+# problems in Antora or break accessibility and link integrity.
+# All patterns run on raw source text before Vale strips markup.
+#
+# Checks:
+#   - Unresolved attribute references {attr-name}
+#   - Bare or malformed URL macros
+#   - Missing blank line before list items
+#   - Source blocks without a language tag
+#   - Image macros with empty alt text (accessibility)
+#   - Xref and hyperlink convention violations (Antora)
+extends: existence
+message: "AsciiDoc markup or convention issue: '%s'. Check formatting."
+level: warning
+raw:
+  # ---- Attribute references --------------------------------
+  # Unresolved attribute references (common in Antora content).
+  # Matches {attr-name} that is NOT followed by a + continuation.
+  - '\{[a-z][a-z0-9-]+\}(?!\+)'
+
+  # ---- URL macros ------------------------------------------
+  # Bare URLs without a link macro - render literally in some outputs.
+  # Matches http(s)://... followed by an unclosed bracket.
+  - 'https?://\S+\[(?!\])'
+
+  # ---- List formatting -------------------------------------
+  # Missing blank line before a list item - common cause of list
+  # items rendering as plain text instead of a list.
+  - '^[*-]\s'
+
+  # ---- Source blocks ---------------------------------------
+  # Source block without a language tag produces unhighlighted output.
+  # Use [source,language], e.g. [source,javascript] or [source,bash].
+  - '^\[source\]$'
+  - '^\[source,\s*\]$'
+
+  # ---- Image alt text (accessibility) ----------------------
+  # Image macros with empty alt text break screen readers (WCAG 2.1 AA).
+  # FAIL: image::diagram.png[]      PASS: image::diagram.png[API flow diagram]
+  # FAIL: image:icon.png[]          PASS: image:icon.png[Settings icon]
+  - 'image::[^\[]+\[\s*\]'
+  - 'image:[^:][^\[]+\[\s*\]'
+
+  # ---- Xref and hyperlink conventions (Antora) -------------
+  # Double-bracket cross-reference: Antora recommends xref: syntax.
+  - '<<[a-zA-Z_][^>]*>>'
+  # xref: macro with empty display text — readers need descriptive text.
+  - 'xref:[^\[]+\[\s*\]'
+  # link: macro for an internal .adoc file — use xref: instead.
+  - 'link:[^\[]*\.adoc\['
+  # External link macro with empty display text.
+  - 'link:https?://[^\[]+\[\s*\]'
