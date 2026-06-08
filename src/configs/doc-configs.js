@@ -22,8 +22,8 @@ module.exports = {
         //   'https://developers.thoughtspot.com/docs/26.3.0.cl?pageid=whats-new'
         // - GA: ' /docs/whats-new'
         //linkHref: '/docs/whats-new',
-        linkHref: '/docs/26.5.0.cl?pageid=whats-new',
-        linkText: 'Version 26.5.0.cl',
+        linkHref: '/docs/26.6.0.cl?pageid=whats-new',
+        linkText: 'Version 26.6.0.cl',
         openInNewTab: true,
     },
     TYPE_DOC_PREFIX: 'typedoc',
@@ -48,10 +48,10 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
 	    {
-            label: '26.5.0.cl',
-            link: '26.5.0.cl',
-            subLabel: 'Cloud (Latest)',
-            iframeUrl: 'https://developer-docs-26-5-0-cl.vercel.app/docs/',
+            label: '26.6.0.cl',
+            link: '26.6.0.cl',
+            subLabel: 'Cloud (Now available)',
+            iframeUrl: 'https://developer-docs-26-6-0-cl.vercel.app/docs',
         },
     ],
     CUSTOM_PAGE_ID: {

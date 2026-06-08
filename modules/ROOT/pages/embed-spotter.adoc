@@ -14,7 +14,7 @@ To embed Spotter, you need the following access and setup:
 
 * Access to a ThoughtSpot instance with the Spotter feature. If you want a specific version of Spotter enabled, work with your ThoughtSpot administrator to enable the xref:embed-ai-analytics.adoc#_feature_status_and_availability_in_embed_mode[required features and settings] on your instance.
 * Your host application domain is added to xref:security-settings.adoc[ThoughtSpot CSP and CORS allowlists].
-* Your application project has access to the xref:api-changelog.adoc[latest version of the Visual Embed SDK]. +
+* Your application project has access to the xref:api-changelog.adoc[latest version of the Visual Embed SDK].
 
 [NOTE]
 ====
@@ -120,6 +120,18 @@ The following example shows how to register xref:EmbedEvent.adoc#_init[EmbedEven
 spotterEmbed.on(EmbedEvent.Init, showLoader); // Show loader when initialization starts
 spotterEmbed.on(EmbedEvent.Load, hideLoader); // Hide loader when embed is fully loaded
 ----
+
+
+[source,JavaScript]
+----
+// Use EmbedEvent.Subscribed to safely trigger a HostEvent on initial load
+spotterEmbed.on(EmbedEvent.Subscribed, (eventData) => {
+    if (eventData.data.hostEventType === 'ResetSpotterConversation') {
+        spotterEmbed.trigger(HostEvent.ResetSpotterConversation);
+    }
+});
+----
+
 
 To trigger actions on the embedded interface, use the xref:HostEvent.adoc[Host events].
 
@@ -229,6 +241,34 @@ const embed = new SpotterEmbed('#tsEmbed', {
 [NOTE]
 ====
 The standalone `enablePastConversationsSidebar` attribute is deprecated in v1.47.0 and can no longer be used to enable or disable the chat history.
+====
+
+
+==== Chat history panel
+
+To enable and customize the chat history sidebar, configure the chat history properties in the `spotterSidebarConfig` object:
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    // ...
+    worksheetId: '<%=datasourceGUID%>',
+    spotterSidebarConfig: {
+        enablePastConversationsSidebar: true,  // Enable the chat history sidebar
+        spotterSidebarDefaultExpanded: true,  // Expand the sidebar by default
+        spotterSidebarTitle: 'Chat History', // Custom sidebar header text
+        spotterNewChatButtonTitle: 'New Conversation', // Custom label for the New chat button
+        spotterChatRenameLabel: 'Rename session', // Custom label for the Rename action
+        spotterChatDeleteLabel: 'Delete session', // Custom label for the Delete action
+        spotterConversationsBatchSize: 20, // Conversations fetched per batch (default: 30)
+        spotterDocumentationUrl: 'https://your-help-center-url', // Custom best practices link
+    },
+});
+----
+
+[NOTE]
+====
+The standalone `enablePastConversationsSidebar` property on `SpotterEmbedViewConfig` is deprecated from Visual Embed SDK v1.47.0. Use the `enablePastConversationsSidebar` property within the `spotterSidebarConfig` object instead. When both properties are defined, the value in `spotterSidebarConfig` takes precedence.
 ====
 
 
@@ -365,7 +405,7 @@ import {
 } from '@thoughtspot/visual-embed-sdk';
 
 spotterChatConfig: {
-    //Hide the default logo and label on tool response cards in Spotter chat UI
+    // Hide the default logo and label on tool response cards in Spotter chat UI
     hideToolResponseCardBranding: true,
     // Set a custom label to display as the branding on tool response cards
     toolResponseCardBrandingLabel: 'CompanyName',
