@@ -50,11 +50,13 @@ module.exports = {
 	    {
             label: '26.6.0.cl',
             link: '26.6.0.cl',
-            subLabel: 'Cloud (Now available)',
-            iframeUrl: 'https://developer-docs-26-6-0-cl.vercel.app/docs',
-            label: '26.5.0.cl',
-            link: ' ',
             subLabel: 'Cloud (Latest)',
+            iframeUrl: 'https://developer-docs-26-6-0-cl.vercel.app/docs/',
+        },
+	    {
+            label: '26.5.0.cl',
+            link: '26.5.0.cl',
+            subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-26-5-0-cl.vercel.app/docs/',
         },
         {
