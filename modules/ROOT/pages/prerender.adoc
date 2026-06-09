@@ -217,6 +217,53 @@ embed.render();
 
 This approach is more efficient than the previous one, but it does not load the Liveboard data and metadata until the end user actually navigates to the analytics page. So users might see a loading state for a few seconds before the Liveboard is loaded.
 
+=== Pre-render with full-height App embed
+
+If you are using `AppEmbed` with the `fullHeight` attribute set to `true`, you can also use pre-rendering to eliminate the initial loading delay. Starting with Visual Embed SDK 1.49.x, the pre-render logic correctly accounts for the height already computed by `fullHeight` so that the embed placeholder and the pre-render overlay remain in sync when you call `showPreRender()`. In the earlier versions,  calling `showPreRender()` after `fullHeight` resized the wrapper could collapse the embed to zero height because the placeholder element had no height at the time `syncPreRenderStyle()` ran.
+
+==== How it works
+
+When `showPreRender()` is called and `fullHeight` is enabled, the SDK:
+
+. Reads the current `height` already applied to the `preRenderWrapper` by the `fullHeight` resize handler.
+. Seeds that height into the in-flow placeholder element (`insertedDomEl`) before calling `syncPreRenderStyle()`.
+. Ensures the overlay aligns correctly with the host element.
+
+This behavior is automatic. No configuration changes are required. Existing code that sets both `preRenderId` and `fullHeight: true` benefits from this fix automatically after upgrading to the v1.49.x SDK version.
+
+==== Implementation
+
+[source,JavaScript]
+----
+import { init, AppEmbed, AuthType } from '@thoughtspot/visual-embed-sdk';
+
+init({
+    thoughtSpotHost: '<your-thoughtspot-host>',
+    authType: AuthType.SAMLRedirect,
+});
+
+// Pre-render the AppEmbed with fullHeight enabled.
+const preRenderedApp = new AppEmbed('#pre-render-target', {
+    preRenderId: 'full-app-prerender',
+    fullHeight: true,
+});
+
+preRenderedApp.preRender();
+
+// When the user navigates to the analytics page, attach the pre-rendered embed to the host element.
+const app = new AppEmbed('#ts-embed', {
+    preRenderId: 'full-app-prerender',
+    fullHeight: true,
+});
+
+app.showPreRender();
+----
+
+[NOTE]
+====
+The `fullHeight` attribute causes the Liveboard container to resize dynamically to match the Liveboard height, which triggers multiple data warehouse queries simultaneously. For Liveboards with many visualizations, consider enabling `lazyLoadingForFullHeight` to load visualizations incrementally as users scroll.
+====
+
 
 === Pre-render on demand
 
