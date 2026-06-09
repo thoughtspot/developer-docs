@@ -6,8 +6,20 @@
 :page-pageid: mcp-tool-reference-spotter3
 :page-description: Refer to this guide to learn which MCP tools are supported, input parameters used for tool calls, and the response format.
 
-The new ThoughtSpot MCP integration exposes a session-based workflow for running natural language analytics queries against your ThoughtSpot data sources. The pattern is always: **create a session** → **send a message** → **poll for updates**.
+The ThoughtSpot Spotter Model Context Protocol (MCP) Server integration exposes a session-based workflow for running natural language analytics queries against your ThoughtSpot data sources. The pattern is always: **create a session** → **send a message** → **poll for updates**.
 
+* <<create_analysis_session,create_analysis_session>> +
+Start an analytical session.
+* <<send_session_message,send_session_message>> +
+Send a natural language question or follow-up.
+* <<get_session_updates,get_session_updates>> +
+Poll for streamed responses.
+* <<create_dashboard,create_dashboard>> +
+Create a Liveboard from session answers.
+* <<check_connectivity,check_connectivity>> +
+Verify that the MCP Server is reachable.
+
+[#create_analysis_session]
 == create_analysis_session
 Start an analytical session with ThoughtSpot's analytics agent. This is the required first step before sending any questions.
 
@@ -43,7 +55,7 @@ call_mcp_tool(
 [source,json]
 ----
 {
-"analytical_session_id": "session-guid-abc123"
+  "analytical_session_id": "session-guid-abc123"
 }
 ----
 
@@ -51,6 +63,7 @@ call_mcp_tool(
 
 * Always capture the returned `analytical_session_id`. It is required for all subsequent calls.
 
+[#send_session_message]
 == send_session_message
 Send a natural language analytical question or follow-up to an existing session. The agent processes requests asynchronously, so this tool does not return the answer directly; use `get_session_updates` to retrieve the response.
 
@@ -114,8 +127,8 @@ call_mcp_tool(
 * To ask a follow-up question, reuse the same `analytical_session_id`. There is no need to create a new session.
 ====
 
+[#get_session_updates]
 == get_session_updates
-
 Poll for the latest response from a ThoughtSpot analytics session. Call this repeatedly after `send_session_message` until `is_done` is `true`.
 
 **Important**: A single call to `get_session_updates` will rarely contain the full response. Spotter streams its work incrementally, including intermediate thinking steps, across multiple polling calls. You must accumulate updates from every poll and combine them to get the complete picture.
@@ -153,10 +166,10 @@ Poll returning intermediate updates with the "is_thinking" response:
   "is_done": false,
   "session_updates": [
     {
-         "is_thinking":true,
-         "type":"text_chunk",
-         "text":"Let me look at your sales data by region...",
-      },
+      "is_thinking": true,
+      "type": "text-chunk",
+      "text": "Let me look at your sales data by region..."
+    }
   ]
 }
 ----
@@ -166,27 +179,27 @@ Poll returning final updates:
 [source,json]
 ----
 {
-   "is_done": true,
-   "session_updates":[
-      {
-         "is_thinking":false,
-         "type":"text-chunk",
-         "text":"Data broken down by region..."
-      },
-      {
-         "is_thinking":false,
-         "type":"text",
-         "text":"I'm interpreting 'last quarter' as Q4 2025 (October–December), based on a fiscal year starting in April."
-      },
-      {
-         "is_thinking":false,
-         "type":"answer",
-         "answer_title":"Total Sales by Region — Q4 2025",
-         "answer_query":"total sales by region last quarter",
-         "iframe_url":"https://your-instance.thoughtspot.cloud/embed/...",
-         "answer_id":"answer-guid-xyz789"
-      }
-   ]
+  "is_done": true,
+  "session_updates": [
+    {
+      "is_thinking": false,
+      "type": "text-chunk",
+      "text": "Data broken down by region..."
+    },
+    {
+      "is_thinking": false,
+      "type": "text",
+      "text": "I'm interpreting 'last quarter' as Q4 2025 (October–December), based on a fiscal year starting in April."
+    },
+    {
+      "is_thinking": false,
+      "type": "answer",
+      "answer_title": "Total Sales by Region — Q4 2025",
+      "answer_query": "total sales by region last quarter",
+      "iframe_url": "https://your-instance.thoughtspot.cloud/embed/...",
+      "answer_id": "answer-guid-xyz789"
+    }
+  ]
 }
 ----
 
@@ -202,7 +215,7 @@ A typical response sequence might look like:
 . Intermediate conclusions: partial results or contextual notes before the final answer.
 . The final answer: one or more `answer` updates containing the visualization title, the underlying query, and the embeddable iframe URL.
 
-This means a complete response might span between 5–20+ `get_session_updates` calls and contain many `session_update` objects before `is_done` becomes `true`. All of this content — the thinking, the narration, and the final answer — should be accumulated and presented together to give the user the full picture.
+This means a complete response might span 5–20+ `get_session_updates` calls and contain many `session_update` objects before `is_done` becomes `true`. All of this content — the thinking, the narration, and the final answer — should be accumulated and presented together to give the user the full picture.
 
 === Type definition: session_update
 
@@ -221,9 +234,8 @@ Each item in the `session_updates` list is a `session_update` object. The `type`
 |`iframe_url`|__String__|An embeddable URL for rendering the answer as an interactive visualization. Present only when `type` is `"answer"`. Use this to display a live chart or table if your environment supports iframes.
 |====
 
-
+[#create_dashboard]
 == create_dashboard
-
 Create a ThoughtSpot dashboard from answers generated in an analysis session.
 
 * Call this only after `get_session_updates` returns `is_done: true`, because you need the `answer_id` values from completed answer updates.
@@ -298,7 +310,7 @@ dashboard = call_mcp_tool(
 
 [cols="2,4", options="header"]
 |====
-|*Field*|*Description*
+|Field|Description
 
 |`dashboard_id`|The unique identifier of the created dashboard.
 |`dashboard_url`|A link to the newly created dashboard in ThoughtSpot.
@@ -361,6 +373,41 @@ The following features are not supported directly. However, you can use the *Mak
 * Changing chart type or chart configuration
 * Show underlying data, view query SQL or query visualizer
 * SpotIQ analysis
+
+[#check_connectivity]
+== check_connectivity
+Runs a basic health check to verify that the ThoughtSpot Spotter MCP Server is reachable and responding. Use this tool to confirm your connection before starting an analytical session.
+
+[NOTE]
+====
+`check_connectivity` is the Spotter 3 equivalent of the `ping` tool in the legacy MCP version.
+====
+
+=== Example call
+
+[div tabbed-code]
+--
+[source,javascript]
+----
+const result = await callMCPTool("check_connectivity", {});
+----
+
+[source,python]
+----
+call_mcp_tool("check_connectivity", {})
+----
+--
+
+=== Response
+
+[source,json]
+----
+{
+  "success": true
+}
+----
+
+* `success`: Returns `true` if the Spotter MCP Server is reachable and operational.
 
 == Additional resources
 
