@@ -22,8 +22,8 @@ module.exports = {
         //   'https://developers.thoughtspot.com/docs/26.3.0.cl?pageid=whats-new'
         // - GA: ' /docs/whats-new'
         //linkHref: '/docs/whats-new',
-        linkHref: '/docs/26.5.0.cl?pageid=whats-new',
-        linkText: 'Version 26.5.0.cl',
+        linkHref: '/docs/26.6.0.cl?pageid=whats-new',
+        linkText: 'Version 26.6.0.cl',
         openInNewTab: true,
     },
     TYPE_DOC_PREFIX: 'typedoc',
@@ -48,9 +48,15 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
 	    {
-            label: '26.5.0.cl',
+            label: '26.6.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
+            iframeUrl: 'https://developer-docs-26-6-0-cl.vercel.app/docs/',
+        },
+	    {
+            label: '26.5.0.cl',
+            link: '26.5.0.cl',
+            subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-26-5-0-cl.vercel.app/docs/',
         },
         {
@@ -64,12 +70,6 @@ module.exports = {
             link: '26.3.0.cl',
             subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-26-3-0-cl.vercel.app/docs/',
-        },
-        {
-            label: '26.2.0.cl',
-            link: '26.2.0.cl',
-            subLabel: 'Cloud',
-            iframeUrl: 'https://developer-docs-26-2-0-cl.vercel.app/docs/',
         },
         {
             label: '26.3.0.sw',
@@ -90,13 +90,11 @@ module.exports = {
             subLabel: 'Software',
             iframeUrl: 'https://visual-embed-sdk-10-1.vercel.app/docs/',
         },
-
     ],
     CUSTOM_PAGE_ID: {
         API_PLAYGROUND: 'restV2-playground',
         ASK_DOCS: 'ask-docs',
         GQ_PLAYGROUND: 'graphql-play-ground',
-        THEME_BUILDER: 'theme-builder',
     },
     CLUSTER_TYPES: {
         PROD: 'PROD',

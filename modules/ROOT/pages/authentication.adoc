@@ -87,13 +87,105 @@ Once the security rules are set, they are fixed for at least that user's session
 |||
 |===
 
+[#_enable_trusted]
+=== Configure trusted authentication
+To generate an access token, trusted authentication must be enabled on your ThoughtSpot instance.
+You can enable trusted authentication through the ThoughtSpot UI or the REST API v2.
+
+*Through the ThoughtSpot UI*
+
+The administrator must enable xref:trusted-auth-secret-key.adoc[Trusted authentication] on the
+*Develop* > *Customizations* > *Security settings* page.
+
+*Through the REST API v2*
+
+Before enabling trusted authentication through the REST API v2, check your existing
+authentication configuration.
+To retrieve the current authentication configuration at the
+cluster or Org level, send a request to the `POST /api/rest/2.0/auth/search` endpoint.
+
+==== Request parameters
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`auth_type`
+|__String__. Type of authentication mechanism to configure. Currently, supports `TRUSTED_AUTH` only.
+
+|`scope`
+__Optional__
+|__String__. Select `CLUSTER` to retrieve only cluster-level settings, or `ORG` to retrieve only Org-level settings. If no selection is made, both cluster and Org-level settings are retrieved based on user permissions.
+|=====
+
+==== API request
+
+.cURL
+[source, cURL]
+----
+curl -X POST \
+--url 'https://{ThoughtSpot-host}/api/rest/2.0/auth/search'  \
+-H 'Accept: application/json' \
+-H 'Content-Type: application/json' \
+-H 'Authorization: Bearer {AUTH_TOKEN}'
+    {
+    "auth_type": "TRUSTED_AUTH"
+    }'
+----
+
+
+If trusted authentication is not enabled, you can enable or disable it at the cluster or Org level by sending a request to the `POST /api/rest/2.0/auth/configure` endpoint.
+
+
+=== Request parameters
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Parameter|Description
+|`auth_type`
+|__String__. Type of authentication mechanism to configure. Currently, supports `TRUSTED_AUTH` only.
+
+|`cluster_preferences`
+__Optional__
+|__Nullable__. `ENABLE` or `DISABLE` authentication for the cluster. When enabled, a new token is generated if one does not exist. When disabled, the existing cluster-level access token is revoked.
+
+|`org_preferences`
+__Optional__
+|__Nullable__. `ENABLE` or `DISABLE` authentication for a particular Org.  When enabled, a new org-level access token is generated if one does not exist. When disabled, the existing org-level access token is revoked.
+
+|`org_identifier`
+
+|=====
+
+==== API request
+
+.cURL
+[source, cURL]
+----
+curl -X POST \
+--url 'https://{ThoughtSpot-host}/api/rest/2.0/auth/configure'  \
+-H 'Content-Type: application/json' \
+-H 'Authorization: Bearer {AUTH_TOKEN}
+    '{
+    "auth_type": "TRUSTED_AUTH",
+    "org_preferences": [
+        {
+        "org_identifier": "Test",
+        "auth_status": "ENABLED"
+        }
+        ]
+    }'
+----
+
+If the API request is successful, ThoughtSpot returns a 204 status code.
+
+
 [#_generate_a_full_access_token]
 === Generating a full access token
 To generate a full access token, send a `POST` request to the `/api/rest/2.0/auth/token/full` API endpoint with the required attributes.
 
 You can generate a token by providing a `username` and `password`, or by using a `secret_key`.
 
-To generate a `secret_key`, the administrator must enable xref:trusted-auth-secret-key.adoc[trusted authentication] on the **Develop** > **Customizations** > **Security Settings** page.
+To generate a `secret_key`, the administrator must enable xref:trusted-auth-secret-key.adoc[trusted authentication] on the **Develop** > **Customizations** > **Security Settings** page or through the APIs.
 
 After ThoughtSpot issues an authentication token, the user must include the token in the `Authorization` header of their subsequent API requests.
 
@@ -117,7 +209,7 @@ To get an access token that grants full access to ThoughtSpot, send a `POST` req
 |`org_id` +
 __Optional__|__Integer__. If the Orgs feature is enabled on your instance, specify the ID of the Org for which you want to generate the authentication token. If no value is specified, the token is generated for the Primary Org (Org 0).
 |`validity_time_in_sec` +
-__Optional__|__Integer__. Token validity duration in seconds. By default, the token is valid for 5 minutes. You can set the token expiry duration to a higher value. API requests with an expired or invalid token result in an error. In such cases, REST clients must obtain a new token from ThoughtSpot and use it in their subsequent API calls.
+__Optional__ |__Integer__. Token validity duration in seconds. By default, the token is valid for 5 minutes. You can set the token expiry duration to a higher value. API requests with an expired or invalid token result in an error. In such cases, REST clients must obtain a new token from ThoughtSpot and use it in their subsequent API calls.
 ||
 |=====
 
@@ -161,7 +253,7 @@ If the API request is successful, ThoughtSpot returns the authentication token t
 ==== API request with username and secret key
 To obtain an authentication token for a user, include `username` and `secret_key` in the API request. In a trusted authentication implementation, you can request tokens on behalf of users who require access to the ThoughtSpot content embedded in a third-party application.
 
-To request a token on behalf of another user, you need administrator privileges and a `secret key` that allows you to securely pass the authentication details of an embedded application user. The `secret key` is generated xref:trusted-auth-secret-key.adoc#trusted-auth-enable[when trusted authentication is enabled on a ThoughtSpot instance].
+To request a token on behalf of another user, you need administrator privileges and a `secret_key` that allows you to securely pass the authentication details of an embedded application user. The `secret_key` is generated xref:trusted-auth-secret-key.adoc#trusted-auth-enable[when trusted authentication is enabled on a ThoughtSpot instance].
 
 To get a trusted authentication token that grants full access to ThoughtSpot, send a `POST` request with `username`, `secret_key`, and other attributes to the `/api/rest/2.0/auth/token/full` endpoint:
 
@@ -172,7 +264,7 @@ To get a trusted authentication token that grants full access to ThoughtSpot, se
 |`username`
 |__String__. Username of the ThoughtSpot user. If the user is not available in ThoughtSpot, you can set the `auto_create` parameter to `true` to create a user just-in-time (JIT).
 |`secret_key`
-|__String__. The secret key string generated for your ThoughtSpot instance. The secret key is created xref:trusted-auth-secret-key.adoc#trusted-auth-enable[when trusted authentication is enabled] on your instance.
+|__String__. The `secret_key` string generated for your ThoughtSpot instance. The `secret_key` is created xref:trusted-auth-secret-key.adoc#trusted-auth-enable[when trusted authentication is enabled] on your instance.
 |`validity_time_in_sec` +
 __Optional__|__Integer__. Token expiry duration in seconds. The default duration is 300 seconds. You can set the token expiry duration to a higher value. API requests with an expired or invalid token result in an error. In such cases, REST clients must obtain a new token from ThoughtSpot and use it in their subsequent API calls.
 |`org_id` +
@@ -187,7 +279,7 @@ The following example shows the request body with `username` and `secret_key`:
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://stage-grapes-champagne.thoughtspotstaging.cloud/api/rest/2.0/auth/token/full'  \
+  --url 'https://{ThoughtSpot-Host}api/rest/2.0/auth/token/full'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   --data-raw '{
@@ -245,9 +337,9 @@ To get a token that grants read-only access to a ThoughtSpot metadata object, se
 |__String__. GUID of the ThoughtSpot object.
 The token obtained from this API request grants `read-only` access to the specified object.
 |`org_id` +
-__Optional__|__Integer__. If the Orgs feature is enabled on your instance, specify the ID of the Org for which you want to generate the authentication token. If no value is specified, the token is generated for the Primary Org (Org 0).
+__Optional__ |__Integer__. If the Orgs feature is enabled on your instance, specify the ID of the Org for which you want to generate the authentication token. If no value is specified, the token is generated for the Primary Org (Org 0).
 |`validity_time_in_sec` +
-__Optional__|__Integer__. Token validity duration in seconds. By default, the token is valid for 5 minutes.
+__Optional__ |__Integer__. Token validity duration in seconds. By default, the token is valid for 5 minutes.
 |=====
 
 ===== Example request
@@ -298,7 +390,7 @@ To get a token that grants `read-only` access to a specific metadata object, sen
 |__String__. Username of the ThoughtSpot user. If the user is not available in ThoughtSpot, you can set the `auto_create` parameter to `true` to create a user just-in-time (JIT).
 
 |`secret_key`
-|__String__. The secret key string generated for your ThoughtSpot instance. The secret key is created xref:trusted-auth-secret-key.adoc#trusted-auth-enable[when trusted authentication is enabled] on your instance.
+|__String__. The `secret_key` string generated for your ThoughtSpot instance. The `secret_key` is created xref:trusted-auth-secret-key.adoc#trusted-auth-enable[when trusted authentication is enabled] on your instance.
 
 |`object_id`
 |__String__. GUID of the ThoughtSpot object.
@@ -542,7 +634,7 @@ For cookie-based authentication, make an API call to the `/api/rest/2.0/auth/ses
 |__String__. The password of the user account.
 
 |`org_identifier`
-|__String__. Name or ID of the Org. If no Org ID is specified, the user will be logged into the Org context of their previous session.
+|__String__. Name or ID of the Org. If no Org ID is specified, the user is logged into the Org context of their previous session.
 
 |`remember_me`
 __Optional__
@@ -772,13 +864,5 @@ curl -X POST \
 
 If the API request is successful, ThoughtSpot returns a 204 status code and ends the user session.
 
-////
-==== Response codes
 
-[options="header", cols="2,4"]
-|===
-|HTTP status code|Description
-|**204**|The user is logged out of ThoughtSpot
-|**500**|Failed operation
-|===
-////
+
