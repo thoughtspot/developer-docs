@@ -235,6 +235,146 @@ curl -X POST \
 
 If the API request is successful, the objects in the Collection are replaced with the objects in this API request.
 
+== Share a Collection
+[NOTE]
+====
+Collections sharing via the security API is available from ThoughtSpot Cloud 26.6.0.cl.
+====
+
+To share a Collection with a user or group, send a `POST` request to the `POST /api/rest/2.0/security/metadata/share` endpoint with `metadata_type` set to `COLLECTION`.
+
+Collections support dual permissions that let you set independent access levels for the Collection and the objects within it.
+
+=== Permission fields
+
+[width="100%", cols="1,1,3"]
+[options='header']
+|=====
+|Field|Applies to|Description
+
+|`share_mode`|Collection |Controls access to the Collection itself — view, edit, or delete the Collection.
+Accepted values: `READ_ONLY`, `MODIFY`, `NO_ACCESS`.
+
+|`content_share_mode`|Collection content|Controls access to the objects within the Collection — Liveboards, Answers, Models, and nested Collections.
+Accepted values: `READ_ONLY`, `MODIFY`, `NO_ACCESS`.
+
+Only applicable when `metadata_type` is `COLLECTION`. If omitted, defaults to `READ_ONLY` (or `NO_ACCESS` when `share_mode` is `NO_ACCESS`).
+|=====
+
+=== Permission scenarios
+
+[width="100%", cols="1,1,1,2"]
+[options='header']
+|=====
+|Role|`share_mode`|`content_share_mode`|What the principal can do
+
+|`MODIFY`|`MODIFY`|Full control — manage the Collection and edit its contents
+|`MODIFY`|`READ_ONLY`|Manage the Collection structure but cannot edit objects within it
+|`READ_ONLY`|`MODIFY`|Edit objects within the Collection but cannot change the Collection itself
+|`READ_ONLY`|`READ_ONLY`|View the Collection and its contents only
+|=====
+
+=== Share a Collection (read-only)
+
+To share a Collection with a user in read-only mode, send the following request:
+
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/security/metadata/share' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_type": "COLLECTION",
+  "metadata_identifiers": ["Sales reports"],
+  "permissions": [
+    {
+      "principal": {
+        "type": "USER",
+        "identifier": "name@example.com"
+      },
+      "share_mode": "READ_ONLY"
+    }
+  ],
+  "notification": {
+    "message": "I have shared the Sales reports collection with you.",
+    "notify_on_share": true
+  }
+}'
+----
+
+If the request is successful, the API returns the HTTP `204 No Content` status code.
+
+=== Share a Collection with dual permissions
+
+To give a user different levels of access to the Collection and its contents, set both `share_mode` and `content_share_mode`.
+
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/security/metadata/share' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_type": "COLLECTION",
+  "metadata_identifiers": ["Marketing Analytics"],
+  "permissions": [
+    {
+      "principal": {
+        "type": "USER",
+        "identifier": "name@example.com"
+      },
+      "share_mode": "MODIFY",
+      "content_share_mode": "READ_ONLY"
+    },
+    {
+      "principal": {
+        "type": "USER_GROUP",
+        "identifier": "Marketing Team"
+      },
+      "share_mode": "READ_ONLY",
+      "content_share_mode": "READ_ONLY"
+    }
+  ],
+  "notification": {
+    "message": "Sharing the Marketing Analytics collection with your team.",
+    "notify_on_share": true
+  }
+}'
+----
+
+If the request is successful, the API returns the HTTP `204 No Content` status code.
+
+=== Remove Collection access
+
+To remove a user's access to a Collection, set `share_mode` to `NO_ACCESS`:
+
+[source,CURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/security/metadata/share' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_type": "COLLECTION",
+  "metadata_identifiers": ["Confidential Reports"],
+  "permissions": [
+    {
+      "principal": {
+        "type": "USER",
+        "identifier": "former-member@example.com"
+      },
+      "share_mode": "NO_ACCESS"
+    }
+  ]
+}'
+----
+
+If the request is successful, the API returns the HTTP `204 No Content` status code.
+
 == Delete a Collection
 To remove an existing Collection, send a `POST` request to the `POST /api/rest/2.0/collections/delete` API endpoint.
 
