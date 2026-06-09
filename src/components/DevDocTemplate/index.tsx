@@ -51,7 +51,6 @@ import {
 } from '../../constants/uiConstants';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
-import { ThemeBuilder } from './playGround/ThemeBuilder';
 import VersionIframe from '../VersionIframe';
 
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
@@ -150,22 +149,23 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const isApiPlayground =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND;
 
-    const isThemeBuilder =
-        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.THEME_BUILDER;
-
-    const isVersionedIframe = VERSION_DROPDOWN.some(
+const isVersionedIframe = VERSION_DROPDOWN.some(
         (version) =>
             props?.pageContext?.iframeUrl &&
             version.iframeUrl === props?.pageContext?.iframeUrl,
     );
 
+    // True when loaded inside a VersionIframe (outer shell sets ?_iframe=1).
+    // Outer shell already renders SecondaryHeader, so suppress ours to avoid duplication.
+    const isIframeMode =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(location.search).get('_iframe') === '1';
 
     const isGQPlayGround =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
     const isPlayGround =
         isGQPlayGround ||
         isApiPlayground ||
-        isThemeBuilder ||
         isVersionedIframe;
 
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
@@ -549,11 +549,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 />
             );
 
-        if (isThemeBuilder) {
-            return <ThemeBuilder backLink={backLink} />;
-        }
-
-        if (isVersionedIframe) {
+if (isVersionedIframe) {
             return (
                 <VersionIframe
                     iframeUrl={props.pageContext.iframeUrl}
@@ -726,20 +722,26 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             : { height: '0px' }
                     }
                 ></div>
-                <SecondaryHeader
-                    activeCategory={activeCategory}
-                    onCategoryChange={setActiveCategory}
-                    location={location}
-                    leftNavOpen={leftNavOpen}
-                    setLeftNavOpen={setLeftNavOpen}
-                />
+                {!isIframeMode && !isVersionedIframe && (
+                    <SecondaryHeader
+                        activeCategory={activeCategory}
+                        onCategoryChange={setActiveCategory}
+                        location={location}
+                        leftNavOpen={leftNavOpen}
+                        setLeftNavOpen={setLeftNavOpen}
+                    />
+                )}
                 <main
                     className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}
                     style={
-                        !isPublicSiteOpen
-                            ? { height: 'calc(100lvh - 44px)' }
-                            : { height: 'calc(100lvh - 65px - 44px)' }
+                        isIframeMode
+                            ? { height: '100lvh' }
+                            : isVersionedIframe
+                                ? { height: 'calc(100lvh - 65px)' }
+                                : !isPublicSiteOpen
+                                    ? { height: 'calc(100lvh - 44px)' }
+                                    : { height: 'calc(100lvh - 65px - 44px)' }
                     }
                 >
                     {isPlayGround ? (
