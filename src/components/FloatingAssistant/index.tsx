@@ -26,7 +26,8 @@ type FloatingAssistantProps = {
     pageId?:string
 };
 
-const CLOUDFLARE_URL = 'https://spottercode-dev.thoughtspot-485.workers.dev';
+const CLOUDFLARE_URL = 'https://spotter-code-popular-questions.thoughtspot-485.workers.dev';
+// const CLOUDFLARE_URL = 'http://localhost:8000';
 
 async function* parseSseStream(
     response: Response,
@@ -81,6 +82,14 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({ isDarkMode, pageI
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        if (!pageId) return;
+        fetch(`${CLOUDFLARE_URL}/suggested-questions?pageId=${encodeURIComponent(pageId)}`)
+            .then((res) => res.json())
+            .then((data: { questions?: string[] }) => setSuggestedQuestions(data.questions ?? []))
+            .catch(() => {});
+    }, [pageId]);
+
     const sendMessage = async (text?: string) => {
         const messageText = (text ?? input).trim();
         if (!messageText || isLoading) return;
@@ -104,12 +113,12 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({ isDarkMode, pageI
                     headers: { 'Content-Type': 'application/json' },
                     signal: abortRef.current.signal,
                     body: JSON.stringify({
-                        playgroundType: 'ask-docs',
+                        playgroundType:'ask-docs',
                         messages: updatedMessages,
                         pageId:pageId
                     }),
                 },
-            );
+            );  
 
             if (!response.ok || !response.body) {
                 throw new Error(`API error: ${response.status}`);
