@@ -1,0 +1,283 @@
+= Migrate from REST API v1 to REST API v2
+:toc: true
+:toclevels: 2
+
+:page-title: Migrate from REST API v1 to REST API v2
+:page-pageid: rest-api-v1v2-migration
+:page-description: Step-by-step instructions for migrating your REST API integrations from v1 to REST API v2.
+
+
+REST API v2 introduces a standardized request and response structure, Bearer token authentication,
+and a richer set of API capabilities.
+This page provides step-by-step instructions for migrating your existing REST API v1 integrations to REST API v2.
+
+For a feature-level comparison of the two versions, see xref:rest-api-v1v2-comparison.adoc[REST API v1 and v2 comparison].
+
+[IMPORTANT]
+====
+The REST API v1 Playground link has been removed from the **Develop** page in the ThoughtSpot UI starting with release version 26.6.0.cl and later. The REST API v1 framework has been deprecated and replaced by REST API v2 endpoints.
+Existing integrations that use REST API v1 endpoints will continue to function without disruption. However, ThoughtSpot strongly recommends migrating your integrations to REST API v2 endpoints and workflows.
+====
+
+== Before you begin
+
+* Confirm that you have admin or developer privilege to generate authentication tokens.
+* If you use trusted authentication, verify that xref:trusted-auth-secret-key.adoc[trusted authentication is enabled]
+on your instance before migrating token generation flows.
+* Review the xref:rest-api-v2-getstarted.adoc[Get started with REST API v2] guide and explore
+the link:{{navprefix}}/restV2-playground[REST API v2 Playground] before starting.
+
+== What changes between v1 and v2
+
+Understanding the structural differences helps you plan the scope of your migration.
+
+=== Base URL
+
+[cols="1,2", options="header"]
+|===
+|Version|Base URL pattern
+|REST API v1|`\https://{your-thoughtspot-hostname}/callosum/v1/tspublic/v1/{resource-group}/{resource}`
+|REST API v2|`\https://{your-thoughtspot-hostname}/api/rest/2.0/{resource-group}/{resource}`
+|===
+
+=== HTTP methods
+
+REST API v1 uses `GET`, `POST`, `PUT`, and `DELETE`.
+REST API v2 uses only `GET` and `POST`.
+All create, update, and delete operations in v2 use `POST` with a JSON request body.
+
+=== Required headers
+
+[cols="2,2", options="header"]
+|===
+|REST API v1|REST API v2
+a|
+* `X-Requested-By: ThoughtSpot` — required on every request
+* `Content-Type: application/x-www-form-urlencoded` — for form-encoded login requests
+* `Content-Type: application/json` — for JSON request bodies
+* `Cookie: JSESSIONID=<value>` — required after login
+a|
+* `Authorization: Bearer {access_token}` — required for token-based authentication
+* `Content-Type: application/json` — required for all requests with a body
+* `Accept: application/json` — required
+|===
+
+[NOTE]
+====
+The `X-Requested-By: ThoughtSpot` header is not used in REST API v2.
+====
+
+=== Response codes
+
+REST API v2 uses a standardized set of HTTP response codes.
+Update any client logic that branches on response codes from v1 calls.
+
+[cols="1,3", options="header"]
+|===
+|Code|Meaning
+|`200`|Successful operation; response body included.
+|`204`|Successful operation; no response body.
+|`400`|Bad request — modify the request before retrying.
+|`401`|Unauthorized — verify credentials and token validity.
+|`403`|Forbidden — verify access privileges and account status.
+|`415`|Unsupported media type — verify the `Content-Type` header.
+|`500`|Internal server error — verify request data format and server availability.
+|===
+
+=== Terminology changes
+
+Some object type strings used in request parameters differ between v1 and v2.
+Search your codebase for the v1 strings and replace them before testing.
+
+[cols="1,1", options="header"]
+|===
+|REST API v1 type string|REST API v2 type string
+|`PINBOARD_ANSWER_BOOK`|`LIVEBOARD`
+|`QUESTION_ANSWER_BOOK`|`ANSWER`
+|`WORKSHEET`|`LOGICAL_TABLE`
+|===
+
+[NOTE]
+====
+Worksheets are deprecated as of ThoughtSpot Cloud 10.4.0.cl.
+If your v1 integration queries Worksheet objects, update your data model to use Models (logical tables)
+and use the `LOGICAL_TABLE` type in v2 API requests.
+For more information, see xref:deprecated-features.adoc#_worksheet_deprecation_and_removal[Worksheet deprecation].
+====
+
+== Step 1: Migrate authentication
+
+Authentication is the most significant structural change between v1 and v2.
+Complete this step before migrating any other API calls.
+
+=== v1 authentication pattern (cookie-based)
+
+[source,cURL]
+----
+# Step 1: Log in and obtain a session cookie
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/session/login' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -H 'X-Requested-By: ThoughtSpot' \
+  --data-urlencode 'username=tsUserA' \
+  --data-urlencode 'password=Guest@123!'
+# Response sets: Set-Cookie: JSESSIONID=<value>
+
+# Step 2: Pass the session cookie in subsequent calls
+curl -X GET \
+  --url 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/metadata/list?type=PINBOARD_ANSWER_BOOK' \
+  -H 'X-Requested-By: ThoughtSpot' \
+  -H 'Cookie: JSESSIONID=<value>'
+----
+
+=== v2 authentication pattern (Bearer token)
+
+[source,cURL]
+----
+# Step 1: Obtain a Bearer token
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/full' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+    "username": "tsUserA",
+    "password": "Guest@123!",
+    "validity_time_in_sec": 86400
+  }'
+
+# Step 2: Pass the token in subsequent calls
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/search' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+    "metadata": [{ "type": "LIVEBOARD" }]
+  }'
+----
+
+=== Choose a token endpoint
+
+[cols="2,4", options="header"]
+|===
+|Token endpoint|When to use
+|`POST /api/rest/2.0/auth/token/full`
+|Standard use. Grants the user full access to ThoughtSpot with their normal privileges and
+row-level security (RLS) rules. Use this for most migrations replacing a v1 session login.
+|`POST /api/rest/2.0/auth/token/custom`
+|Trusted authentication with ABAC. Assigns runtime RLS rule values to the user at login.
+Use this when you need attribute-based access control.
+|`POST /api/rest/2.0/auth/token/object`
+|Restricts the session to a specific metadata object such as a single Liveboard or Answer.
+|===
+
+[NOTE]
+====
+By default, a Bearer token is valid for 300 seconds (5 minutes).
+Set `validity_time_in_sec` in your token request to extend the token lifetime.
+Implement a token refresh mechanism that requests a new token on `401 Unauthorized` responses
+before completing your migration.
+====
+
+[NOTE]
+====
+If multifactor authentication (MFA) is enabled on your ThoughtSpot instance, requests that pass
+`username` and `password` to login and token endpoints return an error.
+Use trusted authentication with the `secret_key` parameter instead.
+For guidance, see xref:authentication.adoc#_generate_a_full_access_token[Generate a full access token]
+and xref:trusted-auth-secret-key.adoc[Enable trusted authentication].
+====
+
+=== Token interoperability
+
+During migration, authentication tokens generated by v1 endpoints can authorize v2 API calls.
+This lets you migrate API calls incrementally without changing your authentication flow first.
+
+[source,cURL]
+----
+# Obtain a token from a REST API v1 endpoint
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/session/login' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -H 'X-Requested-By: ThoughtSpot' \
+  --data-urlencode 'username=tsUserA' \
+  --data-urlencode 'password=Guest@123!'
+
+# Use the v1 session token in a v2 call
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/search' \
+  -H 'Authorization: Bearer {v1-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{ "metadata": [{ "type": "LIVEBOARD" }] }'
+----
+
+[IMPORTANT]
+====
+Token interoperability is a transitional aid only.
+Migrate your authentication to native v2 token endpoints before completing your migration.
+====
+
+== Step 2: Map your v1 endpoints to v2
+
+REST API v2 provides an enhanced and improved framework without an explicit one-to-one mapping
+for every v1 endpoint.
+Therefore, ThoughtSpot recommends that you review both v1 and v2 API references to understand
+what is available in v2 and construct your requests accordingly:
+
+* For a complete list of REST API v2 endpoints, see xref:rest-api-v2-reference.adoc[REST API v2 reference].
+You can also try out the request and response schema for all v2 endpoints in the
+link:{{navprefix}}/restV2-playground[REST API v2 Playground].
+* For a complete list of v1 endpoints, parameters, and response schemas, see
+xref:rest-api-reference.adoc[REST API v1 reference].
+
+== Step 3: Run v1 and v2 in parallel
+
+ThoughtSpot supports running v1 and v2 API calls simultaneously against the same instance.
+Use this to migrate incrementally and reduce risk:
+
+. Migrate authentication first (<<Step 1: Migrate authentication>>).
+. Replace one API service category at a time, starting with read operations such as
+metadata search and user listing.
+. Validate v2 responses against v1 responses in a staging environment before
+switching production traffic.
+. After all calls are migrated, remove `X-Requested-By` headers and cookie-based
+session handling from your client code.
+. Run a full end-to-end test in staging before cutting over to production.
+
+== Step 4: Validate and clean up
+
+After migrating all API calls, complete the following checks.
+
+[cols="2,5", options="header"]
+|===
+|Check|Action
+|Authentication
+|Confirm all calls use `Authorization: Bearer {token}`.
+Remove any `X-Requested-By: ThoughtSpot` and `Cookie: JSESSIONID` headers.
+|Object type strings
+|Search your codebase for `PINBOARD_ANSWER_BOOK`, `QUESTION_ANSWER_BOOK`, and `WORKSHEET`.
+Replace with `LIVEBOARD`, `ANSWER`, and `LOGICAL_TABLE` respectively.
+|Base URL
+|Search your codebase for `/callosum/v1/` and `/tspublic/v1/`.
+Replace with `/api/rest/2.0/`.
+|HTTP methods
+|Search for `PUT` and `DELETE` REST calls targeting ThoughtSpot.
+Replace each with its corresponding `POST` v2 endpoint.
+|Response code handling
+|Review any logic that branches on HTTP status codes.
+Ensure your code handles `204` (no content) correctly.
+|Token expiry
+|Confirm your client handles `401 Unauthorized` by refreshing the Bearer token and retrying.
+|===
+
+== Related information
+
+* xref:rest-api-v1v2-comparison.adoc[REST API v1 and v2 comparison]
+* xref:rest-api-v2-getstarted.adoc[Get started with REST API v2]
+* xref:authentication.adoc[REST API v2 authentication]
+* xref:rest-api-v2-reference.adoc[REST API v2 reference]
+* xref:rest-api-reference.adoc[REST API v1 reference]
+* xref:deprecated-features.adoc[Deprecation announcements]
+* link:{{navprefix}}/restV2-playground[REST API v2 Playground]
+* xref:rest-api-sdk.adoc[REST API SDK and client libraries]
