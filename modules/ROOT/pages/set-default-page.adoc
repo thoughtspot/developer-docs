@@ -80,22 +80,63 @@ const embed = new AppEmbed("#embed", {
 ----
 
 == Customize navigation between pages within the app
-To programmatically control navigation between the pages within the embedded app, you can use the `navigateToPage()` method and custom actions. 
+To programmatically control navigation between the pages within the embedded app, you can use the `navigateToPage()` method and custom actions.
 
 === Using navigateToPage()
+The `AppEmbed` object includes a `navigateToPage()` method that switches the currently loaded page in the embedded view.
 
-The `AppEmbed` object includes a `navigateToPage()` method that can switch the currently loaded page in the embedded view.
+[source]
+----
+navigateToPage(path: string | number, noReload?: boolean): void
+----
 
-The `navigateToPage()` method accepts the same string values that work for `pageId` or `path` attributes. If you are customizing the menu, the new navigation menu should call `navigateToPage` for the various pages you want to provide access to:
+[cols="1,1,3"]
+|====
+| Parameter | Description
+
+| `path`
+|__String__. The page to navigate to. Accepts the same string values as the `pageId` or `path` attributes (for example, `'answers'`, `'pinboard/<GUID>'`, or a `Page` enum value). +
+When `noReload` is set to `true`, this parameter also accepts a number: use `1` to go forward or `-1` to go back in history.
+
+| `noReload`
+|__Boolean__. If `true`, navigation is triggered through the `HostEvent.Navigate` event without reloading the iframe. +
+*Default:* `false`
+|====
+
+[NOTE]
+====
+`navigateToPage()` requires that `render()` has been called on the `AppEmbed` instance before it is invoked. If `render()` has not been called, the method exits silently with a warning in the console.
+====
 
 [source,JavaScript]
 ----
-// Navigate to the Answers page
+// Navigate to the Answers page (reloads the iframe)
 embed.navigateToPage(Page.Answers);
 
-// Navigate to the Answers page without reloading the iframe (noReload = true)
+// Navigate to the Answers page without reloading the iframe
 embed.navigateToPage(Page.Answers, true);
+
+// Navigate back one page in history (noReload must be true)
+embed.navigateToPage(-1, true);
 ----
+
+=== Relationship between navigateToPage() and HostEvent.Navigate
+
+When `noReload` is set to `true`, `navigateToPage()` internally triggers xref:HostEvent.adoc#_navigate[HostEvent.Navigate] with the specified `path` as the event payload. You can also trigger this host event directly to achieve the same no-reload navigation behavior:
+
+[source,JavaScript]
+----
+// Equivalent to embed.navigateToPage('pinboards', true)
+embed.trigger(HostEvent.Navigate, 'pinboards');
+
+// Navigate back one page in history
+embed.trigger(HostEvent.Navigate, -1);
+----
+
+[NOTE]
+====
+`HostEvent.Navigate` is applicable only to `AppEmbed`. It is not supported for `LiveboardEmbed`, `SearchEmbed`, or `SpotterEmbed`.
+====
 
 === Using navigateToPage() with a custom action
 To add a custom action for in-app navigation, create a xref:custom-actions-callback.adoc[callback custom action] and define the navigation path.
@@ -116,7 +157,7 @@ appEmbed.on(EmbedEvent.CustomAction, async (payload: any) => {
 });
 ----
 
-To navigate to a specific application page without initiating a reload, you can set the `noReload` attribute to `true` as shown in this example:
+To navigate to a specific application page without reloading the iframe, set the `noReload` parameter to `true`. When `noReload` is `true`, the navigation is handled via `HostEvent.Navigate` and the browser history is updated without a full iframe reload:
 
 [source,javascript]
 ----
