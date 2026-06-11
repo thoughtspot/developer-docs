@@ -4,6 +4,8 @@ import { customizeDocContent, addScrollListener } from './helper';
 import Footer from '../Footer';
 import Breadcrums from '../Breadcrums';
 import LinkableHeader from '../LinkableHeader';
+import WasThisHelpful from '../WasThisHelpful';
+import CopyPageDropdown from '../CopyPageDropdown';
 import { HOME_PAGE_ID } from '../../configs/doc-configs';
 import parse, { HTMLReactParserOptions, domToReact, attributesToProps } from 'html-react-parser';
 
@@ -12,8 +14,9 @@ const Document = (props: {
     docTitle: string;
     docContent: string;
     isPublicSiteOpen: boolean;
-    shouldShowRightNav: boolean
+    shouldShowRightNav: boolean;
     breadcrumsData: any;
+    markdownBody?: string;
 }) => {
     useEffect(() => {
         customizeDocContent();
@@ -23,32 +26,121 @@ const Document = (props: {
         addScrollListener();
     }, []);
 
+    useEffect(() => {
+        /* ── Tabbed code blocks ──────────────────────────────────────────
+         * Authoring: wrap multiple [source,...] blocks in [.tabbed-code] --
+         * This effect collapses them into a single panel with language tabs.
+         */
+        document.querySelectorAll<HTMLElement>('.tabbed-code').forEach((container) => {
+            const wrappers = Array.from(
+                container.querySelectorAll<HTMLElement>('.code-block-wrapper'),
+            );
+            if (wrappers.length < 2) return;
+
+            const entries = wrappers.map((w) => ({
+                lang: w.querySelector<HTMLElement>('.lang')?.textContent?.trim() || 'Code',
+                pre: w.querySelector<HTMLElement>('pre'),
+            })).filter((e) => e.pre);
+
+            if (entries.length < 2) return;
+
+            /* Build unified wrapper */
+            const block = document.createElement('div');
+            block.className = 'code-block-wrapper';
+
+            /* Shared header: tab buttons + copy button */
+            const header = document.createElement('div');
+            header.className = 'code-block-header';
+
+            const tabsRow = document.createElement('div');
+            tabsRow.className = 'code-tabs-list';
+            header.appendChild(tabsRow);
+
+            /* Copy button — copies visible tab content */
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copyButton';
+            copyBtn.innerHTML = `<svg class="copyIcon" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>`;
+            header.appendChild(copyBtn);
+            block.appendChild(header);
+
+            /* Panels */
+            const panels: HTMLElement[] = [];
+            entries.forEach(({ lang, pre }, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'code-tab-btn' + (idx === 0 ? ' active' : '');
+                btn.textContent = lang;
+                tabsRow.appendChild(btn);
+
+                const panel = document.createElement('div');
+                panel.className = 'code-tab-panel';
+                if (idx > 0) panel.hidden = true;
+                const preClone = pre!.cloneNode(true) as HTMLElement;
+                panel.appendChild(preClone);
+                block.appendChild(panel);
+                panels.push(panel);
+
+                btn.addEventListener('click', () => {
+                    tabsRow.querySelectorAll('.code-tab-btn').forEach((b) =>
+                        b.classList.remove('active'),
+                    );
+                    panels.forEach((p) => { p.hidden = true; });
+                    btn.classList.add('active');
+                    panel.hidden = false;
+                });
+            });
+
+            copyBtn.addEventListener('click', () => {
+                const visiblePanel = panels.find((p) => !p.hidden);
+                const text = visiblePanel?.querySelector('pre')?.textContent || '';
+                navigator.clipboard.writeText(text).catch(() => {});
+                copyBtn.innerHTML = '<span style="font-size:11px;padding:0 2px">Copied!</span>';
+                setTimeout(() => {
+                    copyBtn.innerHTML = `<svg class="copyIcon" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>`;
+                }, 1500);
+            });
+
+            container.replaceChildren(block);
+        });
+    }, [props.docContent]);
+
     const options: HTMLReactParserOptions = {
         replace: (domNode: any) => {
             if (domNode.type === 'tag' &&
                 ['h2', 'h3', 'h4'].includes(domNode.name) &&
                 !domNode.parent?.attribs?.class?.includes('non-link')
             ) {
-                const props = attributesToProps(domNode.attribs);
-                return (<LinkableHeader {...props} tag={domNode.name} id={domNode.attribs.id}>
+                const nodeProps = attributesToProps(domNode.attribs);
+                return (<LinkableHeader {...nodeProps} tag={domNode.name} id={domNode.attribs.id}>
                     {domToReact(domNode.children, options)}
                 </LinkableHeader>)
             }
+            return undefined;
         }
     };
+
+    const isHomePage = props.pageid === HOME_PAGE_ID;
 
     return (
         <div
             className="documentWrapper"
-            style={{
-                width: !props.shouldShowRightNav ? '100%' : null,
-            }}
+            style={!props.shouldShowRightNav ? { width: '100%' } : undefined}
         >
-            {props.pageid !== HOME_PAGE_ID && (
+            {!isHomePage && (
                 <Breadcrums
                     breadcrumsData={props.breadcrumsData}
                     pageid={props.pageid}
                 />
+            )}
+            {!isHomePage && props.isPublicSiteOpen && (
+                <div className="document-toolbar">
+                    <CopyPageDropdown pageTitle={props.docTitle} markdownBody={props.markdownBody} />
+                </div>
             )}
             <div
                 id={props.docTitle}
@@ -56,6 +148,11 @@ const Document = (props: {
             >
                 {parse(props.docContent, options)}
             </div>
+            {/* WasThisHelpful temporarily disabled — no endpoint configured yet
+            {!isHomePage && props.isPublicSiteOpen && (
+                <WasThisHelpful />
+            )}
+            */}
             {props.isPublicSiteOpen && <Footer />}
         </div>
     );

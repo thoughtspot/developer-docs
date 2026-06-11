@@ -1,11 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { ResizableBox } from 'react-resizable';
 import { useResizeDetector } from 'react-resize-detector';
-import { IconContext } from '@react-icons/all-files';
-import { GiHamburgerMenu } from '@react-icons/all-files/gi/GiHamburgerMenu';
-import { MdClear } from '@react-icons/all-files/md/MdClear';
-import { RiMoonClearLine } from '@react-icons/all-files/ri/RiMoonClearLine';
-import { FiSun } from '@react-icons/all-files/fi/FiSun';
 import { removeTrailingSlash, queryStringParser } from '../../utils/app-utils';
 import { NAV_PREFIX, TS_PAGE_ID_PARAM } from '../../configs/doc-configs';
 import {
@@ -56,7 +51,11 @@ const LeftSideBar = (props: {
         const pageid =
             removeTrailingSlash(props.location.pathname).replace(/^\/*/, '') ||
             getPageIdFromUrl(props.location.href);
-        const tag = divElement.querySelector(`a[href='/${pageid}']`);
+        const allLinks = divElement.querySelectorAll('a');
+        const tag = Array.from(allLinks).find((a) => {
+            const href = a.getAttribute('href');
+            return href === `/${pageid}` || href?.endsWith(`/${pageid}`);
+        });
         if (tag) {
             tag.classList.add('active');
         }
@@ -67,7 +66,7 @@ const LeftSideBar = (props: {
             expandedTabsRef.current,
         );
         setNavContent(updatedHTML);
-    }, [params[NAV_PREFIX], params[TS_PAGE_ID_PARAM], props.navContent]);
+    }, [params[NAV_PREFIX], params[TS_PAGE_ID_PARAM], props.navContent, props.location.pathname]);
 
     const toggleExpandOnTab = (text: string) => {
         const allTabsRef = { ...expandedTabsRef.current };
@@ -86,11 +85,6 @@ const LeftSideBar = (props: {
             props.curPageid,
         );
     }, [props.curPageid, isMaxMobileResolution, navContent]);
-
-    const onMenuClick = () => {
-        props.setLeftNavOpen(!props.leftNavOpen);
-        document.documentElement.scrollTop = 0;
-    };
 
     const renderLeftNav = () => {
         return isMaxMobileResolution ? (
@@ -130,41 +124,6 @@ const LeftSideBar = (props: {
             </div>
         ) : (
             <div className="menuMain">
-                <div className="menuContainer">
-                    <IconContext.Provider
-                        value={{
-                            className: `icon ${
-                                props.leftNavOpen && 'imgOpacity'
-                            }`,
-                        }}
-                    >
-                        <GiHamburgerMenu onClick={onMenuClick} />
-                    </IconContext.Provider>
-                    <IconContext.Provider
-                        value={{
-                            className: `icon ${
-                                props.leftNavOpen && 'imgOpacity'
-                            }`,
-                        }}
-                    >
-                        {props.isDarkMode ? (
-                            <RiMoonClearLine
-                                onClick={() => props.setDarkMode(false)}
-                            />
-                        ) : (
-                            <FiSun onClick={() => props.setDarkMode(true)} />
-                        )}
-                    </IconContext.Provider>
-                    <IconContext.Provider
-                        value={{
-                            className: `icon ${
-                                !props.leftNavOpen && 'imgOpacity'
-                            } clearIcon`,
-                        }}
-                    >
-                        <MdClear onClick={onMenuClick} />
-                    </IconContext.Provider>
-                </div>
                 <NavContent
                     backLink={props.backLink}
                     navContent={navContent}

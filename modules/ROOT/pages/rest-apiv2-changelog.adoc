@@ -8,6 +8,153 @@
 
 This changelog lists the features and enhancements introduced in REST API v2.0. For information about new features and enhancements available for embedded analytics, see xref:whats-new.adoc[What's New].
 
+== Version 26.6.0.cl, June 2026
+
+=== Spotter AI APIs
+
+Agent instructions APIs::
+The following new API endpoints allow you to set and retrieve persistent behavioral instructions for the Spotter agent.
+
+* `PUT /api/rest/2.0/ai/agent/instructions/set` +
+Sets behavioral instructions for the Spotter agent. Use this endpoint to define persistent guidance that Spotter applies when responding to queries in a conversation session.
+
+* `GET /api/rest/2.0/ai/agent/instructions/get` +
+Retrieves the behavioral instructions currently configured by the administrator for the Spotter agent.
+
++
+For more information, see xref:spotter-agent-instructions.adoc[Spotter AI Agent instructions APIs].
+
+Stop in-progress agent response::
+
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/stop-response` +
+Stops a Spotter agent response that is currently in progress for a given conversation session.
+
+For more information, see xref:spotter-agent-apis.adoc#_stop_an_in_progress_agent_response[Stop an in-progress agent response].
+
+==== Authentication
+The following new endpoints allow searching for the authentication configuration at the cluster or Org level, and also allows enabling and disabling the authentication. Currently, only support trusted authentication.
+
+* `POST /api/rest/2.0/auth/configure` +
+Enables or disables authentication at cluster or Org level for the specified auth type.
+*  `POST /api/rest/2.0/auth/search` +
+Returns the authentication configuration for the specified auth type at cluster and Org level.
+
+==== Connection deactivate and activate API [beta betaBackground]^Beta^
+
+// SOURCE: SCAL-294844, SCAL-294845, SCAL-278132
+
+ThoughtSpot introduces REST API v2.0 endpoints to programmatically deactivate and activate data connections:
+
+* `POST /api/rest/2.0/connections/{connection_identifier}/status` +
+Deactivates or activates a connection.
+
+=== Answer report API enhancements [earlyAccess eaBackground]#Early Access#
+
+The `POST /api/rest/2.0/report/answer` API endpoint introduces the following enhancements:
+
+Pinned Answer export::
+// SOURCE: SCAL-236681, SCAL-306548
+You can now export a pinned Answer directly from a Liveboard using the Answer report API.
+To export a pinned Answer, specify the `viz_guid` parameter in your API request.
+Exports from this endpoint inherently respect Liveboard-level filters, Runtime Filters, Column security rules, and JWT token context.
++
+To export a specific personalized view of a pinned Answer, include the `personalised_view_identifier` parameter.
+
+Spotter Answer export::
+// SOURCE: SCAL-236681, SCAL-306548
+XLSX and PDF export formats are now supported for Spotter (conversational) Answers.
+
+Custom PNG dimensions::
+// SOURCE: SCAL-236681, SCAL-306548
+PNG exports now support custom dimensions via the following new parameters:
++
+* `x_resolution` — Sets the export width in pixels. Valid range: 600–3840 px.
+* `y_resolution` — Sets the export height in pixels. Valid range: 600–3840 px.
+
+Display scaling::
+// SOURCE: SCAL-236681, SCAL-306548
+A new `scaling` parameter allows you to adjust the relative size of visual elements in PNG exports without cropping.
+Valid range: 80–500%.
+
+Automatic file naming::
+// SOURCE: SCAL-236681, SCAL-306548
+The API now automatically names exported files based on the Answer title and appends the correct file extension (`.png`, `.pdf`, `.csv`, or `.xlsx`).
+
+Contact ThoughtSpot support to enable these settings for PNG downloads on your ThoughtSpot instance.
+For more information, see xref:data-report-v2-api.adoc#_answer_report_api[Answer report API documentation].
+
+=== Share metadata API: Collections support [beta betaBackground]^Beta^
+
+The `POST /api/rest/2.0/security/metadata/share` endpoint now supports sharing Collections.
+
+To share a Collection, set `metadata_type` to `COLLECTION` in the request body.
+For more information, see xref:collections.adoc#share-collection[Share a Collection].
+
+== Version 26.5.0.cl, May 2026
+
+=== Sync connection metadata attributes
+You can now synchronize connection metadata attributes from your Cloud Data Warehouse (CDW) with ThoughtSpot by sending a request to `POST /api/rest/2.0/connections/{connection_identifier}/resync-metadata` API endpoint.
+
+=== Spotter APIs
+
+==== New API endpoints
+
+The following new endpoints allow sending messages to an active conversation
+session with a Spotter agent.
+
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send` +
+Allows sending a message to an active Spotter AI conversation and returns a synchronous response.
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream` +
+Allows sending to an active Spotter AI conversation and returns the response as a real-time Server-Sent Events (SSE) stream.
+
+These new endpoints replace the legacy agent conversation and SSE streaming APIs.
+
+==== Deprecated endpoints [.version-badge.deprecated]#Deprecated#
+
+* `POST /api/rest/2.0/ai/agent/{conversation_identifier}/converse`  +
+Replaced by `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send`.
+
+* `POST /api/rest/2.0/ai/agent/converse/sse` +
+Replaced by `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream`
+
+These endpoints are deprecated and will be removed
+in a future release. Embedding applications and integrations using these APIs are advised to migrate to the new API endpoints for improved experience.
+
+==== Enhancements to conversation creation API [.version-badge.breaking]#Breaking#
+
+The following enhancements have been introduced for the conversation creation operation workflow with the `POST /api/rest/2.0/ai/agent/conversation/create` API endpoint:
+
+metadata_context::
+To define the conversation context, the API request must include the `metadata_context` parameter with one of the following values:
+
+* `AUTO_MODE`: Automatically discovers and selects the most relevant datasets for the user's queries.
+* `DATA_SOURCE`: Sets the target context as the data source. You must specify at least one data source ID.
+** To set a single data source object metadata context, specify a `data_source_identifier`.
+** For multi-data source context, specify the `data_source_identifiers`.
++
+[IMPORTANT]
+====
+The `data_source` and `guid` attributes are deprecated in the 26.5.0.cl release version. Integrations using these parameters in ThoughtSpot versions 26.2.0.cl through 26.4.0.cl will continue to work until further notice. However, ThoughtSpot recommends using either `AUTO_MODE` or `DATA_SOURCE` with `data_source_identifier` or `data_source_identifiers` for the metadata context.
+====
+
+Other context options::
+The `answer_context` and `liveboard_context` are removed and no longer supported. Any existing integration or embedding application passing `answer_context` or `liveboard_context` in the request body must update their workflows to use the `AUTO_MODE` or `DATA_SOURCE` option.
+
+Enable save chat::
+The `enable_save_chat` parameter, when set to `true`, saves the conversation.
+
+API response::
+The API response now returns the `conversation_identifier`, which is used in all
+subsequent send message or SSE streaming calls.
+
+=== Liveboard report API enhancements [beta betaBackground]^Beta^
+The `POST /api/rest/2.0/report/liveboard` API endpoint enhances the pdf downloads by introducing the following parameters:
+
+* `"page_size": "CONTINUOUS"` for a seamless PDF export that matches the full length of your Liveboard. Unlike the A4 format, which introduces forced page breaks between visualizations, this continuous flow maintains your exact design and intended layout.
+* `zoom_level` offers various download size options to suit the viewer's screen dimensions, thereby enhancing legibility. This can be set only when `page_size` is specified as `CONTINUOUS`.
+
+For more information, see xref:data-report-v2-api.adoc#_liveboard_report_api[Liveboard Report API documentation].
+
 == Version 26.4.0.cl, April 2026
 
 === Variable API endpoints
@@ -373,7 +520,7 @@ The search metadata (`/api/rest/2.0/metadata/search`) API includes the following
 
 * The `liveboard_reponse_version` parameter. It allows you to specify the xref:rest-api-v2-metadata-search.adoc#_response_format_for_liveboards[response format for Liveboard objects].
 * The `subtypes` attribute to specify the sub-type for the `LOGICAL_TABLE` metadata type. The `LOGICAL_TABLE` type allows to fetch objects such as Tables, Models, and Views. The `subtypes` parameter allows you to filter API response by specifying subcategories of the object type.
-* The `include_only_published_objects` attribute to specify whether the search should should include xref:publish-api.adoc[published objects].
+* The `include_only_published_objects` attribute to specify whether the search should include xref:publish-api.adoc[published objects].
 
 
 === System API
@@ -390,7 +537,7 @@ For more information, see xref:rest-api-java-sdk.adoc#_import_the_sdk_to_your_ap
 
 == Version 10.10.0.cl, July 2025
 
-=== Email template customization APIs:
+=== Email template customization APIs
 This release introduces the following new endpoints for email template customization:
 
 * `POST /api/rest/2.0/customization/email` +
@@ -629,7 +776,7 @@ Authentication::
 The `/api/rest/2.0/auth/token/custom` API endpoint is now available to generate an authentication token with custom rules and filter conditions for a user.
 
 +
-ThoughtSpot recommends using the custom token API endpoint to generate tokens for the Attribute-Based Access Control (ABAC) implementation. For more information, see xref:authentication.adoc#_get_tokens_with_custom_rules_and_filter_conditions[REST API v2 authentication] and xref:abac-user-parameters.adoc[ABAC via tokens].
+ThoughtSpot recommends using the custom token API endpoint to generate tokens for the Attribute-Based Access Control (ABAC) implementation. For more information, see xref:abac_rls-variables.adoc[ABAC via RLS with variables].
 
 Connections::
 The following new API endpoints are available for updating and deleting a connection object:
@@ -872,7 +1019,7 @@ Deprecation notice::
 
 The `default_branch_name` and `guid_mapping_branch_name` parameters will be deprecated from version 10.0.0.cl and later releases.
 
-For more information, see xref:version_control.adoc#connectTS[Connect your ThoughtSpot environment to the Git repository].
+For more information, see xref:git-configuration.adoc#connectTS[Connect your ThoughtSpot environment to the Git repository].
 
 ==== Commit API
 
