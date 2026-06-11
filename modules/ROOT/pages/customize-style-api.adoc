@@ -1,0 +1,157 @@
+= Customize UI layout and styles through REST APIs
+:toc: true
+:toclevels: 1
+
+:page-title: Customize styles and layout through REST APIs
+:page-pageid: style-customization-apis
+:page-description: Customize styles, design, and layout of embedded ThoughtSpot app using REST APIs
+
+ThoughtSpot introduces a new set of REST API v2.0 endpoints to manage style customization settings programmatically.
+These endpoints expose all branding and theming controls available in the *Develop* > *Customizations* > *Styles* page in the ThoughtSpot UI, enabling developers and administrators to automate branding and white-labeling — including across multiple Orgs on a multi-tenant cluster — without logging in to the ThoughtSpot UI.
+
+== Style customization REST APIs
+
+// SOURCE: SCAL-293070, SCAL-293071
+
+//[earlyAccess eaBackground]#Early Access#
+
+ThoughtSpot provides REST API v2.0 endpoints to manage style customization settings programmatically. These APIs expose the same branding and theming controls available in the *Develop* > *Customizations* > *Styles* page, enabling you to automate branding and white-labeling — including across multiple Orgs — without logging in to the ThoughtSpot UI.
+
+[NOTE]
+====
+All style customization API endpoints require administrator privileges. API calls from non-administrator users return `403 Forbidden`.
+====
+
+=== Style configuration
+
+Use the following endpoints to search and update style settings at the cluster or Org scope.
+
+Search style configuration::
+`POST /api/rest/2.0/customization/styles/search` +
+Returns the current style configuration for the cluster and the active Org. +
+When called from the Primary Org (Org 0), the response returns one record with `"scope": "CLUSTER"` and one with `"scope": "ORG"`.
+
+Update style configuration::
+`POST /api/rest/2.0/customization/styles/update` +
+Updates one or more style settings. Supports the following parameters:
+
+[cols="2,1,4"]
+|=====
+|Parameter|Required|Description
+|`scope`|Yes|`CLUSTER` or `ORG`.
+|`org_identifier`|Conditional|Required when `scope` is `ORG`.
+|`operation`|Yes|`REPLACE` overwrites existing settings. `MERGE` applies only the specified fields.
+|`navigation_panel`|No|Top navigation panel color. Use `"theme": "CUSTOM"` with a valid hex value in `"base_color"`.
+|`chart_color_palette`|No|Array of hex color values for charts.
+|`embedded_footer_text`|No|Footer text for embedded content.
+|`visualization_fonts`|No|Font assignments for visualization elements.
+|`default_logo`|No|Binary image file for the square application logo.
+|`wide_logo`|No|Binary image file for the wide logo (email and PDF exports).
+|`reset_options`|No|Resets specified settings to ThoughtSpot defaults.
+|=====
+
+=== Custom fonts
+
+Upload a custom font::
+`POST /api/rest/2.0/customization/styles/fonts/upload` +
+Uploads a font file (multipart/form-data). +
+Required: `name`, `file_content`. +
+Optional: `weight`, `style`, `color`.
+
+Search custom fonts::
+`POST /api/rest/2.0/customization/styles/fonts/search` +
+Returns custom fonts uploaded to the instance. +
+Optional filters: `font_identifier`, `name_pattern`, `include_font_assignments`.
+
+Update a custom font::
+`PUT /api/rest/2.0/customization/styles/fonts/{font_identifier}` +
+Updates an existing font's display name, weight, style, or color.
+
+Delete custom fonts::
+`POST /api/rest/2.0/customization/styles/fonts/delete` +
+Deletes one or more custom fonts from the font library. Supply one or more font GUIDs or display names in `font_identifiers`. +
++
+[IMPORTANT]
+====
+`dry_run` defaults to `true`. In dry-run mode, the API computes and returns all affected visualization assignments but does *not* delete the fonts. Set `dry_run: false` to commit the deletion.
+====
++
+When a font is deleted, all visualization areas that used it are automatically reset to the system default font. The response body lists these affected assignments grouped by Org.
+
+=== Logo export
+
+Export logos::
+`POST /api/rest/2.0/customization/styles/logos/export` +
+Exports the configured logo files as a ZIP archive containing the default and wide logo images.
+
+=== Example: Update navigation panel color
+
+The following example updates the top navigation panel to a custom color at the cluster scope:
+
+[source,JSON]
+----
+POST /api/rest/2.0/customization/styles/update
+
+{
+  "scope": "CLUSTER",
+  "operation": "REPLACE",
+  "navigation_panel": {
+    "theme": "CUSTOM",
+    "base_color": "#1A2B3C"
+  }
+}
+----
+
+=== Example: Update chart color palette for an Org
+
+[source,JSON]
+----
+POST /api/rest/2.0/customization/styles/update
+
+{
+  "scope": "ORG",
+  "org_identifier": "<org-id>",
+  "operation": "MERGE",
+  "chart_color_palette": {
+    "colors": ["#FF6B35", "#004E89", "#1A936F", "#C6D8D3", "#F18F01"]
+  }
+}
+----
+
+=== Example: Dry-run delete to preview affected assignments
+
+Use `dry_run: true` (the default) to preview which visualization areas will be affected before committing a font deletion:
+
+// SOURCE: entity/FontDeleteRequest.java (dev/scaligent, master)
+[source,JSON]
+----
+POST /api/rest/2.0/customization/styles/fonts/delete
+
+{
+  "scope": "CLUSTER",
+  "font_identifiers": ["<font-guid-1>", "<font-guid-2>"],
+  "dry_run": true
+}
+----
+
+Example response:
+
+[source,JSON]
+----
+{
+  "affected_assignments": [
+    {
+      "visualization_areas": ["CHART_LABEL", "CHART_AXIS"]
+    },
+    {
+      "org": { "id": 3, "name": "Sales Org" },
+      "visualization_areas": ["TABLE_HEADER"]
+    }
+  ]
+}
+----
+
+To commit the deletion, repeat the request with `"dry_run": false`.
+
+
+For a full list of REST API v2.0 style customization endpoints and their parameters, see xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
