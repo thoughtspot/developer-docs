@@ -143,7 +143,10 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = () => {
 
         abortRef.current = new AbortController();
 
-        console.log("sendMessage", pageId)
+        let accumulated = '';
+        let finalContent = 'Sorry, something went wrong. Please try again.';
+        let aborted = false;
+
         try {
             const response = await fetch(
                 `${CLOUDFLARE_URL}/agent/embed-assistant`,
@@ -152,9 +155,9 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = () => {
                     headers: { 'Content-Type': 'application/json' },
                     signal: abortRef.current.signal,
                     body: JSON.stringify({
-                        playgroundType:'ask-docs',
+                        playgroundType: 'ask-docs',
                         messages: updatedMessages,
-                        pageId:pageId
+                        pageId: pageId,
                     }),
                 },
             );
@@ -163,53 +166,37 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = () => {
                 throw new Error(`API error: ${response.status}`);
             }
 
-            let accumulated = '';
-            let aborted = false;
-
-            try {
-                for await (const event of parseSseStream(response)) {
-                    if (event.type === 'text') {
-                        accumulated += event.content;
-                        setStreamingText(accumulated);
-                    } else if (event.type === 'tool-start') {
-                        setToolStatus(`Using ${event.toolName}…`);
-                    } else if (event.type === 'tool-result') {
-                        setToolStatus('');
-                    } else if (event.type === 'done') {
-                        break;
-                    } else if (event.type === 'error') {
-                        throw new Error(event.content);
-                    }
-                }
-            } catch (err: unknown) {
-                if (err instanceof Error && err.name === 'AbortError') {
-                    aborted = true;
-                } else {
-                    accumulated = '';
+            for await (const event of parseSseStream(response)) {
+                if (event.type === 'text') {
+                    accumulated += event.content;
+                    setStreamingText(accumulated);
+                } else if (event.type === 'tool-start') {
+                    setToolStatus(`Using ${event.toolName}…`);
+                } else if (event.type === 'tool-result') {
+                    setToolStatus('');
+                } else if (event.type === 'done') {
+                    break;
+                } else if (event.type === 'error') {
+                    throw new Error(event.content);
                 }
             }
 
-            // Batch all final state updates together in one synchronous block
-            // so React never renders a frame with both messages + isLoading true
-            if (!aborted) {
-                setMessages([
-                    ...updatedMessages,
-                    {
-                        role: 'assistant',
-                        content: accumulated || 'Sorry, something went wrong. Please try again.',
-                    },
-                ]);
-            }
-            setStreamingText('');
-            setToolStatus('');
-            setIsLoading(false);
-            abortRef.current = null;
+            finalContent = accumulated || 'No response received.';
         } catch (err: unknown) {
+            if (err instanceof Error && err.name === 'AbortError') {
+                aborted = true;
+            }
+        } finally {
+            // All state updates batched here so React never renders
+            // a frame where messages is updated but isLoading is still true
+            if (!aborted) {
+                setMessages([...updatedMessages, { role: 'assistant', content: finalContent }]);
+            }
             setStreamingText('');
             setToolStatus('');
             setIsLoading(false);
             abortRef.current = null;
-        } finally {
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
