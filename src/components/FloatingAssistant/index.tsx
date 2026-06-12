@@ -164,39 +164,52 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = () => {
             }
 
             let accumulated = '';
+            let aborted = false;
 
-            for await (const event of parseSseStream(response)) {
-                if (event.type === 'text') {
-                    accumulated += event.content;
-                    setStreamingText(accumulated);
-                } else if (event.type === 'tool-start') {
-                    setToolStatus(`Using ${event.toolName}…`);
-                } else if (event.type === 'tool-result') {
-                    setToolStatus('');
-                } else if (event.type === 'done') {
-                    break;
-                } else if (event.type === 'error') {
-                    throw new Error(event.content);
+            try {
+                for await (const event of parseSseStream(response)) {
+                    if (event.type === 'text') {
+                        accumulated += event.content;
+                        setStreamingText(accumulated);
+                    } else if (event.type === 'tool-start') {
+                        setToolStatus(`Using ${event.toolName}…`);
+                    } else if (event.type === 'tool-result') {
+                        setToolStatus('');
+                    } else if (event.type === 'done') {
+                        break;
+                    } else if (event.type === 'error') {
+                        throw new Error(event.content);
+                    }
+                }
+            } catch (err: unknown) {
+                if (err instanceof Error && err.name === 'AbortError') {
+                    aborted = true;
+                } else {
+                    accumulated = '';
                 }
             }
 
-            // Commit the full response to messages only once, when complete
-            setMessages([...updatedMessages, { role: 'assistant', content: accumulated || 'No response received.' }]);
-        } catch (err: unknown) {
-            if (err instanceof Error && err.name === 'AbortError') return;
-            setMessages([
-                ...updatedMessages,
-                {
-                    role: 'assistant',
-                    content: 'Sorry, something went wrong. Please try again.',
-                },
-            ]);
-        } finally {
+            // Batch all final state updates together in one synchronous block
+            // so React never renders a frame with both messages + isLoading true
+            if (!aborted) {
+                setMessages([
+                    ...updatedMessages,
+                    {
+                        role: 'assistant',
+                        content: accumulated || 'Sorry, something went wrong. Please try again.',
+                    },
+                ]);
+            }
             setStreamingText('');
             setToolStatus('');
             setIsLoading(false);
             abortRef.current = null;
-        }
+        } catch (err: unknown) {
+            setStreamingText('');
+            setToolStatus('');
+            setIsLoading(false);
+            abortRef.current = null;
+        } finally {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
