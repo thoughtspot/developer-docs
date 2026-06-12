@@ -164,20 +164,11 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = () => {
             }
 
             let accumulated = '';
-            let assistantAdded = false;
 
             for await (const event of parseSseStream(response)) {
                 if (event.type === 'text') {
                     accumulated += event.content;
                     setStreamingText(accumulated);
-
-                    // Add assistant message only once, then update it
-                    if (!assistantAdded) {
-                        setMessages([...updatedMessages, { role: 'assistant', content: accumulated }]);
-                        assistantAdded = true;
-                    } else {
-                        setMessages([...updatedMessages, { role: 'assistant', content: accumulated }]);
-                    }
                 } else if (event.type === 'tool-start') {
                     setToolStatus(`Using ${event.toolName}…`);
                 } else if (event.type === 'tool-result') {
@@ -189,7 +180,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = () => {
                 }
             }
 
-            // Final update with complete response
+            // Commit the full response to messages only once, when complete
             setMessages([...updatedMessages, { role: 'assistant', content: accumulated || 'No response received.' }]);
         } catch (err: unknown) {
             if (err instanceof Error && err.name === 'AbortError') return;
