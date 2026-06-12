@@ -52,7 +52,6 @@ import {
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import VersionIframe from '../VersionIframe';
-import FloatingAssistant from '../FloatingAssistant';
 
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
@@ -667,9 +666,9 @@ if (isVersionedIframe) {
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
-            <Analytics />
-            {shouldShowAnnouncementBanner() && (
-                <AnnouncementBanner
+                <Analytics />
+                {shouldShowAnnouncementBanner() && (
+                    <AnnouncementBanner
                     enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
                     variant="release"
                     dismissKey={bannerDismissKey}
@@ -753,7 +752,6 @@ if (isVersionedIframe) {
                         renderDocTemplate()
                     )}
                 </main>
-                <FloatingAssistant isDarkMode={isDarkMode ?? false} pageId={curPageNode.pageAttributes.pageid} />
             </div>
         </>
     );

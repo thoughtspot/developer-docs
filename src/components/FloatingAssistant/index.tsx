@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import './index.scss';
 
 function renderMarkdown(text: string): string {
@@ -21,10 +22,7 @@ type SseEvent =
     | { type: 'done' }
     | { type: 'error'; content: string };
 
-type FloatingAssistantProps = {
-    isDarkMode?: boolean;
-    pageId?:string
-};
+type FloatingAssistantProps = {};
 
 const CLOUDFLARE_URL = 'https://spotter-code-popular-questions.thoughtspot-485.workers.dev';
 // const CLOUDFLARE_URL = 'http://localhost:8000';
@@ -57,18 +55,39 @@ async function* parseSseStream(
     }
 }
 
-const FloatingAssistant: React.FC<FloatingAssistantProps> = ({ isDarkMode, pageId }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([]);
+const getPageId = () => {
+    if (typeof window === 'undefined') return undefined;
+    return new URLSearchParams(window.location.search).get('pageid')
+        || window.location.pathname.split('/').filter(Boolean).pop()
+        || undefined;
+};
+
+const FloatingAssistant: React.FC<FloatingAssistantProps> = () => {
+    const isDarkMode = typeof document !== 'undefined'
+        ? document.getElementById('wrapper')?.getAttribute('data-theme') === 'dark'
+        : false;
+
+    const [pageId, setPageId] = useState<string | undefined>(getPageId);
+    const {
+        isOpen,
+        setIsOpen,
+        messages,
+        setMessages,
+        suggestedQuestions,
+        setSuggestedQuestions,
+        suggestedQuestionsLoaded,
+        setSuggestedQuestionsLoaded,
+        resetConversation,
+    } = useFloatingAssistant();
+
+    const [isClosing, setIsClosing] = useState(false);
     const [streamingText, setStreamingText] = useState('');
     const [toolStatus, setToolStatus] = useState('');
     const [input, setInput] = useState('');
-    const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const abortRef = useRef<AbortController | null>(null);
-
 
     useEffect(() => {
         if (messagesEndRef.current) {
@@ -82,13 +101,32 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({ isDarkMode, pageI
         }
     }, [isOpen]);
 
+    // Track page navigation and reset suggested questions for each new page
     useEffect(() => {
-        if (!pageId) return;
+        const handler = (e: CustomEvent<{ location: Location }>) => {
+            const { location } = e.detail;
+            const newPageId = new URLSearchParams(location.search).get('pageid')
+                || location.pathname.split('/').filter(Boolean).pop()
+                || undefined;
+            setPageId(newPageId);
+            setSuggestedQuestionsLoaded(false);
+        };
+        window.addEventListener('gatsby-route-update', handler as EventListener);
+        return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
+    }, [setSuggestedQuestionsLoaded]);
+
+    useEffect(() => {
+        if (!pageId || suggestedQuestionsLoaded || messages.length > 0) return;
         fetch(`${CLOUDFLARE_URL}/suggested-questions?pageId=${encodeURIComponent(pageId)}`)
             .then((res) => res.json())
-            .then((data: { questions?: string[] }) => setSuggestedQuestions(data.questions ?? []))
-            .catch(() => {});
-    }, [pageId]);
+            .then((data: { questions?: string[] }) => {
+                setSuggestedQuestions(data.questions ?? []);
+                setSuggestedQuestionsLoaded(true);
+            })
+            .catch(() => {
+                setSuggestedQuestionsLoaded(true);
+            });
+    }, [pageId, suggestedQuestionsLoaded, messages.length, setSuggestedQuestions, setSuggestedQuestionsLoaded]);
 
     const sendMessage = async (text?: string) => {
         const messageText = (text ?? input).trim();
@@ -96,6 +134,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({ isDarkMode, pageI
 
         const userMessage: Message = { role: 'user', content: messageText };
         const updatedMessages = [...messages, userMessage];
+
         setMessages(updatedMessages);
         if (!text) setInput('');
         setIsLoading(true);
@@ -118,18 +157,27 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({ isDarkMode, pageI
                         pageId:pageId
                     }),
                 },
-            );  
+            );
 
             if (!response.ok || !response.body) {
                 throw new Error(`API error: ${response.status}`);
             }
 
             let accumulated = '';
+            let assistantAdded = false;
 
             for await (const event of parseSseStream(response)) {
                 if (event.type === 'text') {
                     accumulated += event.content;
                     setStreamingText(accumulated);
+
+                    // Add assistant message only once, then update it
+                    if (!assistantAdded) {
+                        setMessages([...updatedMessages, { role: 'assistant', content: accumulated }]);
+                        assistantAdded = true;
+                    } else {
+                        setMessages([...updatedMessages, { role: 'assistant', content: accumulated }]);
+                    }
                 } else if (event.type === 'tool-start') {
                     setToolStatus(`Using ${event.toolName}…`);
                 } else if (event.type === 'tool-result') {
@@ -141,14 +189,12 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({ isDarkMode, pageI
                 }
             }
 
-            setMessages((prev) => [
-                ...prev,
-                { role: 'assistant', content: accumulated || 'No response received.' },
-            ]);
+            // Final update with complete response
+            setMessages([...updatedMessages, { role: 'assistant', content: accumulated || 'No response received.' }]);
         } catch (err: unknown) {
             if (err instanceof Error && err.name === 'AbortError') return;
-            setMessages((prev) => [
-                ...prev,
+            setMessages([
+                ...updatedMessages,
                 {
                     role: 'assistant',
                     content: 'Sorry, something went wrong. Please try again.',
@@ -169,22 +215,43 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({ isDarkMode, pageI
         }
     };
 
+    const handleClose = () => {
+        setIsClosing(true);
+        setTimeout(() => {
+            setIsOpen(false);
+            setIsClosing(false);
+        }, 300);
+    };
+
     return (
         <div
             className={`floating-assistant${isDarkMode ? ' dark' : ''}`}
             data-theme={isDarkMode ? 'dark' : 'light'}
         >
-            {isOpen && (
-                <div className="floating-assistant__panel">
+            {(isOpen || isClosing) && (
+                <div
+                    className={`floating-assistant__panel${isClosing ? ' closing' : ''}`}
+                    style={isClosing ? { animation: 'floating-assistant-slide-out 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards' } : {}}
+                >
                     <div className="floating-assistant__header">
-                        <span className="floating-assistant__title">Ask AI</span>
-                        <button
-                            className="floating-assistant__close"
-                            onClick={() => setIsOpen(false)}
-                            aria-label="Close assistant"
-                        >
-                            ✕
-                        </button>
+                        <span className="floating-assistant__title">SpotterCode Agent</span>
+                        <div className="floating-assistant__header-actions">
+                            <button
+                                className="floating-assistant__reset"
+                                onClick={resetConversation}
+                                title="Clear conversation"
+                                aria-label="Clear conversation"
+                            >
+                                ↻
+                            </button>
+                            <button
+                                className="floating-assistant__close"
+                                onClick={handleClose}
+                                aria-label="Close assistant"
+                            >
+                                ✕
+                            </button>
+                        </div>
                     </div>
                     <div className="floating-assistant__messages">
                         {messages.length === 0 && !isLoading && (
@@ -274,20 +341,17 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({ isDarkMode, pageI
                 </div>
             )}
             <button
-                className="floating-assistant__bubble"
-                onClick={() => setIsOpen((o) => !o)}
+                className={`floating-assistant__bubble${isOpen ? ' floating-assistant__bubble--active' : ''}`}
+                onClick={() => isOpen ? handleClose() : setIsOpen(true)}
                 aria-label={isOpen ? 'Close assistant' : 'Open assistant'}
+                title={isOpen ? 'Close assistant' : 'Ask AI'}
             >
-                {isOpen ? (
-                    <span className="floating-assistant__bubble-icon">✕</span>
-                ) : (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path
-                            d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"
-                            fill="currentColor"
-                        />
-                    </svg>
-                )}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path
+                        d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"
+                        fill="currentColor"
+                    />
+                </svg>
             </button>
         </div>
     );
