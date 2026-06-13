@@ -5,7 +5,7 @@
 :page-pageid: in-app-navigation
 :page-description: Build dynamic menus and links to ThoughtSpot content from the embedding application
 
-If you want to embed specific pages of ThoughtSpot application, you can individual embed components such as `LiveboardEmbed`, `SpotterEmbed`, or `SearchEmved` rather than full application embedding. The full application embed is a relatively fixed and unified application shell, while individual component embeds offer more granular and isolated control.
+If you want to embed specific pages of the ThoughtSpot application, you can embed individual components such as `LiveboardEmbed`, `SpotterEmbed`, or `SearchEmbed` rather than full application embedding. The full application embed is a relatively fixed and unified application shell, while individual component embeds offer more granular and isolated control.
 
 If you choose to embed individual components with specific pages, your embedding app may require custom menus, navigation elements with xref:customize-links.adoc[routes for pages] and ThoughtSpot REST API integration to programmatically manage interaction and navigation between these pages.
 
@@ -14,12 +14,12 @@ If you choose to embed individual components with specific pages, your embedding
 Mixing full application embedding with other embed components, such as `SearchEmbed`, `SpotterEmbed`, and `LiveboardEmbed`, is not recommended, because each embed method is designed to manage its own navigation, layout, and application state. Combining them can create complicated workflows and make it harder to maintain and customize your embedded application.
 ====
 
-See the link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/examples/menus_and_other_navigation_components/rest_api_ui_navigation_v2.html[code example on GitHub repository, window=_blank] for a complete flow of REST API requests powering various navigation components rendered within an embedding application’s page.
+See the link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/examples/menus_and_other_navigation_components/rest_api_ui_navigation_v2.html[code example on GitHub, window=_blank] for a complete implementation using the V2.0 REST API to power navigation components in an embedded application.
 
 == Create menus to embedded ThoughtSpot pages
 Once you have the URL routes defined within the embedding application to load ThoughtSpot content, you can write code that generates links to these ThoughtSpot routes.
 
-Navigation elements often take the form of a sidebar menu, a dropdown selector, a set of tiles, or individual buttons.
+Navigation elements often take the form of a sidebar menu, a drop-down selector, a set of tiles, or individual buttons.
 
 The examples in the following sections use plain JavaScript to generate unstyled HTML elements.
 
@@ -28,18 +28,16 @@ The real code for generating the proper links and the navigation elements will b
 == Hardcoded links within a menu system
 If your web application only embeds a limited set of ThoughtSpot objects, without granting users the ability to save their objects, you can __hardcode__ the object IDs and names of the ThoughtSpot content.
 
-Object IDs in ThoughtSpot are GUIDs and thus are unique on every Org or instance, except  separate instances that are intentionally replicated with the same GUIDs via TML import and export.
+Object IDs in ThoughtSpot are GUIDs and are unique on every Org or instance, except for separate instances that are intentionally replicated with the same GUIDs via TML import and export.
 
-You may still use the `xref:rest-api-v2-metadata-search.adoc[/metadata/search]` V2.0 REST API endpoint to retrieve the equivalent object IDs for content on various Orgs and environments in the process of "hardcoding" the menu system. Alternatively, you may keep a *mapping file* of equivalent objects during your CICD deployment process, that you use to generate the __hardcoded URLs__ in the menu system.
+You can use the xref:rest-api-v2-metadata-search.adoc[`/api/rest/2.0/metadata/search`] V2.0 REST API endpoint to retrieve the equivalent object IDs for content on various Orgs and environments when building your hardcoded menu system. Alternatively, you can maintain a *mapping file* of equivalent objects during your CI/CD deployment process to generate the hardcoded URLs in the menu system.
 
 == Dynamic requests for content listings via REST API
-Both the V1 and V2.0 REST APIs have endpoints for retrieving filtered lists of the content a user has access to. 
+The xref:rest-api-v2-metadata-search.adoc[`/api/rest/2.0/metadata/search`] V2.0 REST API endpoint retrieves filtered lists of the content a user has access to.
 
-The xref:rest-api-v2-metadata-search.adoc[/metadata/search V2.0 REST API endpoint] can be used by the administrators to retrieve content for any given user or can be called as the user by the web browser once they have signed in via SSO.
+The endpoint can be used by administrators to retrieve content for any given user, or called as the signed-in user directly from the web browser after signing in via SSO.
 
-The response to `/metadata/search` can be parsed and split on *tags*, *author*, or other properties, or you can make multiple calls to the endpoint with the various filtering arguments in each request. For example, xref:rest-api-v2-metadata-search.adoc#_favorite_object_options[favorite options] can be specified to only retrieve objects that are marked as favorites by users.
-
-The xref:metadata-api.adoc#metadata-list[`/metadata/list` V1 REST API endpoint] is identical to the endpoint used within ThoughtSpot to render Answers, Liveboards, and Data pages, making it a simple path to replicate and customize the existing content listing pages within ThoughtSpot.
+The response to `/api/rest/2.0/metadata/search` can be parsed and filtered on *tags*, *author*, or other properties. You can also make multiple calls to the endpoint with different filtering arguments in each request. For example, xref:rest-api-v2-metadata-search.adoc#_favorite_object_options[favorite options] can be specified to retrieve only objects marked as favorites by a user.
 
 The process for generating a dynamic menu includes the following steps:
 
@@ -54,247 +52,315 @@ An administrator account can use the xref:rest-api-v2-metadata-search.adoc#permi
 
 By default, the endpoint returns for Liveboards, but the `metadata` section of the request can be set to specify `LIVEBOARD`, `ANSWER`, and `LOGICAL_TABLE` in any desired combination.
 
-[code,json]
+[source,javascript]
 ----
 const answerRequestObject = {
-    "metadata": [{"type": "ANSWER"}],
-    "permissions" : [
-    {
-      "principal": {
-        "type": "USER",
-        "identifier": "{username}"
-      },
-      "share_mode": "READ_ONLY"
-    }
-  ]
-    'record_offset': 0,  // Adjust to do pagination
-    'record_size': 100000 // Adjust to do pagination (or handle in browser with table component)
-}
+    "metadata": [{ "type": "ANSWER" }],
+    "permissions": [
+        {
+            "principal": {
+                "type": "USER",
+                "identifier": "{username}"
+            },
+            "share_mode": "READ_ONLY"
+        }
+    ],
+    "record_offset": 0,
+    "record_size": 10000
+};
+
+const response = await fetch('/api/rest/2.0/metadata/search', {
+    method: 'POST',
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(answerRequestObject),
+    credentials: 'include'
+});
+
+// V2.0 returns a top-level array directly
+const contentList = await response.json();
 ----
 
-If the web application has implemented other processes on the back-end using a ThoughtSpot service account with administrator privileges, this may be the simplest implementation of retrieving the content listings rather than dealing with individual user access tokens for the requests.
+If the web application uses a ThoughtSpot service account with administrator privileges on the backend, this approach may be simpler than managing individual user access tokens for each REST API request.
 
 === Requesting content as a user
 Rather than using an administrator account to request content listings, you can instead have the REST API request scoped to the user themselves, and the REST API will always only return the content they have access to.
 
 All REST API requests from the browser are scoped as the signed-in user, as long as the `credentials` option of the REST API request has been set properly to `include`.
 
-[code,json]
+[source,javascript]
 ----
 const lbRequestObject = {
-    "metadata": [{"type": "LIVEBOARD"}],
-    'record_offset': 0,  // Adjust to do pagination
-    'record_size': 100000 // Adjust to do pagination (or handle in browser with table component)
-}
+    "metadata": [{ "type": "LIVEBOARD" }],
+    "record_offset": 0,
+    "record_size": 10000
+};
+
+const response = await fetch('/api/rest/2.0/metadata/search', {
+    method: 'POST',
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(lbRequestObject),
+    credentials: 'include'
+});
+
+// V2.0 returns a top-level array directly
+const contentList = await response.json();
 ----
 
-With xref:trusted-authentication.adoc[cookieless trusted authentication], there is no *browser session*. Instead, an *access token* is retrieved for the user and used by the SDK. 
+With xref:trusted-authentication.adoc[cookieless trusted authentication], there is no *browser session*. Instead, an *access token* is retrieved for the user and used by the SDK.
 
 The trusted authentication pattern requires implementing a backend service to generate access tokens for any user. The token request service can instead be used by the backend of the embedding web application to get an access token to make REST API requests for a user, rather than having it happen at the front-end within the web browser.
 
 === Build menu items and web app links
-The response from the search REST API is an array of header objects, which includes the details needed to build out the menu items and the links within the web application to the pages that display ThoughtSpot content.
+The response from `/api/rest/2.0/metadata/search` is a top-level array. Each item in the array exposes `metadata_name`, `metadata_id`, and `metadata_type` at the top level — enough to build a simple navigation list or sidebar menu. For richer rendering (descriptions, tags, modified date, author), use the nested `metadata_header` sub-object within each item.
 
-The `/metadata/search` endpoint returns `metadata_name`, `metadata_id`, and `metadata_type` in each response item, which is enough information to build a simple menu and a link to the appropriate URL to display the content.
+The following properties within `metadata_header` are useful for building navigation UI:
 
-The V2.0 `/metadata/search` endpoint has an additional `metadata_header` key within the response, with the object containing the following properties along with many others, while the `metadata/list` V1 endpoint contains them in a slightly different structure.
-
-Within the `metadata_header` section, `name` and `id` properties are identical to the `metadata_name` and `metadata_id` from the outer portion of the response. Additional properties the web application might use for display include:
-
-* `description`
-+
-Text description added to content by creator
-* `authorDisplayName`
-+
-Display name of the object creator or current owner
-* `authorName`
-+
-Username of the object creator or current owner
-* `created`
-+
-Object creation timestamp (to milliseconds)
-* `modified`
-+
-Last edit timestamp (to milliseconds)
-* `tags`
-+
-Array of tag objects, each with a `name` property among other details
+* `id` — Object GUID (matches `metadata_id` at the top level)
+* `name` — Object display name (matches `metadata_name` at the top level)
+* `description` — Text description added by the creator
+* `tags` — Array of tag objects; each has a `name` property
+* `modified` — Last edit timestamp (milliseconds since epoch)
+* `authorDisplayName` — Display name of the object owner
 
 Individual visualizations on a Liveboard can be loaded using the `LiveboardEmbed` component by supplying both `liveboardId` and `vizId`.
 
-The display of a visualization from a Liveboard differs from a saved Answer object, which is loaded via the `SearchEmbed` component. The saved answer object always displays the ThoughtSpot search bar and UI actions for editing an Answer, whereas the visualizations display fewer UI elements and show the menu items in the **More** menu image:./images/icon-more-10px.png[the more options menu].
+The display of a visualization from a Liveboard differs from a saved Answer, which is loaded via the `SearchEmbed` component. The saved Answer always displays the ThoughtSpot search bar and UI actions for editing, whereas a visualization displays fewer UI elements and shows the *More* menu for chart-level actions.
 
-Setting the `include_visualization_headers` request parameter to `true` will bring back the list of all visualization details with any Liveboard response. This request requires a separate API call for each Liveboard in the V1 REST API.
+// FIX MINOR-8: Clarified that include_visualization_headers is a V2.0 parameter; no separate
+// call is required. Previous wording incorrectly implied a separate V1 API call was needed.
+To retrieve the visualization details for a Liveboard in the same API call, set the `include_visualization_headers` parameter to `true` in your request (see <<retrieve-viz-headers>>).
 
-== Replicating the ThoughtSpot UI Liveboards or Answers page
-As mentioned in the preceding sections, the `/metadata/list` V1 REST API provides the same details as the internal REST API used to display the pages within the ThoughtSpot UI, making it easy to "replicate" those pages exactly within the embedding web app's own UI. The V2.0 REST API includes these details within the `metadata_headers` section of its response so it can be used for a similar purpose as well (see the  link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/examples/menus_and_other_navigation_components/rest_api_ui_navigation_v2.html[example on GitHub for V2.0 equivalents, window=_blank].
+== Replicating the ThoughtSpot Liveboards or Answers page
 
-The endpoint can only request one object type at a time: +
+The `/api/rest/2.0/metadata/search` endpoint provides the metadata required to replicate the Liveboards or Answers pages from the ThoughtSpot UI within your embedding application.
 
-* `PINBOARD_ANSWER_BOOK` for Liveboards
-* `QUESTION_ANSWER_BOOK` for answers
-* `LOGICAL_TABLE` for data objects
+The following `metadata.type` values are supported:
 
-Data objects can be filtered using an additional `subtype` parameter to limit the query specifically to ThoughtSpot tables, worksheets, or views.
+* `LIVEBOARD` — Liveboards
+* `ANSWER` — Saved Answers
+* `LOGICAL_TABLE` — Data objects (Tables, Models, and Views)
 
-There are additional parameters for sorting and a `category` parameter that can filter the response to show only the objects created or marked as favorites by the logged-in user.
+For `LOGICAL_TABLE` objects, you can add a `subtype` filter to narrow results:
 
-REST API calls are asynchronous. The following is an example function returning the response as a JSON object using *fetch()*:
+* `ONE_TO_ONE_LOGICAL` — Tables
+* `WORKSHEET` — Models
+* `AGGR_WORKSHEET` — Views
+
+The following example fetches all three content types, caches the responses, and allows switching between them with a content-type selector — matching the pattern used in the link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/examples/menus_and_other_navigation_components/rest_api_ui_navigation_v2.html[reference implementation, window=_blank]:
 
 [source,javascript]
 ----
-    async function metadataListRestApiCall(args){
-        // args = { 'type', 'category', 'sortOn', 'sortAsc', 'tagnames' }
-        let type = args['type'].toLowerCase();
-        const publicApiUrl = 'callosum/v1/tspublic/v1/';
-        let endpoint = 'metadata/list';
+// Generic V2.0 REST API wrapper — equivalent to restApiCallV2() in the reference example
+async function restApiCallV2(endpoint, httpVerb, apiRequestObj) {
+    const baseUrl = `${tsHost}/api/rest/2.0/`;
+    const apiFullEndpoint = baseUrl + endpoint;
 
-        // Easy type names match ThoughtSpot UI names for objects
-        const typesToApiType = {
-            'liveboard': 'PINBOARD_ANSWER_BOOK',
-            'answer': 'QUESTION_ANSWER_BOOK',
-            'datasource' : 'LOGICAL_TABLE', // datasource doesn't distinguish subtypes
-            'table' : 'ONE_TO_ONE_LOGICAL',
-            'view' : 'AGGR_WORKSHEET',
-            'worksheet' : 'WORKSHEET'
-        }
+    const fetchArgs = {
+        method: httpVerb.toUpperCase(),
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+    };
 
-        // batchsize = -1 gives all results
-        let apiParams = { 'batchsize' : '-1'};
-        console.log(type);
-        // The three datasource types can be specified using 'subtype'
-        if (type == 'table' || type == 'view' || type == 'worksheet'){
-            let subtype = [typesToApiType[type]];
-            apiParams['type'] = 'LOGICAL_TABLE';
-            apiParams['subtypes'] = `["${subtype}"]`;
-        }
-        else {
-            apiParams['type'] = typesToApiType[type];
-        }
-
-        // Category arguments
-        let category = 'ALL';
-        if ('category' in args){
-            if ( args['category'] == 'MY' || args['category'] == 'ALL' || args['category'] == 'FAVORITE'){
-                category = args['category'];
-                apiParams['category'] = category;
-            }
-        }
-
-        // Sort arguments
-        if ('sortOn' in args){
-            if (args['sortOn'] !== null){
-                apiParams['sort'] = args['sortOn'];
-            }
-        }
-
-        if ('sortAsc' in args){
-            if (args['sortAsc'] === true){
-                apiParams['sortascending'] = 'true';
-            }
-            if (args['sortAsc'] === false){
-                apiParams['sortascending'] = 'false';
-            }
-        }
-
-        console.log(apiParams);
-        const searchParams = new URLSearchParams(apiParams);
-        const apiFullEndpoint = tsURL + publicApiUrl + endpoint + "?" + searchParams.toString();
-        console.log(apiFullEndpoint);
-        return await fetch(
-            apiFullEndpoint, {
-            method: 'GET',
-            headers: {
-                "Accept": "application/json",
-                "X-Requested-By": "ThoughtSpot"
-            },
-            credentials: "include"
-            })
-        .then(response =>  response.json())
-        .then(data => data['headers'])  // metadata/list info is really in the 'headers' property returned
-        .catch(error => {
-        console.error("Unable to get the metadata/list response: " + error)
-        });
+    if (apiRequestObj !== null) {
+        fetchArgs['body'] = JSON.stringify(apiRequestObj);
     }
 ----
 
-The results of this REST API request can be directed into a rendering function using `.then()`:
+    const response = await fetch(apiFullEndpoint, fetchArgs);
+
+    if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.status === 204 ? true : response.json();
+}
+
+// Wrapper for /metadata/search — equivalent to callMetadataSearchApi() in the reference example
+async function callMetadataSearchApi(searchRequestObject) {
+    return await restApiCallV2('metadata/search', 'POST', searchRequestObject);
+}
+
+// Request objects for each content type
+const lbRequestObject = {
+    "metadata": [{ "type": "LIVEBOARD" }],
+    "record_offset": 0,
+    "record_size": 10000
+};
+
+const answerRequestObject = {
+    "metadata": [{ "type": "ANSWER" }],
+    "record_offset": 0,
+    "record_size": 10000
+};
+
+const tableRequestObject = {
+    "metadata": [{ "type": "LOGICAL_TABLE" }],
+    "record_offset": 0,
+    "record_size": 10000
+};
+
+// Fetch all content types in parallel and cache the results
+const [lbResponse, answerResponse, tableResponse] = await Promise.all([
+    callMetadataSearchApi(lbRequestObject),
+    callMetadataSearchApi(answerRequestObject),
+    callMetadataSearchApi(tableRequestObject)
+]);
+
+const metadataResponses = {
+    'lb': lbResponse,
+    'answer': answerResponse,
+    'table': tableResponse
+};
+----
+
+=== Rendering Liveboards or Answers pages similar to the ThoughtSpot UI
+
+To render a table similar to the Answers or Liveboards page in the ThoughtSpot UI, use the `tableFromMetadataSearch()` function pattern from the reference implementation. This function reads `metadata_header` sub-object fields (`id`, `name`, `description`, `tags`, `modified`, `authorDisplayName`) from each item in the V2.0 response array to populate the table columns:
 
 [source,javascript]
 ----
-metadataListRestApiCall(
-    {
-        'type': 'liveboard',
-        'sortOn': 'NAME',
-        'sortAsc' : true,
-        'category': 'ALL'
-    })
-.then(
-    (listResponse) => renderNavigationFromResponse(listResponse) // Use your own rendering function here
-);
-----
+// Equivalent to tableFromMetadataSearch() in the reference example
+// SOURCE: rest_api_ui_navigation_v2.html
+function tableFromMetadataSearch(searchResponse) {
+    const table = document.createElement('table');
 
-=== Rendering Liveboards or Answers pages similar to ThoughtSpot UI
-If you want to render something very close to the 'Answers' or 'Liveboards' pages within the ThoughtSpot UI, your rendering function will grab the `name`, `id`, `tags`, `modified`, and `authorDisplayName` properties and make a table in that order (feel free to leave out any undesired elements):
+    // Table headers
+    const thead = table.createTHead();
+    const headerRow = thead.insertRow();
+    ['Name', 'Description', 'Tags', 'Modified', 'Author'].forEach(label => {
+        const th = document.createElement('th');
+        th.innerText = label;
+        headerRow.appendChild(th);
+    });
 
-[source,javascript]
-----
-    function tableFromList(listResponse){
-        console.log(listResponse);
-        let t = document.createElement('table');
+    // Table rows — V2.0 response is a top-level array
+    searchResponse.forEach(item => {
+        // Rich detail fields are inside metadata_header
+        const headers = item['metadata_header'];
 
-        // Make table headers
-        let thead = document.createElement('thead');
-        t.append(thead);
-        let thr = document.createElement('tr');
-        thead.append(thr);
-        let headers = ['Name', 'Tags', 'Modified', 'Author'];
-        for (let i=0, len=headers.length; i < len; i++){
-            let th = document.createElement('th');
-            th.innerText = headers[i];
-            thr.append(th);
+        const id = headers['id'];
+        const name = headers['name'];
+        const desc = headers['description'];
+        const tags = headers['tags'];          // Array of { name: string } objects
+        const modified = headers['modified'];  // Milliseconds since epoch
+        const authorDisplayName = headers['authorDisplayName'];
+
+        const row = table.insertRow();
+
+        // Name column — link triggers loadContent() with the object GUID
+        const nameCell = row.insertCell();
+        nameCell.innerHTML =
+            `<a href="#" onclick="loadContent({type:'liveboard', guid:'${id}'})">${name}</a>`;
+
+        // Description column
+        const descCell = row.insertCell();
+        if (desc !== null) { descCell.innerText = desc; }
+
+        // Tags column — tags is an array of tag objects
+        const tagsCell = row.insertCell();
+        if (tags.length > 0) {
+            tagsCell.innerText = tags.map(t => t['name']).join(', ');
         }
 
-        // Go through response and build rows
-        for (let i=0, len=listResponse.length; i < len; i++){
-            let tr = document.createElement('tr');
+        // Modified date column
+        const modifiedCell = row.insertCell();
+        modifiedCell.innerText = new Date(modified).toUTCString();
 
-            // Name Column
-            let name_td = document.createElement('td');
-            name_td.innerHTML = '<a href="#" onclick="loadContent("' + listResponse[i]['id'] + '")>' +  listResponse[i]['name'] +  '</a>';
-            //name_td.append(name_text);
-            console.log(name_td);
-            tr.append(name_td);
+        // Author column
+        const authorCell = row.insertCell();
+        authorCell.innerText = authorDisplayName;
+    });
 
-            // Tags column
-            let tags_td = document.createElement('td');
-            console.log(listResponse[i]['tags']);
-            // Tags is an Array of Tag objects, with properties ('name' being the important one)
-            if (listResponse[i]['tags'].length > 0){
-                let tagNames = [];
-                for(let k = 0, len = listResponse[i]['tags'].length; k<len; k++){
-                    let tagName = listResponse[i]['tags'][k]['name'];
-                    tagNames.push(tagName);
-                }
-                tags_td.innerText = tagNames.join(', ');
+    return table;
+}
+
+// Usage
+const table = tableFromMetadataSearch(metadataResponses['lb']);
+document.getElementById('main-content-div').appendChild(table);
+----
+
+To render a trellis of tiles split by tag, or a sidebar menu, use the `drawTrellisOfTiles()` and `drawSidebarMenu()` functions. The sidebar functions use the top-level `metadata_name` and `metadata_id` fields (not `metadata_header`) for simple list rendering:
+
+[source,javascript]
+----
+// Sidebar menu — uses top-level metadata_name and metadata_id
+// Equivalent to drawSidebarMenu() in the reference example
+function drawSidebarMenu(metadataResponses) {
+    const lbs = metadataResponses['lb'];
+    const menuUl = document.getElementById('liveboards-menu');
+
+    lbs.forEach(item => {
+        const li = document.createElement('li');
+        // Top-level fields for sidebar display and navigation
+        li.innerText = item['metadata_name'];
+        li.onclick = () => loadContent({ type: 'liveboard', guid: item['metadata_id'] });
+        menuUl.appendChild(li);
+    });
+}
+----
+
+[NOTE]
+====
+`metadata_name` and `metadata_id` at the top level are equivalent to `metadata_header.name` and `metadata_header.id` inside the nested sub-object. Use the top-level fields for simple list or sidebar rendering; use the `metadata_header` sub-object when you need additional properties such as `description`, `tags`, `modified`, or `authorDisplayName`.
+====
+
+[[retrieve-viz-headers]]
+=== Retrieve individual visualizations from a Liveboard
+
+To retrieve the list of visualizations on a specific Liveboard, use the `/api/rest/2.0/metadata/search` endpoint with the `include_visualization_headers` parameter set to `true`. Visualization headers are returned inline in the same response, no separate API call is required.
+
+[NOTE]
+====
+The V1 REST API endpoint `GET /tspublic/v1/metadata/listvizheaders` is deprecated. Use `/api/rest/2.0/metadata/search` with `"include_visualization_headers": true` for all new implementations.
+====
+
+[source,javascript]
+----
+async function fetchLiveboardVizHeaders(liveboardGuid) {
+    const requestBody = {
+        "metadata": [
+            {
+                "type": "LIVEBOARD",
+                "identifier": liveboardGuid
             }
             tr.append(tags_td);
 
-            // Modified Date column
-            let modified_td = document.createElement('td');
-            modified_td.innerText = listResponse[i]['modified'];
-            tr.append(modified_td);
+    const response = await fetch('/api/rest/2.0/metadata/search', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody),
+        credentials: 'include'
+    });
 
-            let author_td = document.createElement('td');
-            author_td.innerText = listResponse[i]['authorDisplayName'];
-            tr.append(author_td);
-
-            t.append(tr);
-
-        }
-
-        return t;
+    if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
+
+    // V2.0 returns a top-level array; visualization_headers is per Liveboard item
+    const results = await response.json();
+    return results[0]?.visualization_headers ?? [];
+}
+
+// Usage: build a list of visualization links for a Liveboard
+const vizHeaders = await fetchLiveboardVizHeaders('{liveboard-GUID}');
+
+vizHeaders.forEach(viz => {
+    // Use viz.id with LiveboardEmbed to load individual visualizations
+    console.log(`Viz ID: ${viz.id}, Name: ${viz.name}`);
+    // new LiveboardEmbed('#embed', { liveboardId: '{liveboard-GUID}', vizId: viz.id })
+});
 ----
 
 The function in the preceding example merely creates the table, it does not place it on the page. You can continue chaining using `.then()` to place the table in the appropriate place on your web application page:
@@ -351,4 +417,3 @@ async function metadataGetVizHeadersRestApiCall(liveboardGuid){
     });
 }
 ----
-
