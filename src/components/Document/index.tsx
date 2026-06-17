@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import './index.scss';
 import { customizeDocContent, addScrollListener } from './helper';
 import Footer from '../Footer';
@@ -18,6 +18,52 @@ const Document = (props: {
     breadcrumsData: any;
     markdownBody?: string;
 }) => {
+    const [selectionPos, setSelectionPos] = useState<{ top: number; left: number } | null>(null);
+    const selectionRef = useRef<string>('');
+
+    useEffect(() => {
+        let mouseDownX = 0;
+        let mouseDownY = 0;
+
+        const handleMouseUp = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.selection-cta-button')) return;
+
+            // If mouse didn't move (plain click, not a drag-select), don't re-show
+            const moved = Math.abs(e.clientX - mouseDownX) > 3 || Math.abs(e.clientY - mouseDownY) > 3;
+            if (!moved) return;
+
+            const selection = window.getSelection();
+            const text = selection?.toString().trim() || '';
+            if (!text) {
+                setSelectionPos(null);
+                return;
+            }
+            const range = selection!.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            selectionRef.current = text;
+            const HEADER_HEIGHT = 108; // main header (60) + secondary header (48)
+            const rawTop = rect.top - 36;
+            setSelectionPos({
+                top: Math.max(HEADER_HEIGHT + 4, rawTop),
+                left: rect.left,
+            });
+        };
+
+        const handleMouseDown = (e: MouseEvent) => {
+            mouseDownX = e.clientX;
+            mouseDownY = e.clientY;
+            setSelectionPos(null);
+        };
+
+        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('mousedown', handleMouseDown);
+        return () => {
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mousedown', handleMouseDown);
+        };
+    }, []);
+
     useEffect(() => {
         customizeDocContent();
     }, [props.docContent]);
@@ -131,6 +177,17 @@ const Document = (props: {
             className="documentWrapper"
             style={!props.shouldShowRightNav ? { width: '100%' } : undefined}
         >
+            {selectionPos && (
+                <a
+                    className="selection-cta-button"
+                    href="https://try.thoughtspot.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ top: selectionPos.top, left: selectionPos.left }}
+                >
+                    Ask SpotterCode
+                </a>
+            )}
             {!isHomePage && (
                 <Breadcrums
                     breadcrumsData={props.breadcrumsData}
