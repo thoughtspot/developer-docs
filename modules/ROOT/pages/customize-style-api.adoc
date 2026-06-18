@@ -35,13 +35,13 @@ Request parameters::
 |`scope`|Yes|`CLUSTER` or `ORG`.
 //|`org_identifier`|Conditional|Required when `scope` is `ORG`.
 |`operation`|Yes|`REPLACE` overwrites existing settings. `RESET` reverts specific fields to defaults.
-|`navigation_panel`|No|Top navigation panel color. Use `"theme": "CUSTOM"` with a valid hex value in `"base_color"`.
-|`chart_color_palette`|No|Array of hex color values for charts. When provided with `REPLACE`, exactly 8 color entries must be specified in colors.
+|`navigation_panel`|No|Top navigation panel color. Can be `DARK`, `TWO_TONE` or `CUSTOM`. A valid hex value for `base_color` is needed only when `theme` is `CUSTOM`.
+|`chart_color_palette`|No|Array of hex color values for charts. When provided with `REPLACE`, exactly 8 `primary` color entries must be specified in colors. `secondary` color entries, if provided, should be exactly 4 in number. If `secondary` shades are omitted, the server auto-generates 4 shades from the primary color.
 |`embedded_footer_text`|No|Footer text for embedded content.
 |`visualization_fonts`|No|Font assignments for visualization elements. Provide only the areas to update; omitted areas remain unchanged.
-|`default_logo`|No|Binary image file for the square application logo.
+|`default_logo`|No|Binary image file for the square application logo. Allowed formats are PNG, JPG, and JPEG only.
 |`wide_logo`|No|Binary image file for the wide logo (email and PDF exports).
-|`reset_options`|No|Resets specified settings to ThoughtSpot defaults.
+|`reset_options`|No|Resets specified settings to ThoughtSpot defaults. Used when `operation` is `RESET`.
 |=====
 
 Example API request:: To set a custom navigation panel color at cluster scope
@@ -75,23 +75,46 @@ curl -X POST \
   -H 'Content-Type: application/json' \
   --data-raw '{
     "scope": "ORG",
-    "org_identifier": "Sales Org",
      "operation": "REPLACE",
-    "chart_color_palette": {
-     "colors": [
-        {"color": "#FF6B35"},
-        {"color": "#004E89"},
-        {"color": "#1A936F"},
-        {"color": "#C6D8D3"},
-        {"color": "#F18F01"},
-        {"color": "#8B4513"},
-        {"color": "#6A0572"},
-        {"color": "#2E8B57"}
-    ],
-    "disable_color_rotation": false
-  }
-}
+    -F 'embedded_footer_text=Test%20footer%20text' \
+    -F 'chart_color_palette={
+            "colors":[
+            {"primary":"#9F2B68",
+                "secondary":["#00FFFF","#00FFFF","#00FFFF","#FF0000"]},
+            {"primary":"#FF0080"},
+            {"primary":"#FF8000"},
+            {"primary":"#FF0000"},
+            {"primary":"#FFFF00"},
+            {"primary":"#00FF80"},
+            {"primary":"#FF00FF"},
+            {"primary":"#2359B6"}],
+        "disable_color_rotation":false}' \
+    -F 'visualization_fonts={
+            "chart_visualization_fonts":[{"visualization_area":"CHART_X_AXIS_LABELS","font_identifier":"a1b2c3d4-e5f6-7890-abcd-ef1234567890"}],
+            "table_visualization_fonts":[{"visualization_area":"TABLE_VALUE_CELLS","font_identifier":"Acme Sans"}],
+            "advanced_chart_visualization_fonts":[{"visualization_area":"ADVANCED_CHART_LABELS","font_identifier":"Acme Sans"}]
+        }'
+    }
 ----
+
+Example API request:: To reset style options at the org level
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/styles/update' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  -F 'scope=ORG' \
+    -F 'operation=RESET' \
+    -F 'reset_options={"style":["CHART_COLOR_PALETTE"],"visualization_areas":["CHART_X_AXIS_LABELS"]}'
+    }
+----
+
+API response::
+If the API request is successful, ThoughtSpot returns a 200 or 204 success code.
 
 === Custom fonts
 
@@ -137,13 +160,28 @@ Example API request::
 curl -X POST 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/styles/fonts/upload' \
 -H 'Authorization: Bearer {token}' \
 -H 'Accept: application/json' \
+-H 'Accept: application/json'\
+-H 'Content-Type: application/json' \
+--data-raw '{
 -F 'name=Acme Sans' \
+-F 'file_content=@/path/to/acme-sans-bold.woff2'
+-F 'scope=ORG' \
 -F 'weight=BOLD' \
 -F 'style=NORMAL' \
 -F 'color=#333333' \
--F 'file_content=@/path/to/acme-sans-bold.woff2'
+}
 ----
 
+API response::
+If the API request is successful, ThoughtSpot returns the details of the uploaded font.
+
+[source,JSON]
+----
+{
+"id": "c3d4e5f6-1111-1111-1111-111111111111",
+"name": "Acme Sans"
+}
+----
 
 ==== Search custom fonts
 To get custom fonts uploaded to the instance or the Org, send an API request to the `POST /api/rest/2.0/customization/styles/fonts/search` endpoint.
@@ -175,14 +213,6 @@ Default: `false`.
 
 |=====
 
-////
-|`org_identifier`
-|Conditional
-|Unique ID or name of the Org. Applicable only when `scope` is `ORG`.
-Defaults to the caller's active Org if omitted.
-////
-
-
 Example API request::
 Return all fonts with their visualization assignments
 
@@ -198,6 +228,7 @@ curl -X POST \
      "include_font_assignments": true
 }
 ----
+
 Example API request:: Filter by name pattern
 [source,cURL]
 ----
@@ -212,6 +243,50 @@ curl -X POST \
     "name_pattern": "acme",
     "include_font_assignments": false
 }
+----
+
+API response::
+If the API request is successful, ThoughtSpot returns the font and its assignment details.
+
+[source,JSON]
+----
+[
+  {
+    "id": "c3d4e5f6-1111-1111-1111-111111111111",
+    "scope": "ORG",
+    "org": {
+      "id": 1234567890,
+      "name": "Sales"
+    },
+    "name": "Acme Sans",
+    "weight": "NORMAL",
+    "style": "NORMAL",
+    "color": "#333333",
+    "creation_time_in_millis": 1714000000000,
+    "assignments": [
+      {
+        "org": {
+          "id": 1234567890,
+          "name": "Sales"
+        },
+        "visualization_areas": [
+          "CHART_X_AXIS_LABELS",
+          "CHART_Y_AXIS_LABELS"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "d4e5f6a7-2222-2222-2222-222222222222",
+    "scope": "CLUSTER",
+    "name": "Corporate Bold",
+    "weight": "BOLD",
+    "style": "NORMAL",
+    "color": "#000000",
+    "creation_time_in_millis": 1713500000000,
+    "assignments": []
+  }
+]
 ----
 
 ==== Update a custom font
@@ -324,6 +399,7 @@ curl -X POST \
 
 === Logo export
 To get the configured logos at the requested scope  as a ZIP archive containing the default and wide logo images, send an API request to the `POST /api/rest/2.0/customization/styles/logos/export` endpoint.
+If no custom logo is configured for the Org, the system falls back to the cluster logo. If a cluster logo is also unavailable, the endpoint returns an empty response with a `200 OK` status.
 
 Example API request::
 
