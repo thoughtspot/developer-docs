@@ -1,0 +1,191 @@
+= Customizing SpotterViz
+:toc: true
+:toclevels: 2
+
+:page-title: Customizing SpotterViz
+:page-pageid: embed-spotter-viz
+:page-description: Customize the SpotterViz panel and Insight Tiles in embedded Liveboards using the Visual Embed SDK.
+
+// SOURCE: SCAL-311987, SCAL-311988, SCAL-303724, SCAL-309605
+
+SpotterViz is the AI-powered analysis panel that appears on embedded Liveboards. It displays **Insight Tiles** — AI-generated textual analysis of Liveboard data — and exposes a customizable prompt interface for user interaction.
+
+This page describes how to customize SpotterViz in embedded Liveboards using the Visual Embed SDK `SpotterVizConfig` interface and related APIs.
+
+[NOTE]
+====
+SpotterViz customization APIs require ThoughtSpot Cloud 26.7.0.cl or later and Visual Embed SDK v1.50.0 or later. The Insight Tile feature is in Beta. Contact ThoughtSpot Support to enable this feature on your instance.
+====
+
+== About Insight Tiles
+
+Insight Tiles are a new Liveboard tile type that uses Spotter AI to generate automated textual analysis of the data in your Liveboard. A tile displays 5–7 AI-generated bullet-point insights with a distinct light blue gradient background.
+
+Key behaviors:
+
+* *Scope* — Each Insight Tile can be scoped to a Tab, a Group, or an individual Answer.
+* *Auto-retriggering* — Insight Tiles automatically regenerate insights on Liveboard load and when Liveboard-level filters change.
+* *Localization* — Insights are rendered in the user's configured locale.
+* *Runtime filters* — Runtime filters and parameters passed to `LiveboardEmbed` are respected by Insight Tiles. See <<runtime-filters>>.
+
+Beta limitations:
+
+* Insight Tiles are not rendered in scheduled exports or downloads. A placeholder is shown instead.
+* Cross-filter interactions are not supported in this Beta release.
+* Pinning Insight Tiles from plugins is not supported.
+
+// TODO: verify with engineering — add link to product docs page for Insight Tiles (thoughtspot-docs) once published
+
+== `SpotterVizConfig` interface
+
+The `SpotterVizConfig` interface is available on `LiveboardViewConfig` and `AppViewConfig` via the `spotterViz` property. Use it to customize the SpotterViz panel's branding and prompt experience.
+
+[source,JavaScript]
+----
+import { LiveboardEmbed } from '@thoughtspot/visual-embed-sdk';
+
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    frameParams: { width: '100%', height: '100%' },
+    liveboardId: '<liveboard-id>',
+    spotterViz: {
+        brandName: 'Acme Analytics',
+        headline: 'AI-powered insights for your business',
+        description: 'Ask a question or explore the insights below.',
+        inputPlaceholder: 'Ask Acme Analytics a question...',
+        starterPrompts: [
+            { prompt: 'What are the top-performing regions this quarter?' },
+            { prompt: 'Show me revenue trends for the last 6 months.' },
+        ],
+    },
+});
+
+liveboardEmbed.render();
+----
+
+=== `SpotterVizConfig` properties
+
+[cols="2,1,1,4"]
+|====
+| Property | Type | Required | Description
+
+| `brandName`
+| string
+| No
+| Custom brand name displayed in the SpotterViz panel header. Replaces the default "Spotter" label.
+
+| `headline`
+| string
+| No
+| Custom headline text for the SpotterViz panel.
+
+| `description`
+| string
+| No
+| Custom description text shown below the headline.
+
+| `inputPlaceholder`
+| string
+| No
+| Custom placeholder text for the Spotter chat input field.
+
+| `starterPrompts`
+| `SpotterVizStarterPrompt[]`
+| No
+| Array of starter prompt objects to replace the default prompt suggestions. Each object requires a `prompt` string property.
+|====
+
+// TODO: verify with engineering — confirm the complete and final list of SpotterVizConfig properties and whether any additional properties are available in 26.7.0.cl
+
+== CSS customization
+
+SpotterViz exposes CSS custom properties that allow you to style the Insight Tile to match your application's visual design. Apply these variables using the `customCSS` configuration in your `LiveboardEmbed` initialization.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    frameParams: { width: '100%', height: '100%' },
+    liveboardId: '<liveboard-id>',
+    customCSS: {
+        variables: {
+            // TODO: verify with engineering — replace with confirmed CSS variable names
+            '--ts-spotterviz-background': 'linear-gradient(135deg, #e8f4fd, #cce8f8)',
+            '--ts-spotterviz-text-color': '#1a1a2e',
+        },
+    },
+});
+----
+
+// TODO: verify with engineering — provide the authoritative list of CSS variable names, their default values, and the CSS scope they apply to
+
+== Brand customization
+
+SpotterViz respects ThoughtSpot's brand customization settings. When brand colors are configured in the ThoughtSpot *Develop* > *Style customization* panel, the Insight Tile gradient background updates to reflect your brand palette.
+
+// TODO: verify with engineering — confirm the exact behavior of brand color overrides on the Insight Tile gradient background
+
+== Embed events
+
+Listen to the following events emitted by SpotterViz in your `LiveboardEmbed`:
+
+=== `EmbedEvent.SpotterVizMount`
+
+Emitted when the SpotterViz panel mounts in embed mode.
+
+[source,JavaScript]
+----
+liveboardEmbed.on(EmbedEvent.SpotterVizMount, (eventData) => {
+    console.log('SpotterViz panel mounted:', eventData);
+});
+----
+
+=== `EmbedEvent.SpotterVizPromptSubmit`
+
+Emitted when a user submits a prompt in the SpotterViz panel.
+
+[source,JavaScript]
+----
+liveboardEmbed.on(EmbedEvent.SpotterVizPromptSubmit, (eventData) => {
+    console.log('SpotterViz prompt submitted:', eventData);
+});
+----
+
+// TODO: verify with engineering — confirm whether additional EmbedEvents are introduced for Insight Tile load and error states in 26.7.0.cl
+
+[#runtime-filters]
+== Runtime filters and Insight Tiles
+
+// SOURCE: SCAL-309605
+
+Runtime filters and parameters passed to `LiveboardEmbed` are respected by Insight Tiles. When a runtime filter is applied, Spotter automatically regenerates the tile's insights using the filtered data context.
+
+No additional configuration is required. Runtime filters specified via `runtimeFilters` in `LiveboardViewConfig` are automatically applied to all Insight Tiles on the same Liveboard.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    frameParams: { width: '100%', height: '100%' },
+    liveboardId: '<liveboard-id>',
+    runtimeFilters: [
+        {
+            columnName: 'Region',
+            operator: RuntimeFilterOp.EQ,
+            values: ['West'],
+        },
+    ],
+    spotterViz: {
+        brandName: 'Acme Analytics',
+    },
+});
+
+liveboardEmbed.render();
+----
+
+For more information, see xref:runtime-filter.adoc[Runtime filters].
+
+== Related topics
+
+* xref:embed-spotter.adoc[Embed Spotter]
+* xref:embed-pinboard.adoc[Embed a Liveboard]
+* xref:runtime-filter.adoc[Runtime filters]
+* xref:api-changelog.adoc[Visual Embed SDK changelog]
+* xref:whats-new.adoc[What's new]
