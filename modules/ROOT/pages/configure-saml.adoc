@@ -339,4 +339,68 @@ Do NOT include the protocol in the SAML redirect domain name string to avoid con
 +
 . Click *Save changes*.
 
+== #Troubleshoot SAML SSO#
 
+=== Users are redirected to the IdP login page but return to an error screen
+
+Check the following in the browser *Network* tab:
+
+. Inspect the SAML response posted to the ACS URL (`/callosum/v1/saml/SSO`). A `400 Bad Request` from ThoughtSpot usually means one of the following:
++
+[cols="1,2"]
+|===
+| Symptom | Fix
+
+| `InResponseTo` mismatch
+| The IdP is sending an IdP-initiated response when ThoughtSpot expects SP-initiated. Check whether your IdP is configured for SP-initiated SSO.
+
+| Assertion expired
+| The SAML assertion `NotOnOrAfter` value has passed. Synchronize server clocks between your IdP and ThoughtSpot. If your IdP doesn't support `SessionNotOnOrAfter`, ask ThoughtSpot Support to enable `maxAuthenticationAge`.
+
+| Audience mismatch
+| The `Audience` element in the SAML assertion does not match the Entity ID configured on ThoughtSpot. Confirm the Entity ID value in *Admin* > *SAML* and ensure it matches exactly in your IdP.
+
+| Signature validation failed
+| The IdP certificate used to sign the assertion has expired or been rotated. Update the IdP certificate in the ThoughtSpot SAML configuration.
+|===
+
+=== SSO works for some users but not others
+
+* Confirm that all affected users exist in ThoughtSpot with usernames that exactly match the `NameID` value sent by the IdP. SAML username matching is case-sensitive.
+* If using Orgs, confirm that the SAML assertion includes a valid `Orgs` attribute for each user. Users not mapped to any Org will be denied access.
+* Verify that the failing users are assigned to the correct application in the IdP.
+
+=== `AuthType.SAMLRedirect` causes infinite redirect loop
+
+This usually means the SAML redirect domain has not been added to the allowed list in ThoughtSpot. Go to *Develop* > *Customizations* > *Security settings* and add your embedding application domain to the SAML redirect allowlist. See xref:configure-saml.adoc#saml-redirect[Add SAML redirect domain to the allowed list].
+
+=== Automatic SAML redirect breaks non-embedded users
+
+When automatic SAML redirect is enabled, it applies to all users — including those accessing ThoughtSpot directly. To temporarily bypass it for testing or admin access, append `?disableSAMLAutoRedirect=true` to the ThoughtSpot URL.
+
+== #FAQs#
+
+=== Can I configure more than one SAML IdP?
+
+Yes. ThoughtSpot supports up to 5 SAML IdP configurations. However, when a user logs in from the ThoughtSpot login page, only the default IdP is used. Users on non-default IdPs must initiate login from those IdPs' own login pages. To configure multiple IdPs, contact ThoughtSpot support.
+
+=== Do I need to reconfigure my IdP if I rotate the ThoughtSpot SAML certificate?
+
+Yes. The SP metadata XML exported from ThoughtSpot contains the signing certificate. After rotating the certificate, re-export the SP metadata and update it in your IdP application. Until the IdP is updated, signature validation will fail for SP-initiated SSO requests.
+
+=== Can SAML and local authentication be active at the same time?
+
+Yes. By default, local authentication remains active after you configure SAML. You can disable local authentication from *Admin* > *Authentication* > *Local* (IAMv2) once SAML is working and verified. See xref:authentication-local.adoc[Managing local authentication].
+
+=== Does SAML support just-in-time user provisioning?
+
+Yes. ThoughtSpot can create user accounts automatically on first SAML login if the SAML assertion includes the required attributes (`username`, `email`). Contact link:https://www.thoughtspot.com/support[ThoughtSpot Support, window=_blank] to enable JIT provisioning on your instance.
+
+=== What SAML bindings does ThoughtSpot support?
+
+ThoughtSpot supports HTTP POST binding for both SP-initiated and IdP-initiated SAML flows. HTTP Redirect binding is not supported for responses.
+// TODO: verify binding support details with engineering
+
+=== Can I use SAML SSO in an embedded ThoughtSpot deployment?
+
+Yes, using `AuthType.SAMLRedirect` in the Visual Embed SDK `init()` call. The browser is redirected to the IdP outside of the iFrame and returned to the embedding application page after authentication. See xref:configure-saml.adoc#auth-config-sdk[Enable SSO authentication in Visual Embed SDK].
