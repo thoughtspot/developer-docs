@@ -1,32 +1,12 @@
-= Deliver Liveboard reports to an external application
+= Delivering reports to external destination via webhooks
 :toc: true
 :toclevels: 3
 
 :page-title: Webhooks for Liveboard Scheduled Jobs
 :page-pageid: webhooks-lb-schedule
-:page-description: Configure Webhooks and send alerts to specific communication channels
-
-[beta betaBackground]^Beta^
-
-By configuring a webhook, users can send notifications automatically to a target application whenever a scheduled Liveboard job is triggered in ThoughtSpot.
-
-[NOTE]
-====
-* Webhook support for Liveboard schedule events is available only on ThoughtSpot Cloud instances with 10.14.0.cl or later. The webhook feature is currently in beta and not enabled by default. To enable this feature on your instance, contact ThoughtSpot Support.
-* You can configure only one webhook for the Liveboard schedule event per Org.
-====
-
-== Overview
+:page-description: Configure a webhook to deliver scheduled Liveboard reports to an external application or cloud storage destination
 
 If you have scheduled a Liveboard job to receive a daily report via email, you can configure ThoughtSpot to send the report directly to a webhook endpoint and create your own custom emails or workflows.
-
-* Configure a webhook for the Liveboard schedule event to enable programmatic communication between the target application and ThoughtSpot. +
-To create and manage webhook APIs, use the following APIs:
-** `POST /api/rest/2.0/webhooks/create`
-** `POST /api/rest/2.0/webhooks/delete`
-** `POST /api/rest/2.0/webhooks/search`
-** `POST /api/rest/2.0/webhooks/{webhook_identifier}/update`
-
 
 == Before you begin
 
@@ -37,25 +17,24 @@ If your instance has Role-based Access Control (RBAC) enabled, you need the foll
 ** `APPLICATION_ADMINISTRATION` (*Can Manage Application settings*) to create and view communication channels.
 ** `CAN_MANAGE_WEBHOOKS` (*Can manage webhooks*) to create and manage webhooks.
 * Ensure that a xref:webhooks-comm-channel.adoc[webhook communication channel] is configured for your Org or at the cluster level on your instance.
-//* To allow outbound traffic from ThoughtSpot to the webhook endpoint, add the webhook destination URL to the xref:security-settings.adoc#csp-connect-src[CSP connect-src] allowlist in ThoughtSpot.
 * Ensure that your destination application has a callback URL to accept HTTP POST requests from ThoughtSpot.
 * If you plan to use OAuth authentication, make sure you have the OAuth credentials and authorization URL of your application.
 * If you plan to use an API key for authentication, ensure that you have a valid API key.
 
 == Configuration steps
-
 The webhook setup for Liveboard schedule events includes the following steps:
 
-* xref:webhooks-lb-schedule.adoc#_configure_a_webhook[Creating a webhook to listen to Liveboard schedule events].
-* xref:webhooks-lb-schedule.adoc#_verify_the_integration[Verifying the integration and webhook payload].
+. xref:webhooks-lb-schedule.adoc#configure-webhook[Configure a webhook] to listen to Liveboard
+schedule events.
+. xref:webhooks-lb-schedule.adoc#verify-integration[Verify the integration] and webhook payload.
 
-== Configure a webhook
+[#configure-webhook]
+== Configuring a webhook
+You can create and manage webhooks using the new Webhooks page in the UI or via Webhook REST APIs.
 
-To configure webhooks for the Liveboard schedule event, use the webhook REST API.
-
-=== Create a webhook
-
-To create a webhook for the Liveboard schedule event, send a `POST` request to the `/api/rest/2.0/webhooks/create` API endpoint. ThoughtSpot allows only one webhook per Org.
+=== Through REST API
+To create a webhook for the Liveboard schedule event, send a `POST` request to the
+`/api/rest/2.0/webhooks/create` API endpoint. ThoughtSpot allows only one webhook per Org.
 
 ==== Request parameters
 
@@ -66,33 +45,35 @@ To create a webhook for the Liveboard schedule event, send a `POST` request to t
 | `name` a|__String__. Name of the webhook.
 | `description` +
 __Optional__ a|__String__. Description text for the webhook.
-| `url` a|__String__. The fully qualified URL of the listening endpoint to which you want to send webhook notifications.
-| `url_params` a| A JSON map of key-value pairs to append as query parameters in the webhook URL.
-| `events` a|__Array of strings__. List of events to subscribe to. Specify the event as `LIVEBOARD_SCHEDULE`.
-| `authentication` a|
+| `url` a|__String__. The fully qualified URL of the listening endpoint to which you want to
+send webhook notifications.
+| `url_params` a|A JSON map of key-value pairs to append as query parameters in the webhook URL.
+| `events` a|__Array of strings__. List of events to subscribe to. Specify `LIVEBOARD_SCHEDULE`.
+| `authentication` a|Defines the authentication method and credentials ThoughtSpot uses when
+sending HTTP requests to the webhook endpoint.
 
-Defines authentication method and credentials that ThoughtSpot will use when sending HTTP requests to the webhook endpoint.
-
-Specify the authentication type.
+Specify the authentication type:
 
 * `API_KEY` +
-API key to authorize the payload requests. Specify the API key to use in the `X-API-Key` request header.
+API key to authorize the payload requests. Specify the API key to use in the `X-API-Key`
+request header.
 * `BASIC_AUTH` +
-Authentication methods with username and password.
+Authentication with username and password.
 * `BEARER_TOKEN` +
 Authentication token to authenticate and authorize requests.
 * `OAUTH2` +
-OAuth credentials to authorize API requests. Specify client ID, client secret key, and authorization URL.
-If the registered webhook has OAuth authentication enabled, `Authorization: Bearer <access-token>` is sent in the request header.
+OAuth credentials to authorize API requests. Specify client ID, client secret key, and
+authorization URL. If the registered webhook has OAuth authentication enabled,
+`Authorization: Bearer <access-token>` is sent in the request header.
 | `signature_verification` +
-__Optional__ a| Signature verification parameters for the webhook endpoint to verify the authenticity of incoming requests. This typically involves ThoughtSpot signing the webhook payload with a secret, and your webhook endpoint validating this signature using the shared secret.
+__Optional__ a|Signature verification parameters for the webhook endpoint to verify the
+authenticity of incoming requests. ThoughtSpot signs the webhook payload with a secret, and
+your webhook endpoint validates the signature using the shared secret.
 
-
-If using signature verification, specify the following parameters.
+If using signature verification, specify the following parameters:
 
 * `type` +
-Signature verification type. Supported type is `HMAC_SHA256`, which uses Hash-based Message Authentication Code (HMAC) algorithm with the SHA-256 hash function to generate a cryptographic signature for webhook payloads. When configured, ThoughtSpot will sign the webhook payload using a shared secret and the HMAC_SHA256 algorithm. Your receiving endpoint should use the same secret and algorithm to compute the HMAC of the received payload and compare it to the signature sent by ThoughtSpot.
-
+Signature verification type. The supported type is `HMAC_SHA256`.
 * `header` +
 HTTP header where the signature is sent.
 * `algorithm` +
@@ -100,11 +81,17 @@ Hash algorithm used for signature verification.
 * `secret` +
 Shared secret used for HMAC signature generation.
 | `storage_destination` +
-__Optional__ | Configuration parameters for the S3 storage destination. For more information, see xref:webhooks-s3-storage.adoc[Deliver content to AWS S3 storage using webhooks].
+__Optional__ a|Configuration parameters for the cloud storage destination. ThoughtSpot supports
+AWS S3 and GCP GCS as storage destinations. For more information, see
+xref:webhooks-s3-storage.adoc[Deliver Liveboard reports to AWS S3 storage] and
+xref:webhooks-gcs-storage.adoc[Deliver Liveboard reports to GCS storage].
+| `status` +
+__Optional__ a|__String__. Status of the webhook. Specify `ENABLED` to activate the webhook
+immediately, or `DISABLED` to create it in a deactivated state. Available from 26.7.0.cl.
 |`additional_headers` +
-__Optional__ a|__Array of key-value pairs__. Allows including custom HTTP headers in every outbound webhook HTTP request that ThoughtSpot sends to the configured destination URL. When configured, ThoughtSpot sends these headers in addition to the authentication headers and standard HTTP headers such as `Content-Type`, `User-Agent`.
-
-You can use this parameter to pass arbitrary headers with custom metadata in key-value pairs, as required by the webhook receiver endpoint:
+__Optional__ a|__Array of key-value pairs__. Custom HTTP headers to include in every outbound
+webhook request, in addition to authentication headers and standard HTTP headers such as
+`Content-Type` and `User-Agent`.
 
 [source,JSON]
 ----
@@ -118,7 +105,6 @@ You can use this parameter to pass arbitrary headers with custom metadata in key
 |=====
 
 ==== Example request
-The following example shows the request body for creating a webhook:
 
 [source,cURL]
 ----
@@ -141,243 +127,87 @@ curl -X POST \
 ----
 
 ==== Example response
-
 If webhook creation is successful, the API returns a 204 response code.
 
-=== View webhook properties
+=== Through the Webhooks page in UI
+If the new Webhooks page is enabled on your instance, you can create a webhook via UI.
 
-To view the properties of a webhook or get a list of webhooks configured on your ThoughtSpot instance, send a `POST` request to the `/api/rest/2.0/webhooks/search` API endpoint.
+==== Creating a webhook
+To add a webhook for the Liveboard schedule events:
 
-To get specific information, define the following parameters. If the API request is sent without parameters in the request body, ThoughtSpot returns the webhooks configured for the Org context in ThoughtSpot.
+. Go to **Develop** > **Customizations** and click **Webhooks**.
+. In the *Webhooks* page, click *Create webhook*.
+. In the *Create webhook* modal, configure the following:
+* *Name*: A display name for the webhook.
+* *URL*: The fully qualified HTTPS URL of the endpoint that will receive webhook payloads.
+* *Description*: (optional) A short description of the webhook's purpose.
+* *Event type*: Specify the ThoughtSpot event types to subscribe to. Ensure that *Liveboard schedule* is set as the event type.
+. Configure the authentication method your destination endpoint requires. +
+ThoughtSpot sends the configured credentials in every outbound request. The following options are available:
+* *No Authentication*: No authentication headers are added to the request. Not recommended for production use.
+* *OAuth 2.0*: ThoughtSpot obtains an access token using your OAuth client ID, client secret, and authorization URL, then sends `Authorization: Bearer <access-token>` in the request header. The token is refreshed automatically before expiry.
+* *API Key*: ThoughtSpot sends the API key in the `X-API-Key` request header.
+* *Bearer Token*: ThoughtSpot sends a static bearer token in the `Authorization: Bearer` header.
+* *Basic authentication*: ThoughtSpot sends a Base64-encoded username and password in the `Authorization` header.
+. Configure the file storage options. For more information, see xref:webhooks-s3-storage.adoc[AWS S3 storage integration for webhook delivery] and xref:webhooks-gcs-storage.adoc[GCS storage integration for webhook delivery].
+. Configure the advanced settings if required:
+* *Signature verification* +
+Specify the signature to send in the header for your endpoint to verify each request. Configure HMAC-SHA256 payload signing. ThoughtSpot signs each outbound
+payload with a shared secret. Your endpoint can use the same secret and algorithm to verify the signature in the incoming request header.
+* *Custom headers* +
+Use this feature to pass arbitrary metadata required by your endpoint in addition to standard and authentication headers. Define key-value pairs of custom headers to add to every outbound HTTP request.
+* *URL parameters*:
+Specify the query parameters to append to the webhook URL on every request.
+. Click *Save*. +
+If the webhook creation is successful, it will be added to table list in the Webhooks page.
 
-==== Request parameters
+==== Activating a webhook
+To activate the webhook, use one of the following options:
+* Select the webhook and click *Enable*.
+* In the webhook row, from the More options menu (`...`), click **Enable*.
 
-[width="100%" cols="2,4"]
+[#test-webhook]
+== Test a webhook
+
+Testing a webhook sends a synthetic payload to the configured endpoint to verify connectivity and
+authentication.
+
+. Hover over the webhook row and click the actions menu (*...*).
+. Select *Test*.
+. Review the result in the *Test Event* modal.
+
+The modal displays one of the following outcomes:
+
+[width="100%" cols="1,4"]
 [options='header']
 |=====
-|Parameter|Description
-| `org_identifier` +
-__Optional__ |__String__. ID or name of the Org.
-| `webhook_identifier` +
-__Optional__ | __String__. ID or name of the webhook.
-| `event_type` +
-__Optional__| __String__. Type of webhook event to filter by. For Liveboard schedule events, specify `LIVEBOARD_SCHEDULE`.
-|Pagination settings a| If fetching multiple records, specify the following parameters to paginate the API response: +
-
-* `record_offset` +
-__Integer__. Specifies the starting point (index) from which records should be returned. Default is 0.
-* `record_size` +
-__Integer__. Specifies the number of records to return in the response. Default is 50.
-| `sort_options` +
-__Optional__ a| Enables sorting of the API response by a specific field in ascending or descending order.
-
-To define a sorting criteria for the webhook records in API response, set the `field_name` to one of the following options:
-
-* `CREATED` +
-Sorts the records by the webhook creation timestamp.
-* `MODIFIED` +
-Sorts the webhook object by the last modified timestamp.
-* `NAME` +
-Sorts the records alphabetically.
-
-To specify the sort order, set `order` to `ASC` for ascending order, or `DESC` for descending order.
-
-For example:
-
-[source,JSON]
-----
-"sort_options": {
-   "field_name":"CREATED",
-   "order":"ASC"
-}
-----
+|Outcome|Description
+|*Success*|The endpoint returned an HTTP 2xx response within the timeout window.
+|*Authentication error*|The endpoint rejected the request due to invalid or missing credentials.
+|*Timeout*|The endpoint did not respond within the allowed time window.
+|*4xx error*|The endpoint returned a client error (for example, 400 Bad Request or 404 Not Found).
+|*5xx error*|The endpoint returned a server error.
 |=====
 
-==== Example request
-
-The following example shows the request body to fetch webhook properties:
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/search'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "org_identifier": "testOrg1",
-  "event_type": "LIVEBOARD_SCHEDULE"
-}'
-----
-
-==== Example response
-
-If the API request is successful, ThoughtSpot returns the webhook configuration details:
-
-[source,JSON]
-----
-{
-   "webhooks":[
-      {
-         "id":"27997a8a-cd33-485d-a039-b40b71d191a8",
-         "name":"webhook-lb-event",
-         "description": "Webhook for Liveboard schedule",
-         "org":{
-            "id":"2100019165",
-            "name":"testOrg1"
-         },
-         "url":"https://webhook-test-server-263n.onrender.com/",
-         "url_params":null,
-         "events":[
-            "LIVEBOARD_SCHEDULE"
-         ],
-         "authentication":null,
-         "signature_verification":null,
-         "additional_headers":null,
-         "creation_time_in_millis":1773824614455,
-         "modification_time_in_millis":1773824614455,
-         "created_by":{
-            "id":"4e6e5692-667e-487d-9672-f301ccc2ea77",
-            "name":"UserA@example.com"
-         },
-         "last_modified_by":null,
-         "storage_destination":null
-      }
-   ],
-   "pagination":{
-      "record_offset":0,
-      "record_size":50,
-      "total_count":1,
-      "has_more":false
-   }
-}
-----
-
-=== Update the properties of a webhook
-
-To update the name, description text, endpoint URL, or the authentication settings of a webhook object, send a `POST` request to the `/api/rest/2.0/webhooks/{webhook_identifier}/update` API endpoint.
-
-==== Request parameters
-
-Specify the `webhook_identifier` and pass it as a path parameter in the request URL.
-
-The API operation allows you to update the following webhook properties:
-
-* `name` +
-Name of the webhook.
-* `description` +
-Description text of the webhook.
-* `url` +
-The URL of the webhook endpoint.
-* `url_params` +
-Query parameters to append to the endpoint URL.
-* `events` +
-Events subscribed to the webhook. In the current release, ThoughtSpot supports only the `LIVEBOARD_SCHEDULE` event.
-* `authentication` +
-Authentication method and credentials that ThoughtSpot will use when sending HTTP requests to the webhook endpoint.
-* `signature_verification` +
-Signature verification parameters for the webhook endpoint to verify the authenticity of incoming requests.
-* `additional_headers` +
-Optional and custom HTTP headers in the webhook request triggered by ThoughtSpot.
-
-==== Example request
-
-The following example shows the request body for updating the name, description text, and endpoint URL of a webhook object:
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/webhook-lb-test/update'  \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "name": "webhook-lb-event",
-  "description": "Webhook for Liveboard schedule event",
-  "url": "https://webhook.site/6643eba5-9d3e-42a1-85e0-bb686ba1524d/2e5251b2-8274-41f6-80a0-1b82854df31f",
-  "events": [
-    "LIVEBOARD_SCHEDULE"
-  ]
-}'
-----
-
-==== Example response
-
-If the API request is successful, the API returns a 204 response code indicating a successful operation.
-
+[#verify-integration]
 == Verify the integration
 
-To verify the webhook configuration, send an API request to the `/api/rest/2.0/system/communication-channels/validate` API endpoint and check the connection status.
+After creating a webhook, verify the configuration using one of the following methods:
 
-If the validation returns errors, verify the configuration and xref:webhooks-lb-schedule.adoc#_update_the_properties_of_a_webhook[update the webhook properties].
+=== Use the test event feature
 
-If the connection status is successful, trigger a webhook delivery to the configured destination and xref:webhooks-payload.adoc[verify the payload].
+On the *Webhooks* page in the *Develop* tab, hover over the webhook row, click the actions
+menu (*...*), and select *Test*. ThoughtSpot sends a synthetic payload to the configured
+endpoint. For more information, see xref:webhooks-manage.adoc#test-webhook[Test a webhook].
 
+=== Trigger a Liveboard schedule
 
-//For testing purposes, you can use a URL from link:https://webhook.site/[Webhook.site^] as a webhook endpoint and check the payload when the Liveboard schedule event is triggered.
+After the webhook is configured, ThoughtSpot delivers a payload to the webhook endpoint
+whenever a Liveboard schedule job runs. You can verify delivery in the *Logs* tab on the
+*Webhooks* page, or by checking your receiving endpoint directly.
 
-== Monitor webhook delivery status
-To monitor the webhook delivery and job status, use the `/api/rest/2.0/jobs/history/communication-channels/search` API endpoint. For more information, see xref:webhooks-comm-channel.adoc#_monitor_webhook_delivery_and_job_status[Monitor webhook delivery and job status].
+For information about scheduling a Liveboard, see
+xref:schedule-liveboard.adoc[Schedule a Liveboard job].
 
-== Delete a webhook
-To delete a webhook, send a `POST` request with the webhook ID to the `/api/rest/2.0/webhooks/delete` API endpoint.
-
-=== Example request
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/delete'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "webhook_identifiers": [
-    "webhook-lb-test"
-  ]
-}'
-----
-
-=== Example response
-
-If the API request is successful, the webhook is deleted, and the API returns the details of the deleted webhook in the response body.
-
-[source,JSON]
-----
-{
-  "deleted_count": 1,
-  "failed_count": 0,
-  "deleted_webhooks": [
-    {
-      "id": "45fe7810-3239-4761-94fd-04c017df29c4",
-      "name": "webhook-test",
-      "description": "Webhook for testing purposes",
-      "org": {
-        "id": "1574427524",
-        "name": "testOrg2025"
-      },
-      "url": "https://webhook.site/6643eba5-9d3e-42a1-85e0-bb686ba1524d/2e5251b2-8274-41f6-80a0-1b82854df31f",
-      "url_params": null,
-      "events": [
-        "LIVEBOARD_SCHEDULE"
-      ],
-      "authentication": null,
-      "signature_verification": null,
-      "additional_headers":null,
-      "creation_time_in_millis": 1761184185887,
-      "modification_time_in_millis": 1761184185887,
-      "created_by": {
-        "id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-        "name": "UserA@example.com"
-      },
-      "last_modified_by": null,
-      "storage_destination":null
-    }
-  ],
-  "failed_webhooks": []
-}
-----
-
-== Additional resources
-* xref:webhooks-comm-channel.adoc[Configure webhook communication channel]
-* link:https://docs.thoughtspot.com/cloud/latest/liveboard-schedule[Scheduling Liveboard jobs^]
-* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fschedules%2Fcreate-schedule">Liveboard schedule REST APIs</a>+++
+For information about the webhook payload structure, see
+xref:webhooks-payload.adoc[Webhook payload for Liveboard events].
