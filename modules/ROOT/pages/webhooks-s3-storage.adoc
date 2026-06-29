@@ -1,4 +1,4 @@
-= Deliver Liveboard reports to AWS S3 Storage
+= AWS S3 storage integration for webhook delivery
 :toc: true
 :toclevels: 3
 
@@ -171,7 +171,6 @@ In the permissions policy, specify the role ARN and S3 bucket name. Optionally, 
 ----
 |====
 
-
 == Provide the storage configuration details to ThoughtSpot
 Provide the following information to your ThoughtSpot administrator:
 
@@ -184,9 +183,9 @@ Provide the following information to your ThoughtSpot administrator:
 == Configure a webhook for the S3 storage destination in ThoughtSpot
 To create a webhook in ThoughtSpot, the webhook feature must be enabled on your instance. Only ThoughtSpot users with administration privileges or the *Can Manage Webhooks* privilege are allowed to create or manage a webhook.
 
-Currently, ThoughtSpot supports webhook creation with AWS S3 storage via REST APIs only.
+You can create a webhook with a cloud storage destination using the **Webhooks** page in the UI or through the create webhook REST API.
 
-=== Create a webhook
+=== Using REST API
 To configure the S3 storage properties in ThoughtSpot, the IAM role, external ID, S3 bucket name, and S3 region configured in your AWS account are required.
 
 To create a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/create` API endpoint.
@@ -317,6 +316,43 @@ If the API request is successful, ThoughtSpot returns the webhook configuration 
 }
 ----
 
+=== Through the Webhooks page in UI
+If the new Webhooks page is enabled on your instance, you can create a webhook via UI.
+
+==== Creating a webhook
+To create a webhook with an AWS S3 storage as the target destination for payload delivery:
+
+. Go to **Develop** > **Customizations** and click **Webhooks**.
+. In the *Webhooks* page, click *Create webhook*.
+. In the *Create webhook* modal, configure the following:
+* *Name*: A display name for the webhook.
+* *URL*: The fully qualified HTTPS URL of the endpoint that will receive webhook payloads.
+* *Description*: (optional) A short description of the webhook's purpose.
+* *Event type*: Specify the ThoughtSpot event types to subscribe to. Ensure that *Liveboard schedule* is set as the event type.
+. Configure the authentication method your destination endpoint requires. +
+ThoughtSpot sends the configured credentials in every outbound request. The following options are available:
+* *No Authentication*: No authentication headers are added to the request. Not recommended for production use.
+* *OAuth 2.0*: ThoughtSpot obtains an access token using your OAuth client ID, client secret, and authorization URL, then sends `Authorization: Bearer <access-token>` in the request header. The token is refreshed automatically before expiry.
+* *API Key*: ThoughtSpot sends the API key in the `X-API-Key` request header.
+* *Bearer Token*: ThoughtSpot sends a static bearer token in the `Authorization: Bearer` header.
+* *Basic authentication*: ThoughtSpot sends a Base64-encoded username and password in the `Authorization` header.
+. Configure the file storage options. For more information, see xref:webhooks-s3-storage.adoc[AWS S3 storage integration for webhook delivery] and xref:webhooks-gcs-storage.adoc[GCS storage integration for webhook delivery].
+. Configure the advanced settings if required:
+* *Signature verification* +
+Specify the signature to send in the header for your endpoint to verify each request. Configure HMAC-SHA256 payload signing. ThoughtSpot signs each outbound
+payload with a shared secret. Your endpoint can use the same secret and algorithm to verify the signature in the incoming request header.
+* *Custom headers* +
+Use this feature to pass arbitrary metadata required by your endpoint in addition to standard and authentication headers. Define key-value pairs of custom headers to add to every outbound HTTP request.
+* *URL parameters*:
+Specify the query parameters to append to the webhook URL on every request.
+. Click *Save*. +
+If the webhook creation is successful, it will be added to table list in the Webhooks page.
+
+==== Activating a webhook
+To activate the webhook, use one of the following options:
+* Select the webhook and click *Enable*.
+* In the webhook row, from the More options menu (`...`), click **Enable*.
+
 === View webhook configuration details
 
 To view the webhook configuration details, send a `POST` request to the `/api/rest/2.0/webhooks/search` API endpoint.
@@ -368,11 +404,11 @@ If the webhook ID is valid, the API returns the following response:
          "modification_time_in_millis":1772127859128,
          "created_by":{
             "id":"08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-            "name":"shashikala.subramanya@thoughtspot.com"
+            "name":"userA@thoughtspot.com"
          },
          "last_modified_by":{
             "id":"08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-            "name":"shashikala.subramanya@thoughtspot.com"
+            "name":"userA@thoughtspot.com"
          },
          "storage_destination":{
             "storage_type":"AWS_S3",

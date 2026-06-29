@@ -1,0 +1,485 @@
+= SpotterViz agent in Liveboards
+:toc: true
+:toclevels: 2
+
+:page-title: SpotterViz agent in Liveboards
+:page-pageid: spotterViz-agent
+:page-description: Customize the SpotterViz panel in embedded Liveboards using the Visual Embed SDK.
+
+The SpotterViz panel is supported in Liveboards embedded using `LiveboardEmbed` or  `AppEmbed` components. ThoughtSpot link:https://docs.thoughtspot.com/cloud/26.6.0.cl/spotter-viz[SpotterViz, window=_blank] is the AI-powered analysis panel that appears when a user opens the Liveboard in the edit mode. It provides Liveboard users with an in-context AI assistant and a prompt interface to ask questions on Liveboard data and receive automatically generated visualizations and insights in response.
+
+[NOTE]
+====
+* SpotterViz is an early access feature and is disabled by default on ThoughtSpot instances. To enable this feature on your instance, contact ThoughtSpot Support.
+* The SpotterViz panel in Liveboard embedding is supported in Visual Embed SDK v1.50.0 and ThoughtSpot instances with 26.7.0.cl or later versions only.
+====
+
+== Before you begin
+* Ensure that the Spotter feature is enabled on your ThoughtSpot instance.
+* Ensure that the SpotterViz feature is enabled on your instance. Contact your ThoughtSpot administrator if SpotterViz is not enabled.
+
+== Accessing SpotterViz panel
+If the SpotterViz feature is enabled on the instance, the panel is displayed by default when a Liveboard is opened in the edit mode in the embedded view.
+
+[.bordered]
+[.widthAuto]
+--
+image::./images/spotterviz-embed-mode.png[SpotterViz in embed view]
+--
+
+To disable or hide SpotterViz in embedded view, use the `Action.SpotterViz` action ID in the `disabledActions` or `hiddenActions` array.
+
+
+== Customizing the SpotterViz panel contents
+For SpotterViz panel customization, pass the `spotterViz` configuration object with the following  properties as needed:
+
+Brand name::
+To replace the default **SpotterViz** label with your product or assistant name, specify the brand name string in `brandName`.
+
+Greeting headline:: Customize the greeting prefix displayed before the brand name using `brandHeadline`. For example, setting `brandHeadline: "Hi there! I'm"` combined with `brandName: "Dashboard Builder"` renders as "Hi there! I'm Dashboard Builder".
+
+Description:: Use `description` to include your custom description text below the greeting. This helps users understand what the AI assistant can do.
+
+Input placeholder:: Use `inputChatPlaceholder` to customize the placeholder text shown in the chat input box when it is empty. By default, this text is displayed as "Let me help you build this Liveboard".
+
+Starter prompts::
+SpotterViz displays the question suggestions in the panel to help users begin an AI-assisted analysis. Each prompt has a short display label (`displayText`) and a full prompt string (`fullPrompt`) sent to Spotter when clicked.
+
+* To hide starter prompts, set `hideStarterPrompts` to `true`.
+* To customize the starter prompt text, use `customStarterPrompts`. The `customStarterPrompts` includes the following attributes:
+** `id`. __String__. Unique identifier for the prompt.
+** `displayText`. __String__. Short label shown to the user as a clickable suggestion chip.
+** `fullPrompt`. __String__. Full prompt text sent to Spotter when the user clicks the suggestion.
++
+For example, you can set the display text as `displayText: 'Regional breakdown'` and `fullPrompt` to `Show me revenue broken down by region`.
+
+Button and other interface elements::
+The SpotterViz panel displays the restore button on checkpoint cards and thumbs up and down feedback buttons by default. To disable or hide these elements, use the following action IDs in the SDK:
+* `Action.SpotterVizCheckpointRestore`
+* `Action.SpotterVizFeedback`
+
+=== SpotterViz in Liveboard embedding
+[source,javascript]
+----
+import {
+    LiveboardEmbed,
+    AuthType,
+    init,
+    SpotterVizConfig
+} from '@thoughtspot/visual-embed-sdk';
+
+init({
+    thoughtSpotHost: 'https://<your-thoughtspot-instance>', //Replace with your ThoughtSpot instance URL
+    authType: AuthType.None,
+});
+
+const embed = new LiveboardEmbed('#embed-container', {
+    liveboardId: '<liveboard-GUID>', // Replace with your Liveboard ID
+    spotterViz: {
+        brandName: 'Dashboard Builder',
+        brandHeadline: "Hi there! I'm",
+        description: 'Ask me anything about your data.',
+        inputChatPlaceholder: 'Ask a question...',
+        hideStarterPrompts: false,
+        customStarterPrompts: [
+            {
+                id: '1',
+                displayText: 'Top products',
+                fullPrompt: 'What are the top 10 products by revenue this quarter?',
+            },
+            {
+                id: '2',
+                displayText: 'Regional breakdown',
+                fullPrompt: 'Show me revenue broken down by region.',
+            },
+        ],
+    },
+    hideActions: [Action.SpotterVizCheckpointRestore],
+});
+embed.render();
+----
+
+=== SpotterViz in full application embedding
+
+[source,javascript]
+----
+import {
+    AppEmbed,
+    AuthType,
+    init,
+    SpotterVizConfig
+} from '@thoughtspot/visual-embed-sdk';
+
+init({
+    thoughtSpotHost: 'https://<your-thoughtspot-instance>.thoughtspot.cloud',
+    authType: AuthType.TrustedAuthTokenCookieless,
+    getAuthToken: () => fetch('/api/ts-token').then(r => r.json()).then(d => d.token),
+});
+
+const embed = new AppEmbed('#embed-container', {
+    pageId: Page.Liveboards,
+    spotterViz: {
+        brandName: 'Dashboard Builder',
+        description: 'Explore your data with AI.',
+        hideStarterPrompts: true,
+    },
+    hideActions: [Action.SpotterVizCheckpointRestore]
+});
+
+embed.render();
+----
+
+== Customizing the style and appearance
+You can customize the visual appearance of the SpotterViz panel using CSS customization framework in the SDK. Use any of the following CSS variables in the `customizations` object of the `init()` call  to customize the panel style and appearance.
+
+[IMPORTANT]
+====
+CSS variable customizations applied in `init()` are scoped to the embedded ThoughtSpot application. Changes to SpotterViz variables affect only the SpotterViz panel and Liveboard edit toolbar. However, changes to other variables, such as `--ts-var-root-background`, affect the entire embedded application. Therefore, you must test the styling changes against all embedded components to avoid unintended visual side effects.
+====
+
+The following tables list all CSS variables available for customizing the SpotterViz panel. Variables are grouped by the UI area they control.
+
+=== Panel and layout
+
+[cols="2,3", options="header"]
+|===
+| CSS variable | Description
+
+| `--ts-var-spotterviz-panel-background`
+| Main background color of the SpotterViz panel.
+
+| `--ts-var-spotterviz-border-color`
+| Shared border color used throughout SpotterViz. Controls the chat input box
+border, user message border, header underline, left panel border, and
+thinking step connector lines and dots.
+
+| `--ts-var-spotterviz-footer-text-color`
+| Text color of the SpotterViz panel footer.
+|===
+
+=== Text colors
+
+[cols="2,3", options="header"]
+|===
+| CSS variable | Description
+
+| `--ts-var-spotterviz-text-primary`
+| Primary text color in the SpotterViz panel. Applied to the SpotterViz panel header, close icon, user message text, agent response text, thinking step headers, checkpoint "Liveboard updated" text, brand name and description, text in the empty state, starter prompt text, and upvote/downvote icons.
+
+| `--ts-var-spotterviz-text-secondary`
+| Secondary text color in the SpotterViz panel. Applied to checkpoint version labels ("version N"), tool call display, and the copy action color on input/JSON/output panels.
+
+| `--ts-var-spotterviz-emptystate-spotterviz-color`
+| Text color of the SpotterViz brand label shown in the empty state, displayed below the SpotterViz icon.
+|===
+
+=== Chat input
+
+[cols="2,3", options="header"]
+|===
+| CSS variable | Description
+
+| `--ts-var-spotterviz-input-background`
+| Background color of the chat input field.
+
+| `--ts-var-spotterviz-input-placeholder-color`
+| Placeholder text color in the chat input field.
+
+| `--ts-var-spotterviz-input-cta-color`
+| Color of the submit (CTA) button in the chat input field.
+
+| `--ts-var-spotterviz-input-cta-hover-color`
+| Hover color of the submit (CTA) button in the chat input field.
+
+| `--ts-var-spotterviz-reference-icon-hover-background`
+| Background color of the reference-mode toggle button in the chat input when it is in the unselected state and the user hovers over it.
+
+| `--ts-var-spotterviz-reference-icon-selected-color`
+| Icon color for the reference-mode selected state. Applies to the toggle button when active and to the icon badge on referenced entity chips in the chat input.
+
+| `--ts-var-spotterviz-reference-icon-selected-background`
+| Background color for the reference-mode selected state. Applies to the reference-mode toggle button when active and to the icon badge on referenced entity chips in the chat input.
+|===
+
+=== Starter prompts
+
+[cols="2,3", options="header"]
+|===
+| CSS variable | Description
+
+| `--ts-var-spotterviz-prompt-card-background`
+| Background color of the starter prompt suggestion cards.
+
+| `--ts-var-spotterviz-prompt-card-hover-background`
+| Background color of starter prompt suggestion cards on hover.
+
+|===
+
+=== User messages
+[cols="2,3", options="header"]
+|===
+| CSS variable | Description
+
+| `--ts-var-spotterviz-message-background`
+| Background color of the user's chat message bubbles.
+
+| `--ts-var-spotterviz-usermessage-icon-hover`
+| Hover color of the expand button on user chat message bubbles.
+
+| `--ts-var-spotterviz-usermessage-icon-background`
+| Background color of the expand button on user chat message bubbles.
+
+|===
+
+=== Thinking and progress states
+
+[cols="2,3", options="header"]
+|===
+| CSS variable | Description
+
+| `--ts-var-spotterviz-thinking-inprogress-header-color`
+| Color of the thinking step header text while the agent is still working.
+
+| `--ts-var-spotterviz-thinking-completed-header-color`
+| Color of the thinking step header text once the step is complete. Also
+applied to the arrow icon on the "work done" state.
+
+| `--ts-var-spotterviz-thinking-work-done-icon-color`
+| Color of the final completion indicator icon (the green circle) shown
+when all agent work is done.
+
+| `--ts-var-spotterviz-thinking-cta-hover-background`
+| Hover background color for the working/work done CTA element.
+|===
+
+=== Tool calls
+
+[cols="2,3", options="header"]
+|===
+| CSS variable | Description
+
+| `--ts-var-spotterviz-tool-call-background`
+| Background color of tool call panels.
+
+| `--ts-var-spotterviz-tool-title-color`
+| Color of tool titles and icons inside tool call panels.
+
+| `--ts-var-spotterviz-tool-border-color`
+| Border color of tool call panels.
+
+| `--ts-var-spotterviz-tool-json-input-background`
+| Background color of the JSON input/output panel inside a tool call.
+
+| `--ts-var-spotterviz-tool-json-input-color`
+| Text color of the JSON input/output panel inside a tool call.
+
+| `--ts-var-spotterviz-tool-feedback-button-background`
+| Background color of the upvote/downvote feedback buttons.
+
+| `--ts-var-spotterviz-tool-feedback-button-hover`
+| Hover background color of the upvote/downvote feedback buttons.
+
+|===
+
+=== Checkpoints
+
+[cols="2,3", options="header"]
+|===
+| CSS variable | Description
+| `--ts-var-spotterviz-last-checkpoint-background`
+| Background color of the last checkpoint summary section.
+| `--ts-var-spotterviz-last-checkpoint-border`
+| Border color of the last checkpoint summary section.
+|===
+
+=== Liveboard edit toolbar
+
+The Liveboard edit toolbar hosts the SpotterViz trigger button and other Liveboard editing controls. You can customize it independently from the SpotterViz panel itself.
+
+[cols="2,3", options="header"]
+|===
+| CSS variable | Description
+
+| `--ts-var-liveboard-edit-toolbar-border`
+| Border color of the Liveboard edit header toolbar.
+
+| `--ts-var-liveboard-edit-toolbar-selected-background`
+| Background color of the selected (active) section in the Liveboard edit header toolbar.
+
+| `--ts-var-liveboard-edit-toolbar-selected-text-color`
+| Text color of the selected section in the Liveboard edit header toolbar. Also applied to the Add button and toolbar icons in the selected state.
+
+| `--ts-var-liveboard-edit-toolbar-text`
+| Text color of unselected items in the Liveboard edit header toolbar. Also applied to the Add button and toolbar icons in the unselected state.
+
+| `--ts-var-liveboard-edit-toolbar-hover-background`
+| Hover background color of unselected items in the Liveboard edit header
+toolbar. Also applied to the Add button and toolbar icons on hover.
+
+| `--ts-var-liveboard-edit-toolbar-hover-text-color`
+| Hover text color of unselected items in the Liveboard edit header toolbar.
+
+|===
+
+=== Apply CSS variable customizations
+
+Pass CSS variables using the `customCSSVariables` map inside the
+`customizations.style` object of the `init()` call.
+
+// SOURCE: https://github.com/thoughtspot/visual-embed-sdk/blob/master/src/css-variables.ts
+
+[source,javascript]
+----
+import {
+    LiveboardEmbed,
+    AuthType,
+    init,
+} from '@thoughtspot/visual-embed-sdk';
+
+init({
+    thoughtSpotHost: 'https://<your-thoughtspot-instance>.thoughtspot.cloud',
+    authType: AuthType.TrustedAuthTokenCookieless,
+    getAuthToken: () => fetch('/api/ts-token').then(r => r.json()).then(d => d.token),
+    customizations: {
+        style: {
+            customCSSVariables: {
+                // Panel and layout
+                '--ts-var-spotterviz-panel-background': '#1a1a2e',
+                '--ts-var-spotterviz-border-color': '#3a3a5c',
+                '--ts-var-spotterviz-footer-text-color': '#a0a0c0',
+
+                // Text colors
+                '--ts-var-spotterviz-text-primary': '#ffffff',
+                '--ts-var-spotterviz-text-secondary': '#a0a0c0',
+                '--ts-var-spotterviz-emptystate-spotterviz-color': '#8080b0',
+
+                // Chat input
+                '--ts-var-spotterviz-input-background': '#16213e',
+                '--ts-var-spotterviz-input-placeholder-color': '#606080',
+                '--ts-var-spotterviz-input-cta-color': '#6c63ff',
+                '--ts-var-spotterviz-input-cta-hover-color': '#8a84ff',
+
+                // Starter prompts
+                '--ts-var-spotterviz-prompt-card-background': '#0f3460',
+                '--ts-var-spotterviz-prompt-card-hover-background': '#1a4a7a',
+
+                //  User messages
+                '--ts-var-spotterviz-message-background': '#0f3460',
+
+                // Thinking / progress states
+                '--ts-var-spotterviz-thinking-inprogress-header-color': '#a0a0ff',
+                '--ts-var-spotterviz-thinking-completed-header-color': '#4caf50',
+                '--ts-var-spotterviz-thinking-work-done-icon-color': '#4caf50',
+                '--ts-var-spotterviz-thinking-cta-hover-background': '#2a2a4e',
+
+                // Tool calls
+                '--ts-var-spotterviz-tool-call-background': '#12122a',
+                '--ts-var-spotterviz-tool-title-color': '#c0c0ff',
+                '--ts-var-spotterviz-tool-border-color': '#3a3a5c',
+                '--ts-var-spotterviz-tool-json-input-background': '#0d0d1a',
+                '--ts-var-spotterviz-tool-json-input-color': '#c0ffc0',
+                '--ts-var-spotterviz-tool-feedback-button-background': '#2a2a4e',
+                '--ts-var-spotterviz-tool-feedback-button-hover': '#3a3a6e',
+
+                // Checkpoints
+                '--ts-var-spotterviz-last-checkpoint-background': '#1a2a3e',
+                '--ts-var-spotterviz-last-checkpoint-border': '#3a5a7c',
+
+                // Liveboard edit toolbar
+                '--ts-var-liveboard-edit-toolbar-border': '#3a3a5c',
+                '--ts-var-liveboard-edit-toolbar-selected-background': '#6c63ff',
+                '--ts-var-liveboard-edit-toolbar-selected-text-color': '#ffffff',
+                '--ts-var-liveboard-edit-toolbar-text': '#a0a0c0',
+                '--ts-var-liveboard-edit-toolbar-hover-background': '#2a2a4e',
+                '--ts-var-liveboard-edit-toolbar-hover-text-color': '#ffffff',
+            },
+        },
+    },
+});
+----
+
+=== SpotterViz button customization
+The SpotterViz trigger button renders in the Liveboard edit toolbar. You can customize it in two ways:
+
+Button icon::
+The SpotterViz button uses the `rd-icon-spotter-viz` icon from the icon sprite. To replace it with a custom icon, set the `iconSpriteUrl` property in your `customizations` object pointing to a sprite that includes  the `rd-icon-spotter-viz` icon ID.
+For more information, see xref:customize-icons.adoc[Customize icons].
+
+Button text::
+The button label follows the `brandName` value you set in the `spotterViz` configuration object. Setting `brandName` in your embed configuration automatically updates the button text to match, keeping your custom brand name consistent across the panel and the toolbar button.
+
+Button colors::
+Use the `--ts-var-liveboard-edit-toolbar-*` variables described in the <<_liveboard_edit_toolbar,Liveboard edit toolbar>> table above to control the button's background, text, and hover colors in both the selected and unselected states.
+
+== Customizing app interactions
+The following embed events are emitted by the SpotterViz panel.
+
+* `EmbedEvent.SpotterVizCheckpointCreated` +
+Emitted when a checkpoint is created in the SpotterViz panel.
+* `EmbedEvent.SpotterVizCheckpointRestored` +
+Emitted when a checkpoint is restored in the SpotterViz panel.
+* `EmbedEvent.SpotterVizClosed` +
+Emitted when the SpotterViz panel is closed.
+* `EmbedEvent.SpotterVizError` +
+Emitted when an error occurs in the SpotterViz panel.
+* `EmbedEvent.SpotterVizInit` +
+Emitted when the SpotterViz panel mounts in embed mode.
+* `EmbedEvent.SpotterVizQueryTriggered` +
+Emitted when the user submits a prompt in the SpotterViz panel.
+* `EmbedEvent.SpotterVizResponseComplete` +
+Emitted when the SpotterViz response ends.
+
+[source,javascript]
+----
+liveboardEmbed.on(EmbedEvent.SpotterVizInit, (payload) => {
+    console.log('SpotterViz initialized', payload);
+    // payload: { liveboardId: string }
+});
+
+liveboardEmbed.on(EmbedEvent.SpotterVizError, (payload) => {
+    console.log('SpotterViz error', payload);
+});
+
+liveboardEmbed.on(EmbedEvent.SpotterVizQueryTriggered, (payload) => {
+    console.log('SpotterViz query triggered', payload);
+    // payload: { query: string, sessionId: string }
+});
+
+liveboardEmbed.on(EmbedEvent.SpotterVizResponseComplete, (payload) => {
+    console.log('SpotterViz response complete', payload);
+    // payload: { sessionId: string, messageId: string }
+});
+----
+
+The following host events can be configured for automating workflows:
+
+* `HostEvent.InitSpotterVizConversation` +
+Initializes a new SpotterViz conversation.
+* `HostEvent.SpotterVizSendUserMessage` +
+Sends a prompt to the SpotterViz panel.
+
+[source,javascript]
+----
+liveboardEmbed.trigger(HostEvent.InitSpotterVizConversation);
+liveboardEmbed.trigger(HostEvent.SpotterVizSendUserMessage, {
+    query: 'Show me revenue by region',
+});
+----
+
+////
+[#runtime-filters]
+== Runtime filters and insight tiles
+Runtime filters and parameters passed to `LiveboardEmbed` are in SpotterViz-generated insight tiles. When a runtime filter is applied, Spotter automatically regenerates the tile's insights using the filtered data context.
+
+No additional configuration is required. Runtime filters specified via `runtimeFilters` in `LiveboardViewConfig` are automatically applied to all Insight Tiles on the same Liveboard.
+////
+
+== Additional resources
+
+See the following documentation for additional information about embedding Liveboards and customizing Liveboard experience:
+
+* xref:embed-liveboard.adoc[Embed a Liveboard]
+* xref:full-embed.adoc[Embed full ThoughtSpot experience]
+* xref:embed-events.adoc[Embed events reference]
+* xref:host-events.adoc[Host events reference]
+* xref:SpotterVizConfig.adoc[SpotterVizConfig interface]
