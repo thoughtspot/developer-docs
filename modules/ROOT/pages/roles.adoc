@@ -285,8 +285,7 @@ the following privileges:
 These privileges are permitted on the ALL group and may be assigned through
 additional roles depending on your ThoughtSpot instance's configuration.
 
-Due to a limitation in the update group flow, additional privileges may be inadvertently assigned to the ALL group.
-When this occurs, every user on that ThoughtSpot instance inherits those unexpected elevated privileges.
+For users who have inherited unexpected elevated privileges, follow the steps listed below to restore privileges.
 
 [NOTE]
 ====
@@ -294,9 +293,12 @@ The ALL role is a system role. It is not visible in the ThoughtSpot UI. You must
 ====
 
 === Before you begin
-* Administrator access to your ThoughtSpot instance.
+Before you start, ensure you have:
 
-=== Steps to unblock the users
+* Administrator privileges on your ThoughtSpot instance.
+* A valid bearer token for authentication.
+
+=== Procedure to unblock the users
 
 . Retrieve the GUID of the ALL group
 +
@@ -305,15 +307,14 @@ Call the `POST /api/rest/2.0/groups/search` endpoint and filter by the group nam
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/api/rest/2.0/groups/search' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/groups/search' \
   -H 'Authorization: Bearer {access-token}'\
   -H 'Accept: application/json'\
   -H 'Content-Type: application/json' \
   --data-raw '{
-      "group_identifier": "All",  // <1>
       "record_offset": 0,
       "record_size": 10
-}
+}'
 ----
 +
 From the response, locate the `id` field. This is the GUID of the ALL group.
@@ -322,7 +323,7 @@ From the response, locate the `id` field. This is the GUID of the ALL group.
 ----
 [
   {
-    "id": "<all-group-guid>",  //
+    "id": "<ALL-group-guid>",
     "name": "All",
     "display_name": "All Group",
     "system_group": true,
@@ -345,11 +346,11 @@ curl -X POST \
 -H 'Content-Type: application/json' \
 --data-raw '{
   "group_identifiers": [
-    "<ALL-group-guid>"  //
+    "<ALL-group-guid>"
   ],
   "record_offset": 0,
   "record_size": 10
-}
+}'
 ----
 
 . Restore the ALL role on the ALL group
@@ -363,18 +364,18 @@ with only the ALL role, removing all unexpected role assignments in a single ope
 [source,cURL]
 ----
 curl -X POST \
---url 'https://{ThoughtSpot-Host}/api/rest/2.0/groups/<all-group-guid>/update' \
+--url 'https://{ThoughtSpot-Host}/api/rest/2.0/groups/<ALL-group-guid>/update' \
 -H 'Authorization: Bearer {access-token}'\
 -H 'Accept: application/json'\
 -H 'Content-Type: application/json' \
 --data-raw '{
     "role_identifiers": {
-        "operation": "REPLACE",  //
+        "operation": "REPLACE",
         "role_identifiers": [
-          "<all-role-guid>"       //
+          "<ALL-role-guid>"
     ]
   }
-}
+}'
 ----
 +
 A successful response returns an HTTP `204` status with an empty body.
