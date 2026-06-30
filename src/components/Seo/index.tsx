@@ -1,5 +1,4 @@
 import React, { FC } from 'react';
-import { Helmet } from 'react-helmet';
 import { useSiteMetadata } from './useSiteMetadataHook';
 
 type SeoProps = {
@@ -8,6 +7,20 @@ type SeoProps = {
     pathname?: string;
     children?: React.ReactNode;
 };
+
+// Asciidoctor converts typographic characters to HTML entities (e.g. ' → &#8217;).
+// React escapes & in text nodes, so entities double-encode and show literally in the tab.
+const decodeHtmlEntities = (str: string): string =>
+    str
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
+            String.fromCharCode(parseInt(hex, 16)),
+        )
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'");
 
 export const Seo: FC<SeoProps> = ({
     title,
@@ -23,7 +36,7 @@ export const Seo: FC<SeoProps> = ({
     } = useSiteMetadata();
 
     const seo = {
-        title: title || defaultTitle,
+        title: decodeHtmlEntities(title || defaultTitle),
         description: description || defaultDescription,
         image: `${siteUrl}${image}`,
         url: `${siteUrl}${pathname || ''}`,
