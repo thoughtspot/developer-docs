@@ -262,3 +262,95 @@ For example, if a group has `DATADOWNLOADING` access, the `DATADOWNLOADING` Role
 * *Can manage data models* (`CAN_MANAGE_WORKSHEET_VIEWS_TABLES`)
 
 For granular access, you can create a Role with required privileges and assign it to groups.
+
+== Restore correct privileges on the ALL group when roles are enabled
+Every ThoughtSpot instance includes a built-in *ALL* group. All users are automatically members of this group.
+When RBAC is enabled, the ALL group is assigned an *ALL role*. This role always grants the `AUTHORING` privilege, which is required for all users
+and must remain assigned to the ALL group at all times.
+
+In addition to the ALL role, the ALL group may hold other roles that grant
+the following privileges:
+
+* `DATADOWNLOADING` — Allows users to download data from answers and Liveboards.
+* `USERDATAUPLOADING` — Allows users to upload data from a local file.
+
+These privileges are permitted on the ALL group and may be assigned through
+additional roles depending on your ThoughtSpot instance's configuration.
+
+For users who have inherited unexpected elevated privileges, follow the steps listed below to restore privileges.
+
+[NOTE]
+====
+The ALL role is a System role. You must contact ThoughtSpot support to retrieve its GUID.
+====
+
+=== Before you begin
+Before you start, ensure you have:
+
+* Administrator privileges on your ThoughtSpot instance.
+* A valid bearer token for authentication.
+
+=== Procedure to unblock the users
+
+. Retrieve the GUID of the ALL group
++
+Call the `POST /api/rest/2.0/groups/search` endpoint and filter by the group name `All`.
++
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/groups/search' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+      "record_offset": 0,
+      "record_size": 10
+}'
+----
++
+From the response, locate the `id` field. This is the GUID of the ALL group.
++
+[source,JSON]
+----
+[
+  {
+    "id": "<ALL-group-guid>",
+    "name": "All",
+    "display_name": "All Group",
+    "system_group": true,
+    ...
+  }
+]
+----
+. Retrieve the GUID of the ALL role
++
+Contact ThoughtSpot support for retrieving the guid for the ALL role.
+
+
+. Restore the ALL role on the ALL group
++
+Call the `POST /api/rest/2.0/groups/{group_identifier}/update` endpoint using the ALL group GUID as the path parameter.
++
+Use `REPLACE` as the operation type.
+This replaces the complete list of roles currently assigned to the ALL group
+with only the ALL role, removing all unexpected role assignments in a single operation.
++
+[source,cURL]
+----
+curl -X POST \
+--url 'https://{ThoughtSpot-Host}/api/rest/2.0/groups/<ALL-group-guid>/update' \
+-H 'Authorization: Bearer {access-token}'\
+-H 'Accept: application/json'\
+-H 'Content-Type: application/json' \
+--data-raw '{
+    "role_identifiers": {
+        "operation": "REPLACE",
+        "role_identifiers": [
+          "<ALL-role-guid>"
+    ]
+  }
+}'
+----
++
+A successful response returns an HTTP `204` status with an empty body.
