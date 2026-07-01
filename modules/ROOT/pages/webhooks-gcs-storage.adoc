@@ -6,144 +6,271 @@
 :page-pageid: webhooks-gcs-storage
 :page-description: Configure a Google Cloud Storage bucket to receive ThoughtSpot webhook payloads on GCP clusters.
 
-// SOURCE: SCAL-301399, SCAL-304083, SCAL-310002
-
-ThoughtSpot supports delivering webhook payloads directly to a **Google Cloud Storage (GCS) bucket** on GCP-hosted clusters. This allows you to capture and retain webhook event data — such as KPI Monitor alerts — without requiring a publicly reachable HTTP endpoint.
+ThoughtSpot supports delivering webhook payloads directly to a Google Cloud Storage (GCS) bucket on Google Cloud Platform (GCP) hosted instances. When integrated, scheduled reports and files up to 25 MB can be sent to the configured GCS storage destination directly, without requiring a publicly reachable HTTP endpoint.
 
 [NOTE]
 ====
-GCS storage integration for webhooks is available for GCP-hosted ThoughtSpot clusters only. For AWS clusters, see xref:webhooks-s3-storage.adoc[Amazon S3 storage integration for webhook delivery].
+GCS storage integration for webhooks is available for GCP-hosted ThoughtSpot instances only. For information about S3 storage configuration, see xref:webhooks-s3-storage.adoc[Amazon S3 storage integration for webhook delivery].
 ====
 
 == Before you begin
+Before configuring GCS storage for webhooks:
 
-Before configuring GCS storage for webhooks, ensure that:
+* Ensure that webhook connection configuration for GCS storage is enabled on your cluster. Contact ThoughtSpot Support if it is not enabled.
+* For GCS storage destination configuration, you'll need the platform GCP service account email and the IAM role to grant for service account impersonation. To xref:webhooks-api.adoc#_retrieving_storage_information_for_webhook_configuration[retrieve these details], send a `GET` request to the `/api/rest/2.0/webhooks/storage-config` API endpoint.
+* Ensure that you have a GCS bucket in the same GCP project or a project that allows cross-project IAM bindings.
+* To configure a webhook in ThoughtSpot, you'll need a user account with administration privileges or the *Can Manage Webhooks* role privilege. Ensure that you have the required privileges to set up webhook connection and monitor delivery status.
+* Ensure that a xref:webhooks-comm-channel.adoc[webhook communication channel] is configured in your Org or at the cluster level on your instance.
 
-* Your ThoughtSpot instance is hosted on GCP.
-* You have a GCS bucket in the same GCP project or a project that allows cross-project IAM bindings.
-* You have administrative access to your ThoughtSpot instance.
-* The *Webhooks* feature is enabled on your cluster. Contact ThoughtSpot Support if it is not enabled.
-
-== Step 1: Retrieve the ThoughtSpot GCP Service Account
-
-ThoughtSpot uses a managed GCP Service Account to write objects to your GCS bucket. You must grant this service account the appropriate IAM role on your bucket before webhook delivery can begin.
-
-Use the storage config REST API endpoint to retrieve the GCP Service Account email address:
+== Grant service account impersonation permissions
+In the GCP Console or using the `gcloud` CLI, grant the ThoughtSpot service account the `roles/iam.serviceAccountTokenCreator` role on your GCS-enabled service account:
 
 [source,bash]
 ----
-curl -X GET \
-  'https://<your-thoughtspot-host>/api/rest/2.0/webhooks/storage/config' \
-  -H 'Authorization: Bearer <token>'
-----
-
-// TODO: verify with engineering — confirm the exact endpoint path for the get storage config API
-
-The response returns the GCP Service Account email in the following format:
-
-[source,json]
-----
-{
-  "gcp_service_account": "ts-webhook-<instance-id>@<gcp-project>.iam.gserviceaccount.com"
-}
-----
-
-// TODO: verify with engineering — confirm the exact response field names for GCP Service Account details
-
-== Step 2: Grant IAM permissions on your GCS bucket
-
-In the GCP Console or using the `gcloud` CLI, grant the ThoughtSpot service account the *Storage Object Creator* role on your GCS bucket:
-
-[source,bash]
-----
-gcloud storage buckets add-iam-policy-binding gs://<your-bucket-name> \
+gcloud iam service-accounts add-iam-policy-binding <your-service-account-email> \
   --member="serviceAccount:<ts-service-account-email>" \
-  --role="roles/storage.objectCreator"
+  --role="roles/iam.serviceAccountTokenCreator"
 ----
 
 [NOTE]
 ====
-ThoughtSpot requires write-only access to deliver payloads. The *Storage Object Creator* role is sufficient and follows the principle of least privilege.
+This grants ThoughtSpot's service account the ability to create short-lived credentials for your service account, enabling it to write to your GCS bucket on your behalf without requiring long-lived credentials to be shared.
 ====
 
-== Step 3: Configure a webhook with GCS storage
+== Configuring a webhook with GCS storage
+To create a webhook in ThoughtSpot, the webhook feature must be enabled on your instance. Only ThoughtSpot users with administration privileges or the *Can Manage Webhooks* privilege are allowed to create or manage a webhook.
 
-Use the REST API to create or update a webhook, specifying your GCS bucket as the storage destination.
+You can create a webhook with a cloud storage destination using the **Webhooks** page in the UI or through the create webhook REST API.
 
-=== Create a webhook with GCS storage
+=== Using REST API
+To configure the GCS storage properties in ThoughtSpot, the service account email and GCS bucket name are required.
 
-[source,bash]
+To create a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/create` API endpoint.
+
+[NOTE]
+====
+ThoughtSpot allows only one webhook for the Liveboard Schedule event type per Org.
+====
+
+==== Request parameters
+
+[width="100%" cols="1,6"]
+[options='header']
+|====
+|Parameter|Description
+| `name` a|__String__. Name of the webhook.
+| `description` +
+__Optional__ a|__String__. Description text for the webhook.
+| `url` a|__String__. The listening endpoint URL where the webhook payload will be sent. The payload will include metadata and a URL referencing the file stored in GCS.
+| `url_params` a|__Optional__. A JSON map of key-value pairs to append as query parameters in the webhook URL.
+| `events` a|__Array of strings__. List of events to subscribe to. Specify the event as `LIVEBOARD_SCHEDULE`. When this event is emitted, a webhook payload is initiated to send data to the configured GCS storage destination.
+| `storage_destination` a| Configuration for storage destination. Specify the following parameters:
+* `storage_type` +
+__String__. Type of storage destination. Specify `GCP_GCS`. +
+
+* `storage_config` +
+Storage configuration parameters. For `gcp_gcs_config`, specify the following parameters:
+
+* `bucket_name` +
+__String__. Name of the GCS bucket where webhook payloads will be stored. For example, `ts-webhook-exports`.
+* `service_account_email` +
+__String__. Email of the GCP service account to impersonate for bucket access. For example, `my-sa@my-project.iam.gserviceaccount.com`. The platform's service account must be granted `roles/iam.serviceAccountTokenCreator`.
+* `path_prefix` __Optional__ +
+__String__. Optional. Path prefix for organizing objects within the bucket. For example, `thoughtspot/`.
+
+|`additional_headers` +
+__Optional__ a|__Array of key-value pairs__. Allows including custom HTTP headers in every outbound webhook HTTP request that ThoughtSpot sends to the configured destination URL. You can use this parameter to pass arbitrary headers with custom metadata in key-value pairs, as required by the webhook receiver endpoint: When configured, ThoughtSpot sends these headers in addition to the authentication headers and standard HTTP headers such as `Content-Type`, `User-Agent`.
+
+[source,JSON]
+----
+"additional_headers": [
+   {
+      "key":"X-Custom-Header",
+      "value":"custom_value"
+   }
+]
+----
+|====
+
+==== API request
+
+[source,cURL]
 ----
 curl -X POST \
-  'https://<your-thoughtspot-host>/api/rest/2.0/webhooks/create' \
-  -H 'Authorization: Bearer <token>' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/create'  \
+  -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -d '{
-    "name": "my-gcs-webhook",
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "name": "webhook-gcs",
+  "url": "https://webhook-destination-site.com",
+  "events": [
+    "LIVEBOARD_SCHEDULE"
+  ],
+  "description": "Webhook delivery to GCS bucket",
+  "storage_destination": {
+    "storage_type": "GCP_GCS",
     "storage_config": {
-      "storage_type": "GCS",
-      "bucket_name": "<your-bucket-name>",
-      "object_prefix": "thoughtspot-webhooks/"
+      "gcp_gcs_config": {
+        "bucket_name": "my-webhook-files",
+        "service_account_email": "my-sa@my-project.iam.gserviceaccount.com",
+        "path_prefix": "thoughtspot/"
+      }
     }
-  }'
+  },
+  "status": "ENABLED"
+}'
 ----
 
-// TODO: verify with engineering — confirm the exact request body schema for GCS storage_config, including all required and optional fields, and whether a URL field is required when GCS storage is used
+==== API response
 
-=== Update an existing webhook to use GCS storage
-
-[source,bash]
+[source,JSON]
 ----
-curl -X PUT \
-  'https://<your-thoughtspot-host>/api/rest/2.0/webhooks/<webhook-id>/update' \
-  -H 'Authorization: Bearer <token>' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "storage_config": {
-      "storage_type": "GCS",
-      "bucket_name": "<your-bucket-name>",
-      "object_prefix": "thoughtspot-webhooks/"
-    }
-  }'
+{
+   "id":"18835251-668b-4851-b5c7-35358549f3f4",
+   "name":"webhook-gcs",
+   "description":"Webhook for GCS delivery",
+   "org":{
+      "id":"0",
+      "name":"test-org"
+   },
+   "url":"https://webhook-destination-site.com",
+   "url_params":null,
+   "events":[
+      "LIVEBOARD_SCHEDULE"
+   ],
+   "authentication":null,
+   "signature_verification":null,
+   "additional_headers":null,
+   "creation_time_in_millis":1782867500837,
+   "modification_time_in_millis":1782867500837,
+   "created_by":{
+      "id":"59481331-ee53-42be-a548-bd87be6ddd4a",
+      "name":"tsadmin"
+   },
+   "last_modified_by":null,
+   "storage_destination":{
+      "storage_type":"GCP_GCS",
+      "storage_config":{
+         "aws_s3_config":null,
+         "gcp_gcs_config":{
+            "bucket_name":"my-webhook-files",
+            "service_account_email":"my-sa@my-project.iam.gserviceaccount.com",
+            "path_prefix":"thoughtspot/"
+         }
+      }
+   },
+   "status":"ENABLED"
+}
 ----
 
-// TODO: verify with engineering — confirm the update endpoint path and request body schema
+=== Using Webhooks page in UI
+If the new Webhooks page is enabled on your instance, you can create a webhook via UI.
+To create a webhook with GCS as the target destination for payload delivery:
+
+. Go to **Develop** > **Customizations** and click **Webhooks**.
+. In the *Webhooks* page, click *Create webhook*.
+. In the *Create webhook* modal, configure the following:
+* *Name*: A display name for the webhook.
+* *URL*: The fully qualified HTTPS URL of the endpoint that will receive webhook payloads.
+* *Description*: (optional) A short description of the webhook's purpose.
+* *Event type*: Specify the ThoughtSpot event types to subscribe to. Ensure that *Liveboard schedule* is set as the event type.
+. To configure storage destination, select the **File storage** checkbox and specify values for the following properties: +
+* **Storage provider**: Select **Google Cloud Storage (GCS)**.
+* **Bucket name**: Name of the S3 bucket. For example, `my-webhook-files`.
+* **Service account email**: Email of the GCP service account to impersonate for bucket access.
+* **Path prefix**: Optional. Path prefix for organizing objects within the bucket. For example, `thoughtspot/`.
++
+[.bordered]
+[.widthAuto]
+--
+image::./images/webhook-create-gcp.png[Webhooks for GCS storage]
+--
+//. Select xref:webhooks-ux.adoc#_creating_a_webhook[the authentication method] to authorize payloads to the destination endpoint. +
+. To configure xref:webhooks-ux.adoc#_creating_a_webhook[advanced settings] such as signature verification, custom headers, and URL query parameters, click **Advanced settings** and configure the fields as required.
+. Click *Save*. +
+If the webhook creation is successful, it will be added to the list in the Webhooks page.
+
+. To activate the webhook, use one of the following options:
+* Select the webhook and click *Enable*.
+* In the webhook row, from the More options menu (`...`), click **Enable**.
 
 == Webhook payload format in GCS
-
 ThoughtSpot writes each webhook event as a separate object in your GCS bucket. Objects are named using the following pattern:
 
 ----
 <object_prefix>/<event-type>/<timestamp>-<event-id>.json
 ----
 
-// TODO: verify with engineering — confirm the object naming convention and payload format for GCS deliveries
+== Viewing webhook configuration details
+To view the webhook details, use one of the following options:
 
-== Verify delivery
+* Through the REST API: +
+To retrieve webhook configuration details, use the xref:webhooks-api.adoc#_getting_a_list_of_webhooks[`/api/rest/2.0/webhooks/search` API endpoint].
+* Using the UI: +
+If the **new Webhook experience** is enabled on your instance, go to the **Develop** > **Customization** > **Webhooks** page. Check the list in the xref:webhooks-ux.adoc#_managing_and_monitoring_webhooks_new_experience[**Webhooks**] to view the details and verify if the webhook connection is activated.
 
+== Validating webhook channel configuration
+To validate webhook configuration status, use one of the following options.
+
+* Using REST API:
+To validate the communication channel configuration for webhook delivery, use xref:webhooks-comm-channel.adoc#_validate_communication_channel_configuration[the `/api/rest/2.0/system/communication-channels/validate` API endpoint].
+
+* Using the UI: +
+If the new Webhook experience is enabled on your instance, go to the **Develop** > **Customization** > **Webhooks** page. The Webhooks page displays a list of webhooks configured in the current Org context. +
+To validate the webhook channel configuration:
+. In the **Webhooks** page, select the webhook row, and click **Send test event**.
+. Verify the delivery status.
+
+If the validation returns errors, update the webhook configuration properties to resolve the errors.
+
+== Monitoring webhook delivery status
+To monitor the webhook delivery and status, use one of the following options:
+
+* Through the REST API: +
+To verify the webhook delivery and job status, use the `/api/rest/2.0/jobs/history/communication-channels/search` API endpoint. For more information, see xref:webhooks-comm-channel.adoc#_monitor_webhook_delivery_and_job_status[Monitor webhook delivery and job status].
+
+* Using the UI: +
+If your ThoughtSpot instance has new Webhooks page enabled, use the **Webhooks** menu option in the **Develop** page to view the details of the webhook:
+. Go to the **Develop** > **Customization** > **Webhooks** page. +
+The **Webhooks** page displays status cards and delivery rate for the webhooks configured in the Org.
+. Click the webhook from the list and verify the delivery details. For more information, see xref:webhooks-ux.adoc#_monitoring_webhook_status[Monitoring delivery status].
+
+== Verifying delivery
 To verify that ThoughtSpot is delivering webhooks to your GCS bucket:
 
 . In the GCP Console, navigate to your bucket and check for new objects.
+. Verify whether the webhook payload is delivered to the correct bucket and prefix.
 . Review the object content to confirm the payload matches the expected schema.
+. Verify the attachments and timestamps in the logs.
+. If files are not delivered to your GCS bucket, check the logs for errors.
 
-== Troubleshoot
+== Troubleshooting errors
 
 [cols="2,3"]
 |====
 | Issue | Resolution
 
-| Objects are not appearing in the bucket
-| Verify that the ThoughtSpot service account has the `roles/storage.objectCreator` IAM binding on the bucket.
+| Objects are not delivered to the bucket
+| This error occurs in the following scenarios:
+
+* When service account impersonation fails
+* When the GCS write operation fails due to permission errors
+* Webhook connection configuration errors
+
+To resolve:
+
+* Verify that the ThoughtSpot service account is granted the `roles/iam.serviceAccountTokenCreator` role on your GCS-enabled service account.
+* Verify that your service account has write access to the GCS bucket.
+* Verify that the service account email in the webhook configuration matches the service account used to grant permissions.
 
 | `permission denied` error in webhook logs
 | The service account may have been rotated. Retrieve the current service account email using the storage config API and re-grant IAM permissions.
 
 | Webhook is configured but not triggering
-| Verify that the webhook is enabled and that the associated KPI Monitor alert condition is met. Contact ThoughtSpot Support if the issue persists.
+| Verify that the webhook is enabled and that the alert condition for the scheduled event is met. Contact ThoughtSpot Support if the issue persists.
 |====
 
 == Related topics
-
-* xref:webhooks-s3-storage.adoc[Amazon S3 storage integration for webhook delivery]
-* xref:webhooks.adoc[Webhooks for KPI Monitor alerts]
-* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
+* See also: xref:webhooks.adoc[Webhooks overview], xref:webhooks-ux.adoc[Webhooks UI], and xref:webhooks-api.adoc[Webhook APIs] documentation.
+* link:https://cloud.google.com/storage/docs/access-control/iam-roles[Google Cloud Storage IAM roles, window=_blank] documentation.
