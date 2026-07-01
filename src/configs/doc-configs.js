@@ -48,10 +48,10 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
 	    {
-            label: '26.6.0.cl',
-            link: '26.6.0.cl',
+            label: '26.7.0.cl',
+            link: '26.7.0.cl',
             subLabel: 'Cloud (Latest)',
-            iframeUrl: 'https://developer-docs-26-6-0-cl.vercel.app/docs/',
+            iframeUrl: 'https://developer-docs-26-7-0-cl.vercel.app/docs/',
         },
     ],
     CUSTOM_PAGE_ID: {
@@ -71,8 +71,9 @@ module.exports = {
                 'git-configuration', 'git-api', 'git-provider-integration', 'guid-mapping',
                 'publish-data-overview', 'publish-to-orgs', 'parameterize-metadata',
                 'multi-tenancy', 'orgs', 'multitenancy-within-an-org', 'single-tenant-data-models',
-                'orgs-api-op', 'tse-cluster', 'pendo-integration', 'sf-integration',
-                'vercel-integration', 'external-tool-script-integration',
+                'orgs-api-op', 'tse-cluster',  'webhooks', 'webhooks-comm-channel', 'webhooks-s3-integration',
+                'webhooks-lb-schedule', 'webhooks-lb-payload', 'webhooks-kpi','pendo-integration',
+                'sf-integration', 'vercel-integration', 'external-tool-script-integration',
                 'license-feature-matrix', 'best-practices', 'faqs', 'code-samples',
                 'thoughtspot-objects', 'variables',
             ],
@@ -115,9 +116,7 @@ module.exports = {
                 'rest-api-pagination', 'runtime-sort', 'v1v2-comparison',
                 'spotter-api', 'audit-logs', 'tml', 'collections', 'connections',
                 'connection-config', 'api-user-management', 'rbac', 'graphql-guide',
-                'webhooks', 'webhooks-comm-channel', 'webhooks-s3-integration',
-                'webhooks-lb-schedule', 'webhooks-lb-payload', 'webhooks-kpi',
-                'rest-v2-changelog', 'rest-v1-changelog',
+                'webhooks-rest-ai', 'rest-v2-changelog', 'rest-v1-changelog',
             ],
         },
         {
