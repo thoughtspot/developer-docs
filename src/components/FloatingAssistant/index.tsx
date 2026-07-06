@@ -6,7 +6,19 @@ import './index.scss';
 
 function renderMarkdown(text: string): string {
     const html = marked.parse(text, { async: false }) as string;
-    return DOMPurify.sanitize(html);
+    const sanitized = DOMPurify.sanitize(html);
+    // Wrap <pre><code> blocks with a copy-button container
+    return sanitized.replace(
+        /<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g,
+        (_, attrs, code) =>
+            `<div class="fa-code-block">` +
+            `<button class="fa-code-copy" data-code="${encodeURIComponent(code)}" title="Copy">` +
+            `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+            `<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>` +
+            `</svg></button>` +
+            `<pre><code${attrs}>${code}</code></pre>` +
+            `</div>`,
+    );
 }
 
 type Message = {
@@ -58,6 +70,33 @@ const getPageId = () => {
         || undefined;
 };
 
+const SparkleIcon = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" />
+        <path d="M19 15L19.8 17.2L22 18L19.8 18.8L19 21L18.2 18.8L16 18L18.2 17.2L19 15Z" opacity="0.7" />
+        <path d="M5 3L5.6 4.4L7 5L5.6 5.6L5 7L4.4 5.6L3 5L4.4 4.4L5 3Z" opacity="0.7" />
+    </svg>
+);
+
+const AssistantAvatar = () => (
+    <div className="floating-assistant__avatar-icon">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+            <circle cx="12" cy="12" r="12" fill="#5b3fa6"/>
+            <path d="M7 10 L6 6 L10 8.5 Z" fill="#8b6fd4"/>
+            <path d="M17 10 L18 6 L14 8.5 Z" fill="#8b6fd4"/>
+            <ellipse cx="12" cy="13" rx="6" ry="5.5" fill="#8b6fd4"/>
+            <circle cx="10" cy="11.5" r="1.8" fill="white"/>
+            <circle cx="14" cy="11.5" r="1.8" fill="white"/>
+            <circle cx="10.4" cy="11.5" r="1" fill="#1a0a3a"/>
+            <circle cx="14.4" cy="11.5" r="1" fill="#1a0a3a"/>
+            <circle cx="10.7" cy="11.1" r="0.4" fill="white"/>
+            <circle cx="14.7" cy="11.1" r="0.4" fill="white"/>
+            <ellipse cx="12" cy="15" rx="3" ry="2" fill="#b89ee0"/>
+            <ellipse cx="12" cy="14.5" rx="0.7" ry="0.5" fill="#5b3fa6"/>
+        </svg>
+    </div>
+);
+
 const FloatingAssistant: React.FC = () => {
     const [pageId, setPageId] = useState<string | undefined>(getPageId);
     const {
@@ -107,8 +146,9 @@ const FloatingAssistant: React.FC = () => {
     }, [setSuggestedQuestionsLoaded]);
 
     useEffect(() => {
-        if (!pageId || suggestedQuestionsLoaded || messages.length > 0) return;
-        fetch(`${CLOUDFLARE_URL}/suggested-questions?pageId=${encodeURIComponent(pageId)}`)
+        if (suggestedQuestionsLoaded || messages.length > 0) return;
+        const id = pageId || 'home';
+        fetch(`${CLOUDFLARE_URL}/suggested-questions?pageId=${encodeURIComponent(id)}`)
             .then((res) => res.json())
             .then((data: { questions?: string[] }) => {
                 setSuggestedQuestions(data.questions ?? []);
@@ -159,7 +199,7 @@ const FloatingAssistant: React.FC = () => {
                     accumulated += event.content;
                     setStreamingText(accumulated);
                 } else if (event.type === 'tool-start') {
-                    setToolStatus(`Using ${event.toolName}…`);
+                    setToolStatus(`${event.toolName}`);
                 } else if (event.type === 'tool-result') {
                     setToolStatus('');
                 } else if (event.type === 'done') {
@@ -192,6 +232,16 @@ const FloatingAssistant: React.FC = () => {
         }
     };
 
+    const handleCodeCopy = (e: React.MouseEvent<HTMLDivElement>) => {
+        const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.fa-code-copy');
+        if (!btn) return;
+        const code = decodeURIComponent(btn.dataset.code ?? '');
+        navigator.clipboard.writeText(code).catch(() => {});
+        const prev = btn.innerHTML;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.innerHTML = prev; }, 1500);
+    };
+
     const handleClose = () => {
         setIsClosing(true);
         setTimeout(() => {
@@ -204,17 +254,15 @@ const FloatingAssistant: React.FC = () => {
 
     return (
         <>
-            {/* Chip trigger button */}
+            {/* Chip trigger */}
             {!isOpen && !isClosing && (
                 <button
                     className="floating-assistant__chip"
                     onClick={() => setIsOpen(true)}
                     aria-label="Open SpotterCode assistant"
                 >
-                    <span className="floating-assistant__chip__chevron">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="15 18 9 12 15 6" />
-                        </svg>
+                    <span className="floating-assistant__chip__icon">
+                        <SparkleIcon />
                     </span>
                     Ask SpotterCode
                 </button>
@@ -226,32 +274,45 @@ const FloatingAssistant: React.FC = () => {
                     {/* Header */}
                     <div className="floating-assistant__header">
                         <span className="floating-assistant__title">SpotterCode</span>
-                        <div className="floating-assistant__header-actions">
-                            <button
-                                className="floating-assistant__close"
-                                onClick={handleClose}
-                                aria-label="Close assistant"
-                                title="Close"
-                            >
-                                {/* » chevron-right double */}
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="13 17 18 12 13 7" />
-                                    <polyline points="6 17 11 12 6 7" />
-                                </svg>
-                            </button>
-                        </div>
+                        <button
+                            className="floating-assistant__close"
+                            onClick={handleClose}
+                            aria-label="Close assistant"
+                            title="Close"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="13 17 18 12 13 7" />
+                                <polyline points="6 17 11 12 6 7" />
+                            </svg>
+                        </button>
                     </div>
 
                     {/* Messages */}
-                    <div className="floating-assistant__messages">
+                    <div className="floating-assistant__messages" onClick={handleCodeCopy}>
                         {isLandingPage ? (
                             <div className="floating-assistant__landing">
-                                <div className="floating-assistant__landing-icon">🤖</div>
-                                <div className="floating-assistant__landing-title">
-                                    Hi, there! I'm <span>SpotterCode</span>
-                                </div>
-                                <div className="floating-assistant__landing-sub">
-                                    Ask me anything about the ThoughtSpot developer docs.
+                                <div className="floating-assistant__landing-intro">
+                                    <div className="floating-assistant__landing-avatar">
+                                        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
+                                            <circle cx="24" cy="24" r="24" fill="#1a2340"/>
+                                            <path d="M13 18 L10 8 L20 15 Z" fill="#2a3560"/>
+                                            <path d="M35 18 L38 8 L28 15 Z" fill="#2a3560"/>
+                                            <ellipse cx="24" cy="26" rx="14" ry="13" fill="#2a3560"/>
+                                            <ellipse cx="24" cy="31" rx="7" ry="5" fill="#3a4a80"/>
+                                            <circle cx="19" cy="23" r="4" fill="white"/>
+                                            <circle cx="29" cy="23" r="4" fill="white"/>
+                                            <circle cx="20" cy="23" r="2.2" fill="#0a1020"/>
+                                            <circle cx="30" cy="23" r="2.2" fill="#0a1020"/>
+                                            <circle cx="20.7" cy="22.3" r="0.8" fill="white"/>
+                                            <circle cx="30.7" cy="22.3" r="0.8" fill="white"/>
+                                            <ellipse cx="24" cy="28.5" rx="1.5" ry="1" fill="#1a2340"/>
+                                            <path d="M21 31 Q24 33.5 27 31" stroke="#3a4a80" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+                                        </svg>
+                                    </div>
+                                    <div className="floating-assistant__landing-title">
+                                        Hey, I'm <span>SpotterCode</span>.<br />
+                                        Where do we start?
+                                    </div>
                                 </div>
                                 {suggestedQuestions.length > 0 && (
                                     <div className="floating-assistant__suggestions">
@@ -274,41 +335,63 @@ const FloatingAssistant: React.FC = () => {
                                         key={i}
                                         className={`floating-assistant__message floating-assistant__message--${msg.role}`}
                                     >
-                                        <span className="floating-assistant__message-label">
-                                            {msg.role === 'user' ? 'You' : 'SpotterCode'}
-                                        </span>
-                                        {msg.role === 'assistant' ? (
-                                            <div
-                                                className="floating-assistant__message-text floating-assistant__message-text--md"
-                                                dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                                            />
-                                        ) : (
-                                            <div className="floating-assistant__message-text">
+                                        {msg.role === 'user' ? (
+                                            <div className="floating-assistant__user-bubble">
                                                 {msg.content}
+                                            </div>
+                                        ) : (
+                                            <div className="floating-assistant__assistant-block">
+                                                <AssistantAvatar />
+                                                <div
+                                                    className="floating-assistant__message-text floating-assistant__message-text--md"
+                                                    dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                                                />
+                                                <div className="floating-assistant__feedback">
+                                                    <button className="floating-assistant__feedback-btn" aria-label="Thumbs down">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/>
+                                                            <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+                                                        </svg>
+                                                    </button>
+                                                    <button className="floating-assistant__feedback-btn" aria-label="Thumbs up">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"/>
+                                                            <path d="M7 22H4.72A2.31 2.31 0 0 1 2.4 20v-7a2.31 2.31 0 0 1 2.33-2H7"/>
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
                                 ))}
                                 {isLoading && (
                                     <div className="floating-assistant__message floating-assistant__message--assistant">
-                                        <span className="floating-assistant__message-label">SpotterCode</span>
-                                        {streamingText ? (
-                                            <div
-                                                className="floating-assistant__message-text floating-assistant__message-text--md"
-                                                dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
-                                            />
-                                        ) : (
-                                            <div className="floating-assistant__typing">
-                                                {toolStatus ? (
-                                                    <>
-                                                        <span className="floating-assistant__tool-dot" />
-                                                        <span className="floating-assistant__tool-status">{toolStatus}</span>
-                                                    </>
-                                                ) : (
-                                                    <><span /><span /><span /></>
-                                                )}
-                                            </div>
-                                        )}
+                                        <div className="floating-assistant__assistant-block">
+                                            <AssistantAvatar />
+                                            {streamingText ? (
+                                                <div
+                                                    className="floating-assistant__message-text floating-assistant__message-text--md"
+                                                    dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
+                                                />
+                                            ) : toolStatus ? (
+                                                <div className="floating-assistant__tool-steps">
+                                                    <div className="floating-assistant__tool-header">
+                                                        <span className="floating-assistant__tool-header-text">{toolStatus}</span>
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                            <polyline points="18 15 12 9 6 15"/>
+                                                        </svg>
+                                                    </div>
+                                                    <div className="floating-assistant__tool-step floating-assistant__tool-step--active">
+                                                        <span className="floating-assistant__tool-step-dot floating-assistant__tool-step-dot--yellow" />
+                                                        <span className="floating-assistant__tool-step-name">{toolStatus}</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="floating-assistant__typing">
+                                                    <span /><span /><span />
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </>
@@ -322,7 +405,7 @@ const FloatingAssistant: React.FC = () => {
                             <textarea
                                 ref={inputRef}
                                 className="floating-assistant__input"
-                                placeholder="Ask a question..."
+                                placeholder="Ask, learn, code..."
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
