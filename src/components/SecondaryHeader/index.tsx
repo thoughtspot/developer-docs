@@ -67,6 +67,8 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
         'orgs-api-op', 'tse-cluster', 'external-tool-script-integration', 'pendo-integration',
         'sf-integration', 'vercel-integration', 'embed-ts', 'get-started-tse',
         'license-feature-matrix', 'faqs', 'code-samples',
+        'webhooks-overview', 'webhooks-ui', 'webhooks-comm-channel', 'webhooks-lb-schedule',
+        'webhooks-s3-integration', 'webhooks-gcs-storage', 'webhooks-lb-payload', 'webhooks-kpi',
     ],
     embedding: [
         'getting-started', 'tsembed', 'embed-liveboard', 'embed-a-viz',
@@ -103,8 +105,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
         'fetch-data-and-report-apis', 'rest-api-sdk', 'rest-api-sdk-typescript', 'rest-api-sdk-java',
         'rest-api-getstarted', 'api-auth-session', 'catalog-and-audit', 'rest-api-pagination',
         'runtime-sort', 'v1v2-comparison', 'graphql-guide',
-        'webhooks', 'webhooks-comm-channel', 'webhooks-s3-integration', 'webhooks-lb-schedule',
-        'webhooks-lb-payload', 'webhooks-kpi', 'rest-v2-changelog', 'rest-v1-changelog',
+        'webhooks-rest-api', 'rest-v2-changelog', 'rest-v1-changelog',
     ],
     'mcp-server': [
         'mcp-integration', 'connect-mcp-server-to-clients',

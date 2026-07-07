@@ -1,0 +1,482 @@
+= Webhook configuration and management via REST APIs
+:toc: true
+:toclevels: 3
+
+:page-title: Manage webhooks
+:page-pageid: webhooks-rest-api
+:page-description: Create and manage webhooks using Webhook APIs
+
+The REST API framework is intended for automation and integration scenarios, for example, creating webhooks programmatically or delivering Liveboard report attachments to a cloud storage destination.
+
+The following webhook REST APIs are available for webhook configuration and management:
+
+* `POST /api/rest/2.0/webhooks/create` +
+Allows xref:webhooks-api.adoc#_creating_a_webhook[creating a webhook] for the Liveboard schedule event type, configuring storage destination for webhook delivery.
+* `GET /api/rest/2.0/webhooks/storage-config` +
+xref:webhooks-api.adoc#_retrieving_storage_information_for_webhook_configuration[Gets storage setup information] for configuring customer-managed storage.
+* `POST /api/rest/2.0/webhooks/search` +
+xref:webhooks-api.adoc#_retrieving_webhook_details[Gets a list of webhooks] configured in the Org.
+* `POST /api/rest/2.0/webhooks/{webhook_identifier}/update` +
+Allows xref:webhooks-api.adoc#_updating_a_webhook[updating configuration properties].
+* `POST /api/rest/2.0/webhooks/delete` +
+xref:webhooks-api.adoc#_deleting_a_webhook[Deletes one or more webhooks].
+
+== Creating a webhook
+To create a webhook for the Liveboard schedule event, send a `POST` request to the
+`/api/rest/2.0/webhooks/create` API endpoint. ThoughtSpot allows only one webhook per Org.
+
+[IMPORTANT]
+====
+Before creating a webhook, ensure that a xref:webhooks-comm-channel.adoc[webhook communication channel] is configured for your Org or at the cluster level.
+====
+
+=== Request parameters
+
+[width="100%" cols="1,6"]
+[options='header']
+|=====
+|Parameter|Description
+| `name` a|__String__. Name of the webhook.
+| `description` +
+__Optional__ a|__String__. Description text for the webhook.
+| `url` a|__String__. The fully qualified URL of the listening endpoint to which you want to
+send webhook notifications.
+| `url_params` a|A JSON map of key-value pairs to append as query parameters in the webhook URL.
+| `events` a|__Array of strings__. List of events to subscribe to. Specify `LIVEBOARD_SCHEDULE`.
+| `status` +
+__Optional__ a|__String__. Status of the webhook. Specify `ENABLED` to activate the webhook immediately after creation, or `DISABLED` to create it in a deactivated state.
+[NOTE]
+====
+When the status parameter is not specified in the API request, the API response returns "status": null, indicating that the status was not explicitly set. Despite the null value, the webhook is enabled by default. To create a webhook in a disabled state, set the status parameter to `DISABLED` in the API request.
+====
+
+| `authentication` a|Defines the authentication method and credentials ThoughtSpot uses when
+sending HTTP requests to the webhook endpoint.
+
+Specify the authentication type:
+
+* `API_KEY` +
+API key to authorize the payload requests. Specify the API key to use in the `X-API-Key`
+request header.
+* `BASIC_AUTH` +
+Authentication with username and password.
+* `BEARER_TOKEN` +
+Authentication token to authenticate and authorize requests.
+* `OAUTH2` +
+OAuth credentials to authorize API requests. Specify client ID, client secret key, and
+authorization URL. If the registered webhook has OAuth authentication enabled,
+`Authorization: Bearer <access-token>` is sent in the request header.
+| `signature_verification` +
+__Optional__ a|Signature verification parameters for the webhook endpoint to verify the
+authenticity of incoming requests. ThoughtSpot signs the webhook payload with a secret, and
+your webhook endpoint validates the signature using the shared secret.
+
+If using signature verification, specify the following parameters:
+
+* `type` +
+Signature verification type. The supported type is `HMAC_SHA256`.
+* `header` +
+HTTP header where the signature is sent.
+* `algorithm` +
+Hash algorithm used for signature verification.
+* `secret` +
+Shared secret used for HMAC signature generation.
+| `storage_destination` +
+__Optional__ a|Configuration parameters for the cloud storage destination. ThoughtSpot supports AWS S3 and Google Cloud Storage (GCS) as storage destinations. For more information, see xref:webhooks-s3-storage.adoc[Deliver Liveboard reports to AWS S3 storage] and xref:webhooks-gcs-storage.adoc[Deliver Liveboard reports to GCS storage].
+|`additional_headers` +
+__Optional__ a|__Array of key-value pairs__. Custom HTTP headers to include in every outbound webhook request, in addition to authentication headers and standard HTTP headers such as
+`Content-Type` and `User-Agent`.
+
+[source,JSON]
+----
+"additional_headers": [
+   {
+      "key":"X-Custom-Header",
+      "value":"custom_value"
+   }
+]
+----
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "name": "webhook-lb-event",
+  "url": "https://webhook.site/6643eba5-9d3e-42a1-85e0-bb686ba1524d",
+  "events": [
+    "LIVEBOARD_SCHEDULE"
+  ],
+  "authentication": {
+    "BEARER_TOKEN": "Bearer {AUTH_TOKEN}"
+  },
+  "description": "Liveboard report"
+}'
+----
+
+=== API response
+If webhook creation is successful, the API returns a 204 response code.
+
+== Retrieving storage information for webhook configuration
+To get storage setup information for your ThoughtSpot instance required for configuring a webhook storage destination, use the `GET /api/rest/2.0/webhooks/storage-config` API.
+
+=== Example request
+
+[source,cURL]
+----
+curl -X GET \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/storage-config'  \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+=== API response
+
+This API endpoint returns data based on whether the ThoughtSpot instance is hosted on AWS or GCP.
+
+* For AWS-hosted ThoughtSpot instances with S3 storage, the API endpoint returns a JSON array with the platform AWS account ID, IAM trust policy template, and storage setup instructions.
+* For GCP-hosted ThoughtSpot instances with S3 storage, the API endpoint returns a JSON array with the GCP service account ID, OIDC provider URL, IAM trust policy template, and storage setup instructions.
+* For GCP-hosted ThoughtSpot instances with GCS storage, the API endpoint returns a JSON array with the platform GCP service account email, the IAM role to grant for service account impersonation, and storage setup instructions.
+
+==== Top-level fields
+The following fields are included in the response, regardless of the storage provider.
+
+* `storage_type`:  The category of storage destination. This field is always `OBJECT_STORAGE` for blob/bucket storage targets, including both AWS S3 and Google Cloud Storage.
+* `provider`: Cloud storage service provider. Returns one of the following values: +
+** `AWS_S3` for Amazon S3 bucket +
+** `GCP_GCS` for Google Cloud Storage bucket
+
+* `config`: A configuration object that contains the provider-specific setup details for the storage destination. The structure of this object varies based on the `config_type` field within it. The `config_type` can be one of the following values:
+** `AWS_TO_S3_STORAGE`: AWS-hosted ThoughtSpot instance writing to an S3 bucket
+** `GCP_TO_S3_STORAGE`: GCP-hosted ThoughtSpot instance writing to an S3 bucket
+** `GCP_TO_GCS_STORAGE`: GCP-hosted ThoughtSpot instance writing to a GCS bucket
+
+==== Storage configuration attributes for AWS_TO_S3_STORAGE
+The response returned for AWS-hosted ThoughtSpot instances where the customer configures an AWS S3 bucket as the storage destination includes the following information:
+
+* `aws_account_id`: The AWS account ID of the ThoughtSpot-managed AWS account. You must reference this value in the `Principal` field of the IAM trust policy you create in your AWS account. The policy grants ThoughtSpot's account permission to assume the IAM role that has write access to your S3 bucket.
+* `trust_policy_template`: A ready-to-use IAM trust policy JSON object. Attach this policy to the IAM role you create in your AWS account. The policy authorizes ThoughtSpot's AWS account (`aws_account_id`) to call `sts:AssumeRole` and deliver webhook payloads to your S3 bucket. The `sts:ExternalId` condition in the policy prevents unauthorized cross-account access (confused deputy attack).
+** `Version`: The IAM policy language version, `2012-10-17`.
+** `Statement`: Includes the following information:
+*** `Effect`: Specifies whether the statement grants or denies access. Always `Allow` in this template.
+*** `Principal`: The ARN of the ThoughtSpot AWS account principal that is trusted to assume your IAM role. Constructed as `arn:aws:iam::<aws_account_id>:root`.
+*** `Action`: The AWS STS action being permitted. Always `sts:AssumeRole` for AWS-hosted instances.
+*** `Condition`: A unique, ThoughtSpot-generated external ID. Include this value as a condition in your IAM trust policy to prevent unauthorized parties from assuming your role. This value is unique per webhook and must be preserved exactly as returned. For example:
++
+[source,JSON]
+----
+"StringEquals": {
+  "sts:ExternalId": "ts-webhook-a1b2c3d4-7890"
+}
+----
+
+* `setup_instructions`: An ordered list of steps to complete in your AWS account before using this storage destination. Follow these steps to create the IAM role, attach the trust policy, and configure the required S3 permissions (`s3:PutObject`, `s3:PutObjectAcl`).
+
+===== Example response
+
+[source,JSON]
+----
+[
+  {
+    "storage_type": "OBJECT_STORAGE",
+    "provider": "AWS_S3",
+    "config": {
+      "config_type": "AWS_TO_S3_STORAGE",
+      "aws_account_id": "123456789012",
+      "trust_policy_template": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": "arn:aws:iam::123456789012:root"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+              "StringEquals": {
+                "sts:ExternalId": "ts-webhook-a1b2c3d4-7890"
+              }
+            }
+          }
+        ]
+      },
+      "setup_instructions": [
+        "1. Create an IAM role in your AWS account",
+        "2. Attach the trust policy template to the role",
+        "3. Attach S3 permissions (s3:PutObject, s3:PutObjectAcl) to the role",
+        "4. Use the role ARN in your webhook storage configuration"
+      ]
+    }
+  }
+]
+----
+
+==== Storage configuration attributes for GCP_TO_S3_STORAGE
+The following response is returned for GCP-hosted ThoughtSpot instances where the customer configures an AWS S3 bucket as the storage destination includes the following attributes.
+
+* `gcp_service_account_id`: The unique numeric ID of the ThoughtSpot GCP service account. This ID is used as the OIDC subject (`sub`) in the AWS IAM web identity trust policy condition, scoping the trust to exactly this service account. Use this value when configuring the `accounts.google.com:sub` condition in your IAM role's trust policy.
+
+* `oidc_provider`: The OIDC identity provider URL that AWS IAM uses to validate the identity token presented by ThoughtSpot's GCP service account. Always `accounts.google.com` for GCP-hosted instances. Register this URL as an Identity Provider in your AWS IAM account before creating the trust policy.
+
+* `trust_policy_template`: A ready-to-use IAM trust policy JSON object for web identity federation. Attach this policy to the IAM role you create in your AWS account. The policy trusts the GCP-hosted OIDC provider (`accounts.google.com`) and restricts assumption to the specific ThoughtSpot GCP service account identified by `gcp_service_account_id`. Includes the following attributes:
+
+** `Version`: The IAM policy language version, `2012-10-17`.
+** `Statement`: Array of IAM policy statements. Contains one statement that permits the ThoughtSpot GCP service account to assume the IAM role via OIDC federation.
+*** `Effect`: Specifies whether the statement grants or denies access. Always `Allow` in this template.
+*** `Principal`: The ARN of the OIDC identity provider registered in your AWS IAM account. Replace `YOUR_AWS_ACCOUNT_ID` in the template with your own AWS account ID before applying the policy.
+*** `Action`: ThoughtSpot uses AWS STS `AssumeRoleWithWebIdentity` (OIDC federation) to obtain temporary credentials. No long-lived AWS access keys are stored or exchanged.
+*** `Condition`: The OIDC subject condition that scopes the trust to the specific ThoughtSpot GCP service account. This value matches `gcp_service_account_id`. Including this condition ensures that only ThoughtSpot's service account, not any other GCP principal, can assume your IAM role.
++
+[source,JSON]
+----
+"StringEquals": {
+    "accounts.google.com:sub": "115663769112811637952"
+}
+----
+
+* `config.setup_instructions`: An ordered list of steps to complete in your AWS account before using this storage destination. Follow these steps to register the OIDC provider, create the IAM role with web identity federation trust, and configure the required S3 permissions (`s3:PutObject`, `s3:PutObjectAcl`).
+
+===== Example response
+
+[source,JSON]
+----
+[
+  {
+    "storage_type": "OBJECT_STORAGE",
+    "provider": "AWS_S3",
+    "config": {
+      "config_type": "GCP_TO_S3_STORAGE",
+      "gcp_service_account_id": "115663769112811637952",
+      "oidc_provider": "accounts.google.com",
+      "trust_policy_template": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:oidc-provider/accounts.google.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "accounts.google.com:sub": "115663769112811637952"
+              }
+            }
+          }
+        ]
+      },
+      "setup_instructions": [
+        "1. Add accounts.google.com as an Identity Provider in AWS IAM",
+        "2. Create an IAM role with Web Identity Federation trust",
+        "3. Configure the trust policy with the GCP service account ID",
+        "4. Attach S3 permissions (s3:PutObject, s3:PutObjectAcl) to the role",
+        "5. Use the role ARN in your webhook storage configuration"
+      ]
+    }
+  }
+]
+----
+
+==== Storage configuration attributes for GCP_TO_GCS_STORAGE
+The storage information is returned for GCP-hosted ThoughtSpot instances where the customer configures a Google Cloud Storage (GCS) bucket as the storage destination. ThoughtSpot's service account is granted the `roles/iam.serviceAccountTokenCreator` role on the customer's service account, which allows it to generate short-lived tokens and write to the GCS bucket on the customer's behalf.
+
+* `service_account_email`: The email address of the ThoughtSpot GCP service account that the customer must grant access to. Grant this service account the `roles/iam.serviceAccountTokenCreator` role on the service account that has write access to your GCS bucket. This allows ThoughtSpot to impersonate that service account and deliver webhook payloads to the bucket.
+* `required_role`: The GCP IAM role that must be granted to ThoughtSpot's service account (`service_account_email`) on your bucket-owning service account. Always `roles/iam.serviceAccountTokenCreator`. This role allows ThoughtSpot to create short-lived identity tokens for the impersonated service account without requiring the service account key to be shared.
+* `setup_instructions`: An ordered list of steps to complete in your GCP project before using this storage destination. Follow these steps to locate your bucket-owning service account, grant the `roles/iam.serviceAccountTokenCreator` role to ThoughtSpot's service account, and configure the GCS bucket in your webhook settings.
+
+===== Example response
+
+[source,json]
+----
+[
+  {
+    "storage_type": "OBJECT_STORAGE",
+    "provider": "GCP_GCS",
+    "config": {
+      "config_type": "GCP_TO_GCS_STORAGE",
+      "aws_account_id":null,
+      "gcp_service_account_id":null,
+      "oidc_provider":null,
+      "trust_policy_template":null,
+      "service_account_email": "webhook-sa@example-project.iam.gserviceaccount.com",
+      "required_role": "roles/iam.serviceAccountTokenCreator",
+      "setup_instructions": [
+        "1. In GCP Console, go to IAM & Admin > Service Accounts",
+        "2. Click on the service account that has write access to your GCS bucket",
+        "3. Open the 'Principals with access' tab and click 'Grant Access'",
+        "4. Enter the service account email as the principal",
+        "5. Assign the roles/iam.serviceAccountTokenCreator role and save",
+        "6. Use your service account email in the webhook storage configuration"
+      ]
+    }
+  }
+]
+----
+
+== Retrieving webhook details
+To view the properties of a webhook or get a list of webhooks configured on your instance, send a `POST` request to the `/api/rest/2.0/webhooks/search` API endpoint.
+
+By default, the API fetches a list of all webhooks available on the ThoughtSpot instance. To fetch webhooks created in a specific Org, specify the Org ID.
+
+To get the details of a specific webhook, specify the webhook ID in the API request.
+
+To filter results by the webhook status, specify `ENABLED` or `DISABLED` in the `status` parameter as needed.
+
+=== Example request
+
+The following example shows the request body to fetch webhook properties:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "org_identifier": "Primary",
+  "webhook_identifier": "27997a8a-cd33-485d-a039-b40b71d191a8",
+  "event_type": "LIVEBOARD_SCHEDULE",
+  "status": "ENABLED"
+}'
+----
+
+=== API response
+If the webhook ID is valid, the API returns the following response:
+
+[source,JSON]
+----
+{
+   "webhooks":[
+      {
+         "id":"3791ad80-70e8-4222-bf11-fb8a5f1b5bf4",
+         "name":"webhook_s3",
+         "description":null,
+         "org":{
+            "id":"2100019165",
+            "name":"docstest"
+         },
+         "url":"https://webhook.site/6643eba5-9d3e-42a1-85e0-bb686ba1524d",
+         "url_params":null,
+         "events":[
+            "LIVEBOARD_SCHEDULE"
+         ],
+         "authentication":null,
+         "signature_verification":null,
+         "additional_headers":null,
+         "creation_time_in_millis":1772127694740,
+         "modification_time_in_millis":1772127859128,
+         "created_by":{
+            "id":"08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
+            "name":"userA@thoughtspot.com"
+         },
+         "last_modified_by":{
+            "id":"08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
+            "name":"userA@thoughtspot.com"
+         },
+         "storage_destination":{
+            "storage_type":"AWS_S3",
+            "storage_config":{
+               "aws_s3_config":{
+                  "bucket_name":"my-company-data-exports",
+                  "region":"us-east-1",
+                  "role_arn":"arn:aws:iam::999888777666:role/thoughtspot-s3-upload",
+                  "external_id":"ts-webhook-x7k9m2p4q1",
+                  "path_prefix":"thoughtspot/"
+               }
+            }
+         }
+      }
+   ],
+   "pagination":{
+      "record_offset":0,
+      "record_size":50,
+      "total_count":1,
+      "has_more":false
+   }
+}
+----
+
+== Updating a webhook
+To update a webhook, send a `POST` request to the
+`/api/rest/2.0/webhooks/{webhook_identifier}/update` API endpoint. In the update request, include the webhook ID as a path parameter and the properties to modify in the request body.
+
+To update the webhook configuration, specify the following parameters in the API request as needed:
+
+* `name`: Name of the webhook.
+* `description`: Description text.
+* `url`: Webhook endpoint URL.
+* `events`: Event type that initiates the webhook delivery.
+* `url_params`: Key-value pairs for the URL query parameters.
+* `authentication`: Authentication type to use for authorizing webhook requests.
+* `signature_verification`: Signature verification type.
+* `storage_destination`: Storage configuration parameters for webhook delivery.
+* `additional_headers`: Custom headers to include in the request.
+* `status`: Activation state of the webhook. Specify `ENABLED` or
+`DISABLED`.
+
+To reset configured values, specify properties to reset in `reset_options`. The `reset_options` attribute removes one or more optional configuration sections from the webhook without replacing the entire configuration. Supported values are:
+
+* `AUTHENTICATION`:  Removes the authentication configuration.
+* `SIGNATURE_VERIFICATION`:  Removes the signature verification configuration.
+* `STORAGE_DESTINATION`:  Removes the storage destination configuration.
+
+=== Example request
+The following example shows the request body for updating the name, description text, endpoint URL, and storage properties of a webhook object:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/09e069e2-fc42-4354-9b46-cc96984c4f30/update'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "name": "test-webhook",
+  "status": "DISABLED",
+  "reset_options": [
+    "AUTHENTICATION"
+  ]
+}'
+----
+
+=== API response
+
+If the API request is successful, the API returns a 204 response code indicating a successful operation.
+
+== Deleting a webhook
+
+To delete a webhook, send a `POST` request to the `/api/rest/2.0/webhooks/delete` API endpoint with the webhook IDs in the request body.
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/webhooks/delete'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "webhook_identifiers": [
+    "09e069e2-fc42-4354-9b46-cc96984c4f30"
+  ]
+}'
+----
+
+=== API response
+
+If the API request is successful, the API returns a 200 response with the details of the deleted webhook.
+
+== Related resources
+* xref:webhooks-comm-channel.adoc[Configure webhook communication channels]
+* xref:webhooks-lb-schedule.adoc[Deliver Liveboard reports to an external application]
+* xref:webhooks-s3-storage.adoc[AWS S3 storage integration for webhook delivery]
+* xref:webhooks-gcs-storage.adoc[GCS storage integration for webhook delivery]
+* xref:webhooks-ux.adoc[Webhook configuration and management in the UI]
