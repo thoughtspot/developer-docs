@@ -127,8 +127,13 @@ const SecondaryHeader = (props: {
     location: Location;
     leftNavOpen: boolean;
     setLeftNavOpen: Function;
+    // In-product (embedded) presentation has no category tabs/AskDocs — render just the
+    // mobile nav-toggle so the left sidebar stays reachable on narrow viewports.
+    minimal?: boolean;
 }) => {
-    const { activeCategory, onCategoryChange, location, leftNavOpen, setLeftNavOpen } = props;
+    const {
+        activeCategory, onCategoryChange, location, leftNavOpen, setLeftNavOpen, minimal,
+    } = props;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -155,6 +160,27 @@ const SecondaryHeader = (props: {
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, [mobileMenuOpen]);
+
+    if (minimal) {
+        return (
+            <nav className="secondary-header secondary-header--minimal" aria-label="Left navigation toggle">
+                <div className="secondary-header__inner">
+                    <div className="secondary-header__mobile-left">
+                        <button
+                            className="secondary-header__nav-toggle"
+                            onClick={() => setLeftNavOpen((o: boolean) => !o)}
+                            aria-label={leftNavOpen ? 'Close navigation' : 'Open navigation'}
+                        >
+                            {leftNavOpen
+                                ? <MdClear className="secondary-header__nav-toggle-icon" />
+                                : <GiHamburgerMenu className="secondary-header__nav-toggle-icon" />
+                            }
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        );
+    }
 
     return (
         <nav className="secondary-header" aria-label="Documentation categories">
