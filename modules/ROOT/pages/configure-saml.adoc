@@ -114,12 +114,36 @@ disableSAMLAutoRedirect=true
 Make a note of all of the redirects within the SAML workflow. Each server must be configured properly to allow the inbound and outbound portions of the SAML flow. If you encounter errors while configuring and testing, go to the *Network* tab of the browser's developer tools to see which server within the workflow is generating the error.
 ====
 
+[#per-org-idp-org-isolation]
+=== Org isolation for per-org IdP authentication
+
+// SOURCE: SCAL-291968 — OIDCClient.java, OrgUtils.java, SecurityEventTypeEnum.java
+When your ThoughtSpot cluster uses per-org IdP configuration — where each Org is bound to its own identity provider — ThoughtSpot enforces strict org isolation on all incoming SAML and OIDC group and org claims.
+
+==== How it works
+
+When a user authenticates through a per-org IdP, ThoughtSpot identifies the **authorized Org** associated with that IdP. It then evaluates every group and org claim in the assertion:
+
+* Claims that reference the authorized Org are accepted and processed normally.
+* Claims that reference any other Org are **silently dropped**. They do not grant access to those Orgs, and they are not used for group provisioning in those Orgs.
+* Group claims that carry no Org suffix are automatically scoped to the authorized Org.
+
+For example, if a user logs in through IdP-A, which is bound to Org X, a claim of `PowerUser@X` is accepted. A claim of `Admin@Y` is dropped.
+
+NOTE: Org isolation applies only to per-org IdP logins. Cluster-wide (single IdP) SSO configurations are not affected.
+
+==== Effect on existing org memberships
+
+Logging in through a per-org IdP can affect existing Org memberships. When a user authenticates via a per-org IdP, ThoughtSpot evaluates and reconciles the user's Org memberships based on the claims scoped to that IdP's authorized Org.
+
+Alternatively, authenticating through a cluster-wide (primary Org) IdP does not alter existing group memberships.
+
 == Configuration steps
 
 To configure SAML SSO authentication on the ThoughtSpot embedded instance, complete the following steps:
 
 * xref:configure-saml.adoc#admin-portal[Enable SAML authentication on ThoughtSpot with IAMv1]
-* xref:configure-saml.adoc#IAMv2[Enable SAML authentication on ThoughtSpot with IAMv2] (Requires assistance from ThoughtSpot Support)
+* xref:configure-saml.adoc#IAMv2[Enable SAML authentication on ThoughtSpot with IAMv2]
 * xref:configure-saml.adoc#idp-config[Configure the IdP server for SAML authentication]
 * xref:configure-saml.adoc#auth-config-sdk[Enable SSO authentication in Visual Embed SDK]
 * xref:configure-saml.adoc#saml-redirect[Add SAML redirect domain to the allowed list in ThoughtSpot]
@@ -281,6 +305,7 @@ The accepted format is `PEM / .cer / .crt`.
 
 Your users can sign in using the updated certificate immediately.
 If users experience sign-in failures after a certificate rotation, verify that the certificate in ThoughtSpot matches the certificate currently active on your IdP.
+
 
 [#idp-config]
 === Configure the IdP server for SAML authentication

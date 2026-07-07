@@ -53,6 +53,10 @@ import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import VersionIframe from '../VersionIframe';
 
+// Key of the merged nav-in-product-help.adoc entry in processedNavMap (pageid minus 'nav-' prefix).
+// Not a real DocCategory/tab — used only to pick the left sidebar content when embedded in-product.
+const IN_PRODUCT_NAV_KEY = 'in-product-help';
+
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
         data,
@@ -127,21 +131,28 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     []);
 
     // Breadcrumb data built from master nav + all category navs for full coverage
+    // (excludes the merged in-product nav, which duplicates the category navs)
     const breadcrumsData = React.useMemo(() => {
         if (typeof window === 'undefined') return [];
         const allHtmls = [
             initialNavContentData,
-            ...Object.values(processedNavMap as Record<string, string>),
+            ...Object.entries(processedNavMap as Record<string, string>)
+                .filter(([cat]) => cat !== IN_PRODUCT_NAV_KEY)
+                .map(([, html]) => html),
         ];
         return allHtmls.flatMap((html) => fetchChild(html));
     }, [processedNavMap]);
 
-    // Pick the right sidebar content for the active category
+    // Pick the right sidebar content for the active category.
+    // In-product (embedded) presentation has no category tabs — always show the merged nav.
     const activeNavContent = React.useMemo(() => {
+        if (!isPublicSiteOpen) {
+            return processedNavMap[IN_PRODUCT_NAV_KEY] || navContent;
+        }
         const navId = CATEGORY_NAV_ID[activeCategory];
         const mapKey = navId.startsWith('nav-') ? navId.slice(4) : null;
         return (mapKey && processedNavMap[mapKey]) || navContent;
-    }, [activeCategory, processedNavMap, navContent]);
+    }, [activeCategory, processedNavMap, navContent, isPublicSiteOpen]);
 
     const isCustomPage = _.values(CUSTOM_PAGE_ID).some(
         (pageId: string) => pageId === params[TS_PAGE_ID_PARAM],
@@ -171,11 +182,13 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
     /* Build pageId → category map by parsing hrefs from each category's nav HTML.
-     * This means writers only need to update nav-*.adoc — no TypeScript changes needed. */
+     * This means writers only need to update nav-*.adoc — no TypeScript changes needed.
+     * Excludes the merged in-product nav, which isn't a real tab/category. */
     const pageIdToCategoryMap = React.useMemo(() => {
         if (typeof window === 'undefined') return {};
         const map: Record<string, DocCategory> = {};
         Object.entries(processedNavMap).forEach(([cat, html]) => {
+            if (cat === IN_PRODUCT_NAV_KEY) return;
             const doc = new DOMParser().parseFromString(html as string, 'text/html');
             doc.querySelectorAll('a[href]').forEach((a) => {
                 const href = a.getAttribute('href') || '';
@@ -723,13 +736,28 @@ if (isVersionedIframe) {
                     }
                 ></div>
                 {!isIframeMode && !isVersionedIframe && (
-                    <SecondaryHeader
-                        activeCategory={activeCategory}
-                        onCategoryChange={setActiveCategory}
-                        location={location}
-                        leftNavOpen={leftNavOpen}
-                        setLeftNavOpen={setLeftNavOpen}
-                    />
+                    isPublicSiteOpen ? (
+                        <SecondaryHeader
+                            activeCategory={activeCategory}
+                            onCategoryChange={setActiveCategory}
+                            location={location}
+                            leftNavOpen={leftNavOpen}
+                            setLeftNavOpen={setLeftNavOpen}
+                        />
+                    ) : !isMaxMobileResolution && (
+                        // In-product presentation has no tabs — show just the nav
+                        // toggle so the sidebar stays reachable on narrow viewports.
+                        // Desktop-width embeds skip this entirely; the sidebar is
+                        // always visible there.
+                        <SecondaryHeader
+                            activeCategory={activeCategory}
+                            onCategoryChange={setActiveCategory}
+                            location={location}
+                            leftNavOpen={leftNavOpen}
+                            setLeftNavOpen={setLeftNavOpen}
+                            minimal
+                        />
+                    )
                 )}
                 <main
                     className={getClassName()}
@@ -740,7 +768,9 @@ if (isVersionedIframe) {
                             : isVersionedIframe
                                 ? { height: 'calc(100lvh - 65px)' }
                                 : !isPublicSiteOpen
-                                    ? { height: 'calc(100lvh - 44px)' }
+                                    ? (!isMaxMobileResolution
+                                        ? { height: 'calc(100lvh - 48px)' }
+                                        : { height: '100lvh' })
                                     : { height: 'calc(100lvh - 65px - 44px)' }
                     }
                 >

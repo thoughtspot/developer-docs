@@ -1,15 +1,15 @@
-= Webhook payload for Liveboard events
+= Webhook payload for scheduled Liveboard events
 :toc: true
 :toclevels: 3
 
 :page-title: Webhook payload for Liveboard events
 :page-pageid: webhooks-lb-payload
-:page-description: Review the webhook payload content delivered to a target destination URL or S3 storage
+:page-description: Review the webhook payload content delivered to a target destination URL, S3 storage, or GCS storage
 
 The payload contains metadata about the event, the source, the actor, the target object, and event-specific data.
 
-== Payload example for S3 storage destination
-When the schedule is configured with an S3 destination, ThoughtSpot delivers the exported file directly to S3, and the webhook payload only contains metadata JSON and the S3 object URL location. The JSON metadata includes the event type, object type, schedule name, recipients, and format.
+== Payload contents for storage destinations
+When the schedule is configured with a storage destination, ThoughtSpot delivers the exported file directly to the S3 or GCS bucket, and the webhook payload only contains metadata JSON and the storage object URL. The JSON metadata includes the event type, object type, schedule name, recipients, and format.
 
 The supported file formats for webhook delivery are PDF, CSV, and XLSX.
 
@@ -71,7 +71,7 @@ The supported file formats for webhook delivery are PDF, CSV, and XLSX.
 }
 ----
 
-The following content in the file attachment indicates successful delivery to the S3 storage destination:
+The following content in the file attachment indicates successful delivery to the storage destination:
 
 [source,JSON]
 ----
@@ -101,7 +101,7 @@ The following content in the file attachment indicates successful delivery to th
 }
 ----
 
-The following examples show a failed delivery of file attachments due to access denied errors:
+The following examples show partial or complete delivery failure of file attachments due to access denied errors:
 
 [source,JSON]
 ----
@@ -149,6 +149,23 @@ The following examples show a failed delivery of file attachments due to access 
 [source,JSON]
 ----
 {
+  "files": [
+    {
+      "filename": "sales_report.pdf",
+      "contentType": "application/pdf",
+      "size": 1024000,
+      "provider": "GCP_GCS",
+      "bucketName": "my-webhook-files",
+      "objectKey": "thoughtspot/cluster-abc/user-123/org-0/liveboard/sales_report.pdf",
+      "uploadStatus": "SUCCESS"
+    }
+  ]
+}
+----
+
+[source,JSON]
+----
+{
   "files": [],
   "error": "cloud storage upload failed: failed to create cloud storage service: Unable to assume role. Verify roleArn, trust policy, externalId, and region."
 }
@@ -162,7 +179,7 @@ For other webhook destinations, ThoughtSpot sends a `multipart/form-data` payloa
 
 The supported attachment file formats for webhook delivery are PDF, CSV, and XLSX.
 
-[source,JSON]
+[source,http]
 ----
 Content-Type: multipart/form-data; boundary=------------------------boundary123
 
@@ -330,7 +347,7 @@ The `WebhookActorInfo` schema defines the properties of the entity that initiate
 
 | `actorType` | string | Initiator of the event such as the API client or user. The default actor type is `SYSTEM`. | Yes
 | `id`  | string a| Unique identifier, such as a GUID or object ID. For system-generated responses, the `id` is set to `null`. | No
-| `name` | string a| Name of the actor that initiated the event. For system-generated responses, the `name` will be set as `null`.  | No
+| `name` | string a| Name of the actor that initiated the event. For system-generated responses, the `name` is set to `null`.  | No
 | `email` | string a| Email of the actor that initiated the event. For system-generated responses, the `email` is set to `null`. | No
 |=====
 
@@ -362,7 +379,7 @@ The `LiveboardScheduleData` schema defines event-specific data for Liveboard sch
 | `recipients` | array   | Details of the ThoughtSpot users, groups, and email addresses of external users configured as subscribers to Liveboard schedule notifications and recipients of the webhook payload. For more information, see xref:webhooks-payload.adoc#_recipientinfo[RecipientInfo]. | Yes
 | `viewInfo`   | object  | Information about the Liveboard view. Applicable if the Liveboard schedule event is triggered for a personalized view of the Liveboard. For more information, see xref:webhooks-payload.adoc#_viewinfo[ViewInfo]. | No
 | `aiHighlights`  | string  | AI Highlights information. Applicable if AI highlights feature is enabled for the visualizations on the Liveboard.   | No
-| `msgUniqueId`   | string  | Unique message identifier. Unique ID of the webhook payload message. This ID can be used for traceability and deduplication on the receiving end.   | No
+| `msgUniqueId`   | string  | Unique ID of the webhook payload message. This ID can be used for traceability and deduplication on the receiving end.   | No
 | `channelID` | string  | The communication channel ID used for event dissemination. | No
 | `channelType` | string  | Type of the communication channel. The channel type used for webhook payloads is `webhook`.  | No
 | `communicationType`  | string  | Type of the messaging event. For Liveboard schedule events, the communication type will be `LiveboardSchedules`. | No
@@ -374,7 +391,7 @@ The `ScheduleDetails` schema defines the properties of the schedule that trigger
 
 [width="100%" cols="1,1,3,1"]
 [options='header']
-|====
+|=====
 | Field         | Type    | Description    | Required?
 | `scheduleId`    | string  | ID of the Liveboard schedule. | Yes
 | `name`          | string  | Name of the Liveboard schedule. | Yes
@@ -385,11 +402,11 @@ The `ScheduleDetails` schema defines the properties of the schedule that trigger
 | `userIds`    | array   | IDs of the ThoughtSpot users that are subscribed to the scheduled Liveboard notifications.  | No
 | `groupIds`   | array   | IDs of the ThoughtSpot groups that are subscribed to the scheduled Liveboard notifications.| No
 | `runId`      | string  | Schedule run ID of the Liveboard job.  | No
-| `exportRequest` | object  | Details of the file export request. If the scheduled notification includes PDF attachment, the `exportRequest`  includes details of the Liveboard and PDF page attributes.  | No
+| `exportRequest` | object  | Details of the file export request. If the scheduled notification includes a PDF attachment, the `exportRequest` includes details of the Liveboard and PDF page attributes.  | No
 | `fileFormat`  | string  | File format for export. Schedule notifications generally include PDF attachments. | No
 | `status`   | string  | Status of the schedule. | No
-| `emailIds`  | array   | Email IDs of users subscribed to Liveboard job schedule. | No
-|====
+| `emailIds`  | array   | Email addresses of users subscribed to the Liveboard job schedule. | No
+|=====
 
 ==== RecipientInfo
 
@@ -417,12 +434,12 @@ The `ViewInfo` schema defines properties of the Liveboard view for which the eve
 
 [width="100%" cols="1,1,3,1"]
 [options='header']
-|======
+|=====
 | Field    | Type   | Description  | Required?
 
 | `viewId`   | string | ID of the Liveboard personalized view. | Yes
 | `viewName` | string | Name of the Liveboard personalized view. | Yes
-|======
+|=====
 
 == Additional resources
 

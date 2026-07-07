@@ -1,48 +1,78 @@
 = Webhooks
 :toc: true
+:toclevels: 3
 
 :page-title: Webhooks
-:page-pageid: webhooks
-:page-description: Register a webhook to send KPI monitor and Liveboard schedule alerts to an external application
+:page-pageid: webhooks-overview
+:page-description: Use webhooks to send real-time event notifications from ThoughtSpot to external applications, communication channels, and cloud storage destinations
 
-Webhooks in ThoughtSpot provide a way to automate workflows and integrate with external systems by sending real-time notifications when specific events occur. In ThoughtSpot, webhooks can be used for two alerting use cases:
+ThoughtSpot webhooks provide a way to deliver data and reports to a target application, URL endpoint, or storage destination, triggered by events such as scheduled Liveboard jobs.
 
-* Liveboard schedule alerts [beta betaBackground]^Beta^ +
-ThoughtSpot supports using a xref:webhooks-lb-schedule.adoc[webhook for delivering scheduled Liveboard notifications] to external applications and communication channels.
+== Overview
+ThoughtSpot allows using webhooks for the following purposes:
 
-* KPI alerts +
-For KPI charts in a Liveboard or Answer, ThoughtSpot allows creating and scheduling alerts. KPI Monitor alerts notify users when a KPI metric meets a threshold condition or periodically as per the schedule configured by the user. You can send these alerts using a webhook and notify external applications when a KPI meets a defined threshold or changes value. For more information, see xref:webhooks-kpi-alerts.adoc[Webhooks for KPI monitor alerts].
+Liveboard schedule notifications::
+ThoughtSpot supports using webhooks to deliver scheduled Liveboard notifications to external applications and communication channels. For more information, see
+xref:webhooks-lb-schedule.adoc[Webhook configuration for Liveboard scheduled events].
 
+Webhook delivery to Cloud Storage destinations::
+ThoughtSpot supports delivering webhook payloads to the following cloud storage destinations:
++
+* *Amazon S3*: Available on AWS-hosted and GCP-hosted ThoughtSpot Cloud instances. For configuration steps, see
+xref:webhooks-s3-storage.adoc[AWS S3 storage configuration for webhooks].
+* *Google Cloud Storage (GCS)*: Available on GCP-hosted ThoughtSpot Cloud instances. For more information, see xref:webhooks-gcs-storage.adoc[GCS storage configuration for webhooks].
 
-== Webhook configuration
+KPI monitor alerts::
+You can use a webhook to trigger KPI monitor alerts to an external application when a KPI metric meets a threshold condition or changes value. For more information, see xref:webhooks-kpi-alerts.adoc[Webhooks for KPI monitor alerts].
 
-ThoughtSpot users with developer or administrator privileges can create webhooks via REST APIs or from the *Develop* page in the UI.
-
-Webhooks configured via the REST API::
-The REST API framework webhook configuration is intended for automation and integration scenarios; for example, delivering attachments to an external application or storage destinations such as the Amazon Web Services (AWS) S3 bucket. Currently, the Webhook REST APIs support creating and managing webhooks for Liveboard schedule events only.
-
-Webhooks created from the Develop > Webhook page::
-Webhooks created from the Develop page in the UI are typically used for integrating with KPI alerts. These webhooks are managed through the UI and can be selected as custom channels when configuring KPI alert notifications in the UI.
+== Webhook configuration and management
+ThoughtSpot supports creating and managing webhooks through the UI or REST APIs.
 
 [NOTE]
 ====
-* Webhooks created from the **Develop** page are different from the webhooks configured via REST APIs and follow a separate flow. Use REST APIs to create webhooks for custom notification channels or external storage destinations.
 * To set up a webhook for Liveboard schedule notifications, you must first configure the xref:webhooks-comm-channel.adoc[webhook communication channel using the communication-channel preferences API].
+* Only one webhook per Org is allowed for the Liveboard Schedule event type.
+* To configure and manage webhooks, `ADMINISTRATION` (**Can administer ThoughtSpot**) or *Can manage webhooks* (`CAN_MANAGE_WEBHOOKS`) privilege is required.
 ====
 
-== Integration with Amazon S3 bucket [beta betaBackground]^Beta^
+=== Webhooks UI
+For managing webhooks via UI, use the following options in the **Develop** page of the ThoughtSpot UI:
 
-Starting with the ThoughtSpot 26.3.0.cl release, ThoughtSpot supports configuring an Amazon S3 bucket as the storage destination for delivering webhook attachments via REST APIs.
+* **Webhooks** : +
+The new *Webhooks* option in the *Develop* page provides a centralized view of webhooks configured in ThoughtSpot, including the options to create, monitor, and manage webhooks, and view delivery statistics and logs in your ThoughtSpot Org.
 
-For more information, see xref:webhooks-s3-storage.adoc[S3 storage integration for Webhook delivery].
++
+[IMPORTANT]
+====
+* The new Webhooks UI experience is in Beta and is disabled by default. To enable this feature, contact ThoughtSpot Support.
+* In the current version, the new experience allows creating and managing webhooks for Liveboard Schedule events only.
+====
 
-== Response after webhook delivery
++
+For more information, see xref:webhooks-ux.adoc[Webhook configuration and management through the UI].
 
-When a webhook delivery is attempted for a Liveboard schedule event, the webhook endpoint must respond with an HTTP 2xx status code within 5 seconds to confirm successful receipt and processing of the request.
+* **Legacy Webhooks**:
+The **Legacy webhooks** page displays a list of webhooks created for KPI alerts and the menu actions to create, view, and edit the webhooks created for KPI alerts. These webhooks are managed through the UI and can be selected as custom channels to send KPI alerts when a KPI metric meets the threshold. For more information, see xref:webhooks-ux.adoc#webhook-configuration-and-management-legacy-experience[Webhook configuration and management through the UI] and xref:webhooks-kpi-alerts.adoc[Webhooks for KPI monitor alerts].
 
-If your server takes longer than 5 seconds to respond, returns a response code other than 2xx, or times out, ThoughtSpot may still deliver the Liveboard data and files. However, the notification status will be recorded as `FAILED` in the ThoughtSpot notification, and the request will be retried.
+=== Webhook REST APIs
+The REST API framework is intended for automation and integration scenarios, for example, creating webhooks programmatically or delivering Liveboard report attachments to a cloud storage destination. For REST API reference and examples, see xref:webhooks-lb-schedule.adoc[Deliver Liveboard reports to an external application] and xref:webhooks-api.adoc[Webhook REST APIs].
 
-To ensure a timely response, we recommend processing webhook payloads asynchronously. Your server can immediately return a 2xx response upon receipt of the webhook and then handle the payload in the background without blocking subsequent webhook deliveries.
+== Webhook delivery behavior
+When ThoughtSpot attempts to deliver a webhook event, the destination endpoint must respond with an HTTP 2xx status code within 5 seconds to confirm successful receipt.
+
+If the endpoint takes longer than 5 seconds to respond, returns a non-2xx status code, or times out, ThoughtSpot records the delivery status as `FAILED` and retries the request.
+
+To ensure a timely response, process webhook payloads asynchronously. Your server can return a 2xx response immediately on receipt and handle the payload in the background, without blocking subsequent webhook deliveries.
+
+For information about retry behavior and delivery logs, see xref:webhooks-ux.adoc[Manage webhooks].
 
 == Webhook payload
-For information about the payload content delivered to a target destination, see xref:webhooks-payload.adoc[Webhook payload for Liveboard events].
+
+For information about the payload structure delivered to a destination, see
+xref:webhooks-payload.adoc[Webhook payload for Liveboard events].
+
+== Next steps
+* xref:webhooks-comm-channel.adoc[Configure webhook communication channels]
+* xref:webhooks-lb-schedule.adoc[Configure a webhook for Liveboard scheduled events]
+* xref:webhooks-s3-storage.adoc[Configure AWS S3 storage destination for webhook delivery]
+* xref:webhooks-gcs-storage.adoc[Configure a GCS destination for webhook delivery]
