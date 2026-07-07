@@ -1,4 +1,5 @@
 import React from 'react';
+import { navigate } from 'gatsby';
 import { IconContext } from '@react-icons/all-files';
 import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import BackButton from '../BackButton';
@@ -50,6 +51,19 @@ const NavContent = (props: {
                     </div>
                 </div>
             </div>
+            {/* AskDocs lives in the top SecondaryHeader on the standalone site;
+                that bar is hidden in-product, so surface it here instead. */}
+            {!props.isPublicSiteOpen && (
+                <div className="leftNav-askdocs-wrapper">
+                    <button
+                        type="button"
+                        className="leftNav-askdocs"
+                        onClick={() => navigate('/ask-docs')}
+                    >
+                        AskDocs <span className="leftNav-askdocs__beta">Beta</span>
+                    </button>
+                </div>
+            )}
             <nav>
                 <h2 className="heading">{props.navTitle}</h2>
                 <div
