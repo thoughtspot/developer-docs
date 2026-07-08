@@ -24,6 +24,7 @@ function renderMarkdown(text: string): string {
 type Message = {
     role: 'user' | 'assistant';
     content: string;
+    quotedText?: string;
 };
 
 type SseEvent =
@@ -71,10 +72,8 @@ const getPageId = () => {
 };
 
 const SparkleIcon = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" />
-        <path d="M19 15L19.8 17.2L22 18L19.8 18.8L19 21L18.2 18.8L16 18L18.2 17.2L19 15Z" opacity="0.7" />
-        <path d="M5 3L5.6 4.4L7 5L5.6 5.6L5 7L4.4 5.6L3 5L4.4 4.4L5 3Z" opacity="0.7" />
+    <svg width="26" height="27" viewBox="0 0 27 27" fill="#2770EF" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8.25809 7.21109C8.83155 5.59342 11.1191 5.59349 11.6927 7.21109L13.4163 12.0753C13.4919 12.2885 13.6602 12.4568 13.8733 12.5324L18.7376 14.256C20.3555 14.8294 20.3555 17.1172 18.7376 17.6906L13.8733 19.4142C13.6601 19.4898 13.4918 19.658 13.4163 19.8712L11.6927 24.7355C11.1191 26.353 8.83157 26.3531 8.25809 24.7355L6.53445 19.8712C6.4589 19.658 6.29064 19.4898 6.07742 19.4142L1.21316 17.6906C-0.404397 17.1171 -0.404379 14.8295 1.21316 14.256L6.07742 12.5324C6.29058 12.4568 6.45883 12.2885 6.53445 12.0753L8.25809 7.21109ZM20.2805 0.49136C20.6395 -0.163697 21.6064 -0.163877 21.9651 0.49136L22.0315 0.642727L22.888 3.05972L25.3059 3.91616C26.1625 4.21966 26.1622 5.43079 25.3059 5.73452L22.888 6.59097L22.0315 9.00894C21.7279 9.86544 20.5167 9.86552 20.2132 9.00894L19.3567 6.59097L16.9397 5.73452C16.0831 5.43098 16.0831 4.21969 16.9397 3.91616L19.3567 3.05972L20.2132 0.642727L20.2805 0.49136Z" />
     </svg>
 );
 
@@ -109,6 +108,8 @@ const FloatingAssistant: React.FC = () => {
         suggestedQuestionsLoaded,
         setSuggestedQuestionsLoaded,
         resetConversation,
+        quotedText,
+        setQuotedText,
     } = useFloatingAssistant();
 
     const [isClosing, setIsClosing] = useState(false);
@@ -133,6 +134,12 @@ const FloatingAssistant: React.FC = () => {
     }, [isOpen]);
 
     useEffect(() => {
+        if (quotedText) {
+            setTimeout(() => inputRef.current?.focus(), 100);
+        }
+    }, [quotedText]);
+
+    useEffect(() => {
         const handler = (e: CustomEvent<{ location: Location }>) => {
             const { location } = e.detail;
             const newPageId = new URLSearchParams(location.search).get('pageid')
@@ -144,6 +151,15 @@ const FloatingAssistant: React.FC = () => {
         window.addEventListener('gatsby-route-update', handler as EventListener);
         return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
     }, [setSuggestedQuestionsLoaded]);
+
+    useEffect(() => {
+        const handler = (e: CustomEvent<{ quotedText: string }>) => {
+            setQuotedText(e.detail.quotedText);
+            setIsOpen(true);
+        };
+        window.addEventListener('spotter-code-ask', handler as EventListener);
+        return () => window.removeEventListener('spotter-code-ask', handler as EventListener);
+    }, [setIsOpen, setQuotedText]);
 
     useEffect(() => {
         if (suggestedQuestionsLoaded || messages.length > 0) return;
@@ -163,7 +179,9 @@ const FloatingAssistant: React.FC = () => {
         const messageText = (text ?? input).trim();
         if (!messageText || isLoading) return;
 
-        const userMessage: Message = { role: 'user', content: messageText };
+        const fullText = quotedText ? `"${quotedText}"\n\n${messageText}` : messageText;
+        const userMessage: Message = { role: 'user', content: fullText, quotedText: quotedText ?? undefined };
+        setQuotedText(null);
         const updatedMessages = [...messages, userMessage];
 
         setMessages(updatedMessages);
@@ -239,7 +257,8 @@ const FloatingAssistant: React.FC = () => {
         navigator.clipboard.writeText(code).catch(() => {});
         const prev = btn.innerHTML;
         btn.textContent = 'Copied!';
-        setTimeout(() => { btn.innerHTML = prev; }, 1500);
+        btn.style.color = '#0d9f6e';
+        setTimeout(() => { btn.innerHTML = prev; btn.style.color = ''; }, 1500);
     };
 
     const handleClose = () => {
@@ -256,21 +275,20 @@ const FloatingAssistant: React.FC = () => {
         <>
             {/* Chip trigger */}
             {!isOpen && !isClosing && (
-                <button
-                    className="floating-assistant__chip"
-                    onClick={() => setIsOpen(true)}
-                    aria-label="Open SpotterCode assistant"
-                >
-                    <span className="floating-assistant__chip__icon">
+                <div className="floating-assistant__chip-ring">
+                    <button
+                        className="floating-assistant__chip"
+                        onClick={() => setIsOpen(true)}
+                        aria-label="Open SpotterCode assistant"
+                    >
                         <SparkleIcon />
-                    </span>
-                    Ask SpotterCode
-                </button>
+                    </button>
+                </div>
             )}
 
             {/* Panel */}
             {(isOpen || isClosing) && (
-                <div className={`floating-assistant__panel${isClosing ? ' closing' : ''}`}>
+                <div className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}`}>
                     {/* Header */}
                     <div className="floating-assistant__header">
                         <span className="floating-assistant__title">SpotterCode</span>
@@ -316,7 +334,7 @@ const FloatingAssistant: React.FC = () => {
                                 </div>
                                 {suggestedQuestions.length > 0 && (
                                     <div className="floating-assistant__suggestions">
-                                        {suggestedQuestions.map((q, i) => (
+                                        {suggestedQuestions.slice(0, 3).map((q, i) => (
                                             <button
                                                 key={i}
                                                 className="floating-assistant__suggestion"
@@ -337,7 +355,17 @@ const FloatingAssistant: React.FC = () => {
                                     >
                                         {msg.role === 'user' ? (
                                             <div className="floating-assistant__user-bubble">
-                                                {msg.content}
+                                                {msg.quotedText && (
+                                                    <div className="floating-assistant__quote-chip floating-assistant__quote-chip--message">
+                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                            <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+                                                        </svg>
+                                                        <span className="floating-assistant__quote-text">{msg.quotedText}</span>
+                                                    </div>
+                                                )}
+                                                {msg.quotedText
+                                                    ? msg.content.replace(`"${msg.quotedText}"\n\n`, '')
+                                                    : msg.content}
                                             </div>
                                         ) : (
                                             <div className="floating-assistant__assistant-block">
@@ -402,6 +430,19 @@ const FloatingAssistant: React.FC = () => {
                     {/* Input */}
                     <div className="floating-assistant__input-row">
                         <div className="floating-assistant__input-wrapper">
+                            {quotedText && (
+                                <div className="floating-assistant__quote-chip">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+                                    </svg>
+                                    <span className="floating-assistant__quote-text">{quotedText}</span>
+                                    <button className="floating-assistant__quote-dismiss" onClick={() => setQuotedText(null)} aria-label="Remove quote">
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
                             <textarea
                                 ref={inputRef}
                                 className="floating-assistant__input"

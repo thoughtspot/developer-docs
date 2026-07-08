@@ -7,6 +7,7 @@ import LinkableHeader from '../LinkableHeader';
 import WasThisHelpful from '../WasThisHelpful';
 import CopyPageDropdown from '../CopyPageDropdown';
 import { HOME_PAGE_ID } from '../../configs/doc-configs';
+import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import parse, { HTMLReactParserOptions, domToReact, attributesToProps } from 'html-react-parser';
 
 const Document = (props: {
@@ -18,6 +19,7 @@ const Document = (props: {
     breadcrumsData: any;
     markdownBody?: string;
 }) => {
+    const { setIsOpen, setQuotedText } = useFloatingAssistant();
     const [selectionPos, setSelectionPos] = useState<{ top: number; left: number } | null>(null);
     const selectionRef = useRef<string>('');
 
@@ -43,16 +45,18 @@ const Document = (props: {
             const rect = range.getBoundingClientRect();
             selectionRef.current = text;
             const HEADER_HEIGHT = 108; // main header (60) + secondary header (48)
-            const rawTop = rect.top - 36;
+            const BUTTON_HEIGHT = 36;
+            const rawTop = rect.top - BUTTON_HEIGHT - 6;
             setSelectionPos({
                 top: Math.max(HEADER_HEIGHT + 4, rawTop),
-                left: rect.left,
+                left: Math.max(8, e.clientX - 80),
             });
         };
 
         const handleMouseDown = (e: MouseEvent) => {
             mouseDownX = e.clientX;
             mouseDownY = e.clientY;
+            if ((e.target as HTMLElement).closest('.selection-cta-button')) return;
             setSelectionPos(null);
         };
 
@@ -178,15 +182,18 @@ const Document = (props: {
             style={!props.shouldShowRightNav ? { width: '100%' } : undefined}
         >
             {selectionPos && (
-                <a
+                <button
                     className="selection-cta-button"
-                    href="https://try.thoughtspot.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
                     style={{ top: selectionPos.top, left: selectionPos.left }}
+                    onClick={() => {
+                        const selected = selectionRef.current;
+                        setSelectionPos(null);
+                        setQuotedText(selected);
+                        setIsOpen(true);
+                    }}
                 >
                     Ask SpotterCode
-                </a>
+                </button>
             )}
             {!isHomePage && (
                 <Breadcrums

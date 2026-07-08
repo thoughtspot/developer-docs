@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 type Message = {
     role: 'user' | 'assistant';
     content: string;
+    quotedText?: string;
 };
 
 type FloatingAssistantContextType = {
@@ -15,6 +16,8 @@ type FloatingAssistantContextType = {
     suggestedQuestionsLoaded: boolean;
     setSuggestedQuestionsLoaded: (loaded: boolean) => void;
     resetConversation: () => void;
+    quotedText: string | null;
+    setQuotedText: (text: string | null) => void;
 };
 
 const STORAGE_KEY = 'floatingAssistantState';
@@ -51,14 +54,13 @@ export const FloatingAssistantProvider: React.FC<{ children: ReactNode }> = ({ c
     const [messages, setMessagesState] = useState<Message[]>(initialState.messages);
     const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
     const [suggestedQuestionsLoaded, setSuggestedQuestionsLoaded] = useState(false);
+    const [quotedText, setQuotedText] = useState<string | null>(null);
 
-    // Synchronous save to sessionStorage only
     const saveState = useCallback((open: boolean, msgs: Message[]) => {
         if (typeof window === 'undefined') return;
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ isOpen: open, messages: msgs }));
     }, []);
 
-    // Wrapped setters that save immediately
     const setIsOpen = useCallback((open: boolean) => {
         setIsOpenState(open);
         saveState(open, messages);
@@ -72,6 +74,7 @@ export const FloatingAssistantProvider: React.FC<{ children: ReactNode }> = ({ c
     const resetConversation = useCallback(() => {
         setMessagesState([]);
         setSuggestedQuestionsLoaded(false);
+        setQuotedText(null);
         sessionStorage.removeItem(STORAGE_KEY);
     }, []);
 
@@ -87,6 +90,8 @@ export const FloatingAssistantProvider: React.FC<{ children: ReactNode }> = ({ c
                 suggestedQuestionsLoaded,
                 setSuggestedQuestionsLoaded,
                 resetConversation,
+                quotedText,
+                setQuotedText,
             }}
         >
             {children}
