@@ -23,6 +23,222 @@ This page lists new features, enhancements, and deprecated functionality introdu
 // *Affects:* Developers, Administrators, End Users
 // ============================================================
 
+== August 2026
+
+**Release version**: ThoughtSpot Cloud 26.8.0.cl +
+*Upgrade notes*: See link:#_breaking_changes[Breaking changes] below before upgrading. +
+*Recommended SDK versions*: Visual Embed SDK v1.51.0 and later
+
+[#_breaking_changes]
+[WARNING]
+====
+*26.8.0.cl contains three breaking changes for embedded applications:*
+
+. *SDK flag defaults changed* — `hideIrrelevantChipsInFilterPanel`, `compactHeader`, `coverFilterPage`, and `aether` are now enabled (`true`) by default. Set them explicitly to `false` to preserve previous behavior.
+. *Home page and navigation V1/V2 removed* — All embedded sessions now render the V3 experience. `HomePage.V1`, `HomePage.V2`, and the equivalent navigation flags are ignored by the platform. Migrate your `AppViewConfig` before upgrading.
+. *Granular download privileges* — The *Can Download Data* privilege is split into *Can Download Visuals* (PDF/PNG) and *Can Download Detailed Data* (XLSX/CSV). Update any programmatic privilege assignments before upgrading.
+====
+
+[.cl-table, cols="2,4", frame=none, grid=none]
+|=====
+a|
+[.cl-label]
+*Version 26.8.0.cl*
+
+a|
+// SOURCE: SCAL-295712
+[discrete]
+==== SDK flag defaults updated [.version-badge.breaking]#Breaking#
+
+The following SDK flags are now enabled (`true`) by default for all embedded ThoughtSpot applications in Visual Embed SDK v1.51.0. If your application explicitly passes `false` for any of these flags, that value is still honored. If you relied on the previous default of `false`, you must now explicitly set the flag to `false` to preserve that behavior.
+
+[cols="2,4", options="header"]
+|===
+| Flag | Description
+| `hideIrrelevantChipsInFilterPanel` | Hides filter chips that are not relevant to the currently displayed visualization. Previously disabled by default.
+| `compactHeader` | Enables the compact Liveboard header layout. Previously disabled by default.
+| `coverFilterPage` | Applies a cover layout to the Liveboard filter page. Previously disabled by default.
+| `aether` | Enables the Aether visual design system for embedded components. Previously disabled by default.
+|===
+
+// TODO: verify exact TypeScript flag names against visual-embed-sdk v1.51.0 release tag (SCAL-295712)
+
+---
+
+// SOURCE: SCAL-312731
+[discrete]
+==== Home page and navigation V1/V2 removed [.version-badge.breaking]#Breaking#
+
+In 26.8.0.cl, the classic (V1) and V2 home page and navigation experiences are removed from all ThoughtSpot embedded applications. All embedded sessions render the V3 navigation and home page experience regardless of the SDK configuration passed at initialization.
+
+If your application uses any of the following, update your configuration before upgrading:
+
+* `homePage: HomePage.V1` or `homePage: HomePage.V2` in `AppViewConfig`
+* Navigation flags that previously enabled V1 or V2 navigation
+
+*Migration steps:*
+
+. Update `AppViewConfig` to use `discoveryExperience` with `primaryNavbarVersion: PrimaryNavbarVersion.Sliding` and `homePage: HomePage.ModularWithStylingChanges` for the V3 experience, or `homePage: HomePage.Focused` for the V4 focused home page.
+. Remove any conditional logic in your codebase that branches on `HomePage.V1` or `HomePage.V2`.
+. Review and test any CSS customizations targeting V1 or V2 navigation selectors.
+
+For migration details, see xref:full-app-customize.adoc[Customize full application embedding] and xref:customize-homepage-full-embed.adoc[Customize home page experience].
+
+---
+
+// SOURCE: SCAL-309481
+[discrete]
+==== Liveboard PDF export — continuous layout generally available [.version-badge.new]#New#
+
+The WYSIWYG Liveboard PDF export experience (`isContinuousLiveboardPDFEnabled`) is now generally available. This feature was in Beta since 26.5.0.cl (SDK v1.48.x). The Beta label has been removed and this parameter is recommended for production use.
+
+When `isContinuousLiveboardPDFEnabled` is set to `true`, each Liveboard tab is rendered on a single continuous page that matches the UI layout. Setting this to `false` retains the paginated A4 format.
+
+// TODO: Confirm with engineering whether isContinuousLiveboardPDFEnabled becomes true by default in 26.8.0.cl or remains opt-in (SCAL-309481)
+
+For more information, see xref:embed-pinboard.adoc#_download_a_liveboard[Download a Liveboard].
+
+---
+
+// SOURCE: SCAL-307283
+[discrete]
+==== Personalized Views — TML portability [.version-badge.new]#New#
+
+Personalized Views in Liveboards can now be reliably ported across ThoughtSpot environments using TML. The following changes apply to Liveboard TML and the Import/Export TML APIs:
+
+New TML fields:::
+* `owned_by` — Assigns the owner of each Personalized View by `username` or email address. Preserves ownership when a Liveboard is promoted between clusters or Orgs.
+* `obj_ID` — A stable identifier for each view across environments, enabling reliable merge behavior on import.
+
+Smart merge on import:::
+When importing a Liveboard TML containing Personalized Views, ThoughtSpot now:
+
+* Preserves views that exist only in the destination environment.
+* Appends views that exist only in the incoming TML.
+* Updates views present in both the TML and the destination environment.
+
+The previous behavior overwrote all destination views on import. This change ensures end-user Personalized Views are not deleted during Liveboard promotions.
+
+// TODO: Verify exact TML field names (owned_by vs owner, obj_ID casing) with engineering (SCAL-307283)
+
+---
+
+// SOURCE: SCAL-273333
+[discrete]
+==== Granular download privileges [.version-badge.breaking]#Breaking#
+
+The *Can Download Data* privilege has been split into two separate privileges that provide more granular control over download permissions:
+
+[cols="2,3", options="header"]
+|===
+| New privilege | Grants access to
+| *Can Download Visuals* | PDF and PNG format downloads of Liveboards and visualizations
+| *Can Download Detailed Data* | XLSX and CSV format downloads of Liveboards and visualizations
+|===
+
+*Impact on embedded applications:*
+
+* Users who previously held the *Can Download Data* privilege are automatically migrated. Access is preserved without action.
+* If your application makes programmatic privilege assignments via REST API or TML-defined role definitions, update those assignments to use the new granular privilege names before upgrading.
+* If your application gates the visibility of download `Action` IDs based on privilege checks, validate your logic against the new privilege structure.
+
+---
+
+// SOURCE: SCAL-310399
+[discrete]
+==== Spotter Analysts (Spots) [earlyAccess eaBackground]#Early Access#
+
+ThoughtSpot introduces Spotter Analysts, also referred to as *Spots*, which are custom AI analysts scoped to a defined data domain. Administrators can create, configure, and manage Spots, define their data scope and behavioral instructions, and surface them to end users in the Spotter interface.
+
+// TODO: Verify whether Spots are accessible via SpotterEmbed or a new embed component, and confirm any new SDK events or flags required for embedding (SCAL-310399)
+
+---
+
+// SOURCE: SCAL-309017
+[discrete]
+==== SpotterViz Insight Tiles [earlyAccess eaBackground]#Early Access#
+
+Users can now pin AI-generated insights from SpotterViz as tiles directly on a Liveboard. Insight Tiles are available within the SpotterViz interface on embedded Liveboards.
+
+For more information, see xref:embed-spotterViz.adoc[SpotterViz in embedded Liveboards].
+
+// TODO: Verify whether new EmbedEvent or HostEvent identifiers are introduced for Insight Tile interactions, and document them in xref:embed-spotterViz.adoc (SCAL-309017)
+
+---
+
+// SOURCE: SCAL-306340
+[discrete]
+==== Spotter Model now generally available [.version-badge.new]#New#
+
+The Spotter Model is now generally available. Administrators can configure the Spotter Model to control how Spotter interprets data, including column relationships, synonyms, and preferred aggregations. The Early Access label has been removed.
+
+// TODO: Confirm whether Spotter Model configuration is available via REST API v2 and link to the relevant API reference page (SCAL-306340)
+
+---
+
+// SOURCE: SCAL-293483
+[discrete]
+==== Spotter onboarding for new users [.version-badge.new]#New#
+
+ThoughtSpot now provides a guided first-run onboarding experience for Spotter. When users open Spotter for the first time, they are guided through the core features and workflows of the Spotter interface. This feature is enabled by default for new users on ThoughtSpot Cloud.
+
+// TODO: Confirm whether embedded Spotter (SpotterEmbed) surfaces the onboarding flow, and whether the onboarding experience can be suppressed using an SDK flag (SCAL-293483)
+
+---
+
+// SOURCE: SCAL-313088
+[discrete]
+==== Business Terms auto-generation deprecated [.version-badge.deprecated]#Deprecated#
+
+Automatic Business Term generation is deprecated in 26.8.0.cl. The Business Terms workflow is now used to allow administrators to manually add descriptive context to columns and data objects, replacing the automated generation flow.
+
+*Impact:* Workflows or integrations that rely on scheduled Business Term auto-generation will no longer execute.
+
+// TODO: Confirm whether any REST API endpoints for Business Terms auto-generation are deprecated or removed in 26.8.0.cl (SCAL-313088)
+
+---
+
+// SOURCE: SCAL-298371
+[discrete]
+==== Timezone-aware dates now generally available [.version-badge.new]#New#
+
+Timezone-aware date handling is now generally available. Date values in search queries and results now reflect the configured user timezone, ensuring consistent date interpretation across time zones. This feature was previously in Beta.
+
+---
+
+// SOURCE: SCAL-301050
+[discrete]
+==== Column Alias UDF in Autocomplete now generally available [.version-badge.new]#New#
+
+Column aliases defined by users are now consistently recognized and surfaced in Autocomplete suggestions across Search and Spotter. This feature was previously in Early Access.
+
+---
+
+// SOURCE: SCAL-273513
+[discrete]
+==== Connection new experience now generally available [.version-badge.new]#New#
+
+The redesigned Embrace connection setup experience is now generally available. The refreshed UI for creating and managing data connections includes improved guidance and field validation. The Early Access label has been removed.
+
+---
+
+[discrete]
+==== Visual Embed SDK
+
+The Visual Embed SDK version 1.51.0 includes the breaking changes and new features listed above.
+For the full SDK changelog, see xref:api-changelog.adoc[Visual Embed changelog].
+
+---
+
+[discrete]
+==== REST API v2
+
+For information about REST API v2 enhancements in this release, see the xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
+
+---
+
+|=====
+
 == July 2026
 
 **Release version**: ThoughtSpot Cloud 26.7.0.cl +
@@ -148,506 +364,16 @@ This release introduces the following enhancements for Spotter AI workflows and 
 
 * Spotter embedding: +
 Spotter now includes data literacy skills that help users understand the underlying data model. Users can ask Spotter to explain available data sources, fields, and relationships in plain language within a conversation session.
-* Spotter AI APIs: +
-//** New REST API endpoints to configure and retrieve persistent behavioral xref:spotter-agent-instructions.adoc[instructions for the Spotter agent].
- New API endpoint xref:spotter-agent-apis.adoc#_stop_an_in_progress_agent_response[stop and cancel a long-running Spotter response].
-
----
-
-[discrete]
-==== Developer page enhancements
-The **Develop** page in the ThoughtSpot UI has been updated with the following enhancements:
-
-* The **Custom actions** list page now shows the code-based custom actions configured using the Visual Embed SDK.
-* Removal of REST API v1 +
-The legacy REST Playground v1 has been removed from the left navigation. This change does not affect your current integrations with v1 REST API. ThoughtSpot recommends that you update your integration workflows to use REST API v2. For more information, see xref:rest-api-v1v2-comparison.adoc[REST API v1 to v2 migration].
-* Removal of GraphQL playgrounds +
-The menu link to the GraphQL playground has been removed from the UI.
-
-[discrete]
-==== Liveboard browser cache refresh
-To improve load performance and reduce, you can now enable the Liveboard cache option with a **Refresh** button to allow your users to clear cache and refresh visualization data when required. For more information, see xref:api-changelog.adoc#_liveboard_browser_cache_refresh[Liveboard browser cache refresh].
-
----
-
-[discrete]
-==== Visual Embed SDK
-The Visual Embed SDK version 1.49.0 includes several new features and enhancements. For more information, see the xref:api-changelog.adoc[Visual Embed changelog].
+* Spotter AI API enhancements: +
+** The `POST /api/rest/2.0/ai/answer/create` endpoint now supports a `session_identifier` parameter to maintain conversation context across requests.
+** The `POST /api/rest/2.0/ai/conversation/converse` endpoint now supports file attachments via a `file_identifiers` parameter.
 
 ---
 
 [discrete]
 ==== REST API v2
-This release introduces new API endpoints for Spotter, connections and trusted authentication. For information about REST API v2 enhancements, see the xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
+For information about REST API v2 enhancements in this release, see the xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
+
+---
 
 |=====
-
-
-== May 2026
-
-**Release version**: ThoughtSpot Cloud 26.5.0.cl +
-*Upgrade notes*: ⚠️ Includes breaking changes to Spotter APIs. Refer to the xref:rest-apiv2-changelog.adoc[REST API changelog] for more information. +
-*Recommended SDK versions*: Visual Embed SDK v1.48.0 and later
-
-
-[.cl-table, cols="2,4", frame=none, grid=none]
-|=====
-a|
-[.cl-label]
-*Version 26.5.0.cl*
-
-a|
-
-
-[discrete]
-==== Liveboard downloads
-
-Continuous Liveboard PDF export [beta betaBackground]^Beta^::
-In PDF downloads, Liveboard tabs can now be rendered in a single page matching the UI layout. This feature can be enabled by setting `isContinuousLiveboardPDFEnabled` to `true` in the SDK. Setting this flag to `false` returns to the paginated PDF view.
-
-Liveboard download in XLSX and CSV formats::
-Embedded Liveboards can now be downloaded in the PDF, XLSX and CSV file formats. To enable this feature, ensure that the `isLiveboardXLSXCSVDownloadEnabled` parameter is set to `true`.
-
-Excel exports for pivot tables::
-Pivot table visualizations can now be exported to Excel format.
-
-For more information, see xref:embed-pinboard.adoc#_liveboard_download_options[Liveboard download options].
-
----
-
-[discrete]
-==== Visualization edit interface within the Liveboard view
-
-Users can now edit the underlying query of an answer directly within the Liveboard. When this feature is enabled, the edit button for visualization appears in the answer's floating toolbar when the Liveboard is opened in the edit mode. Clicking the edit button opens the Answer interface preloaded with the answer's current query context. You can make the edits and save the changes without leaving the Liveboard.
-
----
-
-[discrete]
-==== KPI charts in embedded Liveboards
-
-Embedded Liveboards support advanced controls KPI chart customization. For more information, see link:https://docs.thoughtspot.com/cloud/latest/chart-kpi#advanced[KPI charts].
-
----
-
-[discrete]
-==== Per-org and per-user timezone control via variables [beta betaBackground]^Beta^
-
-You can centrally control timezone behavior per org and per user in embedded deployments using the new template variable `ts_user_timezone` and Variable APIs.
-
-For multi-org and multi-tenant environments, each tenant org and user can be configured independently, guaranteeing isolation and consistency of time-based analytics across regions. Administrators can reference the timezone variable in formulas to render and filter timestamp data correctly for each embedded user, without separate content per region.
-
----
-
-[discrete]
-==== Timezone-aware keyword filtering [beta betaBackground]^Beta^
-ThoughtSpot now supports resolving relative date and time keywords, such as `today`, `yesterday`, and `last 7 days`, using a configurable per-user or per-Org timezone, instead of the system default timezone on a ThoughtSpot instance. This feature eliminates timezone-based inconsistencies in multi-region embedded deployments and removes the need for custom workarounds.
-
-For more information, see xref:timezone.adoc[Timezone-aware keywords and filters].
-
-[NOTE]
-====
-The timezone awareness feature is in Beta and disabled by default. To enable this feature, contact ThoughtSpot Support.
-====
-
-
----
-
-[discrete]
-==== Visual Embed SDK
-The Visual Embed SDK version 1.48.0 includes several new features and enhancements. For more information, see the xref:api-changelog.adoc[Visual Embed changelog].
-
----
-
-[discrete]
-==== REST API v2
-This release introduces new Spotter API endpoints and modifications to the agent conversation APIs, and deprecates legacy agent endpoints. For information about REST API v2 enhancements, see the xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
-
-|=====
-
-
-== April 2026
-
-**Release version**: ThoughtSpot Cloud 26.4.0.cl +
-*Upgrade notes*: ⚠️ Variable update and delete API and metadata parameterization endpoints are deprecated and replaced with new API endpoints. Refer to xref:rest-apiv2-changelog.adoc#version_26_4_0_cl_april_2026[REST API changelog] and xref:deprecated-features.adoc[Deprecation announcements]. +
-*Recommended SDK versions*: Visual Embed SDK v1.47.0 and later
-
-[.cl-table, cols="2,4", frame=none, grid=none]
-|===
-
-a|
-[.cl-label]
-*Version 26.4.0.cl*
-
-a|
-
-[discrete]
-==== Theme builder in AI mode
-
-The Theme Builder now has an AI mode that enables developers to explore and preview style customizations for their embedded application’s branding using natural language instructions and uploaded brand assets. You can execute style updates such as applying colors directly from a PDF branding guide, updating all button shapes with higher contrast, matching a header to a dark background based on a screenshot, or importing typography and spacing from a JSON file. In the AI mode, Theme builder interprets your intent and applies the changes instantly.
-
-For more information, see xref:theme-builder.adoc[Theme builder].
-
----
-
-
-[discrete]
-==== Webhook integration
-In this release version, the following enhancements are introduced in the webhook configuration and delivery status monitoring workflows:
-
-Channel validation::
-Administrators can verify the connection status of a webhook channel by sending a test payload in a `POST` request to the `/api/rest/2.0/system/communication-channels/validate` REST API endpoint. For more information, see xref:webhooks-comm-channel.adoc#_validate_communication_channel_configuration[Webhook channel validation].
-
-Monitor webhook delivery::
-Administrators can also monitor the status of a webhook delivery via a `POST /api/rest/2.0/jobs/history/communication-channels/search` API request. For more information, see xref:webhooks-comm-channel.adoc#_monitor_webhook_delivery_and_job_status[Monitor webhook delivery and job status].
-
-Support for custom HTTP headers in webhook requests::
-When configuring or updating a webhook, you can now specify custom headers to include in every outbound request, in addition to the standard HTTP and authentication headers that ThoughtSpot sends. For more information, refer to the xref:webhooks-lb-schedule.adoc#_create_a_webhook[webhook documentation].
-
----
-
-
-[discrete]
-==== Spotter embed enhancements
-You can now customize the appearance and contents of the chat history sidebar panel in Spotter embedding.
-
-You can also customize the branding and logo in the Spotter chat interface.
-
-For more information, see xref:embed-spotter.adoc#_chat_history_panel[Customizing chat history sidebar] and xref:embed-spotter.adoc#_hiding_the_spotter_icon_and_thoughtspot_branding_chat_interface[Hiding logo and brand label in Spotter chat interface].
-
----
-
-[discrete]
-==== Liveboard enhancements
-The following enhancements are introduced in Liveboard export and filtering workflows.
-
-Embedding a personalized Liveboard view::
-You can now embed a saved personalized Liveboard view using the `personalizedViewId` and load it along with the `liveboardId` in your app.
-
-Centralized filter modal::
-Liveboard users can modify multiple filters and parameters in a single session using the centralized filter modal. This is an early access feature and disabled by default on ThoughtSpot embedded instances. To enable this feature on embedded Liveboards, set the `isCentralizedLiveboardFilterUXEnabled` to `true`.
-
-Current period inclusion in rolling date filters::
-The rolling date filters with the **Last <N> <Period>** and **Next <N> <Period>** filter types support including current period. Developers can disable, show, or hide this option using `isThisPeriodInDateFiltersEnabled` or `Action.IncludeCurrentPeriod`.
-
-Liveboard PNG export::
-The PNG export workflow in the `/api/rest/2.0/report/liveboard` REST API is enhanced to provide high-resolution PNG files. The legacy PNG workflow is deprecated in 26.4.0.cl. For more information about breaking changes and deprecation guidelines, see xref:deprecated-features.adoc[Deprecation announcements]. For information about the new PNG download workflow, see xref:data-report-v2-api.adoc#_liveboard_report_api[Liveboard report API documentation].
-
----
-
-
-[discrete]
-==== Full app embedding
-In full application embedded deployments with the V3 navigation and home page experience, the default list page experience is set to ListPage v3 experience.
-
-The ListPage V3 experience provides a refreshed list layout and styling, including the following enhancements:
-
-* The **Views** column to show the number of views for each object.
-* Sorting options for **Name**, **Author**, and **Views** columns.
-* Filters can be added by clicking the column header without opening the filter modal. This option is available for **Favorites**, **Views** columns, and **Verified** columns.
-
-For more information, see xref:full-app-customize.adoc#_customize_list_page_experience[List page customization].
-
----
-
-
-[discrete]
-==== Variable API
-The variable REST API provides new API endpoints for the following bulk operations:
-
-* Bulk deletion:
-You can now delete multiple variables in a single API request using the `/api/rest/2.0/template/variables/delete` endpoint.
-* Batch update of variable values:
-You can now assign and update multiple values to a variable in a single API request using the `/api/rest/2.0/template/variables/{identifier}/update-values` endpoint.
-
-[NOTE]
-====
-The `/api/rest/2.0/template/variables/update-values` and `/api/rest/2.0/template/variables/{identifier}/delete` endpoints are now deprecated. Use the new `/api/rest/2.0/template/variables/{identifier}/update-values` and `/api/rest/2.0/template/variables/delete` endpoints for the variable update and delete operations instead.
-====
-
-For more information, see xref:variables.adoc[Variables documentation].
-
----
-
-
-[discrete]
-==== Metadata parameterization
-You can now parameterize multiple properties of metadata objects using `POST /api/rest/2.0/metadata/parameterize-fields`. The legacy endpoint `/api/rest/2.0/metadata/parameterize` is deprecated in 26.4.0.cl and later versions, and is replaced with the new endpoint to allow updating multiple fields in a single API request.
-
-For more information, see xref:metadata-parameterization.adoc[Metadata parameterization documentation].
-
----
-
-
-[discrete]
-==== Collections [beta betaBackground]^Beta^
-ThoughtSpot embedded users can now use REST APIs v2 to organize different ThoughtSpot objects into organizational containers called *Collections*. These objects can be Liveboards, Answers, data models, tables, and even other Collections.
-
-For more information, see xref:collections.adoc[Collections].
-
-[NOTE]
-====
-These APIs are currently in beta and turned off by default on ThoughtSpot instances. To enable this feature on your instance, contact ThoughtSpot Support.
-====
----
-
-[discrete]
-==== Visual Embed SDK
-For information about the new features and enhancements introduced in Visual Embed SDK version 1.46.0, see the xref:api-changelog.adoc[Visual Embed changelog].
-
-
-[discrete]
-==== REST API v2
-For information about REST API v2 enhancements, see the xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
-
----
-|===
-
-== March 2026
-
-**Release version**: ThoughtSpot Cloud 26.3.0.cl +
-*Upgrade notes*: ⚠️ Includes feature deprecations. Refer to xref:rest-apiv2-changelog.adoc#_custom_access_token_api[REST API changelog] and xref:deprecated-features.adoc[Deprecation announcements]. +
-*Recommended SDK versions*: Visual Embed SDK v1.46.0 and later
-
-[.cl-table, cols="2,4", frame=none, grid=none]
-|===
-
-a|
-[.cl-label]
-*Version 26.3.0.cl*
-
-a|
-[discrete]
-==== Amazon S3 storage destination for webhook delivery
-You can now configure ThoughtSpot to deliver webhook payloads and attachments directly into your own Amazon S3 storage using secure AWS cross-account access. To enable this integration, your AWS administrator must create an IAM role with S3 permissions and trust policy, and then register a webhook in ThoughtSpot to deliver the payloads and attachments directly to your S3 bucket.
-
-For more information, see xref:webhooks-s3-storage.adoc[Amazon S3 storage integration for webhook delivery].
-
----
-
-[discrete]
-==== Host event enhancements for context-aware routing
-
-HostEvents in the Visual Embed SDK are enhanced to improve event routing and context targeting in ThoughtSpot embedded applications.
-
-Developers can use the page context framework in the SDK to route host events to a specific UI layer and align user experience with the product UI behavior in multi-modal contexts.
-
-For more information, see xref:events-context-aware-routing.adoc[Context-based execution of host events].
-
----
-
-[discrete]
-==== JWT-based ABAC implementation
-The legacy JWT-based approach that uses `filter_rules` and `parameter_values` to implement Attribute-Based Access Control (ABAC) is deprecated.
-
-As part of this deprecation, the following changes have been introduced to the custom authentication token API workflow and REST API Playground:
-
-* The `filter_rules` parameter on the custom token authentication page in the REST API Playground is no longer available for new configurations. This change does not affect your existing implementation.
-
-* The `parameter_values` property is not deprecated in version 26.3.0.cl and remains supported until further notice. However, using parameter values for row-level security use cases will ultimately be deprecated in an upcoming release.
-
-Existing ABAC implementations that use `filter_rules` will continue to function until further notice. However, we strongly recommend migrating your legacy ABAC implementation to the ABAC via RLS method that uses custom variables. For migration steps, refer to the xref:abac-migration-guide.adoc[ABAC migration guide].
-
-For new deployments, use ABAC via RLS with custom variables and pass data security attributes through the `variable_values` property in the custom access token, and define your RLS rules based on those variables. For more information, see xref:abac_rls-variables.adoc[ABAC via RLS].
-
----
-
-[discrete]
-==== Spotter coaching access across published Orgs
-Starting with the 26.3.0.cl release, ThoughtSpot supports publishing Spotter coaching information to other Orgs. Coaching changes from the primary Org are synchronized with the data models published in secondary Orgs.
-
-Administrators and users with edit access to data models can programmatically control user access to Spotter coaching information using the object privilege REST API endpoint, `/api/rest/2.0/security/metadata/manage-object-privilege`. They can assign `SPOTTER_COACHING_PRIVILEGE` to other users and user groups, allowing access to the coaching information without requiring data model editing or administration privileges.
-
-Users and groups with `SPOTTER_COACHING_PRIVILEGE` can import and export coaching TML on data models in the source and destination Orgs where the model is published, and can also share these objects with other users and groups.
-
-For more information, see xref:spotter-nl-instructions.adoc#_spotter_data_model_instructions_access[Spotter data model instructions access].
-
----
-
-[discrete]
-==== Full application embedding
-The height and aspect ratio of the logo in the top-left corner of the ThoughtSpot application interface have been updated for visual alignment and consistency across pages. This enhancement is available only in the V3 navigation and home page experience.
-
-If you have embedded the full application with the V3 navigation experience, you may notice that the logo appears smaller in the top navigation. This is a design update and does not require any configuration changes to your current embedding implementation. However, we recommend that you review the logo size and appearance, and adjust your custom logo if necessary.
-
-For information about adding a custom logo image, see xref:customize-style.adoc#logo-change[Customize application logo and favicon].
-
----
-
-[discrete]
-==== Visual Embed SDK
-For information about the new features and enhancements introduced in Visual Embed SDK version 1.46.0, see the xref:api-changelog.adoc[Visual Embed changelog].
-
----
-
-[discrete]
-==== REST API v2
-For information about REST API v2 enhancements, see the xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
-
----
-
-|===
-
-== February 2026
-**Release version**: ThoughtSpot Cloud 26.2.0.cl +
-*Upgrade notes*: ⚠️ Includes API parameter deprecations. Refer to xref:rest-apiv2-changelog.adoc[REST API changelog] and xref:deprecated-features.adoc[Deprecation announcements]. +
-*Recommended SDK versions*: Visual Embed SDK v1.45.0 and later
-
-
-[.cl-table, cols="2,4", frame=none, grid=none]
-|===
-a|
-[.cl-label]
-*Version 26.2.0.cl*
-
-a|
-[discrete]
-==== SpotterCode extension for IDEs [earlyAccess eaBackground]#Early Access#
-
-ThoughtSpot introduces SpotterCode, an AI-powered Model Context Protocol (MCP) extension for Integrated Development Environments (IDEs) such as Cursor, Visual Studio Code, and Claude Code. When integrated, SpotterCode enables the AI agent in the IDE to access ThoughtSpot SDKs and API documentation resources and provide in-context coding assistance to developers embedding ThoughtSpot content within their applications.
-
-SpotterCode is available as an Early Access feature and can be integrated with development environments that support MCP servers and tools. For more information, see xref:spottercode.adoc[SpotterCode], xref:spottercode-integration.adoc[Integrating SpotterCode in IDEs], and xref:spottercode-prompt-guide.adoc[SpotterCode prompting guide].
-
----
-
-[discrete]
-==== Spotter 3 experience [earlyAccess eaBackground]#Early Access#
-You can now embed the Spotter 3 experience, which introduces several new capabilities, agentic analytics, and an enhanced user experience. Spotter 3 is an Early Access feature and is disabled by default on ThoughtSpot embedded instances.
-
-For more information, see xref:embed-ai-analytics.adoc[Embed AI Search and Analytics] and xref:embed-spotter.adoc[Spotter embedding documentation].
-
----
-
-[discrete]
-==== Rate limits for REST APIs
-To prevent excessive requests from reaching application servers and ensure API stability and service quality for REST API users, ThoughtSpot enforces rate limits on public API requests per client IP. These limits are applied globally at the cluster level for all public API requests, including calls to both REST API v1 and v2 endpoints.
-//Administrators can adjust these limits for their ThoughtSpot deployments as needed.
-
-For more information, see xref:about-rest-apis.adoc#_rate_limits_for_api_requests[Rate limits for REST APIs].
-
----
-
-[discrete]
-==== Security settings via REST APIs
-Security settings that ensure data security and a seamless embedded user experience can now be configured through REST APIs v2. Administrators and developers can configure allowlists for:
-
-* Content Security Policy (CSP)
-* Cross-origin Resource Sharing (CORS)
-* Authentication attributes
-* Access control settings
-
-For more information, see xref:security-settings.adoc[Security Settings].
-
----
-
-[discrete]
-==== WebSocket support for external tools
-ThoughtSpot supports secure WebSocket (`wss://`) endpoints for external tool script integrations, for example, tools that open WebSocket connections from the browser.
-
-To allow a WebSocket host, add the corresponding `wss://` URL to both your CSP allowlists. Only hosts explicitly listed with the `wss://` protocol are permitted. Existing `https://` entries in the allowlists remain unchanged and continue to function as expected.
-
-For more information, see xref:3rd-party-script.adoc#_allow_websocket_endpoints[External tools and script integration].
-
----
-
-
-[discrete]
-==== Visual Embed SDK
-For information about the new features and enhancements introduced in Visual Embed SDK version 1.45.0, see the xref:api-changelog.adoc[Visual Embed changelog].
-
----
-
-[discrete]
-==== REST API v2
-For information about REST API v2 enhancements, see the xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
-
----
-|===
-
-
-== January 2026
-
-**Release version**: ThoughtSpot Cloud 10.15.0.cl +
-*Upgrade notes*: No breaking changes. +
-*Recommended SDK versions*: Visual Embed SDK v1.44.0 and later
-
-
-[.cl-table, cols="2,4", frame=none, grid=none]
-|===
-a|
-[.cl-label]
-*Version 10.15.0.cl*
-
-a|
-[discrete]
-==== Theme Builder
-Theme Builder is now generally available (GA) and will be rolled out to all ThoughtSpot instances in customer deployments over the next few weeks.
-
-When this feature is enabled on your instance, you can access it from the *Develop* page in ThoughtSpot and use it to customize styles and UX themes directly within the product.
-
-For more information, see xref:theme-builder.adoc[Theme Builder].
-
----
-
-[discrete]
-==== V3 navigation and home page experience
-
-The new V3 navigation and home page experience is now generally available (GA) and can be enabled on ThoughtSpot embedded instances.
-
-The default UI experience in full application embedding remains the classic (V1) experience until further notice. Developers embedding the full ThoughtSpot application can enable the V3 experience in their applications by setting the appropriate configuration options in their embed code.
-
-For more information, see xref:full-app-customize.adoc[Customizing full application embedding].
-
----
-
-[discrete]
-==== Formula variables in RLS rules
-
-You can now create formula variables using the Variable REST API and use these variables in RLS rules for a specific data context and in ABAC token requests to dynamically assign security attributes to users.
-
-For more information, see xref:abac_rls-variables.adoc[ABAC via RLS with variables].
-
----
-
-[discrete]
-==== Spotter APIs
-
-ThoughtSpot introduces new REST APIs for the following Spotter workflows:
-
-* To send queries to a conversation session with the Spotter agent
-* To set natural language (NL) instructions on a model to coach the Spotter system
-* To fetch NL instructions configured on a model
-
-For more information, see xref:spotter-apis.adoc[Spotter APIs].
-
----
-
-[discrete]
-==== Embed events and parameters to intercept API calls
-You can now intercept API calls from the embedded ThoughtSpot application using the `interceptUrls` attribute in the Visual Embed SDK. This feature lets you control API requests in your embedding application and use embed events to modify, block, or handle requests before they are sent to the backend. For more information, see xref:api-intercept.adoc[Intercept API calls and search requests].
-
----
-
-[discrete]
-==== Icon customization enhancements
-
-You can now replace or customize the chart switcher toggle and icons in the Charts drawer on an Answer or visualization page using SVG sprites. Previously, these icons were fixed to ThoughtSpot defaults and were not configurable. In the new version, these icons are available as SVG components and can be replaced by developers through the xref:customize-icons.adoc[icon customization framework] as needed.
-
----
-
-[discrete]
-==== Mobile Embed SDK
-The SDKs for embedding ThoughtSpot components in mobile apps are now Generally Available (GA). For more information about the SDKs and how to embed a ThoughtSpot component in a mobile app, see xref:mobile-embed.adoc[Mobile embed documentation].
-
----
-
-[discrete]
-==== Visual Embed SDK
-For information about the new features and enhancements introduced in Visual Embed SDK version 1.44.0, see xref:api-changelog.adoc[Visual Embed changelog].
-
----
-
-[discrete]
-==== REST API
-For information about REST API v2 enhancements, see xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
-
-|===
