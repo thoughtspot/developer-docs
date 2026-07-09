@@ -5,7 +5,8 @@ import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import './index.scss';
 
 function renderMarkdown(text: string): string {
-    const html = marked.parse(text, { async: false }) as string;
+    const cleaned = text.replace(/\s*cite\w+/g, '');
+    const html = marked.parse(cleaned, { async: false }) as string;
     const sanitized = DOMPurify.sanitize(html);
     // Wrap <pre><code> blocks with a copy-button container
     return sanitized.replace(
@@ -112,20 +113,39 @@ const FloatingAssistant: React.FC = () => {
         setQuotedText,
     } = useFloatingAssistant();
 
+    const [feedbackGiven, setFeedbackGiven] = useState<Record<number, 'up' | 'down'>>({});
     const [isClosing, setIsClosing] = useState(false);
     const [streamingText, setStreamingText] = useState('');
     const [toolStatus, setToolStatus] = useState('');
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showScrollDown, setShowScrollDown] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const abortRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
-        if (messagesEndRef.current) {
+        setIsOpen(true);
+    }, []);
+
+    useEffect(() => {
+        if (!showScrollDown && messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [messages, streamingText]);
+
+    const handleMessagesScroll = () => {
+        const el = messagesContainerRef.current;
+        if (!el) return;
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        setShowScrollDown(distFromBottom > 80);
+    };
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        setShowScrollDown(false);
+    };
 
     useEffect(() => {
         if (isOpen && inputRef.current) {
@@ -306,7 +326,12 @@ const FloatingAssistant: React.FC = () => {
                     </div>
 
                     {/* Messages */}
-                    <div className="floating-assistant__messages" onClick={handleCodeCopy}>
+                    <div
+                        className="floating-assistant__messages"
+                        ref={messagesContainerRef}
+                        onScroll={handleMessagesScroll}
+                        onClick={handleCodeCopy}
+                    >
                         {isLandingPage ? (
                             <div className="floating-assistant__landing">
                                 <div className="floating-assistant__landing-intro">
@@ -331,10 +356,9 @@ const FloatingAssistant: React.FC = () => {
                                         Hey, I'm <span>SpotterCode</span>.<br />
                                         Where do we start?
                                     </div>
-                                </div>
-                                {suggestedQuestions.length > 0 && (
+                                    {suggestedQuestions.length > 0 && (
                                     <div className="floating-assistant__suggestions">
-                                        {suggestedQuestions.slice(0, 3).map((q, i) => (
+                                        {suggestedQuestions.slice(0, 5).map((q, i) => (
                                             <button
                                                 key={i}
                                                 className="floating-assistant__suggestion"
@@ -345,6 +369,8 @@ const FloatingAssistant: React.FC = () => {
                                         ))}
                                     </div>
                                 )}
+                                </div>
+                                
                             </div>
                         ) : (
                             <>
@@ -375,18 +401,37 @@ const FloatingAssistant: React.FC = () => {
                                                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                                                 />
                                                 <div className="floating-assistant__feedback">
-                                                    <button className="floating-assistant__feedback-btn" aria-label="Thumbs down">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/>
-                                                            <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
-                                                        </svg>
-                                                    </button>
-                                                    <button className="floating-assistant__feedback-btn" aria-label="Thumbs up">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"/>
-                                                            <path d="M7 22H4.72A2.31 2.31 0 0 1 2.4 20v-7a2.31 2.31 0 0 1 2.33-2H7"/>
-                                                        </svg>
-                                                    </button>
+                                                    {feedbackGiven[i] ? (
+                                                        <span className="floating-assistant__feedback-thanks">
+                                                            {feedbackGiven[i] === 'up' ? (
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                                                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"/>
+                                                                    <path d="M7 22H4.72A2.31 2.31 0 0 1 2.4 20v-7a2.31 2.31 0 0 1 2.33-2H7"/>
+                                                                </svg>
+                                                            ) : (
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                                                    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/>
+                                                                    <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+                                                                </svg>
+                                                            )}
+                                                            Thank you for feedback!
+                                                        </span>
+                                                    ) : (
+                                                        <>
+                                                            <button className="floating-assistant__feedback-btn" aria-label="Thumbs down" onClick={() => setFeedbackGiven(prev => ({ ...prev, [i]: 'down' }))}>
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/>
+                                                                    <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+                                                                </svg>
+                                                            </button>
+                                                            <button className="floating-assistant__feedback-btn" aria-label="Thumbs up" onClick={() => setFeedbackGiven(prev => ({ ...prev, [i]: 'up' }))}>
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"/>
+                                                                    <path d="M7 22H4.72A2.31 2.31 0 0 1 2.4 20v-7a2.31 2.31 0 0 1 2.33-2H7"/>
+                                                                </svg>
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -426,6 +471,23 @@ const FloatingAssistant: React.FC = () => {
                         )}
                         <div ref={messagesEndRef} />
                     </div>
+
+                    {/* Fade + scroll-to-bottom */}
+                    {!isLandingPage && (
+                        <div className={`floating-assistant__messages-fade${showScrollDown ? ' floating-assistant__messages-fade--visible' : ''}`}>
+                            {showScrollDown && (
+                                <button
+                                    className="floating-assistant__scroll-down"
+                                    onClick={scrollToBottom}
+                                    aria-label="Scroll to bottom"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     {/* Input */}
                     <div className="floating-assistant__input-row">
