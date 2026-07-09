@@ -144,13 +144,55 @@ The *Can Download Data* privilege has been split into two separate privileges th
 
 ---
 
-// SOURCE: SCAL-310399
+// SOURCE: SCAL-310399, SCAL-312622, SCAL-312627
 [discrete]
-==== Spotter Analysts (Spots) [earlyAccess eaBackground]#Early Access#
+==== Spotter Analysts (Spots) — TSE support [earlyAccess eaBackground]#Early Access#
 
-ThoughtSpot introduces Spotter Analysts, also referred to as *Spots*, which are custom AI analysts scoped to a defined data domain. Administrators can create, configure, and manage Spots, define their data scope and behavioral instructions, and surface them to end users in the Spotter interface.
+Spotter Analysts (Spots) are custom AI analysts scoped to a data domain. As of 26.8.0.cl, the Visual Embed SDK supports embedding Spotter with Analysts enabled and controlled via SDK configuration.
 
-// TODO: Verify whether Spots are accessible via SpotterEmbed or a new embed component, and confirm any new SDK events or flags required for embedding (SCAL-310399)
+*Default behavior in embedded Spotter:*
+
+* Analysts are *disabled by default* in `SpotterEmbed`. The Analysts side panel is not shown.
+* All Analyst management actions (Create, Edit, Copy, Share, Delete) are hidden by default.
+
+This ensures existing embedded integrations are unaffected when upgrading to 26.8.0.cl.
+
+*Admin prerequisite:* An administrator must enable Spotter Analysts in *Admin* > *Spotter* > *Capabilities* > *Enable Spotter Analysts*. This setting is org-aware.
+
+For full SDK configuration options including enabling the Analysts panel, embedding with a single Spot, and controlling Analyst actions, see xref:embed-ai-analytics.adoc#_spotter_analysts_spots[Spotter Analysts (Spots) in embedded applications].
+
+// TODO: Verify exact SDK property names for showAnalysts, analystId, and Action enum values for Analyst CRUD operations with engineering (SCAL-312622)
+
+---
+
+// SOURCE: SCAL-293483, SCAL-308643, SCAL-314448
+[discrete]
+==== Spotter onboarding — SDK configuration surface [.version-badge.new]#New#
+
+The Spotter first-run onboarding experience is now generally available and includes an SDK configuration surface for embedded applications. The onboarding experience is displayed the first time a user opens Spotter and guides them through core features and workflows.
+
+*Behavior in embedded Spotter (`SpotterEmbed`):*
+
+* The onboarding experience is enabled by default when Spotter 3 is active and the user has not previously completed onboarding.
+* Role gating is applied: the onboarding flow respects the user's role and shows only features they have access to.
+* The experience is controlled via a LaunchDarkly feature flag at the instance level.
+
+// TODO: Verify with engineering (SCAL-314448) whether the onboarding experience can be suppressed in embed via a specific SDK parameter in SpotterEmbed, and document the parameter name and accepted values if available.
+
+---
+
+// SOURCE: SCAL-306340, SCAL-317295
+[discrete]
+==== Spotter Model now generally available — flag enabled by default [.version-badge.new]#New#
+
+The Spotter Model feature is now generally available as of ThoughtSpot Cloud 26.8.0.cl. The `spotterModel` feature flag is now enabled by default on all instances.
+
+*Impact on embedded applications:*
+
+* No SDK configuration change is required. Spotter Model configuration set by administrators is automatically applied to all Spotter 3 sessions.
+* If your instance had Spotter Model in Early Access and disabled via flag, the flag is now `true` by default. Contact ThoughtSpot Support if you need to override this behavior.
+
+// TODO: Confirm with engineering (SCAL-306340) whether REST API v2 endpoints for programmatic Spotter Model configuration are available in 26.8.0.cl, and add a link to the API reference if so.
 
 ---
 
@@ -158,31 +200,9 @@ ThoughtSpot introduces Spotter Analysts, also referred to as *Spots*, which are 
 [discrete]
 ==== SpotterViz Insight Tiles [earlyAccess eaBackground]#Early Access#
 
-Users can now pin AI-generated insights from SpotterViz as tiles directly on a Liveboard. Insight Tiles are available within the SpotterViz interface on embedded Liveboards.
+Users can now pin AI-generated insights as tiles directly on a Liveboard from the SpotterViz interface. Insight Tiles are available within embedded Liveboards when SpotterViz is enabled.
 
-For more information, see xref:embed-spotterViz.adoc[SpotterViz in embedded Liveboards].
-
-// TODO: Verify whether new EmbedEvent or HostEvent identifiers are introduced for Insight Tile interactions, and document them in xref:embed-spotterViz.adoc (SCAL-309017)
-
----
-
-// SOURCE: SCAL-306340
-[discrete]
-==== Spotter Model now generally available [.version-badge.new]#New#
-
-The Spotter Model is now generally available. Administrators can configure the Spotter Model to control how Spotter interprets data, including column relationships, synonyms, and preferred aggregations. The Early Access label has been removed.
-
-// TODO: Confirm whether Spotter Model configuration is available via REST API v2 and link to the relevant API reference page (SCAL-306340)
-
----
-
-// SOURCE: SCAL-293483
-[discrete]
-==== Spotter onboarding for new users [.version-badge.new]#New#
-
-ThoughtSpot now provides a guided first-run onboarding experience for Spotter. When users open Spotter for the first time, they are guided through the core features and workflows of the Spotter interface. This feature is enabled by default for new users on ThoughtSpot Cloud.
-
-// TODO: Confirm whether embedded Spotter (SpotterEmbed) surfaces the onboarding flow, and whether the onboarding experience can be suppressed using an SDK flag (SCAL-293483)
+// TODO: Verify whether new EmbedEvent or HostEvent identifiers are introduced for Insight Tile interactions in 26.8.0.cl (SCAL-309017)
 
 ---
 
@@ -224,42 +244,32 @@ The redesigned Embrace connection setup experience is now generally available. T
 
 // SOURCE: SCAL-317357
 [discrete]
-==== Collections object type support in TML and object ID APIs [.version-badge.new]#New#
+==== Collections TML support and Update Metadata Object ID API [.version-badge.new]#New#
 
-ThoughtSpot Collections objects now support distributed object identity (`obj_id`) across the following areas:
+ThoughtSpot Collections are now supported in TML. You can export and import Collections using the TML Import/Export APIs, enabling Collections to be version-controlled and promoted across environments.
 
-TML import and export:::
-The `COLLECTION` object type is now a supported enum value in the TML Import and Export APIs. You can export a Collection as a TML file, modify it, and import it back into ThoughtSpot — using the same `POST /api/rest/2.0/metadata/tml/import` and `POST /api/rest/2.0/metadata/tml/export` endpoints.
+The new *Update Metadata Object ID* API (`/api/rest/2.0/metadata/update_metadata_obj_id`) allows administrators to update the stable object identifier for any metadata object, including Collections, Liveboards, and Worksheets.
 
-Update Object ID API:::
-The `COLLECTION` object type is now supported in the Update Metadata Object ID API (`POST /api/rest/2.0/metadata/update_metadata_obj_id`). This allows you to assign and manage stable, portable object identifiers for Collections across ThoughtSpot environments.
-
-Update Metadata Header API:::
-The `COLLECTION` object type is now supported in the Update Metadata Header API. You can programmatically update the name and description of Collection objects.
-
-This feature is available on ThoughtSpot Cloud 26.8.0.cl and ThoughtSpot Software.
-
-For more information, see xref:tml.adoc[TML import and export] and xref:rest-api-v2-reference.adoc#_metadata[Metadata REST API reference].
+// TODO: Verify exact endpoint URL, HTTP method, and required request schema for the Update Metadata Object ID API with engineering (SCAL-317357)
+// TODO: Verify the exact TML schema for Collections export — document top-level fields and supported object types (SCAL-317357)
 
 ---
 
 // SOURCE: SCAL-307522
 [discrete]
-==== Spotter training memory — public APIs [.version-badge.new]#New#
+==== Spotter training memory — public REST APIs [.version-badge.new]#New#
 
-ThoughtSpot introduces public REST API v2 endpoints for Spotter training memory management. These APIs enable administrators and developers to programmatically manage the training signals that improve Spotter's query understanding over time.
+New REST API v2 endpoints are available for managing Spotter training memory programmatically. These APIs allow administrators and developers to create, retrieve, and delete Spotter training memory entries outside of the Admin console.
 
-// TODO: Verify the exact API endpoint URLs, request parameters, and privilege requirements for the Spotter training memory APIs with engineering (SCAL-307522)
-
-For more information, see xref:rest-api-v2-reference.adoc#_ai[AI REST API reference].
+// TODO: Verify endpoint URLs, HTTP methods, request/response schemas, and required privilege levels for the Spotter training memory APIs with engineering (SCAL-307522). Placeholder paths: POST /api/rest/2.0/ai/training/memory, GET /api/rest/2.0/ai/training/memory, DELETE /api/rest/2.0/ai/training/memory/{id}
 
 ---
 
 // SOURCE: SCAL-319440
 [discrete]
-==== Scheduled report attachment size limit correction [.version-badge.fixed]#Fixed#
+==== Attachment size limit correction [.version-badge.fixed]#Fixed#
 
-Documentation correction: the maximum supported attachment size for scheduled Liveboard report emails is *22 MB*, not 25 MB as previously documented. The 22 MB limit accounts for base64 encoding overhead, which consumes approximately 33% of the raw file size. Files exceeding 22 MB cannot be delivered as email attachments and will cause the scheduled job to fail.
+Documentation has been updated to reflect the correct maximum attachment size for scheduled report emails. The correct limit is *22 MB*. Previous documentation incorrectly stated 25 MB.
 
 ---
 
@@ -274,27 +284,10 @@ For the full SDK changelog, see xref:api-changelog.adoc[Visual Embed changelog].
 [discrete]
 ==== REST API v2
 
-For information about REST API v2 enhancements in this release, see the xref:rest-api-v2-changelog.adoc[REST API v2.0 changelog].
+For information about REST API v2 enhancements in this release, see the xref:rest-api-v2-reference.adoc[REST API v2.0 changelog].
 
 ---
 
 |=====
 
 == July 2026
-
-**Release version**: ThoughtSpot Cloud 26.7.0.cl +
-*Recommended SDK versions*: Visual Embed SDK v1.50.0 and later
-
-[.cl-table, cols="2,4", frame=none, grid=none]
-|=====
-a|
-[.cl-label]
-*Version 26.7.0.cl*
-
-a|
-[discrete]
-==== REST API v2
-
-For information about REST API v2 enhancements in this release, see the xref:rest-api-v2-changelog.adoc[REST API v2.0 changelog].
-
-|=====
