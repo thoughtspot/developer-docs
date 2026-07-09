@@ -110,53 +110,132 @@ Fetches status of import tasks
 
 === Schedule import tasks
 
-You can import TML objects asynchronously by scheduling TML import tasks via `POST` request to POST `/api/rest/2.0/metadata/tml/async/import` API endpoint.
+You can import TML objects asynchronously by scheduling TML import tasks via `POST` request to POST `/api/rest/2.0/metadata/tml/async/import` API endpoint. You can send the following parameters in the API request body:
+
+[width="100%" cols="2,4,1"]
+[options='header']
+|====
+|Form parameter|Description| Default
+|`metadata_tmls` |__Array of strings__. Array of the TML strings. |__None__
+|`create_new`  +
+__Optional__ |__Boolean__. To create TML objects with new GUIDs during import, specify `true`. By default, the imported TML objects will replace the objects that exist in the cluster. |`false`
+|`import_policy` +
+__Optional__|__String__. Policy to follow when importing TML files. Valid values are `PARTIAL`, `ALL_OR_NONE`, `VALIDATE_ONLY`, and `PARTIAL_OBJECT`. |`PARTIAL`
+|`org_identifier` +
+__Optional__ |__String__. ID or name of the Org. | __None__
+|`skip_cdw_validation_for_tables` +
+__Optional__ |__Boolean__. Specifies whether to skip CDW validation for Tables during import.| `false`
+|====
+
+=== Check import task status
+
+After scheduling an import task, you can check the status of the import task using the `POST /api/rest/2.0/metadata/tml/async/status` API endpoint.
+
+[width="100%" cols="2,4,1"]
+[options='header']
+|====
+|Form parameter|Description| Default
+|`task_identifiers` |__Array of strings__. Array of the task identifiers. |__None__
+|`record_size` +
+__Optional__|__Integer__. The maximum number of records to retrieve in the API response. |`-1`
+|`record_offset` +
+__Optional__|__Integer__. The starting point for fetching records. Used for pagination. |`0`
+|====
 
 == Export TML
 
-You can export TML files for supported objects using the following API endpoints:
+To export a TML object, your account must have view access to the metadata object.
+
+Use the following API endpoints to export TML files:
 
 * +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml">POST /api/rest/2.0/metadata/tml/export</a>+++ (REST API v2)
 * xref:tml-api.adoc#export[POST /tspublic/v1/metadata/tml/export] (REST API v1)
+
+You can export one or several objects at a time, and optionally export associated objects:
+
+* To export multiple objects together, list their GUIDs in the `metadata` attribute in the request body.
+* To export associated data objects, set `export_associated` to `true`.
+* To export TML with FQNs, set `export_fqn` to `true`.
+
+[width="100%" cols="2,4,1"]
+[options='header']
+|====
+|Form parameter|Description| Default
+|`metadata` |__Array of objects__. Array of GUIDs and object types of the metadata objects to export. |__None__
+|`export_associated` +
+__Optional__ |__Boolean__. When set to `true`, the API exports the associated data objects.| `false`
+|`export_fqn` +
+__Optional__|__Boolean__. When set to `true`, the exported TML contains FQNs of the referenced objects instead of names.| `false`
+|`export_schema_version` +
+__Optional__|__String__. The schema version of the TML to export. Valid values are `DEFAULT` and `V2`. | `DEFAULT`
+|====
+
+== Update TML
+
+You can update TML objects using the following API endpoint:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fupdate-metadata-obj-id">POST /api/rest/2.0/metadata/update_metadata_obj_id</a>+++ (REST API v2)
+
+Use this endpoint to update the object ID (`obj_id`) of a metadata object. This is particularly useful for:
+
+* Ensuring consistent object IDs across environments during SDLC promotions.
+* Updating the `obj_id` of Personalized Views after importing a Liveboard TML.
+
+[NOTE]
+====
+// SOURCE: SCAL-317357
+*New in 26.8.0.cl:* The `COLLECTION` object type is now supported in the Update Metadata Object ID API. You can use this endpoint to update the `obj_id` of a Collection.
+
+// TODO: Verify the exact endpoint URL and request schema for COLLECTION support in the Update Metadata Object ID API (SCAL-317357)
+====
+
+== Validate TML
+
+To validate TML objects without importing them, use the `VALIDATE_ONLY` import policy in the Import TML API, or use the following dedicated validation endpoint:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fimport-metadata-tml">POST /api/rest/2.0/metadata/tml/import</a>+++ with `import_policy: VALIDATE_ONLY`
+
+The validation response returns any errors or warnings found in the TML files, without making any changes to the ThoughtSpot instance.
+
+== Delete TML objects
+
+To delete a TML object, use the following API endpoint:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fdelete-metadata">POST /api/rest/2.0/metadata/delete</a>+++ (REST API v2)
 
 [#_collections_tml_support]
 == Collections TML support
 
 // SOURCE: SCAL-317357
-As of ThoughtSpot Cloud 26.8.0.cl and ThoughtSpot Software, the `COLLECTION` object type supports distributed object identity and TML-based management across the following APIs:
+*Available from*: ThoughtSpot Cloud 26.8.0.cl and later
 
-=== TML import and export
+Starting in 26.8.0.cl, the `COLLECTION` object type is a supported enum value in the following APIs:
 
-Collections can now be exported as TML files and imported back into ThoughtSpot using the standard TML import and export API endpoints. To export a Collection:
+* TML Import API (`POST /api/rest/2.0/metadata/tml/import`)
+* TML Export API (`POST /api/rest/2.0/metadata/tml/export`)
+* Update Metadata Object ID API (`POST /api/rest/2.0/metadata/update_metadata_obj_id`)
 
-[source,JSON]
-----
-{
-  "metadata": [
-    {
-      "identifier": "<collection-guid>",
-      "type": "COLLECTION"
-    }
-  ]
-}
-----
+This allows you to include Collections in the same TML-based SDLC workflows you use for Liveboards, Answers, and other metadata objects.
 
-Pass `"type": "COLLECTION"` in the `metadata` array of the `POST /api/rest/2.0/metadata/tml/export` request body. The exported TML file can be modified and re-imported using `POST /api/rest/2.0/metadata/tml/import`.
+// TODO: Verify exact TML schema for Collections (field structure, required fields) and confirm whether Collections TML export includes member object references (SCAL-317357)
 
-=== Update Object ID API
+=== Export a Collection
 
-The `COLLECTION` object type is now a supported value in the Update Metadata Object ID API. This allows you to assign a stable, portable object identifier (`obj_id`) to a Collection, enabling consistent referencing across ThoughtSpot environments in SDLC and deployment workflows.
+To export a Collection as TML, specify `COLLECTION` as the object type in the `metadata` array in the request body of the Export TML API.
 
-API endpoint: `POST /api/rest/2.0/metadata/update_metadata_obj_id`
+=== Import a Collection
 
-// TODO: Verify the exact request body schema for COLLECTION type in update_metadata_obj_id with engineering (SCAL-317357)
+To import or update a Collection using TML, include the Collection TML in the `metadata_tmls` array in the Import TML API request body. Use `PARTIAL` or `ALL_OR_NONE` import policies as appropriate.
 
-=== Update Metadata Header API
+=== Update Collection object ID
 
-The `COLLECTION` object type is now supported in the Update Metadata Header API. You can programmatically update the name and description of a Collection object.
+To update the `obj_id` of a Collection, use the Update Metadata Object ID API and specify `COLLECTION` as the object type.
 
-// TODO: Verify the exact endpoint name for Update Metadata Header in REST API v2 with engineering (SCAL-317357)
+== Limitations
 
-This feature is available on both ThoughtSpot Cloud 26.8.0.cl and ThoughtSpot Software.
+The following limitations apply to TML import and export:
 
-For the full list of supported metadata object types, see xref:rest-api-v2-reference.adoc#_metadata[Metadata REST API reference].
+* TML import and export are not supported for system objects.
+* TML import does not support objects with circular dependencies.
+* When importing TML files with `export_associated: true`, all dependent objects must be present in the import payload or already exist in the destination environment.
+* Worksheet TML is deprecated. Use Model TML instead.
