@@ -8,6 +8,81 @@
 
 ThoughtSpot Modeling Language (TML) is a scriptable format developed by ThoughtSpot for exporting, modifying, and migrating metadata objects such as Models, Views, Tables, Liveboards, and Answers. TML files allow you to manage and version control these objects outside the ThoughtSpot UI, supporting workflows like bulk changes, migration between environments, and programmatic edits via REST API. Users can use link:https://docs.thoughtspot.com/cloud/latest/tml[TML] to model data and build analytics content in the test environment in a flat-file format, and then import and deploy it in their environments.
 
+// SOURCE: SCAL-307283, SCAL-317357
+// TODO: [WRITER] Confirm exact TML field names `owned_by` and `obj_id` in the Personalized View TML schema with the TML/deployment team before publishing.
+// TODO: [WRITER] Confirm the smart merge behavior for `obj_id`: does a match update the existing view, skip import, or prompt the user?
+// TODO: [WRITER] Confirm whether `obj_id` is present in TML export output for Collections by default in 26.8.0.cl, or must it be explicitly requested.
+// TODO: [WRITER] Confirm the correct `metadata_type` value for Collections in the identity update API (`POST /api/rest/2.0/metadata/identity/update`). Verify with the platform team.
+// TODO: [WRITER] Add a cross-reference to the product docs TML page for Personalized Views once the product docs page is updated.
+
+[#personalized-views-portability]
+== Personalized Views portability [.version-badge.new]#New in 26.8.0.cl#
+
+// SOURCE: SCAL-307283
+Starting from ThoughtSpot Cloud 26.8.0.cl, Personalized Views support improved portability across ThoughtSpot environments. Two new TML fields and updated import merge logic make it easier to migrate Personalized Views between development and production environments without creating duplicates.
+
+=== New TML fields for Personalized Views
+
+`owned_by`:::
+// TODO: [WRITER] Confirm field name and accepted value types (username string vs. user GUID).
+A new `owned_by` field is available in the Personalized View TML. Specify a username or user GUID in this field to assign ownership during import. If `owned_by` is omitted, the importing user becomes the owner by default.
+
+`obj_id`:::
+// TODO: [WRITER] Confirm field name. Confirm whether obj_id is auto-generated on export or must be manually assigned before import.
+A new `obj_id` field provides stable cross-environment object identity for Personalized Views. Use the same `obj_id` value across environments to ensure consistent identity during migrations.
+
+=== Smart merge on import
+
+When importing a Personalized View TML that contains an `obj_id`, ThoughtSpot checks the target environment for an existing Personalized View with a matching `obj_id`. If a match is found, the import updates the existing view rather than creating a duplicate. If no match is found, a new Personalized View is created.
+
+// TODO: [WRITER] Confirm: does the merge-on-match behavior apply only when `create_new` is set to `false` in the import request, or does it apply regardless of `create_new`?
+
+=== Example — Personalized View TML with portability fields
+
+[source,yaml]
+----
+# TODO: [WRITER] Replace with a confirmed TML snippet from the product or TML team.
+# The field names and structure below are inferred from the Jira description (SCAL-307283).
+# Verify before publishing.
+personalized_view:
+  name: Q4 Revenue View
+  obj_id: pv-abc123-def456        # Stable cross-environment identifier
+  owned_by: analyst@example.com   # Owner assigned on import (username or GUID)
+  liveboard_id: lb-xyz789         # GUID of the parent Liveboard
+  filters:
+    - column: Region
+      values: [North America]
+----
+
+[#collections-obj-id]
+== Collections `obj_id` in TML [.version-badge.new]#New in 26.8.0.cl#
+
+// SOURCE: SCAL-317357
+Starting from 26.8.0.cl, the `obj_id` attribute is supported for the *Collections* object type in TML import and export. This enables stable cross-environment identification for Collections, consistent with support already available for Models, Liveboards, Answers, and other object types.
+
+=== Assign or update a Collections `obj_id`
+
+To assign or update the `obj_id` for an existing Collections object, use the Metadata Identity Update API:
+
+// TODO: [WRITER] Confirm endpoint path and `metadata_type` value for Collections with the platform team.
+[source,bash]
+----
+curl -X POST 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/identity/update' \
+  -H 'Authorization: Bearer {token}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "metadata": [
+          {
+            "identifier": "<collection-guid>",
+            "metadata_type": "COLLECTION",
+            "obj_id": "my-stable-collection-id"
+          }
+        ]
+      }'
+----
+
+After the `obj_id` is assigned, TML exports for this Collection include the `obj_id` field, enabling stable identity across environments.
+
 == Structure of a TML file
 
 To work with TML files for Models, views, SQL views, tables, Answers, Liveboards, and Monitor alerts in ThoughtSpot, you can download these objects as a flat file in `.TML` format, modify, and subsequently upload the TMLs either to the same or a different cluster.
@@ -50,7 +125,7 @@ You can import single or multiple objects using the `tml/import` API. If you are
 
 By default, the `fqn` parameter is not present in the TML file. However, you can export TML with FQNs and use it during the import.
 
-You can also set the `skip_diff_check` to `true` to skip diff check before processing TMLs for imports. This attribute helps  identify the objects that haven’t been changed since the last import or TML update, and eliminates importing redundant objects.
+You can also set the `skip_diff_check` to `true` to skip diff check before processing TMLs for imports. This attribute helps  identify the objects that haven't been changed since the last import or TML update, and eliminates importing redundant objects.
 
 To import TML representation of the metadata objects into ThoughtSpot, use one of the following API endpoints:
 
@@ -97,392 +172,57 @@ You can import TML objects asynchronously by scheduling TML import tasks via `PO
 |Form parameter|Description| Default
 |`metadata_tmls` |__Array of strings__. Array of the TML strings. |__None__
 |`create_new`  +
-__Optional__ |__Boolean__. To create TML objects with new GUIDs during import, specify `true`. By default, ThoughtSpot updates the existing objects that have the same GUID as the objects you are importing. | `false`
-|`all_orgs_context` +
-__Optional__ |__Boolean__. Specify if import operation must be run for all Orgs on your instance.
-
-__Requires Org administration privileges to access TML objects across all Orgs.__| `false`
-
-|`import_policy`  a|__String__. Available from 10.5.0.cl. Policy to follow during import. The allowed values are:
-
-* `PARTIAL` +
-Imports objects that validate successfully. Skips the objects that do not validate successfully and their dependent objects if any.
-* `ALL_OR_NONE` +
-Imports all objects that validate successfully. If the import fails for one object, no objects will be imported.
-* `VALIDATE_ONLY` +
-Validates the objects but does not import them.
-* `PARTIAL_OBJECT` +
-Imports objects that validate successfully and skips the objects that do not validate successfully. If the import fails for a visualization object in a Liveboard TML, the Liveboard will be imported without that visualization object. Similarly, if importing a relationship in a logical table fails, the table TML will be imported with warnings in the API response.
-| `PARTIAL_OBJECT`
-
-|`skip_diff_check` +
-__Optional__
-|__Boolean__. When set to `true`, skips the diff check before processing TML objects for import. By default, ThoughtSpot compares each TML object against its last imported version and skips objects that have not changed, which reduces unnecessary reimports. Set to `true` to bypass this check and reimport all objects regardless of whether they have changed. |`false`
-|`enable_large_metadata_validation` +
-__Optional__
- |__Boolean__. Available from 10.5.0.cl. Enables validation for large metadata objects. Set to `true` if the database contains multiple thousands of tables. When enabled, it allows for schema validation of one table at a time and helps circumvent the metadata fetching limitations of the Cloud Data Warehouse (CDW).
-|`false`
-|====
-////
-
-
+__Optional__ |__Boolean__. To create TML objects with new GUIDs during import, specify `true`. By default, ThoughtSpot updates the existing objects.| `false`
+|`import_policy` +
+__Optional__ |__String__. Policy to import TML objects. +
+Valid values are `PARTIAL`, `ALL_OR_NONE`, `VALIDATE_ONLY`, and `PARTIAL_OBJECT`. |`PARTIAL`
+|`all_orgs_override` +
+__Optional__ |__Boolean__. When set to `true`, the TML objects are imported in all Orgs.| `false`
 |`skip_cdw_validation_for_tables` +
-__Optional__ |__Boolean__. Skips Cloud Data Warehouse validation for table TML imports. | `false`
-////
-==== Example request
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-host}/api/rest/2.0/metadata/tml/async/import'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "metadata_tmls": [
-    "{\\\"guid\\\": \\\"2ed8192a-1e9d-47d1-810d-52b14cb0e9fe\\\",\\\"liveboard\\\": {\\\"name\\\": \\\"Total Sales\\\",\\\"visualizations\\\": [{\\\"id\\\": \\\"Viz_1\\\",\\\"answer\\\": {\\\"name\\\": \\\"Total quantity purchased, Total sales by region\\\",\\\"description\\\": \\\"test\\\",\\\"tables\\\": [{\\\"id\\\": \\\"(Sample) Retail - Apparel\\\",\\\"name\\\": \\\"(Sample) Retail - Apparel\\\"}],\\\"search_query\\\": \\\"[region] [quantity purchased] [sales]\\\",\\\"answer_columns\\\": [{\\\"name\\\": \\\"Total quantity purchased\\\"},{\\\"name\\\": \\\"Total sales\\\"},{\\\"name\\\": \\\"region\\\"}],\\\"table\\\": {\\\"table_columns\\\": [{\\\"column_id\\\": \\\"Total quantity purchased\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"Total sales\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"region\\\",\\\"show_headline\\\": false}],\\\"ordered_column_ids\\\": [\\\"region\\\",\\\"Total quantity purchased\\\",\\\"Total sales\\\"],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"tableVizPropVersion\\\\\\\": \\\\\\\"V1\\\\\\\"}\\\"},\\\"chart\\\": {\\\"type\\\": \\\"COLUMN\\\",\\\"chart_columns\\\": [{\\\"column_id\\\": \\\"Total quantity purchased\\\"},{\\\"column_id\\\": \\\"Total sales\\\"},{\\\"column_id\\\": \\\"region\\\"}],\\\"axis_configs\\\": [{\\\"x\\\": [\\\"region\\\"],\\\"y\\\": [\\\"Total quantity purchased\\\",\\\"Total sales\\\"]}],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"version\\\\\\\": \\\\\\\"V4DOT2\\\\\\\",\\\\\\\"chartProperties\\\\\\\": {\\\\\\\"responsiveLayoutPreference\\\\\\\": \\\\\\\"AUTO_ON\\\\\\\",\\\\\\\"chartSpecific\\\\\\\": {}},\\\\\\\"axisProperties\\\\\\\": [{\\\\\\\"id\\\\\\\": \\\\\\\"f6701821-5630-49cd-b26f-f98bebb4e98e\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total quantity purchased\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": false}},{\\\\\\\"id\\\\\\\": \\\\\\\"1e086aef-236d-4cf0-8909-9e04e04a1ac4\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total sales\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": true}},{\\\\\\\"id\\\\\\\": \\\\\\\"7be648d3-c791-43e4-bb13-63fea808f326\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"X\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"region\\\\\\\"]}}],\\\\\\\"systemSeriesColors\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"Total quantity purchased\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"Total sales\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"}]}\\\"},\\\"display_mode\\\": \\\"CHART_MODE\\\"},\\\"viz_guid\\\": \\\"b8b38851-5980-40a1-bd88-608b7a9c6e86\\\"},{\\\"id\\\": \\\"Viz_2\\\",\\\"answer\\\": {\\\"name\\\": \\\"Total sales in a year\\\",\\\"tables\\\": [{\\\"id\\\": \\\"(Sample) Retail - Apparel\\\",\\\"name\\\": \\\"(Sample) Retail - Apparel\\\"}],\\\"search_query\\\": \\\"[sales] [store] [date].monthly [date].'\''this year'\''\\\",\\\"answer_columns\\\": [{\\\"name\\\": \\\"Month(date)\\\"},{\\\"name\\\": \\\"Total sales\\\"},{\\\"name\\\": \\\"store\\\"}],\\\"table\\\": {\\\"table_columns\\\": [{\\\"column_id\\\": \\\"Month(date)\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"Total sales\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"store\\\",\\\"show_headline\\\": false}],\\\"ordered_column_ids\\\": [\\\"store\\\",\\\"Month(date)\\\",\\\"Total sales\\\"],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"tableVizPropVersion\\\\\\\": \\\\\\\"V1\\\\\\\"}\\\"},\\\"chart\\\": {\\\"type\\\": \\\"LINE\\\",\\\"chart_columns\\\": [{\\\"column_id\\\": \\\"Month(date)\\\"},{\\\"column_id\\\": \\\"Total sales\\\"},{\\\"column_id\\\": \\\"store\\\"}],\\\"axis_configs\\\": [{\\\"x\\\": [\\\"Month(date)\\\"],\\\"y\\\": [\\\"Total sales\\\"],\\\"color\\\": [\\\"store\\\"]}],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"version\\\\\\\": \\\\\\\"V4DOT2\\\\\\\",\\\\\\\"chartProperties\\\\\\\": {\\\\\\\"responsiveLayoutPreference\\\\\\\": \\\\\\\"AUTO_ON\\\\\\\",\\\\\\\"chartSpecific\\\\\\\": {}},\\\\\\\"axisProperties\\\\\\\": [{\\\\\\\"id\\\\\\\": \\\\\\\"feb33c4a-614b-4623-9d12-1c4cf2250801\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total sales\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": false}},{\\\\\\\"id\\\\\\\": \\\\\\\"e89293cb-d10a-40d5-b787-81be33cc8b81\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"X\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Month(date)\\\\\\\"]}}],\\\\\\\"systemSeriesColors\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"6a4acb32-9036-4d4c-a830-f2b06966a322\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"39e5242e-43d0-4ef7-8673-73b12433e0c5\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"arizona (85226)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"arizona (86001)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"california (91006)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FCC838\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"california (94702)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#06BF7F\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"colorado (80301)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#8C62F5\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"colorado (80920)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FF8142\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"connecticut (06110)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#ABC7F9\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"connecticut (06854)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#B5ECF2\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"delaware (19702)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FDE9AF\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"georgia (30022)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#9BE5CB\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"georgia (30329)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#D1C0FB\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"idaho (83704)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FFCCB3\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"illinois (60062)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2359B6\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"illinois (60642)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#369FAA\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"indiana (46250)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#BF982A\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"iowa (50266)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#049160\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"maryland (21045)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#6A4ABA\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"massachusetts (01701)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#C26232\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"massachusetts (02215)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#71A1F4\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"michigan (48103)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#82DFE9\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"michigan (49512)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FCD977\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"minnesota (55369)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#56D3A8\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"minnesota (55420)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#B094F8\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"missouri (63144)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FFA97E\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"montana (59106)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#163772\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"montana (59718)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#22636B\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"nevada (89052)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#785F1A\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"nevada (89145)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#025B3C\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"new hampshire (03860)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#422E75\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"new jersey (07936)\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#7A3D1F\\\\\\\"}]}\\\"},\\\"display_mode\\\": \\\"CHART_MODE\\\"},\\\"viz_guid\\\": \\\"7efc7b0e-e680-44a4-ba9c-3bd5d7272367\\\"},{\\\"id\\\": \\\"Viz_3\\\",\\\"answer\\\": {\\\"name\\\": \\\"Total sales by item type and region\\\",\\\"tables\\\": [{\\\"id\\\": \\\"(Sample) Retail - Apparel\\\",\\\"name\\\": \\\"(Sample) Retail - Apparel\\\"}],\\\"search_query\\\": \\\"[sales] [item type] [region]\\\",\\\"answer_columns\\\": [{\\\"name\\\": \\\"Total sales\\\"},{\\\"name\\\": \\\"item type\\\"},{\\\"name\\\": \\\"region\\\"}],\\\"table\\\": {\\\"table_columns\\\": [{\\\"column_id\\\": \\\"Total sales\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"item type\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"region\\\",\\\"show_headline\\\": false}],\\\"ordered_column_ids\\\": [\\\"item type\\\",\\\"region\\\",\\\"Total sales\\\"],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"tableVizPropVersion\\\\\\\": \\\\\\\"V1\\\\\\\"}\\\"},\\\"chart\\\": {\\\"type\\\": \\\"STACKED_COLUMN\\\",\\\"chart_columns\\\": [{\\\"column_id\\\": \\\"Total sales\\\"},{\\\"column_id\\\": \\\"item type\\\"},{\\\"column_id\\\": \\\"region\\\"}],\\\"axis_configs\\\": [{\\\"x\\\": [\\\"item type\\\"],\\\"y\\\": [\\\"Total sales\\\"],\\\"color\\\": [\\\"region\\\"]}],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"version\\\\\\\": \\\\\\\"V4DOT2\\\\\\\",\\\\\\\"chartProperties\\\\\\\": {\\\\\\\"responsiveLayoutPreference\\\\\\\": \\\\\\\"AUTO_ON\\\\\\\",\\\\\\\"chartSpecific\\\\\\\": {}},\\\\\\\"axisProperties\\\\\\\": [{\\\\\\\"id\\\\\\\": \\\\\\\"a330db6d-3714-4b5f-aed7-cca5ab679502\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total sales\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": false}},{\\\\\\\"id\\\\\\\": \\\\\\\"96ac1ce3-7efd-455e-a569-2cd0792b5f95\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"X\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"item type\\\\\\\"]}}],\\\\\\\"systemSeriesColors\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"Total sales\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"92153012-664c-458e-9a74-6138c5030838\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"east\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#06BF7F\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"midwest\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#FCC838\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"south\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#48D1E0\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"southwest\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#71A1F4\\\\\\\"},{\\\\\\\"serieName\\\\\\\": \\\\\\\"west\\\\\\\",\\\\\\\"color\\\\\\\": \\\\\\\"#2E75F0\\\\\\\"}]}\\\"},\\\"display_mode\\\": \\\"CHART_MODE\\\"},\\\"viz_guid\\\": \\\"9de47a0e-6f20-40ba-9a52-3374ee530f09\\\"},{\\\"id\\\": \\\"Viz_4\\\",\\\"answer\\\": {\\\"name\\\": \\\"Total sales by state\\\",\\\"tables\\\": [{\\\"id\\\": \\\"(Sample) Retail - Apparel\\\",\\\"name\\\": \\\"(Sample) Retail - Apparel\\\"}],\\\"search_query\\\": \\\"[state] [store] [sales]\\\",\\\"answer_columns\\\": [{\\\"name\\\": \\\"Total sales\\\"},{\\\"name\\\": \\\"state\\\"},{\\\"name\\\": \\\"store\\\"}],\\\"table\\\": {\\\"table_columns\\\": [{\\\"column_id\\\": \\\"Total sales\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"state\\\",\\\"show_headline\\\": false},{\\\"column_id\\\": \\\"store\\\",\\\"show_headline\\\": false}],\\\"ordered_column_ids\\\": [\\\"state\\\",\\\"store\\\",\\\"Total sales\\\"],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"tableVizPropVersion\\\\\\\": \\\\\\\"V1\\\\\\\"}\\\"},\\\"chart\\\": {\\\"type\\\": \\\"GEO_AREA\\\",\\\"chart_columns\\\": [{\\\"column_id\\\": \\\"Total sales\\\"},{\\\"column_id\\\": \\\"state\\\"},{\\\"column_id\\\": \\\"store\\\"}],\\\"axis_configs\\\": [{\\\"x\\\": [\\\"state\\\"],\\\"y\\\": [\\\"Total sales\\\"]}],\\\"client_state\\\": \\\"\\\",\\\"client_state_v2\\\": \\\"{\\\\\\\"version\\\\\\\": \\\\\\\"V4DOT2\\\\\\\",\\\\\\\"chartProperties\\\\\\\": {\\\\\\\"chartSpecific\\\\\\\": {}},\\\\\\\"axisProperties\\\\\\\": [{\\\\\\\"id\\\\\\\": \\\\\\\"e4943da4-f159-470c-836b-7c6c55d59c2f\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"Y\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"Total sales\\\\\\\"],\\\\\\\"isOpposite\\\\\\\": false}},{\\\\\\\"id\\\\\\\": \\\\\\\"b99d582a-b215-4381-89ad-280c451979e3\\\\\\\",\\\\\\\"properties\\\\\\\": {\\\\\\\"axisType\\\\\\\": \\\\\\\"X\\\\\\\",\\\\\\\"linkedColumns\\\\\\\": [\\\\\\\"state\\\\\\\"]}}],\\\\\\\"systemMultiColorSeriesColors\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"Total sales\\\\\\\",\\\\\\\"colorMap\\\\\\\": [{\\\\\\\"serieName\\\\\\\": \\\\\\\"state\\\\\\\",\\\\\\\"color\\\\\\\": [\\\\\\\"#ffffb2\\\\\\\",\\\\\\\"#fddd87\\\\\\\",\\\\\\\"#fba35d\\\\\\\",\\\\\\\"#f75534\\\\\\\",\\\\\\\"#f9140a\\\\\\\",\\\\\\\"#d70315\\\\\\\",\\\\\\\"#b10026\\\\\\\"]}]}]}\\\"},\\\"display_mode\\\": \\\"CHART_MODE\\\"},\\\"viz_guid\\\": \\\"4ab1ed61-2930-46d4-af6f-778279d7414a\\\"}],\\\"filters\\\": [{\\\"column\\\": [\\\"region\\\"],\\\"oper\\\": \\\"in\\\",\\\"values\\\": [\\\"Midwest\\\"],\\\"is_mandatory\\\": false,\\\"is_single_value\\\": false,\\\"display_name\\\": \\\"region\\\"}],\\\"layout\\\": {\\\"tabs\\\": [{\\\"name\\\": \\\"Tab 1\\\",\\\"description\\\": \\\"\\\",\\\"tiles\\\": [{\\\"visualization_id\\\": \\\"Viz_1\\\",\\\"x\\\": 0,\\\"y\\\": 0,\\\"height\\\": 8,\\\"width\\\": 6},{\\\"visualization_id\\\": \\\"Viz_4\\\",\\\"x\\\": 6,\\\"y\\\": 0,\\\"height\\\": 8,\\\"width\\\": 6}],\\\"id\\\": \\\"2c4014b5-a606-4639-8ad0-01032ff3fc13\\\"},{\\\"name\\\": \\\"Tab 2\\\",\\\"description\\\": \\\"\\\",\\\"tiles\\\": [{\\\"visualization_id\\\": \\\"Viz_2\\\",\\\"x\\\": 0,\\\"y\\\": 0,\\\"height\\\": 8,\\\"width\\\": 6},{\\\"visualization_id\\\": \\\"Viz_3\\\",\\\"x\\\": 6,\\\"y\\\": 0,\\\"height\\\": 8,\\\"width\\\": 6}],\\\"id\\\": \\\"185b4875-e7c5-43d2-a9bc-0a404107a3ec\\\"}]}}}\",     \"info\": {       \"filename\": \"Copy of Total Sales.liveboard.tml\",       \"name\": \"Copy of Total Sales\",       \"id\": \"2ed8192a-1e9d-47d1-810d-52b14cb0e9fe\",       \"type\": \"liveboard\",       \"status\": {         \"status_code\": \"OK\"       }     }"
-  ],
-  "create_new": true,
-  "all_orgs_context": false,
-}'
-----
-
-==== Example response
-
-If the API request is successful, ThoughtSpot schedules an import task, and returns the task name and ID in the API response:
-
-[source,JSON]
-----
-{
-  "tenant_id": "default-tenant-id",
-  "org_id": 0,
-  "task_id": "075c322f-b000-4776-9c44-89e13420980c",
-  "task_name": "ASYNC_TML_26:Nov:2024-06:06:24",
-  "import_response": null,
-  "task_status": "IN_QUEUE",
-  "author_id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-  "import_policy": "PARTIAL_OBJECT",
-  "created_at": null,
-  "in_progress_at": null,
-  "completed_at": null,
-  "total_object_count": 2,
-  "object_processed_count": null,
-  "modified_at": null,
-  "author_display_name": "UserA"
-}
-----
-
-===== Response codes
-
-[options="header", cols="1,4"]
-|====
-|HTTP status code|Description
-|**200**|Async TML Import Task submitted successfully
-|**400**|Invalid request
-|**401**|Unauthorized access
-|**403**|Forbidden access
-|**500**|Unexpected Error
+__Optional__|__Boolean__. When set to `true`, skips CDW validation for Table TMLs.| `false`
+|`skip_diff_check` +
+__Optional__|__Boolean__. When set to `true`, skips diff check for TML import. | `false`
 |====
 
-=== Fetch status of the TML import task
+=== Check import task status
 
-To fetch the status of a scheduled import task, send a `POST` request to the `POST /api/rest/2.0/metadata/tml/async/status` API endpoint.
-
-In the request body, include the following attributes:
+After you schedule an import task, you can check the status of the import task using the `POST /api/rest/2.0/metadata/tml/async/status` API endpoint.
 
 [width="100%" cols="2,4,1"]
 [options='header']
 |====
 |Form parameter|Description| Default
-|`task_ids` |__Array of strings__. Task IDs assigned to the scheduled TML async import operations. | __None__
-| `task_status` | __Array of strings__. Status of the scheduled import tasks to filter on. The following options are available: +
+|`task_ids` |__Array of strings__. Array of task IDs to fetch status for. |__None__
+|====
 
-* `COMPLETED` +
-* `IN_QUEUE` +
-* `IN_PROGRESS` +
-* `FAILED`
-| __None__
-|`author_identifier`  +
-__Optional__ |__String__. GUID of the author who initiated the import request. | __None__
-|`include_import_response` +
-__Optional__  |__Boolean__. Specify whether to include import response in the task status objects.| `false`
-|`record_offset` +
-__Optional__ |__Integer__. The offset point, starting from where the task status should
-be included in the response. | `0`
-|`record_size` +
-__Optional__ a|__Integer__. The number of task statuses to include in the
-response starting from offset position.
+The API response includes the task status and the import results for each task.
+
+== Export TML
+
+To export a TML object from ThoughtSpot, use one of the following API endpoints:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml">POST /api/rest/2.0/metadata/tml/export</a>+++ (REST API v2)
+* xref:tml-api.adoc#export[POST /tspublic/v1/metadata/tml/export] (REST API v1)
+
+You can export TML objects with FQNs by setting the `export_fqn` parameter to `true` in the API request. The exported TML file includes the FQN for each referenced object. This is useful when importing TML files to a different ThoughtSpot environment, as it allows ThoughtSpot to uniquely identify referenced objects.
+
+You can also export TML for multiple objects at the same time by passing multiple GUIDs in the `metadata` array. For example, you can export a Liveboard along with all its dependent Answers and Models in one API call.
 
 [NOTE]
 ====
-The maximum limit for the `record_size` that user can pass in an API request is 50. If the `record_size` exceeds this threshold, the API returns a bad request error. To extend the `record_size` limit, contact ThoughtSpot Support.
-====
-| `5`
-|`include_import_response`|__Boolean__. Specify whether to include the import response when fetching status for the import task.
-
-|====
-
-[IMPORTANT]
-====
-You can poll up to 100 API requests per minute to get details of your TML import tasks. The API returns an error if you exceed this rate limit.
+ThoughtSpot does not export TML for the following object types: Embrace connections, ThoughtSpot-managed tables and schema, Spot IQ generated objects, and user-uploaded data objects.
 ====
 
-==== Example request
+== Validate TML
 
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-host}/api/rest/2.0/metadata/tml/async/status'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "record_offset": 0,
-  "record_size": 5,
-  "include_import_response": true,
-  "task_ids": [
-    "c8c8c4da-0bc8-4460-8039-cfa7fd598335"
-  ],
-  "task_status": [
-    "COMPLETED"
-  ],
-  "author_identifier": "95ac814f-eb01-4625-93c7-c7624b29d226"
-}'
-----
+Before importing TML objects, you can validate TML by setting the `import_policy` to `VALIDATE_ONLY` in the import API request. The API response includes details about validation errors for each TML object.
 
-==== Example response
+== Modify TML
 
-If the API request is successful, ThoughtSpot returns the status details of the TML async import tasks.
-If Orgs are enabled on your instance, the API returns task status only for objects within the current Org context.
+For information about TML modification best practices and recommendations, see xref:modify-tml.adoc[TML modification].
 
-[source,JSON]
-----
-{
-  "status_list": [
-    {
-      "tenant_id": "default-tenant-id",
-      "org_id": 0,
-      "task_id": "c8c8c4da-0bc8-4460-8039-cfa7fd598335",
-      "task_name": "ASYNC_TML_26:Nov:2024-06:06:24",
-      "import_response": {
-        "object": [
-          {
-            "filename": "tml_0",
-            "zip_filename": "zip_tml_0",
-            "response": {
-              "status": {
-                "status_code": "ERROR",
-                "error_message": "Invalid YAML/JSON syntax in file."
-              }
-            },
-            "request_index": 0
-          },
-          {
-            "filename": "tml_1",
-            "zip_filename": "zip_tml_1",
-            "response": {
-              "status": {
-                "status_code": "ERROR",
-                "error_message": "Invalid YAML/JSON syntax in file."
-              }
-            },
-            "request_index": 1
-          }
-        ],
-        "status": {
-          "status_code": "OK",
-          "error_code": 0,
-          "error_message": ""
-        }
-      },
-      "task_status": "COMPLETED",
-      "author_id": "08c6b203-ff6e-4ed8-b923-35ebbbfef27b",
-      "import_policy": "PARTIAL_OBJECT",
-      "created_at": 1732601184212,
-      "in_progress_at": 1732601184255,
-      "completed_at": 1732601184476,
-      "total_object_count": 2,
-      "object_processed_count": 2,
-      "modified_at": 1732601184476,
-      "author_display_name": "UserA"
-    }
-  ],
-  "last_batch": true
-}
-----
+== Related resources
 
-===== Response codes
-
-[options="header", cols="1,4"]
-|====
-|HTTP status code|Description
-|**200**|Async TML import task status fetched successfully
-|**400**|Invalid request
-|**401**|Unauthorized access
-|**403**|Forbidden access
-|**500**|Unexpected Error
-|====
-
-== Export a TML
-To export the TML data, your account must have the `DATAMANAGEMENT` (Can manage data) or `ADMINISTRATION` (Can administer ThoughtSpot) privilege.
-
-The default format to export the objects is YAML is v1, and JSON in v2 APIs. To export the TML representation of the metadata objects from ThoughtSpot in JSON or YAML format, use one of the  following endpoints:
-
-* link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml[**POST** /api/rest/2.0/metadata/tml/export] (REST API v2)
-* xref:tml-api.adoc#export[**POST** /tspublic/v1/metadata/tml/export] (REST API v1)
-
-To export the TML representation of the metadata objects in a *batch*, use one of the following endpoints:
-
-* link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml-batched[**POST** /api/rest/2.0/metadata/tml/export/batch] (REST API v2)
-* xref:tml-api.adoc#BatchExport[**POST** /tspublic/v1/metadata/tml/export/batch] (REST API v1)
-
-There are several export options available with these APIs:
-
-=== Metadata specification for Answers
-To export a specific metadata object, specify the name or ID of the object.
-
-For Answer objects, the `identifier` is optional, and you can define parameters such as `session_identifier` and `generation_number` instead. These attributes can be used to export   unsaved Answers generated from Spotter queries or Answers that do not have the name and ID assigned.
-
-=== Export associated objects
-
-To export associated objects, set the following attributes:
-
-* `export_associated` +
-When set to `true`, exports the associated objects for the `export_ids` specified in the API request. The API exports any underlying Models, tables, or views for a given object. By default, the API does not export these underlying objects.
-* `export_dependent` +
-Specifies if the Tables of the referenced Connection object must be included in the export.
-* `export_connection_as_dependent` +
-Specifies if a Connection object must be included as a dependent object when exporting a Table, Model, Answer, or Liveboard TML.
-
-=== Export FQNs
-
-When `export_fqn=true`, the API exports the FQNs of the referenced objects in the TML data. For example, if you are exporting a Liveboard and its associated objects, the API returns the Liveboard TML data with the FQNs of the referenced Model.
-Note that the FQN of a referenced object is the same as the GUID of that object.
-
-ThoughtSpot recommends adding the fqn property before importing the TML objects into the system, because only the name of a referenced object is not sufficient to identify the referenced object during TML import. For example, if your ThoughtSpot instance has two Models with the same name, the TML import for a Liveboard that uses one of these Models would fail unless the Liveboard TML includes the FQN of the referenced object.
-The `export_fqn` attribute is useful when ThoughtSpot has multiple objects with the same name and you want to eliminate ambiguity during TML import. The `export_fqn=true` property adds the FQNs of the referenced objects in the TML export API response and saves the manual effort of adding FQNs for TML import.
-
-=== Export schema
-
-Specifies the schema version to use during TML export. For link:https://docs.thoughtspot.com/cloud/latest/models[Models, window=_blank], set `export_schema_version` to v2.
-The v1 schema is used for Worksheet objects (Deprecated).
-
-=== Additional export options for REST API v2
-Following are some additional attributes which can be set for exporting objects:
-
-* `include_obj_id_ref` +
-When set to `true`, exports the object ID of the referenced object. This flag will work only when the object ID feature is enabled. Contact ThoughtSpot Support to enable the feature.
-
-* `include_guid` +
-When set to `true`, exports the guid of the object. This flag will work only when the object ID feature is enabled. Contact ThoughtSpot Support to enable the feature.
-* `include_obj_id` +
-When set to `true`, exports the object ID of the object. This flag will work only when the object ID feature is enabled. Contact ThoughtSpot Support to enable the feature.
-* `export_with_associated_feedbacks` +
-When set to `true`, exports the TML of an object along with all feedback, such as Spotter or Sage feedback, associated with that object. No feedback file will be exported if there are no feedback entries associated with the object
-* `export_column_security_rules` [beta betaBackground]^Beta^ +
-When set to `true`, exports the column-level security rules defined on the object. Contact ThoughtSpot Support to enable the feature.
-* `export_with_column_aliases` [beta betaBackground]^Beta^ +
-When set to `true`, export column aliases of the Model if the data Model includes any link:https://docs.thoughtspot.com/cloud/latest/column-aliases[column aliases, window=_blank].
-
-=== Export in a batch
-This API operation supports exporting User, User Group, and Role objects only.
-To export objects in a batch, set the following additional attributes:
-
-* `batch_size` +
-Exports the specified number of objects in a single API request. A batch size of up to 200 objects is allowed for a single API operation.
-
-* `batch_offset` +
-Offsets the API response by the specified number. Batch offset value defines the starting position of the records for the results returned by the API.
-
-For more information, see the API documentation in REST API v2 Playground and  xref:tml-api.adoc[Export a TML object using REST API v1].
-
-
-== TML modification
-
-ThoughtSpot offers a lot of flexibility within its set of xref:intro-thoughtspot-objects.adoc[data objects], and there is no particular hierarchy to TML files, but rather just some rules. Visit this page for detailed information on xref:modify-tml.adoc[TML modification].
-
-== Limitations of working with TML files
-There are certain limitations to the changes you can apply by editing a ThoughtSpot object through TML. Visit link:https://docs.thoughtspot.com/cloud/latest/tml#_limitations_of_working_with_tml_files[Limitations of working with TML files, window=_blank] for detailed information.
-
-[#yamlReimport]
-=== YAML reimport in REST API v2 Playground
-If you are using the REST API Playground to import TML in YAML format, note that copying YAML content directly in the input field will likely result in the `Invalid YAML/JSON syntax in file` error.
-When you copy the YAML output from the export TML API response in the Playground, the copied content is wrapped in quotation marks and include escaped newline characters (`\n`). When you paste this content directly in the `metadata_tml` input field, the API Playground double-escapes characters or removes necessary newline (`\n`) characters. Due to improper formatting, the YAML input becomes invalid for import, resulting in the `Invalid YAML/JSON syntax in file` error.
-
-To work around this issue, follow these steps:
-
-. After you +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml">export TML</a>+++ in the Playground, use the `copy to clipboard` option to copy the YAML output from the API response as shown in this video.
-
-+
-
-[div videoContainer]
---
-video::./images/tml-export.mp4[width=100%,options="autoplay,loop"]
---
-+
-The output copied from the API response is enclosed in quotation marks (`"`).
-For example, `"guid: a162289a-c1ab-427e-9985-8fb5f7c7e539\nliveboard:\n  name: Liveboard 1\n"`.
-. Paste the YAML output copied from the export TML API response into a text editor.
-. Remove the quotation marks, update the TML, and ensure that the YAML is properly formatted: +
-`guid: a162289a-c1ab-427e-9985-8fb5f7c7e539\nliveboard:\n  name: Liveboard 1\n`
-. When +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fimport-metadata-tml">importing TML in the Playground</a>+++, do not paste the YAML directly into the `metadata_tmls` input field. Instead, use the JSON editor to add the YAML.
-. To open the JSON editor, click *View JSON*. +
-In the JSON preview, you'll see the following code:
-+
-[source,JSON]
-----
-{
-  "metadata_tmls": [
-    "metadata_tmls3",
-    "metadata_tmls5",
-  ],
-  "import_policy": "PARTIAL",
-  "create_new": false,
-  "all_orgs_context": false
-}
-----
-. Remove the text in the `metadata_tmls` array and paste your YAML content inside the array. If you are importing more than one TML, use a comma after pasting a TML YAML and then add YAML for the otehr TML.
-+
-[source,JSON]
-----
-{
-  "metadata_tmls": [
-    "guid: a162289a-c1ab-427e-9985-8fb5f7c7e539\nliveboard:\n  name: Liveboard 1\n"
-  ],
-  "import_policy": "PARTIAL",
-  "create_new": false,
-  "all_orgs_context": false
-}
-----
-+
-You may see double-escaped characters in JSON preview. For example, `\\n` instead `\n`. However,  these will not be imported in the actual payload.
-. To submit the request, click **Try it Out**.
-
-+
-In the following video, you can see that pasting YAML directly in the `metadata_tmls` form field results in an error due to additional quotation marks and improper formatting. Using the JSON editor, you can paste the YAML inside the array and import TML successfully.
-+
-
-[div videoContainer]
---
-video::./images/import-tml.mp4[width=100%,options="autoplay,loop"]
---
-
-== Deployment and version control of TML objects
-For information about version control and TML deployment, see the following pages:
-
-* xref:version_control.adoc[Git integration and version control]
-* xref:development-and-deployment.adoc[TML files from development to testing and production environments]
-
-////
-When embedding or deploying a third-party application in their environments, most organizations use defined practices at various stages of their SDLC process. Users typically use a version control system and CI-CD pipeline to push their .
-
-ThoughtSpot instances act as a constantly running service, so deployment only involves publishing ThoughtSpot content, in the form of ThoughtSpot Modeling Language (TML) files to a given ThoughtSpot instance. The three traditional steps to building an SDLC process with ThoughtSpot are:
-
-* Exporting TML objects into a source control system (Git, etc.)
-* Altering copies of the TML files for the next stage/environment
-* Importing the TML files into the new environment
-
-But this changed with the link:https://developers.thoughtspot.com/docs/git-integration[Git integration] feature. ThoughtSpot now allows you to connect your deployment instance to a Git repository, push TML files to CI/CD pipelines, and deploy commits from your Git repository to your production environment.
-However, ThoughtSpot’s Git integration does not support moving objects within the same Org or application instance. For example, it does not support moving objects in an environment where xref:multitenancy-without-orgs[multi-tenancy is implemented using groups].
-///
-
+* link:https://docs.thoughtspot.com/cloud/latest/tml[TML reference, window=_blank]
+* xref:modify-tml.adoc[TML modification]
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
