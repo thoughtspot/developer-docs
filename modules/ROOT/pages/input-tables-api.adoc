@@ -1,0 +1,285 @@
+= Input Tables API reference
+:toc: true
+:toclevels: 2
+
+:page-title: Input Tables API
+:page-pageid: input-tables-api
+:page-description: Use the Input Tables REST API v2.0 endpoints to create, update, and delete input table records in ThoughtSpot programmatically.
+:keywords: input tables, REST API, create input table, update input table, delete input table, writable tables
+:product-version: 26.8.0.cl
+:jira-ref: SCAL-319440
+
+// SOURCE: SCAL-319440 | ThoughtSpot Cloud 26.8.0.cl
+// TODO: [WRITER] Confirm the Jira key for the Input Tables REST API feature — SCAL-319440 is the
+//       best match found at time of authoring. Verify with the Data platform / DM team.
+// TODO: [WRITER] Confirm whether Input Tables require a specific license or feature flag to be
+//       enabled on the ThoughtSpot instance before these APIs are available.
+// TODO: [WRITER] Confirm whether `input_table_identifier` accepts both the GUID and the table
+//       name, or only one of these. Verify with the platform team.
+// TODO: [WRITER] Confirm the required privilege name for input table write operations.
+//       "Can manage data" is assumed — verify with the access control team.
+// TODO: [WRITER] Add a conceptual overview link once an Input Tables concept page exists.
+// TODO: [WRITER] Request confirmed example payloads from the Data platform team to replace
+//       the illustrative examples in this page before publishing.
+
+ThoughtSpot 26.8.0.cl introduces REST API v2.0 endpoints for managing input table records
+programmatically. Input tables are writable tables in ThoughtSpot that allow you to push
+data directly into ThoughtSpot without an external data pipeline. Use these APIs to create
+new input tables, insert or update records, and delete records at scale.
+
+[NOTE]
+====
+Input Tables API endpoints are available from ThoughtSpot Cloud 26.8.0.cl onwards.
+====
+
+== Supported operations
+
+* <<create-input-table,Create an input table>> — `POST /api/rest/2.0/input-tables/create`
+* <<update-input-table,Update records in an input table>> — `POST /api/rest/2.0/input-tables/{input_table_identifier}/update`
+* <<delete-input-table,Delete records from an input table>> — `POST /api/rest/2.0/input-tables/{input_table_identifier}/delete`
+
+=== Required permissions
+
+// TODO: [WRITER] Confirm the exact privilege required. "Can manage data" is assumed.
+To use Input Tables API endpoints, you must have the *Can manage data* privilege or
+administrator access on your ThoughtSpot instance.
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+[#create-input-table]
+== Create an input table
+
+[.version-badge.new]#New# ThoughtSpot Cloud 26.8.0.cl
+
+Creates a new input table in ThoughtSpot with a specified schema.
+
+// TODO: [WRITER] Confirm whether creating an input table also creates a corresponding
+//       data model/worksheet automatically, or whether that step is separate.
+
+=== Resource URL
+
+----
+POST /api/rest/2.0/input-tables/create
+----
+
+=== Request parameters
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+
+|`name`
+|string
+|Yes
+|Name of the input table to create. Must be unique within the Org.
+
+|`columns`
+|array of objects
+|Yes
+|Column definitions. Each object requires: +
+* `name` (string) — Column name. +
+* `data_type` (string) — Data type. For example, `VARCHAR`, `INT64`, `DATE`, `BOOL`. +
+* `is_primary_key` (boolean) — Whether the column is part of the primary key. Default: `false`. +
+// TODO: [WRITER] Confirm the full list of supported data types with the Data platform team.
+// TODO: [WRITER] Confirm whether additional column properties (nullable, default_value) are supported.
+
+|`org_identifier`
+|string
+|No
+|Unique ID or name of the Org. Defaults to the Org from the authentication token.
+
+|===
+
+=== Example request
+
+// TODO: [WRITER] Replace with a confirmed working example from the Data platform team.
+[source,cURL]
+----
+curl -X POST \
+  'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/create' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "sales_targets",
+    "columns": [
+      { "name": "region",         "data_type": "VARCHAR", "is_primary_key": true  },
+      { "name": "quarter",        "data_type": "VARCHAR", "is_primary_key": true  },
+      { "name": "target_revenue", "data_type": "DOUBLE",  "is_primary_key": false }
+    ]
+  }'
+----
+
+=== Example response
+
+// TODO: [WRITER] Confirm the response body schema with the Data platform team.
+[source,JSON]
+----
+{
+  "input_table_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "name": "sales_targets",
+  "status": "CREATED"
+}
+----
+
+=== Response codes
+
+[cols="1,3", options="header"]
+|===
+|HTTP code |Description
+|`200` |Input table created successfully.
+|`400` |Bad request. Check required parameters and formatting.
+|`401` |Unauthorized. Authentication token is missing or invalid.
+|`403` |Forbidden. Insufficient privilege to create input tables.
+|`409` |Conflict. An input table with this name already exists in the Org.
+|`500` |Internal server error. Contact ThoughtSpot Support.
+|===
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+[#update-input-table]
+== Update records in an input table
+
+[.version-badge.new]#New# ThoughtSpot Cloud 26.8.0.cl
+
+Inserts new records or updates existing records in a specified input table (upsert behavior).
+Records matching the primary key are updated; unmatched records are inserted.
+
+// TODO: [WRITER] Confirm upsert vs insert-only behavior with the Data platform team.
+// TODO: [WRITER] Confirm whether partial updates (PATCH semantics) are supported, or whether
+//       the full row must be provided for each update.
+
+=== Resource URL
+
+----
+POST /api/rest/2.0/input-tables/{input_table_identifier}/update
+----
+
+=== Path parameters
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+|`input_table_identifier` |string |Yes |GUID or name of the input table to update.
+// TODO: [WRITER] Confirm whether both GUID and name are accepted, or only GUID.
+|===
+
+=== Request parameters
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+|`rows` |array of objects |Yes |Rows to insert or update. Each object maps column name to value. Column names must match the table schema.
+|===
+
+=== Example request
+
+// TODO: [WRITER] Replace with a confirmed working example from the Data platform team.
+[source,cURL]
+----
+curl -X POST \
+  'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/sales_targets/update' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "rows": [
+      { "region": "North America", "quarter": "Q3-2026", "target_revenue": 5200000 },
+      { "region": "EMEA",          "quarter": "Q3-2026", "target_revenue": 3100000 }
+    ]
+  }'
+----
+
+=== Example response
+
+// TODO: [WRITER] Confirm response schema with the Data platform team.
+[source,JSON]
+----
+{ "rows_inserted": 1, "rows_updated": 1, "rows_failed": 0, "status": "SUCCESS" }
+----
+
+=== Response codes
+
+[cols="1,3", options="header"]
+|===
+|HTTP code |Description
+|`200` |Records updated or inserted successfully.
+|`400` |Bad request. Row schema does not match the table definition.
+|`401` |Unauthorized.
+|`403` |Forbidden. Insufficient privilege.
+|`404` |Input table not found. Verify the `input_table_identifier`.
+|`500` |Internal server error.
+|===
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+[#delete-input-table]
+== Delete records from an input table
+
+[.version-badge.new]#New# ThoughtSpot Cloud 26.8.0.cl
+
+Deletes one or more records from an input table by matching primary key values.
+
+// TODO: [WRITER] Confirm whether this endpoint deletes individual rows or the entire table object.
+// TODO: [WRITER] Confirm behavior when a primary key match is not found (error vs silent success).
+
+=== Resource URL
+
+----
+POST /api/rest/2.0/input-tables/{input_table_identifier}/delete
+----
+
+=== Path parameters
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+|`input_table_identifier` |string |Yes |GUID or name of the input table.
+|===
+
+=== Request parameters
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+|`primary_key_values` |array of objects |Yes |Primary key values of rows to delete. Each object maps primary key column name to value. +
+// TODO: [WRITER] Confirm parameter name `primary_key_values` with the Data platform team.
+|===
+
+=== Example request
+
+// TODO: [WRITER] Replace with a confirmed example from the Data platform team.
+[source,cURL]
+----
+curl -X POST \
+  'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/sales_targets/delete' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "primary_key_values": [
+      { "region": "North America", "quarter": "Q2-2026" }
+    ]
+  }'
+----
+
+=== Example response
+
+// TODO: [WRITER] Confirm response schema with the Data platform team.
+[source,JSON]
+----
+{ "rows_deleted": 1, "rows_not_found": 0, "status": "SUCCESS" }
+----
+
+=== Response codes
+
+[cols="1,3", options="header"]
+|===
+|HTTP code |Description
+|`200` |Records deleted successfully.
+|`400` |Bad request. Check primary key values and request format.
+|`401` |Unauthorized.
+|`403` |Forbidden. Insufficient privilege.
+|`404` |Input table not found.
+|`500` |Internal server error.
+|===
+
+== Additional resources
+
+* xref:rest-api-v2-reference.adoc[REST API v2.0 reference]
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
+// TODO: [WRITER] Add a link to the input tables concept page if it exists.

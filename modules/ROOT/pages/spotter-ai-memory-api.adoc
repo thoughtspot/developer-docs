@@ -1,0 +1,344 @@
+= Spotter memory migration API reference
+:toc: true
+:toclevels: 2
+
+:page-title: Spotter memory migration API
+:page-pageid: spotter-memory-migration
+:page-description: Use the AI memory REST API v2.0 endpoints to export and import Spotter training memory across ThoughtSpot environments.
+:keywords: Spotter memory, AI memory, memory migration, memory export, memory import, Spotter training, REST API
+:product-version: 26.8.0.cl
+:jira-ref: SCAL-307522
+
+
+[beta betaBackground]#Beta#
+
+// SOURCE: SCAL-307522
+// SOURCE: Engineering design doc — https://docs.google.com/document/d/1YvnVNIkNQ5_vW4TY7rvR2x8uGXk2fHqwri4n6vCTTRc
+// API schemas (ExportMemory, ImportMemory, ImportStatus, ImportMemoryItemFailureReason)
+// confirmed from design doc. Public REST endpoint paths are inferred from naming convention.
+//
+// TODO: [WRITER] Confirm the public REST API v2.0 endpoint paths with the Agent Coaching team
+//       (Balakrishna Moravineni / SCAL-307522). Internal gRPC endpoints are
+//       eureka.dataindexer.EurekaDataIndexerService/ExportMemory and /ImportMemory.
+//       The paths POST /api/rest/2.0/ai/memory/export and /import are inferred — verify
+//       against the published OpenAPI spec before publishing.
+// TODO: [WRITER] Confirm whether memory export/import requires a specific privilege beyond
+//       standard coaching access. Design doc states: "access checks same as coaching migration."
+// TODO: [WRITER] Confirm the public request body parameter names — REST API v2.0 naming
+//       convention (snake_case) is used here. Verify against the OpenAPI spec.
+// TODO: [WRITER] Confirm the export file format label ("memory-export-v2"). Clarify whether
+//       the output is JSON, YAML, or a custom TML-like format, and document the schema.
+// TODO: [WRITER] Confirm export size limit — design doc states export fails if data models
+//       exceed 10,000 memory records combined. Verify the exact limit and error message.
+
+Spotter accumulates training memory — *rules* (business logic) and *recipes* (query patterns) —
+as users interact with data models. ThoughtSpot 26.8.0.cl introduces public REST API v2.0
+endpoints to export and import this memory, enabling you to:
+
+* Promote validated Spotter knowledge from a development environment to production.
+* Replicate a gold-standard Spotter configuration across multiple Orgs at scale.
+* Back up and restore Spotter memory as part of your deployment pipeline.
+
+// SOURCE: Design doc — "The core problem is the inability to migrate Spotter Memory between
+// environments, leading to a 'cold start' for the AI agent in new environments."
+
+[NOTE]
+====
+Spotter memory migration APIs are available from ThoughtSpot Cloud 26.8.0.cl onwards. +
+User memory and analyst memory are *not* supported in this release — only model-level rules
+and recipes are included.
+====
+
+// SOURCE: Design doc — "User Memory is explicitly out of scope for V1."
+
+== Supported operations
+
+* <<export-memory,Export Spotter memory>> — `POST /api/rest/2.0/ai/memory/export`
+* <<import-memory,Import Spotter memory>> — `POST /api/rest/2.0/ai/memory/import`
+
+=== Required permissions
+
+// TODO: [WRITER] Confirm exact privilege name with the Agent Coaching team.
+// SOURCE: Design doc — "Export and import must follow the same access checks as coaching migration."
+To use Spotter memory migration APIs, you must have coaching access or administrator privilege
+on the data models being exported or imported. The Org and tenant context is resolved from the
+authentication token.
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+[#export-memory]
+== Export Spotter memory
+
+[.version-badge.new]#New# ThoughtSpot Cloud 26.8.0.cl
+
+Exports Spotter training memory (rules and recipes) for one or more data models as a
+structured, human-readable file. The exported file can be reviewed, edited, and imported
+into another ThoughtSpot environment or Org.
+
+[TIP]
+====
+Filter the export by data model GUIDs and a time window to export only memory entries
+created or updated within a specific period.
+====
+
+=== Resource URL
+
+----
+POST /api/rest/2.0/ai/memory/export
+----
+
+=== Request parameters
+
+// SOURCE: Design doc — ExportMemoryRequest { memory_types, filter_groups, time_window }
+// SOURCE: Design doc — enum MemoryType { RULES, RECIPES }
+// SOURCE: Design doc — message TimeWindow { from_epoch, to_epoch, TimeField }
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+
+|`memory_types`
+|array of strings
+|No
+|Types of memory to export. Accepted values: `RULES`, `RECIPES`. If not specified, all
+supported types are exported.
+
+|`data_model_identifiers`
+|array of strings
+|No
+|GUIDs of the data models to export memory for. If not specified, memory for all accessible
+data models is exported, up to the size limit. +
+// TODO: [WRITER] Confirm parameter name. Design doc uses filter_groups with ContextFilter
+//       { type: WORKSHEET, ids: [...] }. The public REST API may simplify this to
+//       data_model_identifiers. Verify with the Agent Coaching team.
+
+|`time_window`
+|object
+|No
+|Filters memory entries by time. Contains: +
+* `from_epoch` (integer) — Start of window as Unix timestamp in milliseconds. +
+* `to_epoch` (integer) — End of window as Unix timestamp in milliseconds. +
+* `field` (string) — Time field to filter on: `CREATED_AT` (default) or `UPDATED_AT`.
+
+|===
+
+=== Example request
+
+// TODO: [WRITER] Replace with a confirmed working example from the Agent Coaching team.
+[source,cURL]
+----
+curl -X POST \
+  'https://{ThoughtSpot-Host}/api/rest/2.0/ai/memory/export' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "memory_types": ["RULES", "RECIPES"],
+    "data_model_identifiers": [
+      "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy"
+    ],
+    "time_window": {
+      "from_epoch": 1768099200000,
+      "to_epoch":   1769099200000,
+      "field": "UPDATED_AT"
+    }
+  }'
+----
+
+=== Example response
+
+// SOURCE: Design doc — ExportMemoryResponse { export_json, export_tml }
+// TODO: [WRITER] Confirm response format — JSON envelope with a file string field, or a
+//       direct file download? Design doc mentions export_json and export_tml as fields.
+//       Document the full memory-export-v2 format so users know what they can edit.
+[source,JSON]
+----
+{
+  "export_tml": "# memory-export-v2\nversion: \"2.0\"\ndata_models:\n  - id: \"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\"\n    rules:\n      - ...\n    recipes:\n      - ..."
+}
+----
+
+=== Response codes
+
+[cols="1,3", options="header"]
+|===
+|HTTP code |Description
+|`200` |Memory exported successfully. Response body contains the export file.
+|`400` |Bad request. Invalid memory type, malformed GUID, or export exceeds size limit (10,000 memory records).
+|`401` |Unauthorized. Authentication token is missing or invalid.
+|`403` |Forbidden. Insufficient coaching access on one or more specified data models.
+|`404` |One or more specified data model GUIDs were not found.
+|`500` |Internal server error. Contact ThoughtSpot Support.
+|===
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+[#import-memory]
+== Import Spotter memory
+
+[.version-badge.new]#New# ThoughtSpot Cloud 26.8.0.cl
+
+Imports a Spotter memory export file into the target ThoughtSpot environment.
+The import *replaces* the existing memory of the target data models with the file contents —
+it is an all-or-nothing operation. If any part of the import fails, all changes are rolled back.
+
+[IMPORTANT]
+====
+The import operation is *destructive* — it replaces all existing Spotter memory for the
+target data models. Use `dry_run` mode to validate before committing.
+
+// SOURCE: Design doc — "Import must replace the target's existing memory with the uploaded
+// file (all-or-nothing migration). The file is the source of truth."
+====
+
+=== Resource URL
+
+----
+POST /api/rest/2.0/ai/memory/import
+----
+
+=== Request parameters
+
+// SOURCE: Design doc — ImportMemoryRequest { import_tml, mode }
+// SOURCE: Design doc — enum ImportMode { EXECUTE_IMPORT = 0, DRY_RUN = 1 }
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+
+|`import_tml`
+|string
+|Yes
+|Full content of the memory export file as a string — produced by the export API or manually edited.
+
+|`mode`
+|string
+|No
+|Import execution mode. Accepted values: +
+* `DRY_RUN` (default) — Validates the file and returns a preview without making changes. +
+* `EXECUTE_IMPORT` — Executes the import and replaces target memory.
+
+|===
+
+=== Import statuses
+
+// SOURCE: Design doc — enum ImportStatus
+After an import operation, the response includes one of these status values:
+
+[cols="1,3", options="header"]
+|===
+|Status |Description
+|`OK` |Import succeeded. `import_summaries` contains actual record counts.
+|`DRY_RUN_OK` |Dry run completed. `import_summaries` contains a preview.
+|`VALIDATION_FAILED` |File or row-level validation failed before any data was written. Review `failures` in the response.
+|`ROLLED_BACK` |Import started but failed mid-execution. All changes rolled back to pre-import state.
+|`FAILED` |Unexpected error. Contact ThoughtSpot Support.
+|===
+
+=== Import failure reasons
+
+// SOURCE: Design doc — enum ImportMemoryItemFailureReason
+
+[cols="1,3", options="header"]
+|===
+|Failure reason |Description
+|`VALIDATION` |Schema or format violation in the row.
+|`UNRESOLVED_SOURCE` |Referenced data model GUID cannot be resolved in the target Org.
+|`ACCESS_DENIED` |Insufficient coaching access on the referenced data model.
+|`CHAR_LIMIT` |A content field exceeds the character or byte limit.
+|`SCHEMA` |The YAML structure of the import file is invalid and could not be parsed.
+|===
+
+=== Example request — dry run
+
+// TODO: [WRITER] Replace with a confirmed working example from the Agent Coaching team.
+[source,cURL]
+----
+curl -X POST \
+  'https://{ThoughtSpot-Host}/api/rest/2.0/ai/memory/import' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "import_tml": "# memory-export-v2\nversion: \"2.0\"\ndata_models:\n  - ...",
+    "mode": "DRY_RUN"
+  }'
+----
+
+=== Example request — execute import
+
+[source,cURL]
+----
+curl -X POST \
+  'https://{ThoughtSpot-Host}/api/rest/2.0/ai/memory/import' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "import_tml": "# memory-export-v2\nversion: \"2.0\"\ndata_models:\n  - ...",
+    "mode": "EXECUTE_IMPORT"
+  }'
+----
+
+=== Example response
+
+// TODO: [WRITER] Confirm response body structure with the Agent Coaching team.
+[source,JSON]
+----
+{
+  "status": "OK",
+  "import_summaries": [
+    {
+      "data_model_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "rules_imported": 12,
+      "recipes_imported": 34,
+      "rows_failed": 0
+    }
+  ],
+  "failures": []
+}
+----
+
+=== Response codes
+
+[cols="1,3", options="header"]
+|===
+|HTTP code |Description
+|`200` |Operation completed. Check `status` in the response — a 200 may still indicate `VALIDATION_FAILED` or `ROLLED_BACK`.
+|`400` |Bad request. Malformed request body or missing required parameter.
+|`401` |Unauthorized. Authentication token is missing or invalid.
+|`403` |Forbidden. Insufficient coaching access on one or more data models.
+|`500` |Internal server error. Contact ThoughtSpot Support.
+|===
+
+== Memory migration workflow
+
+Use this workflow to migrate Spotter memory from a source environment to a target environment:
+
+. *Export memory from the source.* +
+  Call `POST /api/rest/2.0/ai/memory/export` with the GUIDs of the data models to migrate.
+  Save the exported file.
+
+. *Review and edit the file (optional).* +
+  The file is human-readable. You can update data model GUIDs for the target environment
+  and modify individual rules or recipes. Note that no semantic or column-level validation
+  is performed on import — ensure column names are valid in the target environment.
+
+. *Validate with a dry run.* +
+  Call `POST /api/rest/2.0/ai/memory/import` with `"mode": "DRY_RUN"`. Review
+  `import_summaries` and `failures` before proceeding.
+
+. *Execute the import.* +
+  Call `POST /api/rest/2.0/ai/memory/import` with `"mode": "EXECUTE_IMPORT"`.
+
+[WARNING]
+====
+Appending or merging memory is *not* supported in this release. The import always replaces
+the full memory state of the target data models.
+// SOURCE: Design doc — "Merging memory on top of the existing target state is explicitly
+// not supported in V1."
+====
+
+== Additional resources
+
+* xref:rest-api-v2-reference.adoc[REST API v2.0 reference]
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
+* xref:spotter-train.adoc[Train Spotter]
+// TODO: [WRITER] Add a link to the Spotter memory concept page once it exists.
+// TODO: [WRITER] Add a link to the UI-based memory migration guide once published.
