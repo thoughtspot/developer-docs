@@ -10,8 +10,7 @@ This page documents the changes introduced in each release of the Visual Embed S
 
 // ============================================================
 // SOURCE: src/embed/conversation.ts, src/embed/spotter-viz-utils.ts,
-//         src/embed/app.ts, src/embed/liveboard.ts
-//         (visual-embed-sdk main branch, verified 2026-07-10)
+//         src/types.ts (visual-embed-sdk main branch, verified 2026-07-10)
 // SOURCE: SCAL-310399, SCAL-312622, SCAL-293483, SCAL-309017
 // TODO: [WRITER] Confirm calendar month label — "August 2026" if release ships in
 //       late July / early August 2026. Verify with release team.
@@ -58,7 +57,7 @@ Default: `false` +
 New action IDs for `disableActions` and `hideActions` (Analyst actions):
 
 // TODO: [WRITER] Verify these Action enum values exist in the SDK 1.51.0 release of types.ts.
-//       Source: SCAL-312622 Jira description (not yet confirmed in types.ts grep).
+//       Source: SCAL-312622 Jira description. Not yet confirmed in types.ts grep at authoring time.
 [width="100%", cols="2,4"]
 |====
 |Action ID |Description
@@ -334,6 +333,725 @@ EmbedEvent::
 * `EmbedEvent.Subscribed` +
 The SDK introduces the `EmbedEvent.Subscribed` to emit an event when a HostEvent listener is registered. You can use this event to  dispatch host events during the initial load without race conditions. This is particularly useful for Spotter, where host events such as `HostEvent.ResetSpotterConversation` may be triggered immediately after load.
 * `EmbedEvent.Error` +
-The `EmbedEvent.Error` event now includes an error code in the payload for more specific error identification.
+The `EmbedEve
+nt.Error` now fires on HostEvent payload validation failures.
+* `EmbedEvent.ChangePersonalizedView` +
+Emits when a user selects a different Personalized View or resets to default.
 
+HostEvent::
+* `HostEvent.GetExportRequestForCurrentPinboard` [.version-badge.breaking]#Breaking# +
+The response payload of the `GetExportRequestForCurrentPinboard` passthrough
+host event has been updated to include a `type` discriminator field, making it
+consistent with the shape of other host event responses. It now returns `{ data: { v2Content }, type }` instead of `{ v2Content }` directly. This enhancement introduces a breaking change for any code that reads `result.v2Content` directly. Update your integration workflows to use `result.data.v2Content`.
+
+* `HostEvent.SelectPersonalizedView` +
+Triggers the selection of a specific Personalized View and resets the default view on a Liveboard.
+
+
+⚠️Deprecated events and action IDs️::
+The following events are deprecated and replaced with new event IDs.
+
+* `EmbedEvent.UpdatePersonalisedView`. Use `EmbedEvent.UpdatePersonalizedView`.
+* `EmbedEvent.SavePersonalisedView`. Use `EmbedEvent.SavePersonalizedView`.
+* `EmbedEvent.DeletePersonalisedView`. Use `EmbedEvent.DeletePersonalizedView`.
+* `HostEvent.ResetLiveboardPersonalisedView`. Use `HostEvent.ResetLiveboardPersonalizedView`.
+* `Action.PersonalisedViewsDropdown`. Use `Action.PersonalizedViewsDropdown`.
+* `Action.OrganiseFavourites`. Use `Action.OrganizeFavorites`.
+
+
+|====
+
+
+== Version 1.47.x, April 2026
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE# a| **Spotter chat history sidebar customization**
+
+The SDK introduces the `SpotterSidebarViewConfig` interface and the `spotterSidebarConfig` object with configuration controls to customize the appearance and contents of the chat history panel. Developers can use the  following properties in the `spotterSidebarConfig` object to enable or disable chat history panel and customize the contents of the sidebar when enabled:
+
+* `enablePastConversationsSidebar` +
+Controls the visibility of the past conversations sidebar panel. The chat history panel is disabled by default in embed view. When this property in `spotterSidebarConfig` is specified, it takes precedence over the standalone `enablePastConversationsSidebar` setting, which is deprecated from v1.47.0.
+
+* `spotterSidebarTitle` +
+Allows adding custom title text for the sidebar header.
+
+* `spotterSidebarDefaultExpanded` +
+Sets the default state of the sidebar to expanded or collapsed view.
+
+* `spotterChatRenameLabel` +
+Allows setting a custom label for the **Rename** action in the conversation edit menu.
+
+* `spotterChatDeleteLabel` +
+Allows setting a custom label for the **Delete** action in the conversation edit menu.
+
+* `spotterDeleteConversationModalTitle` +
+Allows editing the title text of the chat delete confirmation modal.
+
+* `spotterPastConversationAlertMessage` +
+Sets a custom message text for the past conversation banner alert. Defaults to the translated alert message.
+
+* `spotterBestPracticesLabel` +
+Allows customizing the label for the best practices button in the sidebar footer.
+
+* `spotterDocumentationUrl` +
+The best practices documentation link shown in the sidebar footer. You can customize the link by specifying the full URL.
+
+* `spotterConversationsBatchSize` +
+Sets the number of conversations to fetch per batch when loading conversation history. Default is `30`.
+
+* `spotterNewChatButtonTitle` +
+Allows customizing the title text for the **New chat** button in the sidebar.
+
+|[tag redBackground]#DEPRECATED# a| **Standalone `enablePastConversationsSidebar` attribute in Spotter embed**
+
+The standalone `enablePastConversationsSidebar` property on `SpotterEmbedViewConfig` and `AppViewConfig` is deprecated from SDK 1.47.0 and ThoughtSpot 26.4.0.cl.
+
+Use `enablePastConversationsSidebar` in the `spotterSidebarConfig` instead. When both are defined, the property in the `spotterSidebarConfig` object takes precedence.
+
+[source,javascript]
+----
+// Deprecated
+enablePastConversationsSidebar: false,
+
+// Recommended
+spotterSidebarConfig: {
+    enablePastConversationsSidebar: true,
+    //... other config properties
+}
+----
+
+|[tag greenBackground]#NEW FEATURE# a| **Spotter chat UI branding**
+
+The SDK introduces the `SpotterChatViewConfig` interface for customizing branding in Spotter tool response cards. You can pass these parameters as the `spotterChatConfig` object properties in `SpotterEmbed`, `AppEmbed`, or `LiveboardEmbed` where Spotter interface is used.
+
+* `hideToolResponseCardBranding` +
+When set to `true`, hides the ThoughtSpot logo and icon in tool response cards. The branding label prefix is controlled separately via `toolResponseCardBrandingLabel`. Default value is `false`.
+
+* `toolResponseCardBrandingLabel` +
+Custom label to replace the `ThoughtSpot` prefix in tool response cards. Set to an empty string (`''`) to hide the prefix entirely.
+
+[NOTE]
+====
+These settings do not affect the external MCP tool branding.
+====
+
+|[tag greenBackground]#NEW FEATURE# a|**Liveboard embed enhancements**
+
+Personalized Liveboard view::
+
+The `personalizedViewId` property allows embedding a saved personalized view of a Liveboard. A personalized view is a saved configuration that includes specific filter selections and changes applied by a user. To embed a personalized view of Liveboard, specify the GUID of the saved personalized view to load along with `liveboardId`.
+
+Centralized Liveboard filter setting::
+
+When set to `true`, the `isCentralizedLiveboardFilterUXEnabled` enables displaying a unified modal to manage and update multiple filters at once, replacing the older individual filter interactions. This feature is disabled by default on ThoughtSpot Embedded instances.
+
+|[tag greenBackground]#NEW FEATURE#  a|**Option to include current period in rolling date filters**
+
+If the current period inclusion in rolling date filters feature is enabled on your instance, the rolling date filters options such as **Last <N> <period>** and **Next <N> <period>** for the Liveboards and Answers in the embed view will allow you to include current period. For example, when you define a date range such as "Last 2 months", the date filter interface displays the **Include this month** checkbox.
+To disable this feature, use the `isThisPeriodInDateFiltersEnabled` setting. To hide, show, or disable this option in the embed view, use the action ID, `Action.IncludeCurrentPeriod`.
+|====
+
+
+== Version 1.46.x, March 2026
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE# a| **Host events with page context framework**
+
+The Visual Embed SDK introduces the HostEvent V2 framework for improved handling and execution of host events in embedded ThoughtSpot experiences with multi-layer UI interactions. The v2 framework supports the page context feature, which tracks the top-most active layer in the user's current context. Developers can use this feature to route events based on the user's current context or set a specific target context for precise and predictable handling of host events.
+
+* To enable this feature, set `useHostEventsV2` to `true`.
+* To retrieve the current context, use `getCurrentContext()`.
+* To set a target context for a host event, use xref:ContextType.adoc[ContextType].
+
+For more information, refer to the xref:events-context-aware-routing.adoc[Host events documentation].
+
+|[tag redBackground]#DEPRECATED# a| **dataPanelV2**
+
+The `dataPanelV2` parameter is deprecated and can no longer be used to switch between the classic and new data panel experience. By default, the new data panel v2 experience is enabled on all ThoughtSpot embedded instances.
+
+|[tag greenBackground]#NEW FEATURE#  a| **Spotter experience**
+The SDK includes the following parameters, action IDs, and events to customize the Spotter embed experience.
+
+Chat history sidebar customization::
+
+//* `SpotterSidebarViewConfig` interface with configuration parameters for customizing the visibility and appearance of the chat history sidebar.
+//* `spotterSidebarConfig` properties for customizing the appearance and available options in the chat history sidebar.
+* Action IDs for customizing the visibility and status of actions in the embedded Spotter interface:
+** `Action.DataModelInstructions` for the data model instructions icon.
+** `Action.SpotterSidebarHeader` for the chat history sidebar header
+** `Action.SpotterSidebarFooter` for the chat history sidebar footer
+** `Action.SpotterSidebarToggle` for the chat history toggle that expands or collapses the sidebar.
+** `Action.SpotterNewChat` for the new chat icon in the chat history sidebar.
+** `Action.SpotterPastChatBanner` for the banner in the chat history sidebar.
+** `Action.SpotterChatMenu` for the chat menu component in the chat history sidebar.
+** `Action.SpotterChatRename` for **Rename** action in the chat menu of a saved chat.
+** `Action.SpotterChatDelete` for **Delete** action in the chat menu of a saved chat.
+//** `Action.SpotterDocs` for best practices documentation icon in the chat history sidebar.
+
+Events::
+* `HostEvent.DataModelInstructions` +
+Opens the Data Model instructions modal.
+* `EmbedEvent.DataModelInstructions` +
+Is emitted when a user clicks the Data Model instructions icon in the Spotter interface.
+* `EmbedEvent.SpotterConversationRenamed` +
+Is emitted when a user renames a saved chat.
+* `EmbedEvent.SpotterConversationDeleted` +
+Is emitted when a saved chat is deleted.
+* `EmbedEvent.SpotterConversationSelected` +
+Is emitted when a saved chat is selected in the chat history sidebar.
+
+|[tag greenBackground]#NEW FEATURE# | `enableLinkOverridesV2` +
+
+Use this configuration setting to override ThoughtSpot URLs on hover or when opening in a new tab. This is recommended over the earlier `linkOverride` flag for a better user experience.
+
+|[tag greenBackground]#NEW FEATURE# a| **Liveboard experience enhancements**
+
+* The `isLiveboardXLSXCSVDownloadEnabled` attribute adds XLSX and CSV to the available Liveboard download formats.
+* The `isGranularXLSXCSVSchedulesEnabled` attribute allows you to include the entire Liveboard, specific visualizations, or only tables and pivot tables in the XLSX and CSV schedules.
+|====
+
+== Version 1.45.0, February 2026
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE# a| **Spotter enhancements**
+
+You can now embed the Spotter 3 experience in your application and use features such as Auto mode for automatic data model selection, chat history, and a new chat prompt interface.
+
+* To enable the new chat prompt interface, set `updatedSpotterChatPrompt` to `true`.
+* To use Auto mode, set the `worksheetId` to `auto_mode`.
+* To enable Chat history, set `enablePastConversationsSidebar` to `true`.
+
+For more information, see xref:embed-spotter.adoc[Embedding Spotter] and xref:embed-ai-analytics.adoc#_feature_status_and_availability_in_embed_mode[Features available with Spotter 3 experience].
+
+Events::
+
+* `EmbedEvent.AddToCoaching` for the *Add to Coaching* workflow in a Spotter conversation session
+* `HostEvent.AddToCoaching` to trigger the *Add to Coaching* action in a Spotter conversation session.
+* `HostEvent.StartNewSpotterConversation` to trigger the action to start a new chat session with Spotter.
+
+[NOTE]
+====
+On Spotter embed deployments running version 26.2.0.cl or later, the *Add to Coaching* feature is enabled by default. To disable or hide the *Add to Coaching* button, use the xref:Action.adoc#_inconversationtraining[InConversationTraining] action ID.
+====
+
+|[tag greenBackground]#NEW FEATURE# a| **Liveboard experience enhancements** +
+
+Styling and grouping::
+
+* The `isLiveboardStylingAndGrouping` attribute, used to enable the Liveboard styling and grouping feature, is now replaced with `isLiveboardMasterpiecesEnabled`. While your existing configuration with the deprecated `isLiveboardStylingAndGrouping` attribute continues to work, we recommend switching to the new configuration setting.
+* The following action IDs are now available to show, disable, or hide the grouping menu actions on a Liveboard:
+** `Action.MoveToGroup` for the **Move to Group** menu action.
+** `Action.MoveOutOfGroup` for the **Move out of Group** menu action.
+** `Action.CreateGroup` for the *Create Group* menu action.
+** `Action.UngroupLiveboardGroup` for the **Ungroup Liveboard Group** menu action.
+
+Filter chip masking::
+The `showMaskedFilterChip` boolean parameter is now available to control the visibility of masked filter chips on a Liveboard. When set to `true`, if a Liveboard is shared with a user who has restricted access due to column-level security, the filter chip corresponding to those inaccessible columns will be displayed as masked to that user. When set to `false`, the filter chip for inaccessible columns will not be visible to the user.
++
+For more information, see link:https://docs.thoughtspot.com/cloud/latest/security-data-object#csr-liveboard[Column security rules on Liveboards].
++
+The `showMaskedFilterChip` setting is also available in full application embedding.
+
+|[tag greenBackground]#NEW FEATURE# a| **Publishing objects**
+
+The following action IDs are available for the data publishing menu actions in the *Data workspace* page:
+
+* `Action.Publish` for *Publish*
+* `Action.ManagePublishing` for *Manage publishing*
+* `Action.Unpublish` for *Unpublish*
+* `Action.Parameterize` for *Parameterize*
+|[tag greenBackground]#NEW FEATURE#  a| **Error handling improvements**
+
+To handle errors in the embedding workflows, the SDK includes the following features:
+
+* `ErrorDetailsTypes` enum for categorizing error types, such as `API`, `VALIDATION_ERROR`, and `NETWORK`.
+* `EmbedErrorCodes` enum with specific error codes for programmatic error handling.
+* `EmbedErrorDetailsEvent` interface for structured error event handling.
+
+For more information, see link:https://developers.thoughtspot.com/docs/Enumeration_EmbedErrorCodes[EmbedErrorCodes] and link:https://developers.thoughtspot.com/docs/Enumeration_ErrorDetailsTypes[ErrorDetailsTypes].
+|====
+
+== Version 1.44.x, January 2026
+
+[width="100%" cols="1,4"]
+|====
+
+|[tag redBackground]#DEPRECATED# | **Use `minimumHeight` instead of `defaultHeight`** +
+
+The `defaultHeight` parameter is deprecated in Visual Embed SDK v1.44.2 and later.
+To set the minimum height of the embed container for ThoughtSpot components such as a Liveboard, use the `minimumHeight` attribute instead.
+
+|[tag greenBackground]#NEW FEATURE# a| *Intercepting API calls* +
+The SDK provides the following attributes to intercept API calls and handle interception via events and custom workflows:
+
+//* `enableApiIntercept` +
+//When set to true, enables the feature on your ThoughtSpot embed.
+* `interceptUrls` +
+Allows configuring which API calls to intercept.
+* `interceptTimeout` +
+Sets the timeout duration for handling interception.
+* `isOnBeforeGetVizDataInterceptEnabled` +
+When set to true, it enables use of `EmbedEvent.OnBeforeGetVizDataIntercept` to emit and intercept search execution calls initiated by users and implement custom logic or workflows to allow or restrict search execution.
+* `EmbedEvent.ApiIntercept` +
+Emits when an API call matching the conditions defined in `interceptUrls` is detected.
+
+For more information, see xref:api-intercept.adoc[Intercept API calls and search requests].
+|====
+
+
+== Version 1.43.0, November 2025
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE# a| *Code-based custom actions*
+
+The following enumerations are available for code-based custom actions:
+
+* `CustomActionTarget` +
+To define the target object for the custom action, such as on a Liveboard, visualization, Answer, or in Spotter.
+* `CustomActionsPosition` +
+To define the position of the custom action in the target object, such as primary menu, **More** options menu image:./images/icon-more-10px.png[the more options menu], or the contextual menu.
+|[tag greenBackground]#NEW FEATURE# | *Attribute to set Parameter chip visibility during overrides* +
+The `HostEvent.UpdateParameters` event now supports configuring the `isVisibleToUser` attribute to show or hide the Parameter chips after an override. For more information, see xref:runtime-parameters.adoc#_show_or_hide_parameter_chips_in_embedded_sessions[Show or hide Parameter chips in embedded sessions].
+|====
+
+== Version 1.42.0, October 2025
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE# a|*Runtime overrides in Spotter embed*
+
+The Visual Embed SDK now supports runtime overrides in Spotter embed.
+
+* To apply runtime filters, use the `runtimeFilters` object
+* To apply runtime Parameters, use the `runtimeParameters` object.
+
+|[tag greenBackground]#NEW FEATURE# a|*PNG images in Liveboard schedule notifications* +
+To enable embedding PNG images of Liveboards in scheduled job notifications sent to subscribers, the SDK provides the `isPNGInScheduledEmailsEnabled` boolean parameter. When set to true, scheduled emails will include a PNG image of the Liveboard.
+
+The SDK also provides the following action IDs:
+
+* `Action.PngScreenshotInEmail` +
+Adds the option to include a PNG screenshot in the notification email body when scheduling emails in ThoughtSpot.
+* `Action.RemoveAttachment` +
+Allows the user to remove an attachment from the email configuration in the schedule email dialog.
+|[tag greenBackground]#NEW FEATURE#  a|*Spotter embed*
+
+Action IDs::
+The following action IDs are available for Spotter embedding and are currently supported only in the `hiddenActions` array:
+
+* `Action.SpotterWarningsBanner` +
+Action ID to control the visibility of the Spotter warnings banner in the UI. This banner displays general warnings or informational messages related to Spotter results or queries.
+* `Action.SpotterWarningsOnTokens` +
+Action ID to control the visibility of warning indicators on individual Spotter tokens parsed from a Spotter query.
+* `Action.SpotterTokenQuickEdit` +
+Action ID to enable or disable the link:https://docs.thoughtspot.com/cloud/latest/spotter-getting-started#quick-edits[quick edit functionality^] for Spotter tokens.
+|====
+
+== Version 1.41.0, September 2025
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE# a|*React component for Spotter Agent embed*
+
+The Visual Embed SDK now supports embedding Spotter Agent feature without a body or Spotter interface in a React app. For ease of implementation, the SDK also provides a custom React hook, `useSpotterAgent`.
+
+For more information, see xref:embed-ts-react-app.adoc#_embed_spotter_agent_in_your_own_app[Spotter Agent embedding in a React app].
+
+|[tag greenBackground]#NEW FEATURE# a|*Event handlers for Spotter embed*
+
+The following event handlers are now available for Spotter embed:
+
+* `EmbedEvent.SpotterInit` +
+Fires when Spotter embed component rendering is initialized.
+* `EmbedEvent.QueryChanged` +
+Fires when the Spotter query is updated by the user.
+* `HostEvent.AskSpotter` +
+Triggers *Ask Spotter* action for visualizations.
+* `HostEvent.GetParameters` +
+Triggers the action to fetch runtime Parameters applied on a visualization.
+* `HostEvent.UpdateParameters` +
+Triggers the action to update runtime Parameters for a Spotter-generated Answer.
+* `HostEvent.GetTML` +
+Triggers the action to get TML representation of a Spotter-generated Answer.
+
+For more information, see xref:EmbedEvent.adoc[EmbedEvent] and xref:HostEvent.adoc[HostEvent].
+
+|[tag greenBackground]#NEW FEATURE# a|*Event handlers for Spotter Agent embed*
+
+You can now use the following host events in Spotter Agent embedding:
+
+- `HostEvent.DownloadAsCsv` +
+Triggers the action to download a Spotter-generated Answer in CSV format.
+- `HostEvent.DownloadAsPng` +
+Triggers the action to download a Spotter-generated Answer in PNG format.
+- `HostEvent.DownloadAsXlsx` +
+Triggers the action to download a Spotter-generated Answer in XLSX format.
+- `HostEvent.DownloadAsPdf` +
+Triggers the action to download the PDF version of a Spotter-generated Answer.
+- `HostEvent.Pin` +
+Triggers the action to add a Spotter-generated Answer to a Liveboard.
+- `HostEvent.Save` +
+Triggers the *Save* action for a Spotter-generated Answer.
+
+For more information, see xref:HostEvent.adoc[HostEvent].
+
+|[tag greenBackground]#NEW FEATURE# a| *Lazy loading of visualizations on an embedded Liveboard*
+
+You can now use the `lazyLoadingForFullHeight` parameter with the `fullHeight` to progressively load visualizations on an embedded Liveboard. When both these attributes are enabled, only the visualizations in the current viewport are loaded initially, while the other visualizations load as the user scrolls the Liveboard page.
+
+You can also set the margin property for lazy loading to define when the visualization should load.
+
+For more information, see xref:lazy-loading-fullheight.adoc[Lazy loading of visualizations in an embedded Liveboard].
+
+|[tag greenBackground]#NEW FEATURE# a| *Full application embed* +
+
+You can now enable the persona-based left navigation panel and home page experience on your ThoughtSpot instance. This feature is disabled by default on ThoughtSpot instances and is available for Early Access. When it's enabled on your ThoughtSpot instance, you can roll out the new experience on embedding applications by configuring the xref:AppViewConfig.adoc#_discoveryexperience[`discoveryExperience`] attribute.
+
+When enabled, the left navigation panel organizes the application menu into persona-based contextual sections. For example, the *Insights* icon for business users, the *Data Workspace* icon for Analysts and Data engineers, and the *Develop* icon for developers. Your application users can navigate to each option using the tabs in the left navigation panel. The new interface also provides a slider to allow users to view or hide the left navigation panel.
+|====
+
+== Version 1.40.0, July 2025
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE#  a| *Fullscreen presentation mode controls for embedded Liveboards and visualizations* +
+Developers can now control whether a visualization or Liveboard can be presented in full screen mode using the `disableFullscreenPresentation` attribute. By default, the full screen mode is disabled on embedded Liveboards and visualizations.
+|[tag greenBackground]#NEW FEATURE#  a| *PDF download settings* +
+Developers can now control the display of *Include cover page* and *Include filter page(s)* options on the Download PDF dialog for Liveboards. The *Include cover page* and *Include filter page(s)* options are disabled by default on ThoughtSpot instances. When this feature is enabled, developers can use the `coverAndFilterOptionInPDF` attribute to show or hide these options for the Liveboard users in their embedding app.
+
+|[tag greenBackground]#NEW FEATURE# a| *Parameter for overriding a default primary action* +
+
+If Spotter is enabled on your instance, the *Spotter* button appears by default as the primary action on embedded Liveboard charts; if Spotter is not enabled, the *Explore* button is set as the primary action. If you want to replace the primary action with a different action, you can now use the `primaryAction` attribute.
+
+For more information, see xref:embed-actions.adoc#_override_default_primary_actions[Override default primary action].
+
+|[tag greenBackground]#NEW FEATURE# a| *Full application embed experience enhancements* +
+
+The SDK now includes the `hideObjectSearch` property, which allows developers to hide the object search button in the navigation bar when embedding the full application.
+
+|[tag greenBackground]#NEW FEATURE#  a| *Host events* +
+
+In this version, the SDK introduces the following host event handlers:
+
+- `HostEvent.ExitPresentMode` +
+Triggers the exit action that allows users to exit the Liveboard or visualization present mode.
+- `HostEvent.SpotterSearch` +
+Triggers a search operation for the specified query string in Spotter embed.
+- `HostEvent.PreviewSpotterData` +
+Triggers the *Preview data* action that shows the data used for Spotter conversations.
+- `HostEvent.ResetSpotterConversation` +
+Triggers the *Reset* action to reset a Spotter conversation.
+- `HostEvent.EditLastPrompt` +
+Triggers the edit prompt action.
+- `HostEvent.DeleteLastPrompt` +
+Triggers the delete prompt action.
+
+For more information, see xref:HostEvent.adoc[HostEvent].
+
+|[tag greenBackground]#NEW FEATURE# a|*Events support for Spotter embed*
+
+You can now use the following host events in Spotter embed:
+
+- `HostEvent.DownloadAsCsv`
+- `HostEvent.DownloadAsPng`
+- `HostEvent.DownloadAsXlsx`
+- `HostEvent.Edit`
+//- `HostEvent.GetParameters`
+//- `HostEvent.GetTML`
+- `HostEvent.MakeACopy`
+- `HostEvent.Pin`
+- `HostEvent.Save`
+
+For more information, see xref:HostEvent.adoc[HostEvent].
+
+|[tag greenBackground]#NEW FEATURE# a| *Lazy loading with full height*
+
+The SDK introduces `lazyLoadingForFullHeight` parameter, which enables progressive loading of visualizations on an  embedded Liveboard.
+This parameter works in conjunction with the `fullHeight` attribute. When both these attributes are enabled, only the visualizations in the current viewport are loaded initially, while the other visualizations load as the user scrolls the Liveboard page.
+
+[NOTE]
+====
+To use these attributes effectively in embedded applications, your ThoughtSpot instance must be upgraded to version 10.12.0.cl or later.
+====
+|====
+
+
+== Version 1.39.0, July 2025
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE#  a| *Spotter embed components with new names* +
+The following Spotter embed components are now deprecated and replaced with new components in the SDK and Visual Embed Playground:
+
+* `ConversationEmbed` +
+Replaced with `SpotterEmbed`
+* `ConversationViewConfig` +
+Replaced with `SpotterEmbedViewConfig`
+* `BodylessConversation` +
+Replaced with `SpotterAgentEmbed`
+* `BodylessConversationViewConfig` +
+Replaced with `SpotterAgentEmbedViewConfig`
+
+The deprecated components with old names in the existing Spotter embed implementations will continue to function until further notice. For code samples with new component names, see xref:embed-spotter.adoc[Spotter embed documentation].
+
+|[tag greenBackground]#NEW FEATURE# a| *Action ID for Spotter in-conversation training* +
+For ThoughtSpot instances that have the new Spotter in-conversation training workflow enabled, the SDK provides the action ID `Action.InConversationTraining` to manage the visibility of the *Add to Coaching* button on Answers generated from Spotter prompts.
+
+[NOTE]
+The *Add to Coaching* feature is currently in beta and is turned off by default on embed deployments. To enable this feature on your instance, contact ThoughtSpot Support.
+
+|[tag greenBackground]#NEW FEATURE# a|*Events support for Spotter embed*
+
+New embed events::
+
+- `EmbedEvent.ExitPresentMode` +
+Emits when a user exits the Liveboard or visualization presentation mode.
+- `EmbedEvent.LastPromptDeleted` +
+Emits when a query prompt in Spotter embed is deleted.
+- `EmbedEvent.LastPromptEdited` +
+Emits when a query prompt in Spotter embed is edited.
+- `EmbedEvent.ResetSpotterConversation` +
+Emits when a Spotter query is reset.
+- `EmbedEvent.PreviewSpotterData` +
+Emits when a user clicks the Preview data button in the Spotter conversation panel.
+- `EmbedEvent.SpotterQueryTriggered`
+Emits when a Spotter query is triggered.
+
+The following embed events are also supported in Spotter embed:
+
+- `EmbedEvent.AddRemoveColumns`
+- `EmbedEvent.AnswerChartSwitcher`
+- `EmbedEvent.AuthExpire`
+- `EmbedEvent.AuthInit`
+- `EmbedEvent.CopyToClipboard`
+- `EmbedEvent.CustomAction`
+- `EmbedEvent.Data`
+- `EmbedEvent.DataSourceSelected`
+- `EmbedEvent.DialogClose`
+- `EmbedEvent.DialogOpen`
+- `EmbedEvent.Download`
+- `EmbedEvent.DownloadAsCsv`
+- `EmbedEvent.DownloadAsPng`
+- `EmbedEvent.DownloadAsXlsx`
+- `EmbedEvent.DrillDown`
+- `EmbedEvent.DrillExclude`
+- `EmbedEvent.DrillInclude`
+- `EmbedEvent.Edit`
+- `EmbedEvent.Error`
+- `EmbedEvent.Load`
+- `EmbedEvent.Pin`
+- `EmbedEvent.Save`
+- `EmbedEvent.TableVizRendered`
+- `EmbedEvent.VizPointClick`
+- `EmbedEvent.VizPointDoubleClick`
+- `EmbedEvent.VizPointRightClick`
+
+For more information, see xref:EmbedEvent.adoc[EmbedEvent].
+
+|====
+
+== Version 1.38.0, June 2025
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE#  a| *String IDs for text customization* +
+Developers can now customize a specific occurrence of a visible text string in the ThoughtSpot UI using the `stringIDs` object in the customization interface.
+
+To locate the string IDs, SDK provides the `exposeTranslationIds` attribute. By setting `exposeTranslationIds` to `true` in the Playground, you can find the string ID of the UI text and use it in your customization code.
+
+Additionally, the SDK provides the `StringIDsUrl` attribute to allow using a JSON file with string IDs and custom strings to override the visible text in the UI.
+
+For more information, see xref:customize-text-strings.adoc[Customize text strings].
+
+|[tag greenBackground]#NEW FEATURE# a| *Hide columns on list pages* +
+
+In full app embedding, you can now hide the following columns on the *Liveboards* and *Answers* listing pages using the `hiddenListColumns` array:
+
+* *Author* +
+`hiddenListColumns: [ListPageColumns.Author]`
+* *Favorite* +
+`hiddenListColumns: [ListPageColumns.Favourite]`
+* *Last modified* +
+`hiddenListColumns: [ListPageColumns.DateSort]`
+* *Tags* +
+`hiddenListColumns: [ListPageColumns.Tags]`
+* *Share* +
+`hiddenListColumns: [ListPageColumns.Share]` +
+
+For more information, see xref:full-app-customize.adoc#_hide_columns_on_list_pages_new_experience[Customize full application embed].
+|====
+
+== Version 1.37.0, April 2025
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE#  a|
+The SDK now provides the `customVariablesForThirdPartyTools` setting to pass custom variables when integrating third-party tools and running custom scripts in your embed. Developers can define this object in the **init()** function and add variables as key-value pairs.
+This feature is available only if third-party integration is enabled on your instance and the script hosting domain URL is added to the CSP allowlist.
+
+For more information, see xref:3rd-party-script.adoc[Integrate third-party tools and allow custom scripts].
+
+|[tag greenBackground]#NEW FEATURE#  a|
+You can now exclude search token string from the application URL by setting `excludeSearchTokenStringFromURL` to `true` in your embed with ThoughtSpot token-based Search or Search bar.
+
+|[tag greenBackground]#NEW FEATURE#  a| This version of the SDK supports the following embed and host events:
+
+Embed Events::
+
+* `EmbedEvent.TableVizRendered` +
+Emits when a table visualization is rendered in the ThoughtSpot embedded app. You can also use this event as a hook to trigger host events such as `HostEvent.TransformTableVizData` on the table visualization. For more information, see the link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent#_tablevizrendered[SDK reference documentation].
+
+* `EmbedEvent.CreateLiveboard` +
+Emits when a Liveboard is created.
+
+Host Events::
+
+* `HostEvent.TransformTableVizData` +
+Triggers the table visualization re-render with the updated data. You can use this event in conjunction with `EmbedEvent.TableVizRendered` to apply the modifications to table visualization payload.
+
+* `HostEvent.Remove` +
+Triggers the *Delete* action on a Liveboard.
+|====
+
+== Version 1.36.0, February 2025
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE# a|
+The following HostEvents now allow custom parameters to set object properties programmatically:
+
+* `HostEvent.SaveAnswer` +
+Allows adding `name` and `description` text strings. When these parameters are defined, the event triggers the Save action to save the Answer with the predefined properties without opening the *Describe your Answer* modal.
+* `HostEvent.Pin` +
+Allows adding custom properties for visualization ID, name, and description, Liveboard ID, and Tab ID. When these parameters are defined, the event triggers an action to pin the Answer to the Liveboard specified in the code, without opening the *Pin* modal.
+
+For more information, see xref:events-hostEvents.adoc#hostEventParameterization[Host Events] documentation.
+
+|[tag greenBackground]#NEW FEATURE# a|
+
+New configuration attributes::
+
+* `disableSourceSelection` +
+Disables data source selection panel for embed users when set to `true`.
+* `hideSourceSelection` +
+Hides data source selection panel when set to `true`
+* `locale` +
+Sets the xref:locale-setting.adoc[locale and regional settings] for the Spotter interface.
+* `showSpotterLimitations` +
+Shows functional limitations of Spotter when set to `true`
+* `hideSampleQuestions` +
+Hides sample questions that appear on the default Spotter page.
+
+Action IDs for menu customization::
+Use the following action IDs in the  `disabledActions`, `visibleActions`, or `hiddenActions` array to disable, show, or hide menu actions and elements in the embedded Spotter interface:
+
+* `Action.PreviewDataSpotter` +
+The *Preview data* button on the Spotter conversation panel.
+* `Action.ResetSpotterChat` +
+The *Reset* button on the Spotter conversation panel.
+* `Action.SpotterFeedback` +
+The feedback widget on Spotter-generated charts.
+* `Action.EditPreviousPrompt` +
+The edit icon on the prompt panel.
+The Prompt panel appears after Spotter generates a response to a user query.
+* `Action.DeletePreviousPrompt` +
+The delete icon on the prompt panel.
+
+////
+* `Action.EditTokens` +
+The option to edit tokens on a Spotter-generated chart or table.
+////
+CSS variables::
+
+The following new CSS variables are available for Spotter interface customization:
+
+* `--ts-var-spotter-input-background`
+* `--ts-var-spotter-prompt-background`
+
+For more information about Spotter customization, see xref:embed-spotter.adoc#SpotterCSS[Customize styles].
+|[tag greenBackground]#NEW FEATURE# a|
+
+
+Configuration attributes::
+
+* `hideIrrelevantChipsInLiveboardTabs` +
+Hides filter chips on a Liveboard when set to `true`.
+
+* `isLiveboardCompactHeaderEnabled` +
+Enables the compact Liveboard header feature when set to `true`.
+
+Action IDs::
+Use the following action IDs in the `disabledActions`, `visibleActions`, or `hiddenActions` array to disable, show, or hide menu actions on an embedded Liveboard:
+
+* `Action.DisableChipReorder` +
+ID for the action that disables filter chip reordering.
+* `Action.ChangeFilterVisibilityInTab`
+
+|====
+
+== Version 1.35.0, December 2024
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE#  a|
+The SDK now provides the `isUnifiedSearchExperienceEnabled` setting to customize the Search experience on ThoughtSpot Home page for embedding application users:
+
+* When set to `true`, the split search experience is disabled and the Search bar on the Home page functions as Natural Language Search interface
+* When set to `false`, the split search experience is enabled and object Search is set as the default Home page search experience.
+
+For more information, see xref:full-app-customize.adoc#_search_components[Search interface on the Home page in full application embedding].
+
+|[tag greenBackground]#NEW FEATURE#  a| The `overrideOrgId` parameter in the SDK provides the ability to override Org context for embedding application users. This parameter allows users authenticated to an Org to temporarily view content from another Org. Before specifying the Org ID for override, make sure the Per Org URL feature is enabled on your ThoughtSpot instance. To enable Per Org URL on your instance, contact ThoughtSpot Support.
+|====
+
+== Version 1.34.0, November 2024
+
+[width="100%" cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE#  a| You can now embed the following ThoughtSpot Spotter components in your app:
+
+* `SpotterEmbed` +
+Embeds Spotter conversation interface in your app
+* `SpotterAgentEmbed` +
+Creates a conversation component without the body, which can be integrated into chatbots or other conversational apps.
+
+For more information, see xref:embed-spotter.adoc[Embed Spotter] and xref:spotter-in-custom-chatbot.adoc[Integrate Spotter into your chatbot].
+
+|[tag greenBackground]#NEW FEATURE#  a|The following parameters and enumerations are available for customizing Liveboard experience:
+
+* `showLiveboardVerifiedBadge` +
+Shows or hides the Liveboard verified badge. Available if the Liveboard compact header feature is enabled.
+* `showLiveboardReverifyBanner` +
+Shows or hides the re-verify banner. Available if the Liveboard compact header feature is enabled.
+* `Action.KPIAnalysisCTA` +
+Action ID to show, hide, or disable the **Analyze CTA** action on a KPI chart.
+
+|[tag greenBackground]#NEW FEATURE# |You can now use the `HostEvent.GetIframeUrl` to get the iframe src URL from the Visual Embed Playground. If you are embedding ThoughtSpot in apps like Salesforce and Sharepoint without the SDK, use this event to generate the iframe URL.
+
+|[tag greenBackground]#NEW FEATURE#  a|The following parameters are available for customizing Search experience:
+
+* `collapseDataPanel`
+Minimizes the data panel view. Users can click the data panel header any time to expand the panel.
+* `collapseSearchBar`
+Sets the initial state of the search bar when embedding a saved Answer.
+
+|[tag greenBackground]#NEW FEATURE# a| The following settings are available for customizing the new home page and navigation experience in full app embedding:
+
+* `HomeLeftNavItem.LiveboardSchedules` +
+The Liveboard schedules menu on the left navigation panel.
+
+Action enumerations::
+
+* `Action.EditScheduleHomepage` +
+To show, disable, or hide the *Edit* action on the *Liveboard schedules* page
+* `Action.PauseScheduleHomepage` +
+To show, disable, or hide the *Pause* action on the *Liveboard schedules* page
+* `Action.ViewScheduleRunHomepage` +
+To show, disable, or hide the *View run history* action on the *Liveboard schedules* page
+* `Action.DeleteScheduleHomepage` +
+To show, disable, or hide the *Delete* action on the *Liveboard schedules* page
+* `Action.UnsubscribeScheduleHomepage` +
+To show, disable, or hide the *Unsubscribe* action on the *Liveboard schedules* page
 |====
