@@ -473,7 +473,7 @@ const FloatingAssistant: React.FC = () => {
 
             {/* Panel */}
             {(isOpen || isClosing) && (
-                <div className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}`} style={{ top: isEmbedded ? 0 : undefined }}>
+                <div className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}${isEmbedded ? ' floating-assistant__panel--embedded' : ''}`}>
                     {/* Header */}
                     <div className="floating-assistant__header">
                         <span className="floating-assistant__title">SpotterCode</span>
@@ -509,7 +509,7 @@ const FloatingAssistant: React.FC = () => {
                                     </div>
                                     {suggestedQuestions.length > 0 && (
                                         <div className="floating-assistant__suggestions">
-                                            {suggestedQuestions.slice(0, 5).map((q, i) => (
+                                            {suggestedQuestions.map((q, i) => (
                                                 <button
                                                     key={i}
                                                     className="floating-assistant__suggestion"
