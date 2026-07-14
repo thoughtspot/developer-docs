@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const hljs = require('highlight.js');
 import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import { isPublicSite } from '../../utils/app-utils';
+import { Alert, Button, Icon, IconID, IconSize, IconColor, LoadingIndicator } from '@thoughtspot/radiant-react';
+import '@thoughtspot/radiant-react/styles';
 import './index.scss';
 
 function renderMarkdown(text: string): string {
@@ -34,7 +37,7 @@ function renderMarkdown(text: string): string {
             return `<a href="${href}" target="_blank" rel="noopener noreferrer">${display}</a>`;
         },
     );
-    // Wrap <pre><code> blocks with copy button + max-height scroll + syntax highlighting
+    // Wrap <pre><code> blocks with language header + copy button + syntax highlighting
     return withLinks.replace(
         /<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g,
         (_, attrs, code) => {
@@ -42,16 +45,29 @@ function renderMarkdown(text: string): string {
             const lang = langMatch?.[1];
             const decoded = code.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
             let highlighted = decoded;
+            let detectedLang = lang;
             try {
-                highlighted = lang && hljs.getLanguage(lang)
-                    ? hljs.highlight(decoded, { language: lang }).value
-                    : hljs.highlightAuto(decoded).value;
+                if (lang && hljs.getLanguage(lang)) {
+                    highlighted = hljs.highlight(decoded, { language: lang }).value;
+                } else {
+                    const result = hljs.highlightAuto(decoded);
+                    highlighted = result.value;
+                    detectedLang = result.language;
+                }
             } catch { /* fallback to plain */ }
+            const labelMap: Record<string, string> = {
+                javascript: 'JavaScript', typescript: 'TypeScript', python: 'Python',
+                bash: 'Bash', shell: 'Shell', sh: 'Shell', sql: 'SQL', json: 'JSON',
+                html: 'HTML', css: 'CSS', scss: 'SCSS', java: 'Java', go: 'Go',
+                ruby: 'Ruby', rust: 'Rust', cpp: 'C++', c: 'C', csharp: 'C#',
+                yaml: 'YAML', xml: 'XML', markdown: 'Markdown', curl: 'cURL',
+            };
+            const label = detectedLang ? (labelMap[detectedLang.toLowerCase()] || detectedLang.toUpperCase()) : 'Code';
             return `<div class="fa-code-block">` +
-                `<button class="fa-code-copy" data-code="${encodeURIComponent(decoded)}" title="Copy">` +
-                `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
-                `<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>` +
-                `</svg></button>` +
+                `<div class="fa-code-header">` +
+                `<span class="fa-code-lang">${label}</span>` +
+                `<button class="fa-code-copy" data-code="${encodeURIComponent(decoded)}">Copy</button>` +
+                `</div>` +
                 `<pre><code${attrs}>${highlighted}</code></pre>` +
                 `</div>`;
         },
@@ -124,10 +140,35 @@ const getPageId = () => {
 };
 
 const SparkleIcon = () => (
-    <svg width="26" height="27" viewBox="0 0 27 27" fill="#2770EF" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8.25809 7.21109C8.83155 5.59342 11.1191 5.59349 11.6927 7.21109L13.4163 12.0753C13.4919 12.2885 13.6602 12.4568 13.8733 12.5324L18.7376 14.256C20.3555 14.8294 20.3555 17.1172 18.7376 17.6906L13.8733 19.4142C13.6601 19.4898 13.4918 19.658 13.4163 19.8712L11.6927 24.7355C11.1191 26.353 8.83157 26.3531 8.25809 24.7355L6.53445 19.8712C6.4589 19.658 6.29064 19.4898 6.07742 19.4142L1.21316 17.6906C-0.404397 17.1171 -0.404379 14.8295 1.21316 14.256L6.07742 12.5324C6.29058 12.4568 6.45883 12.2885 6.53445 12.0753L8.25809 7.21109ZM20.2805 0.49136C20.6395 -0.163697 21.6064 -0.163877 21.9651 0.49136L22.0315 0.642727L22.888 3.05972L25.3059 3.91616C26.1625 4.21966 26.1622 5.43079 25.3059 5.73452L22.888 6.59097L22.0315 9.00894C21.7279 9.86544 20.5167 9.86552 20.2132 9.00894L19.3567 6.59097L16.9397 5.73452C16.0831 5.43098 16.0831 4.21969 16.9397 3.91616L19.3567 3.05972L20.2132 0.642727L20.2805 0.49136Z" />
-    </svg>
+    <Icon id={IconID.AI_SPARKLE_SELECTED} size={IconSize.XLARGE} color={IconColor.BLUE} />
 );
+
+const stripMarkdown = (md: string) =>
+    md.replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*\n?/, '').replace(/```$/, '').trim())
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/#{1,6}\s+/g, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/^[-*+]\s+/gm, '')
+      .replace(/^\d+\.\s+/gm, '')
+      .trim();
+
+const MsgCopyButton = ({ text }: { text: string }) => {
+    const [copied, setCopied] = React.useState(false);
+    const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const handleCopy = () => {
+        navigator.clipboard.writeText(stripMarkdown(text)).catch(() => {});
+        if (timerRef.current) clearTimeout(timerRef.current);
+        setCopied(true);
+        timerRef.current = setTimeout(() => setCopied(false), 1500);
+    };
+    return (
+        <button className={`fa-msg-copy-btn${copied ? ' fa-msg-copy-btn--copied' : ''}`} onClick={handleCopy} aria-label="Copy response">
+            <Icon id={copied ? IconID.CHECKMARK : IconID.COPY} size={IconSize.SMALL} color={copied ? IconColor.GREEN : IconColor.GRAY} />
+        </button>
+    );
+};
 
 const SpotterCodeLogo = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -199,6 +240,34 @@ const FloatingAssistant: React.FC = () => {
     } = useFloatingAssistant();
 
     const [feedbackGiven, setFeedbackGiven] = useState<Record<number, 'up' | 'down'>>({});
+    const [loadingPhase, setLoadingPhase] = useState(0);
+    const [questionsKey, setQuestionsKey] = useState(0);
+    const loadingPhaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const LOADING_PHASES = [
+        'Processing your request...',
+        'Thinking...',
+        'Understanding your query...',
+        'Searching documentation...',
+        'Generating response...',
+    ];
+    const [showFeedbackToast, setShowFeedbackToast] = useState(false);
+    const feedbackToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const giveFeedback = (idx: number, type: 'up' | 'down') => {
+        const isUnfill = feedbackGiven[idx] === type;
+        setFeedbackGiven((prev: Record<number, 'up' | 'down'>) => {
+            const next = { ...prev };
+            if (isUnfill) delete next[idx];
+            else next[idx] = type;
+            return next;
+        });
+        if (!isUnfill) {
+            if (feedbackToastTimer.current) clearTimeout(feedbackToastTimer.current);
+            setShowFeedbackToast(true);
+            feedbackToastTimer.current = setTimeout(() => setShowFeedbackToast(false), 2500);
+        }
+    };
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editDraft, setEditDraft] = useState('');
 
@@ -211,26 +280,32 @@ const FloatingAssistant: React.FC = () => {
         setEditDraft('');
     };
 
+    const [editQuotedText, setEditQuotedText] = useState<string | undefined>(undefined);
+
     const startEdit = (idx: number, content: string, quotedText?: string) => {
         setEditingIndex(idx);
+        setEditQuotedText(quotedText);
         setEditDraft(quotedText ? content.replace(`"${quotedText}"\n\n`, '') : content);
     };
 
     const cancelEdit = () => {
         setEditingIndex(null);
         setEditDraft('');
+        setEditQuotedText(undefined);
     };
 
     const submitEdit = async (idx: number) => {
         const draft = editDraft.trim();
         if (!draft) return;
         const original = messages[idx];
-        const fullText = original.quotedText ? `"${original.quotedText}"\n\n${draft}` : draft;
-        const updated: Message = { ...original, content: fullText, sentAt: Date.now() };
+        const effectiveQuote = editQuotedText;
+        const fullText = effectiveQuote ? `"${effectiveQuote}"\n\n${draft}` : draft;
+        const updated: Message = { ...original, content: fullText, quotedText: effectiveQuote, sentAt: Date.now() };
         // Keep messages up to and including this user message, drop everything after
         const trimmed = [...messages.slice(0, idx), updated];
         setEditingIndex(null);
         setEditDraft('');
+        setEditQuotedText(undefined);
         await sendMessage(fullText, trimmed);
     };
     const [isClosing, setIsClosing] = useState(false);
@@ -261,9 +336,11 @@ const FloatingAssistant: React.FC = () => {
     useEffect(() => {
         if (isOpen && messages.length > 0) {
             userScrolledRef.current = false;
+            // Wait for the 250ms slide-in animation to finish before scrolling
             setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, 50);
+                const el = messagesContainerRef.current;
+                if (el) el.scrollTop = el.scrollHeight;
+            }, 280);
         }
     }, [isOpen]);
 
@@ -301,6 +378,8 @@ const FloatingAssistant: React.FC = () => {
                 || location.pathname.split('/').filter(Boolean).pop()
                 || undefined;
             setPageId(newPageId);
+            // Don't clear questions immediately — keep stale ones visible while fetching
+            // Mark as not loaded so the fetch effect re-runs for the new page
             setSuggestedQuestionsLoaded(false);
         };
         window.addEventListener('gatsby-route-update', handler as EventListener);
@@ -332,6 +411,7 @@ const FloatingAssistant: React.FC = () => {
             .then((data: { questions?: string[] }) => {
                 setSuggestedQuestions(data.questions ?? []);
                 setSuggestedQuestionsLoaded(true);
+                setQuestionsKey((k: number) => k + 1);
             })
             .catch(() => {
                 setSuggestedQuestionsLoaded(true);
@@ -362,7 +442,16 @@ const FloatingAssistant: React.FC = () => {
         setStreamingText('');
         setToolStatus('');
         setToolSteps([]);
+        setLoadingPhase(0);
         userScrolledRef.current = false;
+
+        // Cycle through loading phases smoothly
+        const phaseDelays = [0, 1200, 2800, 4800, 7000];
+        phaseDelays.forEach((delay, idx) => {
+            const t = setTimeout(() => setLoadingPhase(idx), delay);
+            // store only the last timer for cleanup
+            if (idx === phaseDelays.length - 1) loadingPhaseTimer.current = t;
+        });
 
         abortRef.current = new AbortController();
         const startTime = Date.now();
@@ -422,6 +511,8 @@ const FloatingAssistant: React.FC = () => {
             }
             setStreamingText('');
             setToolStatus('');
+            if (loadingPhaseTimer.current) clearTimeout(loadingPhaseTimer.current);
+            setLoadingPhase(0);
             setToolSteps([]);
             setIsLoading(false);
             abortRef.current = null;
@@ -435,15 +526,29 @@ const FloatingAssistant: React.FC = () => {
         }
     };
 
+    const copyTimers = useRef<Map<HTMLElement, ReturnType<typeof setTimeout>>>(new Map());
     const handleCodeCopy = (e: React.MouseEvent<HTMLDivElement>) => {
         const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.fa-code-copy');
         if (!btn) return;
         const code = decodeURIComponent(btn.dataset.code ?? '');
         navigator.clipboard.writeText(code).catch(() => {});
-        const prev = btn.innerHTML;
-        // Show green checkmark instead of "Copied!" text
-        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9f6e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-        setTimeout(() => { btn.innerHTML = prev; }, 1500);
+        // Clear any pending reset for this button
+        const existing = copyTimers.current.get(btn);
+        if (existing) clearTimeout(existing);
+        btn.textContent = 'Copied!';
+        btn.classList.add('fa-code-copy--copied');
+        btn.classList.remove('fa-code-copy--fading');
+        const t = setTimeout(() => {
+            // Fade out "Copied!" then swap back to "Copy"
+            btn.classList.add('fa-code-copy--fading');
+            const reset = setTimeout(() => {
+                btn.textContent = 'Copy';
+                btn.classList.remove('fa-code-copy--copied', 'fa-code-copy--fading');
+                copyTimers.current.delete(btn);
+            }, 300);
+            copyTimers.current.set(btn, reset);
+        }, 1500);
+        copyTimers.current.set(btn, t);
     };
 
     const handleClose = () => {
@@ -477,15 +582,9 @@ const FloatingAssistant: React.FC = () => {
                     {/* Header */}
                     <div className="floating-assistant__header">
                         <span className="floating-assistant__title">SpotterCode</span>
-                        <button
-                            className="floating-assistant__close"
-                            onClick={handleClose}
-                            aria-label="Close assistant"
-                            title="Close"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="13 17 18 12 13 7" />
-                                <polyline points="6 17 11 12 6 7" />
+                        <button className="floating-assistant__close-btn" onClick={handleClose} aria-label="Close assistant">
+                            <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8.55252 7.73942L3.4796 12.8123L2.22266 11.5554L6.03863 7.73942L2.22266 3.92345L3.4796 2.6665L8.55252 7.73942ZM13.8859 7.73942L8.81293 12.8123L7.55599 11.5554L11.372 7.73942L7.55599 3.92345L8.81293 2.6665L13.8859 7.73942Z" fill="#1D232F"/>
                             </svg>
                         </button>
                     </div>
@@ -508,11 +607,12 @@ const FloatingAssistant: React.FC = () => {
                                         Where do we start?
                                     </div>
                                     {suggestedQuestions.length > 0 && (
-                                        <div className="floating-assistant__suggestions">
+                                        <div key={questionsKey} className="floating-assistant__suggestions">
                                             {suggestedQuestions.map((q, i) => (
                                                 <button
                                                     key={i}
                                                     className="floating-assistant__suggestion"
+                                                    style={{ animationDelay: `${i * 60}ms` }}
                                                     onClick={() => sendMessage(q)}
                                                 >
                                                     {q}
@@ -552,13 +652,27 @@ const FloatingAssistant: React.FC = () => {
                                                         if (e.key === 'Escape') cancelEdit();
                                                     }}
                                                 >
-                                                    {msg.quotedText && (
-                                                        <div className="floating-assistant__quote-chip floating-assistant__quote-chip--message">
-                                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                                <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
-                                                            </svg>
-                                                            <span className="floating-assistant__quote-text">{msg.quotedText}</span>
-                                                        </div>
+                                                    {editingIndex === i ? (
+                                                        editQuotedText && (
+                                                            <div className="floating-assistant__quote-chip floating-assistant__quote-chip--message">
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,color:'#a5acb9'}}><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                                                                <span className="floating-assistant__quote-text">{editQuotedText}</span>
+                                                                <button
+                                                                    className="floating-assistant__quote-dismiss-inline"
+                                                                    onClick={() => setEditQuotedText(undefined)}
+                                                                    aria-label="Remove quote"
+                                                                >
+                                                                    <Icon id={IconID.CROSS} size={IconSize.XSMALL} color={IconColor.GRAY} />
+                                                                </button>
+                                                            </div>
+                                                        )
+                                                    ) : (
+                                                        msg.quotedText && (
+                                                            <div className="floating-assistant__quote-chip floating-assistant__quote-chip--message">
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,color:'#a5acb9'}}><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                                                                <span className="floating-assistant__quote-text">{msg.quotedText}</span>
+                                                            </div>
+                                                        )
                                                     )}
                                                     {msg.quotedText
                                                         ? msg.content.replace(`"${msg.quotedText}"\n\n`, '')
@@ -570,21 +684,22 @@ const FloatingAssistant: React.FC = () => {
                                                     )}
                                                     {editingIndex === i ? (
                                                         <>
-                                                            <button className="floating-assistant__edit-cancel" onClick={cancelEdit}>Cancel</button>
-                                                            <button className="floating-assistant__edit-submit" onClick={() => submitEdit(i)}>Send</button>
+                                                            <button className="floating-assistant__edit-action-btn" onClick={cancelEdit} aria-label="Cancel edit">
+                                                                <Icon id={IconID.CROSS} size={IconSize.SMALL} color={IconColor.GRAY} />
+                                                            </button>
+                                                            <button className="floating-assistant__edit-action-btn floating-assistant__edit-action-btn--send" onClick={() => submitEdit(i)} aria-label="Send edit">
+                                                                <Icon id={IconID.PAPER_PLANE} size={IconSize.SMALL} color={IconColor.WHITE} />
+                                                            </button>
                                                         </>
                                                     ) : (
                                                         i === messages.map((m, idx) => m.role === 'user' ? idx : -1).filter(x => x >= 0).pop() && !isLoading && (
-                                                            <button
-                                                                className="floating-assistant__edit-btn"
+                                                            <Button
+                                                                type="tertiary"
+                                                                size="xs"
+                                                                icon={IconID.PENCIL}
+                                                                ariaLabel="Edit message"
                                                                 onClick={() => startEdit(i, msg.content, msg.quotedText)}
-                                                                aria-label="Edit message"
-                                                            >
-                                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                                                </svg>
-                                                            </button>
+                                                            />
                                                         )
                                                     )}
                                                 </div>
@@ -597,9 +712,7 @@ const FloatingAssistant: React.FC = () => {
                                                     <details className="floating-assistant__gen-summary">
                                                         <summary className="floating-assistant__gen-summary-header">
                                                             <span>Work done in {formatDuration(msg.durationMs)}</span>
-                                                            <svg className="floating-assistant__gen-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                                <polyline points="6 9 12 15 18 9"/>
-                                                            </svg>
+                                                            <Icon id={IconID.CHEVRON_DOWN} size={IconSize.XSMALL} color={IconColor.CONTENT_TERTIARY} className="floating-assistant__gen-chevron" />
                                                         </summary>
                                                         {msg.toolSteps && msg.toolSteps.length > 0 && (
                                                             <div className="floating-assistant__gen-steps">
@@ -618,45 +731,23 @@ const FloatingAssistant: React.FC = () => {
                                                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                                                 />
                                                 <div className="floating-assistant__feedback">
-                                                    {feedbackGiven[i] ? (
-                                                        <span className="floating-assistant__feedback-thanks">
-                                                            {feedbackGiven[i] === 'up' ? (
-                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                                                                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"/>
-                                                                    <path d="M7 22H4.72A2.31 2.31 0 0 1 2.4 20v-7a2.31 2.31 0 0 1 2.33-2H7"/>
-                                                                </svg>
-                                                            ) : (
-                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                                                                    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/>
-                                                                    <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
-                                                                </svg>
-                                                            )}
-                                                            Thank you for feedback!
-                                                        </span>
-                                                    ) : (
-                                                        <>
-                                                            <button
-                                                                className="floating-assistant__feedback-btn"
-                                                                aria-label="Thumbs down"
-                                                                onClick={() => setFeedbackGiven(prev => ({ ...prev, [i]: 'down' }))}
-                                                            >
-                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/>
-                                                                    <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
-                                                                </svg>
-                                                            </button>
-                                                            <button
-                                                                className="floating-assistant__feedback-btn"
-                                                                aria-label="Thumbs up"
-                                                                onClick={() => setFeedbackGiven(prev => ({ ...prev, [i]: 'up' }))}
-                                                            >
-                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"/>
-                                                                    <path d="M7 22H4.72A2.31 2.31 0 0 1 2.4 20v-7a2.31 2.31 0 0 1 2.33-2H7"/>
-                                                                </svg>
-                                                            </button>
-                                                        </>
-                                                    )}
+                                                    <Button
+                                                        type="tertiary"
+                                                        size="xs"
+                                                        icon={feedbackGiven[i] === 'down' ? IconID.THUMB_DOWN_UNDO : IconID.THUMB_DOWN}
+                                                        ariaLabel="Thumbs down"
+                                                        className={feedbackGiven[i] === 'down' ? 'fa-feedback-btn--active' : ''}
+                                                        onClick={() => giveFeedback(i, 'down')}
+                                                    />
+                                                    <Button
+                                                        type="tertiary"
+                                                        size="xs"
+                                                        icon={feedbackGiven[i] === 'up' ? IconID.THUMB_UP_UNDO : IconID.THUMB_UP}
+                                                        ariaLabel="Thumbs up"
+                                                        className={feedbackGiven[i] === 'up' ? 'fa-feedback-btn--active' : ''}
+                                                        onClick={() => giveFeedback(i, 'up')}
+                                                    />
+                                                    <MsgCopyButton text={msg.content} />
                                                 </div>
                                             </div>
                                         )}
@@ -668,32 +759,19 @@ const FloatingAssistant: React.FC = () => {
                                     <div className="floating-assistant__message floating-assistant__message--assistant">
                                         <div className="floating-assistant__assistant-block">
                                             <AssistantAvatar />
-                                            {toolStatus && (
-                                                <div className="floating-assistant__tool-steps">
-                                                    <div className="floating-assistant__tool-header">
-                                                        <span className="floating-assistant__tool-header-text">{toolStatus}</span>
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                            <polyline points="18 15 12 9 6 15"/>
-                                                        </svg>
-                                                    </div>
-                                                    {toolSteps.map((step, si) => (
-                                                        <div key={si} className="floating-assistant__tool-step floating-assistant__tool-step--active">
-                                                            <span className="floating-assistant__tool-step-dot floating-assistant__tool-step-dot--yellow" />
-                                                            <span className="floating-assistant__tool-step-name">{step}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
                                             {streamingText ? (
                                                 <div
                                                     className="floating-assistant__message-text floating-assistant__message-text--md"
                                                     dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
                                                 />
-                                            ) : !toolStatus ? (
-                                                <div className="floating-assistant__typing">
-                                                    <span /><span /><span />
+                                            ) : (
+                                                <div className="floating-assistant__loading-status">
+                                                    <LoadingIndicator.Contextual loaderColor="blue" />
+                                                    <span key={loadingPhase} className="floating-assistant__loading-phase">
+                                                        {LOADING_PHASES[loadingPhase]}
+                                                    </span>
                                                 </div>
-                                            ) : null}
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -706,15 +784,14 @@ const FloatingAssistant: React.FC = () => {
                     {!isLandingPage && (
                         <div className={`floating-assistant__messages-fade${showScrollDown ? ' floating-assistant__messages-fade--visible' : ''}`}>
                             {showScrollDown && (
-                                <button
+                                <Button
                                     className="floating-assistant__scroll-down"
+                                    type="tertiary"
+                                    size="xs"
+                                    icon={IconID.CHEVRON_DOWN}
+                                    ariaLabel="Scroll to bottom"
                                     onClick={scrollToBottom}
-                                    aria-label="Scroll to bottom"
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="6 9 12 15 18 9" />
-                                    </svg>
-                                </button>
+                                />
                             )}
                         </div>
                     )}
@@ -724,15 +801,16 @@ const FloatingAssistant: React.FC = () => {
                         <div className="floating-assistant__input-wrapper">
                             {quotedText && (
                                 <div className="floating-assistant__quote-chip">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
-                                    </svg>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,color:'#a5acb9'}}><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
                                     <span className="floating-assistant__quote-text">{quotedText}</span>
-                                    <button className="floating-assistant__quote-dismiss" onClick={() => setQuotedText(null)} aria-label="Remove quote">
-                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                        </svg>
-                                    </button>
+                                    <Button
+                                        type="tertiary"
+                                        size="xs"
+                                        icon={IconID.CROSS}
+                                        ariaLabel="Remove quote"
+                                        className="floating-assistant__quote-dismiss"
+                                        onClick={() => setQuotedText(null)}
+                                    />
                                 </div>
                             )}
                             <textarea
@@ -748,25 +826,17 @@ const FloatingAssistant: React.FC = () => {
                                 <button
                                     className="floating-assistant__reset-input"
                                     onClick={handleReset}
-                                    title="Reset conversation"
                                     aria-label="Reset conversation"
                                 >
-                                    {/* Trash / new chat icon */}
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                                        <path d="M3 3v5h5" />
-                                    </svg>
+                                    <Icon id={IconID.RESET} size={IconSize.SMALL} color={IconColor.TEXT_COLOR} />
                                 </button>
                                 {isLoading ? (
                                     <button
                                         className="floating-assistant__stop"
                                         onClick={stopGeneration}
                                         aria-label="Stop generation"
-                                        title="Stop"
                                     >
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                            <rect x="4" y="4" width="16" height="16" rx="2"/>
-                                        </svg>
+                                        <Icon id={IconID.STOP_SQUARE} size={IconSize.SMALL} color={IconColor.TEXT_COLOR} />
                                     </button>
                                 ) : (
                                     <button
@@ -775,10 +845,7 @@ const FloatingAssistant: React.FC = () => {
                                         disabled={!input.trim()}
                                         aria-label="Send"
                                     >
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <line x1="12" y1="19" x2="12" y2="5" />
-                                            <polyline points="5 12 12 5 19 12" />
-                                        </svg>
+                                        <Icon id={IconID.PAPER_PLANE} size={IconSize.SMALL} color={IconColor.WHITE} />
                                     </button>
                                 )}
                             </div>
@@ -788,11 +855,21 @@ const FloatingAssistant: React.FC = () => {
                     {/* Footer */}
                     <div className="floating-assistant__footer">
                         SpotterCode responses should be reviewed.{' '}
-                        <a href="https://docs.thoughtspot.com" target="_blank" rel="noopener noreferrer">
+                        <a href="https://developers.thoughtspot.com/docs/SpotterCode" target="_blank" rel="noopener noreferrer">
                             Learn more
                         </a>
                     </div>
                 </div>
+            )}
+            {typeof document !== 'undefined' && createPortal(
+                <Alert.Toast
+                    message="Thank you for submitting feedback."
+                    isVisible={showFeedbackToast}
+                    autoHide={false}
+                    showCloseButton
+                    onClose={() => setShowFeedbackToast(false)}
+                />,
+                document.body
             )}
         </>
     );
