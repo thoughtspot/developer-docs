@@ -70,6 +70,13 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
         `${__dirname}/public/robots.txt`,
     );
 
+    // Copy Radiant icon sprite to the root public folder so it's served at
+    // /node_modules/... — the hardcoded path Radiant fetches regardless of pathPrefix
+    const spriteSrc = `${__dirname}/node_modules/@thoughtspot/radiant-react/styles/img/rd-icons/rd-icons-sprite/rd-icons.svg`;
+    const spriteDest = `${__dirname}/public/node_modules/@thoughtspot/radiant-styles/public/img/rd-icons/rd-icons-sprite/rd-icons.svg`;
+    fsExtra.ensureDirSync(require('path').dirname(spriteDest));
+    fsExtra.copyFileSync(spriteSrc, spriteDest);
+
     try {
         const result = await graphql(`
             query {
