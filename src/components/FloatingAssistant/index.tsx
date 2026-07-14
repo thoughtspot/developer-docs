@@ -4,6 +4,7 @@ import DOMPurify from 'dompurify';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const hljs = require('highlight.js');
 import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
+import { isPublicSite } from '../../utils/app-utils';
 import './index.scss';
 
 function renderMarkdown(text: string): string {
@@ -180,6 +181,9 @@ function formatDuration(ms: number): string {
 
 const FloatingAssistant: React.FC = () => {
     const [pageId, setPageId] = useState<string | undefined>(getPageId);
+    const [isEmbedded, setIsEmbedded] = useState(() =>
+        typeof window !== 'undefined' && !isPublicSite(window.location.search)
+    );
     const {
         isOpen,
         setIsOpen,
@@ -302,6 +306,14 @@ const FloatingAssistant: React.FC = () => {
         window.addEventListener('gatsby-route-update', handler as EventListener);
         return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
     }, [setSuggestedQuestionsLoaded]);
+
+    useEffect(() => {
+        const handler = (e: CustomEvent<{ location: Location }>) => {
+            setIsEmbedded(!isPublicSite(e.detail.location.search));
+        };
+        window.addEventListener('gatsby-route-update', handler as EventListener);
+        return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
+    }, []);
 
     useEffect(() => {
         const handler = (e: CustomEvent<{ quotedText: string }>) => {
@@ -461,7 +473,7 @@ const FloatingAssistant: React.FC = () => {
 
             {/* Panel */}
             {(isOpen || isClosing) && (
-                <div className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}`}>
+                <div className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}`} style={{ top: isEmbedded ? 0 : undefined }}>
                     {/* Header */}
                     <div className="floating-assistant__header">
                         <span className="floating-assistant__title">SpotterCode</span>
