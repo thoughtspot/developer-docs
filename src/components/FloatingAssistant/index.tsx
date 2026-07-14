@@ -693,13 +693,9 @@ const FloatingAssistant: React.FC = () => {
                                                         </>
                                                     ) : (
                                                         i === messages.map((m, idx) => m.role === 'user' ? idx : -1).filter(x => x >= 0).pop() && !isLoading && (
-                                                            <Button
-                                                                type="tertiary"
-                                                                size="xs"
-                                                                icon={IconID.PENCIL}
-                                                                ariaLabel="Edit message"
-                                                                onClick={() => startEdit(i, msg.content, msg.quotedText)}
-                                                            />
+                                                            <button className="floating-assistant__edit-action-btn" onClick={() => startEdit(i, msg.content, msg.quotedText)} aria-label="Edit message">
+                                                                <Icon id={IconID.PENCIL} size={IconSize.SMALL} color={IconColor.GRAY} />
+                                                            </button>
                                                         )
                                                     )}
                                                 </div>
@@ -712,7 +708,7 @@ const FloatingAssistant: React.FC = () => {
                                                     <details className="floating-assistant__gen-summary">
                                                         <summary className="floating-assistant__gen-summary-header">
                                                             <span>Work done in {formatDuration(msg.durationMs)}</span>
-                                                            <Icon id={IconID.CHEVRON_DOWN} size={IconSize.XSMALL} color={IconColor.CONTENT_TERTIARY} className="floating-assistant__gen-chevron" />
+                                                            <Icon id={IconID.CHEVRON_DOWN} size={IconSize.XSMALL} color={IconColor.CONTENT_TERTIARY} />
                                                         </summary>
                                                         {msg.toolSteps && msg.toolSteps.length > 0 && (
                                                             <div className="floating-assistant__gen-steps">
@@ -731,22 +727,20 @@ const FloatingAssistant: React.FC = () => {
                                                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                                                 />
                                                 <div className="floating-assistant__feedback">
-                                                    <Button
-                                                        type="tertiary"
-                                                        size="xs"
-                                                        icon={feedbackGiven[i] === 'down' ? IconID.THUMB_DOWN_UNDO : IconID.THUMB_DOWN}
-                                                        ariaLabel="Thumbs down"
-                                                        className={feedbackGiven[i] === 'down' ? 'fa-feedback-btn--active' : ''}
+                                                    <button
+                                                        className={`fa-feedback-btn${feedbackGiven[i] === 'down' ? ' fa-feedback-btn--active' : ''}`}
+                                                        aria-label="Thumbs down"
                                                         onClick={() => giveFeedback(i, 'down')}
-                                                    />
-                                                    <Button
-                                                        type="tertiary"
-                                                        size="xs"
-                                                        icon={feedbackGiven[i] === 'up' ? IconID.THUMB_UP_UNDO : IconID.THUMB_UP}
-                                                        ariaLabel="Thumbs up"
-                                                        className={feedbackGiven[i] === 'up' ? 'fa-feedback-btn--active' : ''}
+                                                    >
+                                                        <Icon id={feedbackGiven[i] === 'down' ? IconID.THUMB_DOWN_UNDO : IconID.THUMB_DOWN} size={IconSize.SMALL} color={feedbackGiven[i] === 'down' ? IconColor.BLUE : IconColor.GRAY} />
+                                                    </button>
+                                                    <button
+                                                        className={`fa-feedback-btn${feedbackGiven[i] === 'up' ? ' fa-feedback-btn--active' : ''}`}
+                                                        aria-label="Thumbs up"
                                                         onClick={() => giveFeedback(i, 'up')}
-                                                    />
+                                                    >
+                                                        <Icon id={feedbackGiven[i] === 'up' ? IconID.THUMB_UP_UNDO : IconID.THUMB_UP} size={IconSize.SMALL} color={feedbackGiven[i] === 'up' ? IconColor.BLUE : IconColor.GRAY} />
+                                                    </button>
                                                     <MsgCopyButton text={msg.content} />
                                                 </div>
                                             </div>
@@ -784,14 +778,9 @@ const FloatingAssistant: React.FC = () => {
                     {!isLandingPage && (
                         <div className={`floating-assistant__messages-fade${showScrollDown ? ' floating-assistant__messages-fade--visible' : ''}`}>
                             {showScrollDown && (
-                                <Button
-                                    className="floating-assistant__scroll-down"
-                                    type="tertiary"
-                                    size="xs"
-                                    icon={IconID.CHEVRON_DOWN}
-                                    ariaLabel="Scroll to bottom"
-                                    onClick={scrollToBottom}
-                                />
+                                <button className="floating-assistant__scroll-down" aria-label="Scroll to bottom" onClick={scrollToBottom}>
+                                    <Icon id={IconID.CHEVRON_DOWN} size={IconSize.SMALL} color={IconColor.GRAY} />
+                                </button>
                             )}
                         </div>
                     )}
@@ -803,14 +792,9 @@ const FloatingAssistant: React.FC = () => {
                                 <div className="floating-assistant__quote-chip">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,color:'#a5acb9'}}><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
                                     <span className="floating-assistant__quote-text">{quotedText}</span>
-                                    <Button
-                                        type="tertiary"
-                                        size="xs"
-                                        icon={IconID.CROSS}
-                                        ariaLabel="Remove quote"
-                                        className="floating-assistant__quote-dismiss"
-                                        onClick={() => setQuotedText(null)}
-                                    />
+                                    <button className="floating-assistant__quote-dismiss" aria-label="Remove quote" onClick={() => setQuotedText(null)}>
+                                        <Icon id={IconID.CROSS} size={IconSize.XSMALL} color={IconColor.GRAY} />
+                                    </button>
                                 </div>
                             )}
                             <textarea
