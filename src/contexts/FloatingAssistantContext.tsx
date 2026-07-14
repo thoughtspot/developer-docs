@@ -4,6 +4,9 @@ type Message = {
     role: 'user' | 'assistant';
     content: string;
     quotedText?: string;
+    toolSteps?: string[];
+    durationMs?: number;
+    sentAt?: number;
 };
 
 type FloatingAssistantContextType = {

@@ -1,24 +1,59 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const hljs = require('highlight.js');
 import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import './index.scss';
 
 function renderMarkdown(text: string): string {
-    const cleaned = text.replace(/\s*cite\w+/g, '');
+    const cleaned = text
+        .replace(/【[\d]+】/g, '')
+        .replace(/【[\d†]+†?[^】]*】/g, '')
+        .replace(/\s*\bcite\w*/gi, '')
+        .replace(/\s*\[cite[^\]]*\]/gi, '');
     const html = marked.parse(cleaned, { async: false }) as string;
-    const sanitized = DOMPurify.sanitize(html);
-    // Wrap <pre><code> blocks with a copy-button container
-    return sanitized.replace(
+    const sanitized = DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] });
+    // After sanitizing: open all links in new tab + convert raw-URL labels to readable text
+    const withLinks = sanitized.replace(
+        /<a\s+href="([^"]+)"[^>]*>([^<]+)<\/a>/g,
+        (_, href, label) => {
+            const trimmed = label.trim();
+            let display = trimmed;
+            // If the label is a raw URL, derive a readable title from the path
+            if (/^https?:\/\//i.test(trimmed)) {
+                try {
+                    const url = new URL(trimmed);
+                    const slug = url.pathname.split('/').filter(Boolean).pop() || url.hostname;
+                    display = slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                } catch {
+                    display = trimmed;
+                }
+            }
+            return `<a href="${href}" target="_blank" rel="noopener noreferrer">${display}</a>`;
+        },
+    );
+    // Wrap <pre><code> blocks with copy button + max-height scroll + syntax highlighting
+    return withLinks.replace(
         /<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g,
-        (_, attrs, code) =>
-            `<div class="fa-code-block">` +
-            `<button class="fa-code-copy" data-code="${encodeURIComponent(code)}" title="Copy">` +
-            `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
-            `<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>` +
-            `</svg></button>` +
-            `<pre><code${attrs}>${code}</code></pre>` +
-            `</div>`,
+        (_, attrs, code) => {
+            const langMatch = attrs.match(/class="language-([^"]+)"/);
+            const lang = langMatch?.[1];
+            const decoded = code.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+            let highlighted = decoded;
+            try {
+                highlighted = lang && hljs.getLanguage(lang)
+                    ? hljs.highlight(decoded, { language: lang }).value
+                    : hljs.highlightAuto(decoded).value;
+            } catch { /* fallback to plain */ }
+            return `<div class="fa-code-block">` +
+                `<button class="fa-code-copy" data-code="${encodeURIComponent(decoded)}" title="Copy">` +
+                `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+                `<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>` +
+                `</svg></button>` +
+                `<pre><code${attrs}>${highlighted}</code></pre>` +
+                `</div>`;
+        },
     );
 }
 
@@ -26,7 +61,22 @@ type Message = {
     role: 'user' | 'assistant';
     content: string;
     quotedText?: string;
+    toolSteps?: string[];
+    durationMs?: number;
+    sentAt?: number;
 };
+
+function formatTimestamp(ts: number): string {
+    const d = new Date(ts);
+    const h = d.getHours();
+    const m = d.getMinutes().toString().padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    const year = d.getFullYear();
+    return `${h12}:${m} ${ampm}, ${month}/${day}/${year}`;
+}
 
 type SseEvent =
     | { type: 'text'; content: string }
@@ -118,6 +168,16 @@ const AssistantAvatar = () => (
     </div>
 );
 
+
+function formatDuration(ms: number): string {
+    const totalSec = Math.round(ms / 1000);
+    if (totalSec < 60) return `${totalSec} second${totalSec !== 1 ? 's' : ''}`;
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    const minPart = `${mins} min${mins !== 1 ? 's' : ''}`;
+    return secs > 0 ? `${minPart} ${secs} second${secs !== 1 ? 's' : ''}` : minPart;
+}
+
 const FloatingAssistant: React.FC = () => {
     const [pageId, setPageId] = useState<string | undefined>(getPageId);
     const {
@@ -135,9 +195,44 @@ const FloatingAssistant: React.FC = () => {
     } = useFloatingAssistant();
 
     const [feedbackGiven, setFeedbackGiven] = useState<Record<number, 'up' | 'down'>>({});
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [editDraft, setEditDraft] = useState('');
+
+    // Clear feedback state when conversation is reset
+    const handleReset = () => {
+        resetConversation();
+        setInput('');
+        setFeedbackGiven({});
+        setEditingIndex(null);
+        setEditDraft('');
+    };
+
+    const startEdit = (idx: number, content: string, quotedText?: string) => {
+        setEditingIndex(idx);
+        setEditDraft(quotedText ? content.replace(`"${quotedText}"\n\n`, '') : content);
+    };
+
+    const cancelEdit = () => {
+        setEditingIndex(null);
+        setEditDraft('');
+    };
+
+    const submitEdit = async (idx: number) => {
+        const draft = editDraft.trim();
+        if (!draft) return;
+        const original = messages[idx];
+        const fullText = original.quotedText ? `"${original.quotedText}"\n\n${draft}` : draft;
+        const updated: Message = { ...original, content: fullText, sentAt: Date.now() };
+        // Keep messages up to and including this user message, drop everything after
+        const trimmed = [...messages.slice(0, idx), updated];
+        setEditingIndex(null);
+        setEditDraft('');
+        await sendMessage(fullText, trimmed);
+    };
     const [isClosing, setIsClosing] = useState(false);
     const [streamingText, setStreamingText] = useState('');
     const [toolStatus, setToolStatus] = useState('');
+    const [toolSteps, setToolSteps] = useState<string[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showScrollDown, setShowScrollDown] = useState(false);
@@ -145,25 +240,40 @@ const FloatingAssistant: React.FC = () => {
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const abortRef = useRef<AbortController | null>(null);
+    const userScrolledRef = useRef(false);
 
     useEffect(() => {
         setIsOpen(true);
     }, []);
 
+    // Scroll to bottom when messages change, unless user has scrolled up
     useEffect(() => {
-        if (!showScrollDown && messagesEndRef.current) {
+        if (!userScrolledRef.current && messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [messages, streamingText]);
+
+    // Scroll to bottom when panel opens and there are messages
+    useEffect(() => {
+        if (isOpen && messages.length > 0) {
+            userScrolledRef.current = false;
+            setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 50);
+        }
+    }, [isOpen]);
 
     const handleMessagesScroll = () => {
         const el = messagesContainerRef.current;
         if (!el) return;
         const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-        setShowScrollDown(distFromBottom > 80);
+        const isAtBottom = distFromBottom <= 80;
+        setShowScrollDown(!isAtBottom);
+        userScrolledRef.current = !isAtBottom;
     };
 
     const scrollToBottom = () => {
+        userScrolledRef.current = false;
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         setShowScrollDown(false);
     };
@@ -216,24 +326,37 @@ const FloatingAssistant: React.FC = () => {
             });
     }, [pageId, suggestedQuestionsLoaded, messages.length, setSuggestedQuestions, setSuggestedQuestionsLoaded]);
 
-    const sendMessage = async (text?: string) => {
+    const stopGeneration = () => {
+        abortRef.current?.abort();
+    };
+
+    const sendMessage = async (text?: string, historyOverride?: Message[]) => {
         const messageText = (text ?? input).trim();
         if (!messageText || isLoading) return;
 
-        const fullText = quotedText ? `"${quotedText}"\n\n${messageText}` : messageText;
-        const userMessage: Message = { role: 'user', content: fullText, quotedText: quotedText ?? undefined };
-        setQuotedText(null);
-        const updatedMessages = [...messages, userMessage];
+        let updatedMessages: Message[];
+        if (historyOverride) {
+            updatedMessages = historyOverride;
+        } else {
+            const fullText = quotedText ? `"${quotedText}"\n\n${messageText}` : messageText;
+            const userMessage: Message = { role: 'user', content: fullText, quotedText: quotedText ?? undefined, sentAt: Date.now() };
+            setQuotedText(null);
+            updatedMessages = [...messages, userMessage];
+        }
 
         setMessages(updatedMessages);
         if (!text) setInput('');
         setIsLoading(true);
         setStreamingText('');
         setToolStatus('');
+        setToolSteps([]);
+        userScrolledRef.current = false;
 
         abortRef.current = new AbortController();
+        const startTime = Date.now();
 
         let accumulated = '';
+        let collectedSteps: string[] = [];
         let finalContent = 'Sorry, something went wrong. Please try again.';
         let aborted = false;
 
@@ -258,7 +381,9 @@ const FloatingAssistant: React.FC = () => {
                     accumulated += event.content;
                     setStreamingText(accumulated);
                 } else if (event.type === 'tool-start') {
-                    setToolStatus(`${event.toolName}`);
+                    collectedSteps = [...collectedSteps, event.toolName];
+                    setToolStatus(event.toolName);
+                    setToolSteps([...collectedSteps]);
                 } else if (event.type === 'tool-result') {
                     setToolStatus('');
                 } else if (event.type === 'done') {
@@ -272,13 +397,20 @@ const FloatingAssistant: React.FC = () => {
         } catch (err: unknown) {
             if (err instanceof Error && err.name === 'AbortError') {
                 aborted = true;
+                finalContent = accumulated || '';
             }
         } finally {
-            if (!aborted) {
-                setMessages([...updatedMessages, { role: 'assistant', content: finalContent }]);
+            if (!aborted || accumulated) {
+                setMessages([...updatedMessages, {
+                    role: 'assistant',
+                    content: finalContent,
+                    toolSteps: collectedSteps.length > 0 ? collectedSteps : undefined,
+                    durationMs: Date.now() - startTime,
+                }]);
             }
             setStreamingText('');
             setToolStatus('');
+            setToolSteps([]);
             setIsLoading(false);
             abortRef.current = null;
         }
@@ -297,9 +429,9 @@ const FloatingAssistant: React.FC = () => {
         const code = decodeURIComponent(btn.dataset.code ?? '');
         navigator.clipboard.writeText(code).catch(() => {});
         const prev = btn.innerHTML;
-        btn.textContent = 'Copied!';
-        btn.style.color = '#0d9f6e';
-        setTimeout(() => { btn.innerHTML = prev; btn.style.color = ''; }, 1500);
+        // Show green checkmark instead of "Copied!" text
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9f6e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+        setTimeout(() => { btn.innerHTML = prev; }, 1500);
     };
 
     const handleClose = () => {
@@ -314,7 +446,7 @@ const FloatingAssistant: React.FC = () => {
 
     return (
         <>
-            {/* Chip trigger */}
+            {/* Chip trigger — bottom right */}
             {!isOpen && !isClosing && (
                 <div className="floating-assistant__chip-ring">
                     <button
@@ -364,20 +496,19 @@ const FloatingAssistant: React.FC = () => {
                                         Where do we start?
                                     </div>
                                     {suggestedQuestions.length > 0 && (
-                                    <div className="floating-assistant__suggestions">
-                                        {suggestedQuestions.slice(0, 5).map((q, i) => (
-                                            <button
-                                                key={i}
-                                                className="floating-assistant__suggestion"
-                                                onClick={() => sendMessage(q)}
-                                            >
-                                                {q}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                                        <div className="floating-assistant__suggestions">
+                                            {suggestedQuestions.slice(0, 5).map((q, i) => (
+                                                <button
+                                                    key={i}
+                                                    className="floating-assistant__suggestion"
+                                                    onClick={() => sendMessage(q)}
+                                                >
+                                                    {q}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                                
                             </div>
                         ) : (
                             <>
@@ -387,22 +518,89 @@ const FloatingAssistant: React.FC = () => {
                                         className={`floating-assistant__message floating-assistant__message--${msg.role}`}
                                     >
                                         {msg.role === 'user' ? (
-                                            <div className="floating-assistant__user-bubble">
-                                                {msg.quotedText && (
-                                                    <div className="floating-assistant__quote-chip floating-assistant__quote-chip--message">
-                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                            <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
-                                                        </svg>
-                                                        <span className="floating-assistant__quote-text">{msg.quotedText}</span>
-                                                    </div>
-                                                )}
-                                                {msg.quotedText
-                                                    ? msg.content.replace(`"${msg.quotedText}"\n\n`, '')
-                                                    : msg.content}
+                                            <div className="floating-assistant__user-message-wrap">
+                                                <div
+                                                    className={`floating-assistant__user-bubble${editingIndex === i ? ' floating-assistant__user-bubble--editing' : ''}`}
+                                                    contentEditable={editingIndex === i}
+                                                    suppressContentEditableWarning
+                                                    ref={el => {
+                                                        if (editingIndex === i && el && document.activeElement !== el) {
+                                                            el.focus();
+                                                            const range = document.createRange();
+                                                            range.selectNodeContents(el);
+                                                            range.collapse(false);
+                                                            window.getSelection()?.removeAllRanges();
+                                                            window.getSelection()?.addRange(range);
+                                                        }
+                                                    }}
+                                                    onInput={e => setEditDraft((e.target as HTMLDivElement).innerText)}
+                                                    onKeyDown={e => {
+                                                        if (editingIndex !== i) return;
+                                                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitEdit(i); }
+                                                        if (e.key === 'Escape') cancelEdit();
+                                                    }}
+                                                >
+                                                    {msg.quotedText && (
+                                                        <div className="floating-assistant__quote-chip floating-assistant__quote-chip--message">
+                                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+                                                            </svg>
+                                                            <span className="floating-assistant__quote-text">{msg.quotedText}</span>
+                                                        </div>
+                                                    )}
+                                                    {msg.quotedText
+                                                        ? msg.content.replace(`"${msg.quotedText}"\n\n`, '')
+                                                        : msg.content}
+                                                </div>
+                                                <div className="floating-assistant__user-meta">
+                                                    {msg.sentAt && editingIndex !== i && (
+                                                        <span className="floating-assistant__timestamp">{formatTimestamp(msg.sentAt)}</span>
+                                                    )}
+                                                    {editingIndex === i ? (
+                                                        <>
+                                                            <button className="floating-assistant__edit-cancel" onClick={cancelEdit}>Cancel</button>
+                                                            <button className="floating-assistant__edit-submit" onClick={() => submitEdit(i)}>Send</button>
+                                                        </>
+                                                    ) : (
+                                                        i === messages.map((m, idx) => m.role === 'user' ? idx : -1).filter(x => x >= 0).pop() && !isLoading && (
+                                                            <button
+                                                                className="floating-assistant__edit-btn"
+                                                                onClick={() => startEdit(i, msg.content, msg.quotedText)}
+                                                                aria-label="Edit message"
+                                                            >
+                                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                                </svg>
+                                                            </button>
+                                                        )
+                                                    )}
+                                                </div>
                                             </div>
                                         ) : (
                                             <div className="floating-assistant__assistant-block">
                                                 <AssistantAvatar />
+                                                {/* Generation summary — collapsible with duration + steps */}
+                                                {msg.durationMs !== undefined && (
+                                                    <details className="floating-assistant__gen-summary">
+                                                        <summary className="floating-assistant__gen-summary-header">
+                                                            <span>Work done in {formatDuration(msg.durationMs)}</span>
+                                                            <svg className="floating-assistant__gen-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polyline points="6 9 12 15 18 9"/>
+                                                            </svg>
+                                                        </summary>
+                                                        {msg.toolSteps && msg.toolSteps.length > 0 && (
+                                                            <div className="floating-assistant__gen-steps">
+                                                                {msg.toolSteps.map((step: string, si: number) => (
+                                                                    <div key={si} className="floating-assistant__gen-step">
+                                                                        <span className="floating-assistant__tool-step-dot floating-assistant__tool-step-dot--done" />
+                                                                        <span>{step}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </details>
+                                                )}
                                                 <div
                                                     className="floating-assistant__message-text floating-assistant__message-text--md"
                                                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
@@ -425,13 +623,21 @@ const FloatingAssistant: React.FC = () => {
                                                         </span>
                                                     ) : (
                                                         <>
-                                                            <button className="floating-assistant__feedback-btn" aria-label="Thumbs down" onClick={() => setFeedbackGiven(prev => ({ ...prev, [i]: 'down' }))}>
+                                                            <button
+                                                                className="floating-assistant__feedback-btn"
+                                                                aria-label="Thumbs down"
+                                                                onClick={() => setFeedbackGiven(prev => ({ ...prev, [i]: 'down' }))}
+                                                            >
                                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                     <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/>
                                                                     <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
                                                                 </svg>
                                                             </button>
-                                                            <button className="floating-assistant__feedback-btn" aria-label="Thumbs up" onClick={() => setFeedbackGiven(prev => ({ ...prev, [i]: 'up' }))}>
+                                                            <button
+                                                                className="floating-assistant__feedback-btn"
+                                                                aria-label="Thumbs up"
+                                                                onClick={() => setFeedbackGiven(prev => ({ ...prev, [i]: 'up' }))}
+                                                            >
                                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                     <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"/>
                                                                     <path d="M7 22H4.72A2.31 2.31 0 0 1 2.4 20v-7a2.31 2.31 0 0 1 2.33-2H7"/>
@@ -444,16 +650,13 @@ const FloatingAssistant: React.FC = () => {
                                         )}
                                     </div>
                                 ))}
+
+                                {/* Streaming / loading state */}
                                 {isLoading && (
                                     <div className="floating-assistant__message floating-assistant__message--assistant">
                                         <div className="floating-assistant__assistant-block">
                                             <AssistantAvatar />
-                                            {streamingText ? (
-                                                <div
-                                                    className="floating-assistant__message-text floating-assistant__message-text--md"
-                                                    dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
-                                                />
-                                            ) : toolStatus ? (
+                                            {toolStatus && (
                                                 <div className="floating-assistant__tool-steps">
                                                     <div className="floating-assistant__tool-header">
                                                         <span className="floating-assistant__tool-header-text">{toolStatus}</span>
@@ -461,16 +664,24 @@ const FloatingAssistant: React.FC = () => {
                                                             <polyline points="18 15 12 9 6 15"/>
                                                         </svg>
                                                     </div>
-                                                    <div className="floating-assistant__tool-step floating-assistant__tool-step--active">
-                                                        <span className="floating-assistant__tool-step-dot floating-assistant__tool-step-dot--yellow" />
-                                                        <span className="floating-assistant__tool-step-name">{toolStatus}</span>
-                                                    </div>
+                                                    {toolSteps.map((step, si) => (
+                                                        <div key={si} className="floating-assistant__tool-step floating-assistant__tool-step--active">
+                                                            <span className="floating-assistant__tool-step-dot floating-assistant__tool-step-dot--yellow" />
+                                                            <span className="floating-assistant__tool-step-name">{step}</span>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ) : (
+                                            )}
+                                            {streamingText ? (
+                                                <div
+                                                    className="floating-assistant__message-text floating-assistant__message-text--md"
+                                                    dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
+                                                />
+                                            ) : !toolStatus ? (
                                                 <div className="floating-assistant__typing">
                                                     <span /><span /><span />
                                                 </div>
-                                            )}
+                                            ) : null}
                                         </div>
                                     </div>
                                 )}
@@ -524,26 +735,40 @@ const FloatingAssistant: React.FC = () => {
                             <div className="floating-assistant__input-buttons">
                                 <button
                                     className="floating-assistant__reset-input"
-                                    onClick={() => { resetConversation(); setInput(''); }}
+                                    onClick={handleReset}
                                     title="Reset conversation"
                                     aria-label="Reset conversation"
                                 >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    {/* Trash / new chat icon */}
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                                         <path d="M3 3v5h5" />
                                     </svg>
                                 </button>
-                                <button
-                                    className="floating-assistant__send"
-                                    onClick={() => sendMessage()}
-                                    disabled={!input.trim() || isLoading}
-                                    aria-label="Send"
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="12" y1="19" x2="12" y2="5" />
-                                        <polyline points="5 12 12 5 19 12" />
-                                    </svg>
-                                </button>
+                                {isLoading ? (
+                                    <button
+                                        className="floating-assistant__stop"
+                                        onClick={stopGeneration}
+                                        aria-label="Stop generation"
+                                        title="Stop"
+                                    >
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                            <rect x="4" y="4" width="16" height="16" rx="2"/>
+                                        </svg>
+                                    </button>
+                                ) : (
+                                    <button
+                                        className="floating-assistant__send"
+                                        onClick={() => sendMessage()}
+                                        disabled={!input.trim()}
+                                        aria-label="Send"
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <line x1="12" y1="19" x2="12" y2="5" />
+                                            <polyline points="5 12 12 5 19 12" />
+                                        </svg>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
