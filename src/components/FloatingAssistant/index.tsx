@@ -6,7 +6,7 @@ import DOMPurify from 'dompurify';
 const hljs = require('highlight.js');
 import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import { isPublicSite } from '../../utils/app-utils';
-import { Alert, Button, Icon, IconID, IconSize, IconColor, LoadingIndicator } from '@thoughtspot/radiant-react';
+import { Alert, Icon, IconID, IconSize, IconColor, LoadingIndicator } from '@thoughtspot/radiant-react';
 import '@thoughtspot/radiant-react/styles';
 import './index.scss';
 
@@ -104,7 +104,6 @@ type SseEvent =
     | { type: 'error'; content: string };
 
 const CLOUDFLARE_URL = 'https://spotter-code-popular-questions.thoughtspot-485.workers.dev';
-// const CLOUDFLARE_URL = 'http://localhost:8000';
 
 async function* parseSseStream(response: Response): AsyncGenerator<SseEvent> {
     const reader = response.body!.getReader();
@@ -310,7 +309,6 @@ const FloatingAssistant: React.FC = () => {
     };
     const [isClosing, setIsClosing] = useState(false);
     const [streamingText, setStreamingText] = useState('');
-    const [toolStatus, setToolStatus] = useState('');
     const [toolSteps, setToolSteps] = useState<string[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -440,7 +438,6 @@ const FloatingAssistant: React.FC = () => {
         if (!text) setInput('');
         setIsLoading(true);
         setStreamingText('');
-        setToolStatus('');
         setToolSteps([]);
         setLoadingPhase(0);
         userScrolledRef.current = false;
@@ -483,10 +480,8 @@ const FloatingAssistant: React.FC = () => {
                     setStreamingText(accumulated);
                 } else if (event.type === 'tool-start') {
                     collectedSteps = [...collectedSteps, event.toolName];
-                    setToolStatus(event.toolName);
                     setToolSteps([...collectedSteps]);
                 } else if (event.type === 'tool-result') {
-                    setToolStatus('');
                 } else if (event.type === 'done') {
                     break;
                 } else if (event.type === 'error') {
@@ -510,7 +505,6 @@ const FloatingAssistant: React.FC = () => {
                 }]);
             }
             setStreamingText('');
-            setToolStatus('');
             if (loadingPhaseTimer.current) clearTimeout(loadingPhaseTimer.current);
             setLoadingPhase(0);
             setToolSteps([]);
