@@ -240,8 +240,12 @@ const FloatingAssistant: React.FC = () => {
     };
 
     const handleReset = () => {
+        abortRef.current?.abort();
         resetConversation();
         setInput('');
+        setIsLoading(false);
+        setStreamingText('');
+        setToolSteps([]);
         setFeedbackGiven({});
         setEditingIndex(null);
         setEditDraft('');
@@ -655,22 +659,9 @@ const FloatingAssistant: React.FC = () => {
                                             <div className="floating-assistant__assistant-block">
                                                 <AssistantAvatar />
                                                 {msg.durationMs !== undefined && (
-                                                    <details className="floating-assistant__gen-summary">
-                                                        <summary className="floating-assistant__gen-summary-header">
-                                                            <span>Work done in {formatDuration(msg.durationMs)}</span>
-                                                            <Icon id={IconID.CHEVRON_DOWN} size={IconSize.XSMALL} color={IconColor.CONTENT_TERTIARY} />
-                                                        </summary>
-                                                        {msg.toolSteps && msg.toolSteps.length > 0 && (
-                                                            <div className="floating-assistant__gen-steps">
-                                                                {msg.toolSteps.map((step: string, si: number) => (
-                                                                    <div key={si} className="floating-assistant__gen-step">
-                                                                        <span className="floating-assistant__tool-step-dot floating-assistant__tool-step-dot--done" />
-                                                                        <span>{step}</span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </details>
+                                                    <div className="floating-assistant__gen-summary-header">
+                                                        <span>Work done in {formatDuration(msg.durationMs)}</span>
+                                                    </div>
                                                 )}
                                                 <div
                                                     className="floating-assistant__message-text floating-assistant__message-text--md"
@@ -682,14 +673,14 @@ const FloatingAssistant: React.FC = () => {
                                                         aria-label="Thumbs down"
                                                         onClick={() => giveFeedback(i, 'down')}
                                                     >
-                                                        <Icon id={feedbackGiven[i] === 'down' ? IconID.THUMB_DOWN_UNDO : IconID.THUMB_DOWN} size={IconSize.SMALL} color={feedbackGiven[i] === 'down' ? IconColor.BLUE : IconColor.GRAY} />
+                                                        <Icon id={feedbackGiven[i] === 'down' ? IconID.THUMB_DOWN_UNDO : IconID.THUMB_DOWN} size={IconSize.SMALL} color={feedbackGiven[i] === 'down' ? IconColor.DARKGRAY : IconColor.CONTENT_TERTIARY} />
                                                     </button>
                                                     <button
                                                         className={`fa-feedback-btn${feedbackGiven[i] === 'up' ? ' fa-feedback-btn--active' : ''}`}
                                                         aria-label="Thumbs up"
                                                         onClick={() => giveFeedback(i, 'up')}
                                                     >
-                                                        <Icon id={feedbackGiven[i] === 'up' ? IconID.THUMB_UP_UNDO : IconID.THUMB_UP} size={IconSize.SMALL} color={feedbackGiven[i] === 'up' ? IconColor.BLUE : IconColor.GRAY} />
+                                                        <Icon id={feedbackGiven[i] === 'up' ? IconID.THUMB_UP_UNDO : IconID.THUMB_UP} size={IconSize.SMALL} color={feedbackGiven[i] === 'up' ? IconColor.DARKGRAY : IconColor.CONTENT_TERTIARY} />
                                                     </button>
                                                     <MsgCopyButton text={msg.content} />
                                                 </div>
