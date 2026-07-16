@@ -2,8 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const hljs = require('highlight.js');
+import hljs from 'highlight.js';
 import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import { isPublicSite } from '../../utils/app-utils';
 import { Alert, Icon, IconID, IconSize, IconColor, LoadingIndicator } from '@thoughtspot/radiant-react';
@@ -682,7 +681,7 @@ const FloatingAssistant: React.FC = () => {
                                                                 <Icon id={IconID.CROSS} size={IconSize.SMALL} color={IconColor.GRAY} />
                                                             </button>
                                                             <button className="floating-assistant__edit-action-btn floating-assistant__edit-action-btn--send" onClick={() => submitEdit(i)} aria-label="Send edit">
-                                                                <Icon id={IconID.PAPER_PLANE} size={IconSize.SMALL} color={IconColor.WHITE} />
+                                                                <Icon id={IconID.ARROW_UP} size={IconSize.SMALL} color={IconColor.WHITE} />
                                                             </button>
                                                         </>
                                                     ) : (

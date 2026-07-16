@@ -1,5 +1,4 @@
 const React = require('react');
-const { FloatingAssistantProvider } = require('./src/contexts/FloatingAssistantContext');
 
 // Inline only the Radiant icon symbols used by FloatingAssistant.
 // This avoids Radiant's runtime XHR fetch for the full 454KB sprite,
@@ -14,9 +13,3 @@ exports.onRenderBody = ({ setPreBodyComponents }) => {
         }),
     ]);
 };
-
-exports.wrapRootElement = ({ element }) => (
-    <FloatingAssistantProvider>
-        {element}
-    </FloatingAssistantProvider>
-);

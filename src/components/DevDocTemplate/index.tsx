@@ -666,9 +666,9 @@ if (isVersionedIframe) {
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
-                <Analytics />
-                {shouldShowAnnouncementBanner() && (
-                    <AnnouncementBanner
+            <Analytics />
+            {shouldShowAnnouncementBanner() && (
+                <AnnouncementBanner
                     enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
                     variant="release"
                     dismissKey={bannerDismissKey}
