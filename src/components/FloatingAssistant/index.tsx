@@ -842,6 +842,7 @@ const FloatingAssistant: React.FC = () => {
                                     className="floating-assistant__reset-input"
                                     onClick={handleReset}
                                     aria-label="Reset conversation"
+                                    disabled={messages.length === 0 && !input.trim() && !quotedText}
                                 >
                                     <Icon id={IconID.RESET} size={IconSize.SMALL} color={IconColor.TEXT_COLOR} />
                                 </button>
@@ -860,7 +861,7 @@ const FloatingAssistant: React.FC = () => {
                                         disabled={!input.trim()}
                                         aria-label="Send"
                                     >
-                                        <Icon id={IconID.PAPER_PLANE} size={IconSize.SMALL} color={IconColor.WHITE} />
+                                        <Icon id={IconID.ARROW_UP} size={IconSize.SMALL} color={IconColor.WHITE} />
                                     </button>
                                 )}
                             </div>
