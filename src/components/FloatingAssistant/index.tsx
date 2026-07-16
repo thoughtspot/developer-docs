@@ -269,6 +269,40 @@ const FloatingAssistant: React.FC = () => {
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editDraft, setEditDraft] = useState('');
 
+    const MIN_WIDTH = 300;
+    const MAX_WIDTH = 720;
+    const [panelWidth, setPanelWidth] = useState(360);
+    const isResizing = useRef(false);
+    const resizeStartX = useRef(0);
+    const resizeStartWidth = useRef(0);
+
+    const onResizeMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        isResizing.current = true;
+        resizeStartX.current = e.clientX;
+        resizeStartWidth.current = panelWidth;
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+
+        const onMouseMove = (ev: MouseEvent) => {
+            if (!isResizing.current) return;
+            const delta = resizeStartX.current - ev.clientX;
+            const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, resizeStartWidth.current + delta));
+            setPanelWidth(next);
+        };
+
+        const onMouseUp = () => {
+            isResizing.current = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    };
+
     // Clear feedback state when conversation is reset
     const handleReset = () => {
         resetConversation();
@@ -571,7 +605,11 @@ const FloatingAssistant: React.FC = () => {
 
             {/* Panel */}
             {(isOpen || isClosing) && (
-                <div className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}${isEmbedded ? ' floating-assistant__panel--embedded' : ''}`}>
+                <div
+                    className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}${isEmbedded ? ' floating-assistant__panel--embedded' : ''}`}
+                    style={{ width: panelWidth }}
+                >
+                    <div className="floating-assistant__resize-handle" onMouseDown={onResizeMouseDown} />
                     {/* Header */}
                     <div className="floating-assistant__header">
                         <span className="floating-assistant__title">SpotterCode</span>
