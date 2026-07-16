@@ -269,7 +269,7 @@ const FloatingAssistant: React.FC = () => {
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editDraft, setEditDraft] = useState('');
 
-    const MIN_WIDTH = 300;
+    const MIN_WIDTH = 360;
     const MAX_WIDTH = 720;
     const [panelWidth, setPanelWidth] = useState(360);
     const isResizing = useRef(false);
