@@ -759,7 +759,7 @@ const FloatingAssistant: React.FC = () => {
                                         onClick={stopGeneration}
                                         aria-label="Stop generation"
                                     >
-                                        <Icon id={IconID.STOP_SQUARE} size={IconSize.SMALL} color={IconColor.WHITE} />
+                                        <Icon id={IconID.STOP_SQUARE} size={IconSize.SMALL} color={IconColor.CONTENT_TERTIARY} />
                                     </button>
                                 ) : (
                                     <button
