@@ -102,10 +102,22 @@ export const FloatingAssistantProvider: React.FC<{ children: ReactNode }> = ({ c
     );
 };
 
+const NOOP = () => {};
+
+const FLOATING_ASSISTANT_DEFAULT: FloatingAssistantContextType = {
+    isOpen: false,
+    setIsOpen: NOOP,
+    messages: [],
+    setMessages: NOOP,
+    suggestedQuestions: [],
+    setSuggestedQuestions: NOOP,
+    suggestedQuestionsLoaded: false,
+    setSuggestedQuestionsLoaded: NOOP,
+    resetConversation: NOOP,
+    quotedText: null,
+    setQuotedText: NOOP,
+};
+
 export const useFloatingAssistant = () => {
-    const context = useContext(FloatingAssistantContext);
-    if (!context) {
-        throw new Error('useFloatingAssistant must be used within FloatingAssistantProvider');
-    }
-    return context;
+    return useContext(FloatingAssistantContext) ?? FLOATING_ASSISTANT_DEFAULT;
 };
