@@ -673,14 +673,14 @@ const FloatingAssistant: React.FC = () => {
                                                         aria-label="Thumbs down"
                                                         onClick={() => giveFeedback(i, 'down')}
                                                     >
-                                                        <Icon id={feedbackGiven[i] === 'down' ? IconID.THUMB_DOWN_UNDO : IconID.THUMB_DOWN} size={IconSize.SMALL} color={feedbackGiven[i] === 'down' ? IconColor.DARKGRAY : IconColor.CONTENT_TERTIARY} />
+                                                        <Icon id={feedbackGiven[i] === 'down' ? IconID.THUMB_DOWN_UNDO : IconID.THUMB_DOWN} size={IconSize.SMALL} color={feedbackGiven[i] === 'down' ? IconColor.BLUE : IconColor.GRAY} />
                                                     </button>
                                                     <button
                                                         className={`fa-feedback-btn${feedbackGiven[i] === 'up' ? ' fa-feedback-btn--active' : ''}`}
                                                         aria-label="Thumbs up"
                                                         onClick={() => giveFeedback(i, 'up')}
                                                     >
-                                                        <Icon id={feedbackGiven[i] === 'up' ? IconID.THUMB_UP_UNDO : IconID.THUMB_UP} size={IconSize.SMALL} color={feedbackGiven[i] === 'up' ? IconColor.DARKGRAY : IconColor.CONTENT_TERTIARY} />
+                                                        <Icon id={feedbackGiven[i] === 'up' ? IconID.THUMB_UP_UNDO : IconID.THUMB_UP} size={IconSize.SMALL} color={feedbackGiven[i] === 'up' ? IconColor.BLUE : IconColor.GRAY} />
                                                     </button>
                                                     <MsgCopyButton text={msg.content} />
                                                 </div>
