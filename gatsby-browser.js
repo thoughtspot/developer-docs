@@ -1,24 +1,29 @@
-const React = require('react');
-const ReactDOM = require('react-dom/client');
-const { FloatingAssistantProvider } = require('./src/contexts/FloatingAssistantContext');
-const FloatingAssistant = require('./src/components/FloatingAssistant').default;
-
-// Mount FloatingAssistant as a standalone React root — completely outside Gatsby's
-// component tree. This avoids any hydration mismatch because Gatsby never SSRs
-// this subtree, so there's no server/client tree structure to reconcile.
 exports.onClientEntry = () => {
-    const container = document.createElement('div');
-    container.id = 'floating-assistant-root';
-    document.body.appendChild(container);
+    // Dynamic imports so @thoughtspot/radiant-react (which reads `window` at
+    // module-load time) is never evaluated during Gatsby's SSR build.
+    Promise.all([
+        import('./src/contexts/FloatingAssistantContext'),
+        import('./src/components/FloatingAssistant'),
+        import('react'),
+        import('react-dom/client'),
+    ]).then(([
+        { FloatingAssistantProvider },
+        { default: FloatingAssistant },
+        React,
+        ReactDOM,
+    ]) => {
+        const container = document.createElement('div');
+        container.id = 'floating-assistant-root';
+        document.body.appendChild(container);
 
-    const root = ReactDOM.createRoot(container);
-    root.render(
-        React.createElement(
-            FloatingAssistantProvider,
-            null,
-            React.createElement(FloatingAssistant)
-        )
-    );
+        ReactDOM.createRoot(container).render(
+            React.createElement(
+                FloatingAssistantProvider,
+                null,
+                React.createElement(FloatingAssistant)
+            )
+        );
+    });
 };
 
 exports.onRouteUpdate = ({ location }) => {
