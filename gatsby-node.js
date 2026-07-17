@@ -118,7 +118,7 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
 
             // Write static .md file — serves at /docs<docPath>.md for agent crawlers
             if (markdownBody) {
-                const header = `# ${title ?? pageid}\n\nSource: ${SITE_URL}${docPath}\n\n`;
+                const header = `# ${title ?? pageid}\n\n> For the complete documentation index, see [llms.txt](${SITE_URL}/llms.txt)\n\nSource: ${SITE_URL}${docPath}\n\n`;
                 fsExtra.outputFileSync(
                     `${__dirname}/public${docPath}.md`,
                     header + markdownBody,
@@ -143,7 +143,7 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
             for (const pageId of section.pageIds) {
                 const data = pageData[pageId];
                 if (data) {
-                    sectionLines.push(`- [${data.title}](${SITE_URL}${data.docPath})`);
+                    sectionLines.push(`- [${data.title}](${SITE_URL}${data.docPath}.md)`);
                     coveredIds.add(pageId);
                 }
             }
@@ -161,7 +161,7 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
         );
         if (uncovered.length) {
             lines.push('## Additional documentation');
-            uncovered.forEach(([, { title, docPath }]) => lines.push(`- [${title}](${SITE_URL}${docPath})`));
+            uncovered.forEach(([, { title, docPath }]) => lines.push(`- [${title}](${SITE_URL}${docPath}.md)`));
             lines.push('');
         }
 
