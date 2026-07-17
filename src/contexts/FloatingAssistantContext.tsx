@@ -41,6 +41,9 @@ export const FloatingAssistantProvider: React.FC<{ children: ReactNode }> = ({ c
     // sessionStorage is restored in useEffect after hydration.
     const [isOpen, setIsOpenState] = useState(false);
     const [messages, setMessagesState] = useState<Message[]>([]);
+    const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+    const [suggestedQuestionsLoaded, setSuggestedQuestionsLoaded] = useState(false);
+    const [quotedText, setQuotedText] = useState<string | null>(null);
 
     useEffect(() => {
         if (isPageReload()) {
@@ -58,9 +61,6 @@ export const FloatingAssistantProvider: React.FC<{ children: ReactNode }> = ({ c
             // ignore
         }
     }, []);
-    const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
-    const [suggestedQuestionsLoaded, setSuggestedQuestionsLoaded] = useState(false);
-    const [quotedText, setQuotedText] = useState<string | null>(null);
 
     const saveState = useCallback((open: boolean, msgs: Message[]) => {
         if (typeof window === 'undefined') return;
