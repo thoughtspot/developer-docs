@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 
 type Message = {
     role: 'user' | 'assistant';
@@ -36,25 +36,28 @@ const isPageReload = (): boolean => {
     }
 };
 
-const getInitialState = () => {
-    if (typeof window === 'undefined') return { isOpen: false, messages: [] };
-    if (isPageReload()) {
-        sessionStorage.removeItem(STORAGE_KEY);
-        return { isOpen: false, messages: [] };
-    }
-    try {
-        const saved = sessionStorage.getItem(STORAGE_KEY);
-        if (saved) return JSON.parse(saved);
-    } catch {
-        // ignore
-    }
-    return { isOpen: false, messages: [] };
-};
-
 export const FloatingAssistantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const initialState = getInitialState();
-    const [isOpen, setIsOpenState] = useState(initialState.isOpen);
-    const [messages, setMessagesState] = useState<Message[]>(initialState.messages);
+    // Always start with SSR-safe defaults to avoid hydration mismatch.
+    // sessionStorage is restored in useEffect after hydration.
+    const [isOpen, setIsOpenState] = useState(false);
+    const [messages, setMessagesState] = useState<Message[]>([]);
+
+    useEffect(() => {
+        if (isPageReload()) {
+            sessionStorage.removeItem(STORAGE_KEY);
+            return;
+        }
+        try {
+            const saved = sessionStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const { isOpen: savedOpen, messages: savedMsgs } = JSON.parse(saved);
+                if (savedOpen) setIsOpenState(savedOpen);
+                if (savedMsgs?.length) setMessagesState(savedMsgs);
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
     const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
     const [suggestedQuestionsLoaded, setSuggestedQuestionsLoaded] = useState(false);
     const [quotedText, setQuotedText] = useState<string | null>(null);

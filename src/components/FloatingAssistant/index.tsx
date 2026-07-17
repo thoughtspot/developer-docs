@@ -166,9 +166,7 @@ const AssistantAvatar = () => (
 
 const FloatingAssistant: React.FC = () => {
     const [pageId, setPageId] = useState<string | undefined>(getPageId);
-    const [isEmbedded, setIsEmbedded] = useState(() =>
-        typeof window !== 'undefined' && !isPublicSite(window.location.search)
-    );
+    const [isEmbedded, setIsEmbedded] = useState(false);
     const {
         isOpen,
         setIsOpen,
@@ -351,6 +349,7 @@ const FloatingAssistant: React.FC = () => {
     }, [setSuggestedQuestionsLoaded]);
 
     useEffect(() => {
+        setIsEmbedded(!isPublicSite(window.location.search));
         const handler = (e: CustomEvent<{ location: Location }>) => {
             setIsEmbedded(!isPublicSite(e.detail.location.search));
         };
