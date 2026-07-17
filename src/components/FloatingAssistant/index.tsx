@@ -59,7 +59,17 @@ const FloatingAssistant: React.FC = () => {
     const [questionsKey, setQuestionsKey] = useState(0);
     const loadingPhaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [showFeedbackToast, setShowFeedbackToast] = useState(false);
+    const [toastExiting, setToastExiting] = useState(false);
     const feedbackToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const toastExitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const hideToast = () => {
+        setToastExiting(true);
+        toastExitTimer.current = setTimeout(() => {
+            setShowFeedbackToast(false);
+            setToastExiting(false);
+        }, 250);
+    };
 
     const giveFeedback = (idx: number, type: 'up' | 'down') => {
         const isUnfill = feedbackGiven[idx] === type;
@@ -71,12 +81,16 @@ const FloatingAssistant: React.FC = () => {
         });
         if (!isUnfill) {
             if (feedbackToastTimer.current) clearTimeout(feedbackToastTimer.current);
+            if (toastExitTimer.current) clearTimeout(toastExitTimer.current);
+            setToastExiting(false);
             setShowFeedbackToast(true);
-            feedbackToastTimer.current = setTimeout(() => setShowFeedbackToast(false), 2500);
+            feedbackToastTimer.current = setTimeout(hideToast, 2500);
         }
     };
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editDraft, setEditDraft] = useState('');
+    const editDivRef = useRef<HTMLDivElement | null>(null);
+    const editOriginalRef = useRef<string>('');
 
     const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT_WIDTH);
     const isResizing = useRef(false);
@@ -125,12 +139,17 @@ const FloatingAssistant: React.FC = () => {
     const [editQuotedText, setEditQuotedText] = useState<string | undefined>(undefined);
 
     const startEdit = (idx: number, content: string, quotedText?: string) => {
+        const draft = quotedText ? content.replace(`"${quotedText}"\n\n`, '') : content;
+        editOriginalRef.current = draft;
         setEditingIndex(idx);
         setEditQuotedText(quotedText);
-        setEditDraft(quotedText ? content.replace(`"${quotedText}"\n\n`, '') : content);
+        setEditDraft(draft);
     };
 
     const cancelEdit = () => {
+        if (editDivRef.current) {
+            editDivRef.current.innerText = editOriginalRef.current;
+        }
         setEditingIndex(null);
         setEditDraft('');
         setEditQuotedText(undefined);
@@ -446,13 +465,16 @@ const FloatingAssistant: React.FC = () => {
                                                     contentEditable={editingIndex === i}
                                                     suppressContentEditableWarning
                                                     ref={el => {
-                                                        if (editingIndex === i && el && document.activeElement !== el) {
-                                                            el.focus();
-                                                            const range = document.createRange();
-                                                            range.selectNodeContents(el);
-                                                            range.collapse(false);
-                                                            window.getSelection()?.removeAllRanges();
-                                                            window.getSelection()?.addRange(range);
+                                                        if (editingIndex === i) {
+                                                            editDivRef.current = el;
+                                                            if (el && document.activeElement !== el) {
+                                                                el.focus();
+                                                                const range = document.createRange();
+                                                                range.selectNodeContents(el);
+                                                                range.collapse(false);
+                                                                window.getSelection()?.removeAllRanges();
+                                                                window.getSelection()?.addRange(range);
+                                                            }
                                                         }
                                                     }}
                                                     onInput={e => setEditDraft((e.target as HTMLDivElement).innerText)}
@@ -460,6 +482,19 @@ const FloatingAssistant: React.FC = () => {
                                                         if (editingIndex !== i) return;
                                                         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitEdit(i); }
                                                         if (e.key === 'Escape') cancelEdit();
+                                                    }}
+                                                    onPaste={e => {
+                                                        e.preventDefault();
+                                                        const text = e.clipboardData.getData('text/plain');
+                                                        const sel = window.getSelection();
+                                                        if (!sel || !sel.rangeCount) return;
+                                                        const range = sel.getRangeAt(0);
+                                                        range.deleteContents();
+                                                        range.insertNode(document.createTextNode(text));
+                                                        range.collapse(false);
+                                                        sel.removeAllRanges();
+                                                        sel.addRange(range);
+                                                        setEditDraft((e.currentTarget as HTMLDivElement).innerText);
                                                     }}
                                                 >
                                                     {editingIndex === i ? (
@@ -638,13 +673,13 @@ const FloatingAssistant: React.FC = () => {
                     </div>
                 </div>
             )}
-            {typeof document !== 'undefined' && createPortal(
+            {typeof document !== 'undefined' && showFeedbackToast && createPortal(
                 <Alert.Toast
                     message="Thank you for submitting feedback."
-                    isVisible={showFeedbackToast}
+                    isVisible={!toastExiting}
                     autoHide={false}
                     showCloseButton
-                    onClose={() => setShowFeedbackToast(false)}
+                    onClose={hideToast}
                 />,
                 document.body
             )}
