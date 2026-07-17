@@ -171,7 +171,10 @@ module.exports = {
             label: 'MCP Server',
             pageIds: [
                 'mcp-integration', 'connect-mcp-server-to-clients',
-                'custom-chatbot-integration-mcp', 'mcp-tool-reference', 'mcp-server-changelog',
+                'custom-chatbot-integration-mcp', 'mcp-tool-reference',
+                'mcp-tool-reference-spotter3', 'mcp-tool-reference-legacy',
+                'mcp-server-spotter3', 'mcp-server-legacy',
+                'mcp-server-changelog',
             ],
         },
         {
