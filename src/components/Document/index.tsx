@@ -7,7 +7,6 @@ import LinkableHeader from '../LinkableHeader';
 import WasThisHelpful from '../WasThisHelpful';
 import CopyPageDropdown from '../CopyPageDropdown';
 import { HOME_PAGE_ID } from '../../configs/doc-configs';
-import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import parse, { HTMLReactParserOptions, domToReact, attributesToProps } from 'html-react-parser';
 
 const Document = (props: {
@@ -19,7 +18,9 @@ const Document = (props: {
     breadcrumsData: any;
     markdownBody?: string;
 }) => {
-    const { setIsOpen, setQuotedText } = useFloatingAssistant();
+    const openAssistantWithQuote = (text: string) => {
+        window.dispatchEvent(new CustomEvent('spotter-code-ask', { detail: { quotedText: text } }));
+    };
     const [selectionPos, setSelectionPos] = useState<{ top: number; left: number } | null>(null);
     const selectionRef = useRef<string>('');
 
@@ -188,8 +189,7 @@ const Document = (props: {
                     onClick={() => {
                         const selected = selectionRef.current;
                         setSelectionPos(null);
-                        setQuotedText(selected);
-                        setIsOpen(true);
+                        openAssistantWithQuote(selected);
                     }}
                 >
                     Ask SpotterCode
