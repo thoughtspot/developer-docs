@@ -106,11 +106,15 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
             const pageid = node.pageAttributes?.pageid;
             const title = node.document?.title;
             const markdownBody = node.fields?.markdownBody;
+            const relativePath = node.parent?.relativePath || '';
+            // Auto-generated per-symbol SDK reference pages (scripts/Converter/index.ts) —
+            // represented in llms.txt by the single curated VisualEmbedSdk entry, not individually.
+            const isTypedocGenerated = relativePath.startsWith('generated/typedoc/');
 
             if (!pageid || pageid.startsWith('nav-')) return;
 
             const docPath = getDocLinkFromEdge({ node }); // e.g. '/getting-started' or '/tutorials/category/page'
-            if (title) pageData[pageid] = { title, docPath };
+            if (title) pageData[pageid] = { title, docPath, isTypedocGenerated };
 
             // Write static .md file — serves at /docs<docPath>.md for agent crawlers
             if (markdownBody) {
@@ -150,8 +154,11 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
             }
         }
 
-        // Add pages that exist as Asciidoc nodes but aren't in any LLMS_SECTIONS entry
-        const uncovered = Object.entries(pageData).filter(([id]) => !coveredIds.has(id));
+        // Add pages that exist as Asciidoc nodes but aren't in any LLMS_SECTIONS entry.
+        // Excludes typedoc-generated pages — those are covered by the curated VisualEmbedSdk entry.
+        const uncovered = Object.entries(pageData).filter(
+            ([id, data]) => !coveredIds.has(id) && !data.isTypedocGenerated,
+        );
         if (uncovered.length) {
             lines.push('## Additional documentation');
             uncovered.forEach(([, { title, docPath }]) => lines.push(`- [${title}](${SITE_URL}${docPath})`));
