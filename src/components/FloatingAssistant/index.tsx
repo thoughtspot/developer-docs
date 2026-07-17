@@ -1,146 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
-import hljs from 'highlight.js';
 import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import { isPublicSite } from '../../utils/app-utils';
 import { Alert, Icon, IconID, IconSize, IconColor, LoadingIndicator } from '@thoughtspot/radiant-react';
 import '@thoughtspot/radiant-react/styles';
 import './index.scss';
 import SpotterCodeLogo from './SpotterCodeLogo';
-import { CLOUDFLARE_URL, LOADING_PHASES, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH, PANEL_DEFAULT_WIDTH } from './constants';
-import { Message, SseEvent } from './types';
-
-function renderMarkdown(text: string): string {
-    const cleaned = text
-        .replace(/【[\d]+】/g, '')
-        .replace(/【[\d†]+†?[^】]*】/g, '')
-        .replace(/\s*\bcite\w*/gi, '')
-        .replace(/\s*\[cite[^\]]*\]/gi, '');
-    const html = marked.parse(cleaned, { async: false }) as string;
-    const sanitized = DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] });
-    const withLinks = sanitized.replace(
-        /<a\s+href="([^"]+)"[^>]*>([^<]+)<\/a>/g,
-        (_, href, label) => {
-            const trimmed = label.trim();
-            let display = trimmed;
-            if (/^https?:\/\//i.test(trimmed)) {
-                try {
-                    const url = new URL(trimmed);
-                    const slug = url.pathname.split('/').filter(Boolean).pop() || url.hostname;
-                    display = slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-                } catch {
-                    display = trimmed;
-                }
-            }
-            return `<a href="${href}" target="_blank" rel="noopener noreferrer">${display}</a>`;
-        },
-    );
-    return withLinks.replace(
-        /<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g,
-        (_, attrs, code) => {
-            const langMatch = attrs.match(/class="language-([^"]+)"/);
-            const lang = langMatch?.[1];
-            const decoded = code.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
-            let highlighted = decoded;
-            let detectedLang = lang;
-            try {
-                if (lang && hljs.getLanguage(lang)) {
-                    highlighted = hljs.highlight(decoded, { language: lang }).value;
-                } else {
-                    const result = hljs.highlightAuto(decoded);
-                    highlighted = result.value;
-                    detectedLang = result.language;
-                }
-            } catch { /* fallback to plain */ }
-            const labelMap: Record<string, string> = {
-                javascript: 'JavaScript', typescript: 'TypeScript', python: 'Python',
-                bash: 'Bash', shell: 'Shell', sh: 'Shell', sql: 'SQL', json: 'JSON',
-                html: 'HTML', css: 'CSS', scss: 'SCSS', java: 'Java', go: 'Go',
-                ruby: 'Ruby', rust: 'Rust', cpp: 'C++', c: 'C', csharp: 'C#',
-                yaml: 'YAML', xml: 'XML', markdown: 'Markdown', curl: 'cURL',
-            };
-            const label = detectedLang ? (labelMap[detectedLang.toLowerCase()] || detectedLang.toUpperCase()) : 'Code';
-            return `<div class="fa-code-block">` +
-                `<div class="fa-code-header">` +
-                `<span class="fa-code-lang">${label}</span>` +
-                `<button class="fa-code-copy" data-code="${encodeURIComponent(decoded)}">Copy</button>` +
-                `</div>` +
-                `<pre><code${attrs}>${highlighted}</code></pre>` +
-                `</div>`;
-        },
-    );
-}
-
-function formatTimestamp(ts: number): string {
-    const d = new Date(ts);
-    const h = d.getHours();
-    const m = d.getMinutes().toString().padStart(2, '0');
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    const month = (d.getMonth() + 1).toString().padStart(2, '0');
-    const day = d.getDate().toString().padStart(2, '0');
-    const year = d.getFullYear();
-    return `${h12}:${m} ${ampm}, ${month}/${day}/${year}`;
-}
-
-function formatDuration(ms: number): string {
-    const totalSec = Math.round(ms / 1000);
-    if (totalSec < 60) return `${totalSec} second${totalSec !== 1 ? 's' : ''}`;
-    const mins = Math.floor(totalSec / 60);
-    const secs = totalSec % 60;
-    const minPart = `${mins} min${mins !== 1 ? 's' : ''}`;
-    return secs > 0 ? `${minPart} ${secs} second${secs !== 1 ? 's' : ''}` : minPart;
-}
-
-async function* parseSseStream(response: Response): AsyncGenerator<SseEvent> {
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() ?? '';
-
-        for (const part of parts) {
-            const line = part.trim();
-            if (!line.startsWith('data:')) continue;
-            const json = line.slice('data:'.length).trim();
-            try {
-                yield JSON.parse(json) as SseEvent;
-            } catch {
-                // skip malformed lines
-            }
-        }
-    }
-}
-
-const getPageId = () => {
-    if (typeof window === 'undefined') return undefined;
-    return new URLSearchParams(window.location.search).get('pageid')
-        || window.location.pathname.split('/').filter(Boolean).pop()
-        || undefined;
-};
+import { LOADING_PHASES, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH, PANEL_DEFAULT_WIDTH, LOADING_PHASE_DELAYS, ERROR_MESSAGES } from './constants';
+import { Message } from './types';
+import { renderMarkdown, formatTimestamp, formatDuration, getPageId, stripMarkdown } from './helpers';
+import { fetchSuggestedQuestions, streamAgentResponse } from './api';
 
 const SparkleIcon = () => (
     <Icon id={IconID.AI_SPARKLE_SELECTED} size={IconSize.XLARGE} color={IconColor.BLUE} />
 );
-
-const stripMarkdown = (md: string) =>
-    md.replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*\n?/, '').replace(/```$/, '').trim())
-      .replace(/`([^`]+)`/g, '$1')
-      .replace(/#{1,6}\s+/g, '')
-      .replace(/\*\*([^*]+)\*\*/g, '$1')
-      .replace(/\*([^*]+)\*/g, '$1')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/^[-*+]\s+/gm, '')
-      .replace(/^\d+\.\s+/gm, '')
-      .trim();
 
 const MsgCopyButton = ({ text }: { text: string }) => {
     const [copied, setCopied] = React.useState(false);
@@ -369,10 +242,9 @@ const FloatingAssistant: React.FC = () => {
     useEffect(() => {
         if (suggestedQuestionsLoaded || messages.length > 0) return;
         const id = pageId || 'home';
-        fetch(`${CLOUDFLARE_URL}/suggested-questions?pageId=${encodeURIComponent(id)}`)
-            .then((res) => res.json())
-            .then((data: { questions?: string[] }) => {
-                setSuggestedQuestions(data.questions ?? []);
+        fetchSuggestedQuestions(id)
+            .then((questions) => {
+                setSuggestedQuestions(questions);
                 setSuggestedQuestionsLoaded(true);
                 setQuestionsKey((k: number) => k + 1);
             })
@@ -407,10 +279,9 @@ const FloatingAssistant: React.FC = () => {
         setLoadingPhase(0);
         userScrolledRef.current = false;
 
-        const phaseDelays = [0, 1200, 2800, 4800, 7000];
-        phaseDelays.forEach((delay, idx) => {
+        LOADING_PHASE_DELAYS.forEach((delay, idx) => {
             const t = setTimeout(() => setLoadingPhase(idx), delay);
-            if (idx === phaseDelays.length - 1) loadingPhaseTimer.current = t;
+            if (idx === LOADING_PHASE_DELAYS.length - 1) loadingPhaseTimer.current = t;
         });
 
         abortRef.current = new AbortController();
@@ -418,26 +289,11 @@ const FloatingAssistant: React.FC = () => {
 
         let accumulated = '';
         let collectedSteps: string[] = [];
-        let finalContent = 'Sorry, something went wrong. Please try again.';
+        let finalContent: string = ERROR_MESSAGES.DEFAULT;
         let aborted = false;
 
         try {
-            const response = await fetch(`${CLOUDFLARE_URL}/agent/embed-assistant`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                signal: abortRef.current.signal,
-                body: JSON.stringify({
-                    playgroundType: 'ask-docs',
-                    messages: updatedMessages,
-                    pageId,
-                }),
-            });
-
-            if (!response.ok || !response.body) {
-                throw new Error(`API error: ${response.status}`);
-            }
-
-            for await (const event of parseSseStream(response)) {
+            for await (const event of streamAgentResponse(updatedMessages, pageId, abortRef.current.signal)) {
                 if (event.type === 'text') {
                     accumulated += event.content;
                     setStreamingText(accumulated);
@@ -451,7 +307,7 @@ const FloatingAssistant: React.FC = () => {
                 }
             }
 
-            finalContent = accumulated || 'No response received.';
+            finalContent = accumulated || ERROR_MESSAGES.NO_RESPONSE;
         } catch (err: unknown) {
             if (err instanceof Error && err.name === 'AbortError') {
                 aborted = true;

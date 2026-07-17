@@ -1,13 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-
-type Message = {
-    role: 'user' | 'assistant';
-    content: string;
-    quotedText?: string;
-    toolSteps?: string[];
-    durationMs?: number;
-    sentAt?: number;
-};
+import { Message } from '../components/FloatingAssistant/types';
+import { STORAGE_KEY, isPageReload } from '../components/FloatingAssistant/constants';
 
 type FloatingAssistantContextType = {
     isOpen: boolean;
@@ -23,18 +16,7 @@ type FloatingAssistantContextType = {
     setQuotedText: (text: string | null) => void;
 };
 
-const STORAGE_KEY = 'floatingAssistantState';
-
 const FloatingAssistantContext = createContext<FloatingAssistantContextType | undefined>(undefined);
-
-const isPageReload = (): boolean => {
-    try {
-        const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-        return nav?.type === 'reload';
-    } catch {
-        return false;
-    }
-};
 
 export const FloatingAssistantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     // Always start with SSR-safe defaults to avoid hydration mismatch.
