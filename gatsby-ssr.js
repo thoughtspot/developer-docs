@@ -1,4 +1,10 @@
 const React = require('react');
+const { FloatingAssistantProvider } = require('./src/contexts/FloatingAssistantContext');
+
+// wrapRootElement must mirror gatsby-browser.js so SSR and client trees match.
+exports.wrapRootElement = ({ element }) => (
+    React.createElement(FloatingAssistantProvider, null, element)
+);
 
 // Inline only the Radiant icon symbols used by FloatingAssistant.
 // This avoids Radiant's runtime XHR fetch for the full 454KB sprite,
