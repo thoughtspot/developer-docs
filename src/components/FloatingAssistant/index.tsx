@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
 import { isPublicSite } from '../../utils/app-utils';
+import { CUSTOM_PAGE_ID } from '../../configs/doc-configs';
 import { Alert, Icon, IconID, IconSize, IconColor, LoadingIndicator } from '@thoughtspot/radiant-react';
 import '@thoughtspot/radiant-react/styles';
 import './index.scss';
@@ -222,6 +223,13 @@ const FloatingAssistant: React.FC = () => {
     }, [isOpen]);
 
     useEffect(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    }, [input]);
+
+    useEffect(() => {
         if (quotedText) {
             setTimeout(() => inputRef.current?.focus(), 100);
         }
@@ -390,6 +398,8 @@ const FloatingAssistant: React.FC = () => {
 
     const isLandingPage = messages.length === 0 && !isLoading;
 
+    if (pageId === CUSTOM_PAGE_ID.API_PLAYGROUND) return null;
+
     return (
         <>
             {!isOpen && !isClosing && (
@@ -532,7 +542,7 @@ const FloatingAssistant: React.FC = () => {
                                                             <button className="floating-assistant__edit-action-btn" onClick={cancelEdit} aria-label="Cancel edit">
                                                                 <Icon id={IconID.CROSS} size={IconSize.SMALL} color={IconColor.GRAY} />
                                                             </button>
-                                                            <button className="floating-assistant__edit-action-btn floating-assistant__edit-action-btn--send" onClick={() => submitEdit(i)} aria-label="Send edit">
+                                                            <button className="floating-assistant__edit-action-btn floating-assistant__edit-action-btn--send" onClick={() => submitEdit(i)} aria-label="Send edit" disabled={editDraft === editOriginalRef.current}>
                                                                 <Icon id={IconID.ARROW_UP} size={IconSize.SMALL} color={IconColor.WHITE} />
                                                             </button>
                                                         </>
@@ -632,6 +642,9 @@ const FloatingAssistant: React.FC = () => {
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
+                                onFocus={() => {
+                                    if (editingIndex !== null) cancelEdit();
+                                }}
                                 rows={1}
                             />
                             <div className="floating-assistant__input-buttons">
