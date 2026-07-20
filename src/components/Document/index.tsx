@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import './index.scss';
 import { customizeDocContent, addScrollListener } from './helper';
 import Footer from '../Footer';
@@ -18,6 +18,57 @@ const Document = (props: {
     breadcrumsData: any;
     markdownBody?: string;
 }) => {
+    const openAssistantWithQuote = (text: string) => {
+        window.dispatchEvent(new CustomEvent('spotter-code-ask', { detail: { quotedText: text } }));
+    };
+    const [selectionPos, setSelectionPos] = useState<{ top: number; left: number } | null>(null);
+    const selectionRef = useRef<string>('');
+
+    useEffect(() => {
+        let mouseDownX = 0;
+        let mouseDownY = 0;
+
+        const handleMouseUp = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.selection-cta-button')) return;
+
+            // If mouse didn't move (plain click, not a drag-select), don't re-show
+            const moved = Math.abs(e.clientX - mouseDownX) > 3 || Math.abs(e.clientY - mouseDownY) > 3;
+            if (!moved) return;
+
+            const selection = window.getSelection();
+            const text = selection?.toString().trim() || '';
+            if (!text) {
+                setSelectionPos(null);
+                return;
+            }
+            const range = selection!.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            selectionRef.current = text;
+            const HEADER_HEIGHT = 108; // main header (60) + secondary header (48)
+            const BUTTON_HEIGHT = 36;
+            const rawTop = rect.top - BUTTON_HEIGHT - 6;
+            setSelectionPos({
+                top: Math.max(HEADER_HEIGHT + 4, rawTop),
+                left: Math.max(8, e.clientX - 80),
+            });
+        };
+
+        const handleMouseDown = (e: MouseEvent) => {
+            mouseDownX = e.clientX;
+            mouseDownY = e.clientY;
+            if ((e.target as HTMLElement).closest('.selection-cta-button')) return;
+            setSelectionPos(null);
+        };
+
+        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('mousedown', handleMouseDown);
+        return () => {
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mousedown', handleMouseDown);
+        };
+    }, []);
+
     useEffect(() => {
         customizeDocContent();
     }, [props.docContent]);
@@ -131,6 +182,19 @@ const Document = (props: {
             className="documentWrapper"
             style={!props.shouldShowRightNav ? { width: '100%' } : undefined}
         >
+            {selectionPos && (
+                <button
+                    className="selection-cta-button"
+                    style={{ top: selectionPos.top, left: selectionPos.left }}
+                    onClick={() => {
+                        const selected = selectionRef.current;
+                        setSelectionPos(null);
+                        openAssistantWithQuote(selected);
+                    }}
+                >
+                    Ask SpotterCode
+                </button>
+            )}
             {!isHomePage && (
                 <Breadcrums
                     breadcrumsData={props.breadcrumsData}

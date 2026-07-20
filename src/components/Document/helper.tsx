@@ -79,7 +79,20 @@ export const customizeDocContent = () => {
         langSpan.innerText = rawLang;
         header.appendChild(langSpan);
 
-        /* Copy button (right) */
+        /* Right group: CTA + copy button */
+        const rightGroup = document.createElement('div');
+        rightGroup.classList.add('code-block-header-actions');
+
+        const ctaLink = document.createElement('button');
+        ctaLink.classList.add('ctaButton');
+        ctaLink.innerText = 'Ask SpotterCode';
+        ctaLink.addEventListener('click', () => {
+            const code = copySource.innerText.trim();
+            window.dispatchEvent(new CustomEvent('spotter-code-ask', { detail: { quotedText: code } }));
+        });
+        rightGroup.appendChild(ctaLink);
+
+        /* Copy button — icon style */
         const buttonElement = document.createElement('button');
         buttonElement.setAttribute('class', 'copyButton');
         buttonElement.setAttribute('aria-label', t('CODE_COPY_BTN_HOVER_TEXT'));
@@ -90,7 +103,9 @@ export const customizeDocContent = () => {
         buttonElement.appendChild(imageElement);
 
         enableCopyToClipboard(buttonElement, copySource);
-        header.appendChild(buttonElement);
+        rightGroup.appendChild(buttonElement);
+
+        header.appendChild(rightGroup);
 
         /* ── Wrap pre in code-block-wrapper ── */
         const wrapper = document.createElement('div');

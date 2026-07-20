@@ -1,0 +1,842 @@
+@import '../../assets/styles/variables.scss';
+@import '../../assets/styles/highlight.scss';
+
+// ── Chip trigger ─────────────────────────────────────────────────────────────
+.floating-assistant__chip {
+    position: fixed;
+    top: 120px;
+    right: 24px;
+    z-index: 1001;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    background: #fff;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    background-clip: padding-box;
+    box-shadow: 0 4px 16px 0 rgba(25, 35, 49, 0.10);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    outline: 2px solid transparent;
+
+    // Gradient border using outline + pseudo-element on a wrapper isn't needed —
+    // use a parent wrapper div for the gradient ring
+    &:hover {
+        box-shadow: 0 8px 24px 0 rgba(25, 35, 49, 0.16);
+    }
+
+    svg {
+        width: 26px;
+        height: 26px;
+        position: relative;
+        z-index: 1;
+        color: #2770ef;
+    }
+}
+
+// Gradient ring wrapper rendered around the chip button — top right
+.floating-assistant__chip-ring {
+    position: fixed;
+    top: 120px;
+    right: 24px;
+    width: 61px;
+    height: 61px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8C62F5, #48D1E0, #2770EF);
+    padding: 1px;
+    z-index: 1001;
+    box-shadow: 0 4px 16px 0 rgba(25, 35, 49, 0.10);
+    cursor: pointer;
+
+    .floating-assistant__chip {
+        position: static;
+        width: 100%;
+        height: 100%;
+        box-shadow: none;
+        top: unset;
+        right: unset;
+        z-index: unset;
+    }
+}
+
+// ── Panel ─────────────────────────────────────────────────────────────────────
+.floating-assistant__resize-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 5px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 10;
+
+    &:hover, &:active {
+        background: rgba(39, 112, 239, 0.15);
+    }
+}
+
+.floating-assistant__panel {
+    position: fixed;
+    top: 108px;
+    right: 0;
+    bottom: 0;
+    width: 360px;
+    background:
+        linear-gradient(180deg, transparent 0%, #fff 35%),
+        linear-gradient(90deg,
+            rgba(255, 120, 160, 0.3) 0%,
+            rgba(160, 100, 255, 0.2) 60%,
+            rgba(100, 160, 255, 0.3) 90%
+        ),
+        #fff;
+    border-left: 1px solid #e3e6eb;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1002;
+    box-shadow: -4px 0 24px 0 rgba(25, 35, 49, 0.10);
+    animation: fa-slide-in 0.25s ease-out forwards;
+
+    &.closing {
+        animation: fa-slide-out 0.25s ease-in forwards;
+    }
+
+    &--conversation {
+        background: #fff;
+    }
+
+    &--embedded {
+        top: 44px; // secondary nav height only — top header is hidden in embedded mode
+    }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+.floating-assistant__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 52px;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    border-bottom: 1px solid #EAEDF2;
+}
+
+.floating-assistant__close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.15s;
+
+    &:hover { background: #f1f4f8; }
+}
+
+.floating-assistant__title {
+    font-size: 16px;
+    font-weight: 600;
+    font-family: 'Optimo-Plain', sans-serif;
+    color: #1d232f;
+}
+
+
+// ── Messages area ─────────────────────────────────────────────────────────────
+.floating-assistant__messages {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px 16px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: transparent;
+
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-track { background: transparent; }
+    &::-webkit-scrollbar-thumb {
+        background: #d0d4db;
+        border-radius: 2px;
+        &:hover { background: #a5acb9; }
+    }
+    scrollbar-width: thin;
+    scrollbar-color: #d0d4db transparent;
+}
+
+// ── Messages fade + scroll-to-bottom ─────────────────────────────────────────
+.floating-assistant__messages-fade {
+    position: relative;
+    flex-shrink: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 10;
+
+    &::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 48px;
+        background: linear-gradient(to top, #fff 0%, transparent 100%);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    &--visible::before {
+        opacity: 1;
+    }
+}
+
+.floating-assistant__scroll-down {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: all;
+    animation: fa-fade-in 0.15s ease-out forwards;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: 1px solid #e0e4ea;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    @media (prefers-color-scheme: dark) {
+        background: #2a3142;
+        border-color: #3a4255;
+    }
+}
+
+@keyframes fa-fade-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+// ── Landing ───────────────────────────────────────────────────────────────────
+.floating-assistant__landing {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 32px 16px 16px;
+}
+
+.floating-assistant__landing-intro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
+    gap: 24px;
+    flex: 1;
+}
+
+.floating-assistant__landing-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+
+    svg {
+        width: 48px;
+        height: 48px;
+    }
+}
+
+.floating-assistant__landing-title {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: 'Optimo-Plain', sans-serif;
+    color: #1d232f;
+    line-height: 1.3;
+    letter-spacing: -0.4px;
+    text-align: center;
+
+    span { color: #2770ef; }
+}
+
+.floating-assistant__suggestions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    padding-bottom: 8px;
+}
+
+.floating-assistant__suggestion {
+    background: #F6F8FA;
+    border: 1px solid #EAEDF2;
+    border-radius: 40px;
+    color: #1d232f;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: 'Optimo-Plain', sans-serif;
+    line-height: 1.4;
+    padding: 14px;
+    text-align: left;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+    animation: fa-suggestion-in 0.3s ease-out both;
+    opacity: 0;
+
+    &:hover { background: #eef1f5; }
+}
+
+@keyframes fa-suggestion-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+// ── Conversation messages ─────────────────────────────────────────────────────
+.floating-assistant__message {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+// User message wrapper
+.floating-assistant__user-message-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+// Timestamp + edit row
+.floating-assistant__user-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.floating-assistant__timestamp {
+    font-size: 11px;
+    color: #a5acb9;
+    font-family: 'Optimo-Plain', sans-serif;
+}
+
+// Icon-only send/cancel buttons shown in edit mode (below the bubble)
+.floating-assistant__edit-action-btn {
+    border: none;
+    cursor: pointer;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.15s;
+    background: none;
+
+    &:hover {
+        background: #d0d4db;
+    }
+
+    &--send {
+        background: #2770ef;
+
+        &:hover {
+            background: #1a5fd4;
+        }
+    }
+}
+
+// Dismiss button on the input-row quote chip
+.floating-assistant__quote-dismiss {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    opacity: 0.6;
+    border-radius: 3px;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+    &:hover { opacity: 1; }
+}
+
+// Inline dismiss button inside the quote chip when editing
+.floating-assistant__quote-dismiss-inline {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    opacity: 0.6;
+    border-radius: 3px;
+    transition: opacity 0.15s;
+
+    &:hover {
+        opacity: 1;
+    }
+}
+
+
+// User bubble — light gray rounded box
+.floating-assistant__user-bubble {
+    background: #f1f4f8;
+    border: 1px solid #e8eaed;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #1d232f;
+    font-family: 'Optimo-Plain', sans-serif;
+    line-height: 1.5;
+    word-break: break-word;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+
+    &--editing {
+        border-color: #2770ef;
+        background: #fff;
+        cursor: text;
+        white-space: pre-wrap;
+    }
+}
+
+// Assistant block — avatar + content stacked
+.floating-assistant__assistant-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+// Small avatar
+.floating-assistant__avatar-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    svg {
+        width: 24px;
+        height: 24px;
+    }
+}
+
+// Assistant message text — flat, no bubble
+.floating-assistant__message-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #1d232f;
+    word-break: break-word;
+    font-family: 'Optimo-Plain', sans-serif;
+
+    &--md {
+        padding: 0;
+        white-space: normal;
+
+        p { margin: 0 0 8px; &:last-child { margin-bottom: 0; } }
+        ul, ol { margin: 4px 0 8px; padding-left: 20px; }
+        li { margin-bottom: 3px; }
+        strong { font-weight: 600; }
+        em { font-style: italic; }
+        a { color: #2770ef; text-decoration: underline; }
+        h1, h2, h3 { font-weight: 600; margin: 10px 0 4px; color: #1d232f; }
+        h1 { font-size: 15px; }
+        h2 { font-size: 14px; }
+        h3 { font-size: 13px; }
+
+        code {
+            font-family: $font-family-code;
+            font-size: 12px;
+            background: #f1f4f8;
+            color: #1d232f;
+            border-radius: 3px;
+            padding: 1px 5px;
+            border: 1px solid #e3e6eb;
+        }
+
+        pre {
+            background: #1d232f;
+            color: #e6edf3;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 6px 0;
+            overflow-x: auto;
+            font-size: 12px;
+            line-height: 1.5;
+
+            code { background: none; border: none; padding: 0; color: inherit; }
+        }
+    }
+}
+
+// ── Generation summary bar ────────────────────────────────────────────────────
+.floating-assistant__gen-summary-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #6b7280;
+    font-family: 'Optimo-Plain', sans-serif;
+    cursor: default;
+    user-select: none;
+}
+
+// Feedback thumbs
+.floating-assistant__feedback {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    min-height: 26px;
+}
+
+// Copy response button
+.fa-msg-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: 'Optimo-Plain', sans-serif;
+    color: #a5acb9;
+    transition: color 0.15s, background 0.15s;
+
+    &:hover {
+        color: #1d232f;
+        background: #f1f4f8;
+    }
+
+    &--copied {
+        color: #0d9f6e;
+    }
+}
+
+// Feedback thumb buttons
+.fa-feedback-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    opacity: 0.7;
+    transition: opacity 0.15s, background 0.15s;
+    &:hover { opacity: 1; background: rgba(0,0,0,0.06); }
+    &.fa-feedback-btn--active { opacity: 1; }
+}
+
+
+// ── Loading status ────────────────────────────────────────────────────────────
+.floating-assistant__loading-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.floating-assistant__loading-phase {
+    font-size: 13px;
+    color: #5f6368;
+    font-family: 'Optimo-Plain', sans-serif;
+    animation: fa-phase-in 0.4s ease-out forwards;
+}
+
+@keyframes fa-phase-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+// ── Quoted text chip above input ─────────────────────────────────────────────
+.floating-assistant__quote-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #f1f4f8;
+    border-radius: 8px;
+    padding: 6px 8px 6px 10px;
+    margin-bottom: 4px;
+    color: #5f6368;
+
+    svg { flex-shrink: 0; color: #a5acb9; }
+}
+
+.floating-assistant__quote-text {
+    flex: 1;
+    font-size: 12px;
+    color: #5f6368;
+    font-family: 'Optimo-Plain', sans-serif;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 240px;
+}
+
+
+// ── Code blocks inside assistant messages ────────────────────────────────────
+.fa-code-block {
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 6px 0;
+    background: #1d232f;
+
+    pre {
+        background: #1a1f2b;
+        color: #e6edf3;
+        padding: 12px 14px;
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 300px;
+        font-size: 12px;
+        line-height: 1.6;
+        margin: 0;
+        white-space: pre;
+        border-radius: 0 0 10px 10px;
+
+        code { background: none; border: none; padding: 0; color: inherit; font-family: $font-family-code; white-space: pre; }
+    }
+}
+
+.fa-code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: #2a3142;
+    border-radius: 10px 10px 0 0;
+}
+
+.fa-code-lang {
+    font-size: 12px;
+    font-family: 'Optimo-Plain', sans-serif;
+    color: #a5acb9;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.fa-code-copy {
+    background: none;
+    border: none;
+    color: #2770ef;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: 'Optimo-Plain', sans-serif;
+    font-weight: 500;
+    padding: 0;
+    transition: color 0.3s ease, opacity 0.3s ease;
+
+    &:hover { color: #5592f5; }
+    &--copied { color: #0d9f6e !important; }
+    &--fading { opacity: 0; }
+}
+
+// ── Input area ────────────────────────────────────────────────────────────────
+.floating-assistant__input-row {
+    padding: 8px 12px 8px;
+    flex-shrink: 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(8px);
+}
+
+.floating-assistant__input-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 10px 10px 8px;
+    cursor: text;
+    position: relative;
+
+    // Gradient border via pseudo-element
+    &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 12px;
+        padding: 1.5px;
+        background: #d0d4db;
+        -webkit-mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+        mask-composite: exclude;
+        transition: opacity 0.25s ease;
+        pointer-events: none;
+    }
+
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 12px;
+        padding: 1.5px;
+        background: linear-gradient(135deg, #8C62F5, #48D1E0, #2770EF, #8C62F5);
+        background-size: 300% 300%;
+        -webkit-mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+        mask-composite: exclude;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+        animation: fa-gradient-border 3s ease 1 forwards;
+        pointer-events: none;
+    }
+
+    &:focus-within::before { opacity: 0; }
+    &:focus-within::after  { opacity: 1; }
+}
+
+.floating-assistant__input {
+    flex: 0 1 auto;
+    resize: none;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    font-family: 'Optimo-Plain', sans-serif;
+    background: transparent;
+    color: #1d232f;
+    min-height: 28px;
+    max-height: calc(14px * 1.5 * 4); // 4 lines at font-size 14px, line-height 1.5
+    overflow-y: auto;
+    line-height: 1.5;
+
+    &::placeholder { color: #a5acb9; }
+    scrollbar-width: thin;
+    scrollbar-color: #d0d4db transparent;
+}
+
+.floating-assistant__input-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.floating-assistant__reset-input {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid #e3e6eb;
+    background: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+    &:hover { background: #f1f4f8; }
+}
+
+.floating-assistant__send {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: #2770ef;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+    &:disabled { opacity: 0.4; cursor: not-allowed; }
+    &:not(:disabled):hover { background: #1a5ccc; }
+}
+
+.floating-assistant__stop {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: #2770ef;
+    border:0px;
+    color: #fff;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+
+// ── Footer ────────────────────────────────────────────────────────────────────
+.floating-assistant__footer {
+    padding: 6px 16px 12px;
+    font-size: 11.5px;
+    color: #a5acb9;
+    text-align: center;
+    font-family: 'Optimo-Plain', sans-serif;
+
+    a {
+        color: #2770ef;
+        text-decoration: none;
+        &:hover { text-decoration: underline; }
+    }
+}
+
+// ── Animations ────────────────────────────────────────────────────────────────
+@keyframes fa-slide-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes fa-slide-out {
+    from { transform: translateX(0);    opacity: 1; }
+    to   { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes fa-gradient-border {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+
+@media (max-width: 600px) {
+    .floating-assistant__panel {
+        width: 100vw;
+    }
+}
+
+// ── Toast overrides ───────────────────────────────────────────────────────────
+.rd-alert-toast,
+[class*="alertToast"],
+[class*="toast"] {
+    text-align: center !important;
+
+    &[class*="exit"],
+    &[class*="leaving"],
+    &[class*="hide"] {
+        animation: fa-toast-out 0.25s ease-in forwards !important;
+    }
+}
+
+@keyframes fa-toast-out {
+    from { transform: translateY(0); opacity: 1; }
+    to   { transform: translateY(-12px); opacity: 0; }
+}
