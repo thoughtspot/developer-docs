@@ -67,6 +67,8 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
         'orgs-api-op', 'tse-cluster', 'external-tool-script-integration', 'pendo-integration',
         'sf-integration', 'vercel-integration', 'embed-ts', 'get-started-tse',
         'license-feature-matrix', 'faqs', 'code-samples',
+        'webhooks-overview', 'webhooks-ui', 'webhooks-comm-channel', 'webhooks-lb-schedule',
+        'webhooks-s3-integration', 'webhooks-gcs-storage', 'webhooks-lb-payload', 'webhooks-kpi',
     ],
     embedding: [
         'getting-started', 'tsembed', 'embed-liveboard', 'embed-a-viz',
@@ -103,8 +105,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
         'fetch-data-and-report-apis', 'rest-api-sdk', 'rest-api-sdk-typescript', 'rest-api-sdk-java',
         'rest-api-getstarted', 'api-auth-session', 'catalog-and-audit', 'rest-api-pagination',
         'runtime-sort', 'v1v2-comparison', 'graphql-guide',
-        'webhooks', 'webhooks-comm-channel', 'webhooks-s3-integration', 'webhooks-lb-schedule',
-        'webhooks-lb-payload', 'webhooks-kpi', 'rest-v2-changelog', 'rest-v1-changelog',
+        'webhooks-rest-api', 'rest-v2-changelog', 'rest-v1-changelog',
     ],
     'mcp-server': [
         'mcp-integration', 'connect-mcp-server-to-clients',
@@ -126,8 +127,13 @@ const SecondaryHeader = (props: {
     location: Location;
     leftNavOpen: boolean;
     setLeftNavOpen: Function;
+    // In-product (embedded) presentation has no category tabs/AskDocs — render just the
+    // mobile nav-toggle so the left sidebar stays reachable on narrow viewports.
+    minimal?: boolean;
 }) => {
-    const { activeCategory, onCategoryChange, location, leftNavOpen, setLeftNavOpen } = props;
+    const {
+        activeCategory, onCategoryChange, location, leftNavOpen, setLeftNavOpen, minimal,
+    } = props;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -154,6 +160,27 @@ const SecondaryHeader = (props: {
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, [mobileMenuOpen]);
+
+    if (minimal) {
+        return (
+            <nav className="secondary-header secondary-header--minimal" aria-label="Left navigation toggle">
+                <div className="secondary-header__inner">
+                    <div className="secondary-header__mobile-left">
+                        <button
+                            className="secondary-header__nav-toggle"
+                            onClick={() => setLeftNavOpen((o: boolean) => !o)}
+                            aria-label={leftNavOpen ? 'Close navigation' : 'Open navigation'}
+                        >
+                            {leftNavOpen
+                                ? <MdClear className="secondary-header__nav-toggle-icon" />
+                                : <GiHamburgerMenu className="secondary-header__nav-toggle-icon" />
+                            }
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        );
+    }
 
     return (
         <nav className="secondary-header" aria-label="Documentation categories">

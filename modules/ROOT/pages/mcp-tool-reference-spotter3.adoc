@@ -15,7 +15,11 @@ Send a natural language question or follow-up.
 * <<get_session_updates,get_session_updates>> +
 Poll for streamed responses.
 * <<create_dashboard,create_dashboard>> +
-Create a Liveboard from session answers.
+Create a dashboard from session answers.
+* <<list_orgs,list_orgs>> +
+List the Orgs your account can access. (OAuth connections on Org-enabled instances only)
+* <<switch_org,switch_org>> +
+Switch your active Org for the current session. (OAuth connections on Org-enabled instances only)
 * <<check_connectivity,check_connectivity>> +
 Verify that the MCP Server is reachable.
 
@@ -373,6 +377,141 @@ The following features are not supported directly. However, you can use the *Mak
 * Changing chart type or chart configuration
 * Show underlying data, view query SQL or query visualizer
 * SpotIQ analysis
+
+[#org-switching-tools]
+== Org switching tools
+Some ThoughtSpot deployments use Orgs, the isolated tenant workspaces within a single instance, each with its own users, data models, and resources. A user may have membership in one or several Orgs and want to analyze data from a different Org without ending the session, closing the connection, or re-authenticating. When connecting to the MCP Server over OAuth on an Org-enabled instance, users can discover and switch between Orgs during a session using `list_orgs` and `switch_org`.
+
+Org switching is a two-step pattern:
+
+. The agent calls `list_orgs` to retrieve the Orgs the user can currently access. The response identifies which Org is active and returns the `id` of the Orgs to switch.
+. The agent calls `switch_org` with the target `org_id`. ThoughtSpot switches the active Org for the session and confirms the new active Org ID.
+
+
+[IMPORTANT]
+====
+* The `list_orgs` and `switch_org` tools are available on xref:mcp-integration.adoc#_mcp_server_url[OAuth MCP server endpoints] only. Bearer-token MCP Server endpoints do not expose these tools.
+* The `switch_org` is a state-changing operation. Host applications that gate state-changing tools behind user confirmation will prompt the user before this tool runs.
+* `list_orgs` reflects the user's current org membership at call time, not a snapshot taken at connection. Orgs granted or revoked mid-session appear immediately.
+* Data models and resources in a target Org are not visible until after switching. Use `list_orgs` to discover Org names, then `switch_org` to enter an Org and explore its contents.
+====
+
+[#list_orgs]
+=== list_orgs
+Returns the `orgId` of the Orgs that the authenticated user has access to and flags the Org that the user is currently logged in to.
+
+Use the `list_orgs` tool to discover which Orgs you can reach before switching. The list always reflects your live access at call time, not a snapshot taken when you connected, so orgs granted or revoked since your session started are reflected immediately.
+
+==== Example call
+
+[div tabbed-code]
+--
+[source,javascript]
+----
+const orgs = await callMCPTool("list_orgs", {});
+----
+
+[source,python]
+----
+call_mcp_tool("list_orgs", {})
+----
+--
+
+==== Response
+
+[source,json]
+----
+{
+  "orgs": [
+    {
+      "id": 1001,
+      "name": "Finance",
+      "description": "Finance org — Q3 revenue models and budget data.",
+      "is_active": true
+    },
+    {
+      "id": 1002,
+      "name": "Staging",
+      "description": "Staging environment for testing new data models."
+    }
+  ]
+}
+----
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`id`|Unique identifier for the Org. Pass this value to `switch_org` to switch to this Org.
+|`name`|Display name of the Org.
+|`description`|Description of the Org.
+|`is_active`|Set to `true` if the user's current session is in this Org (the active Org). If the user's current session is not in this Org, this field is omitted from the response.
+|====
+
+[#switch_org]
+=== switch_org
+Switches the active Org for the current session.
+
+After a successful switch, all subsequent tool calls including `create_analysis_session` and data source lookups run against the Org to which the user is switched. This switch persists across all active sessions without requiring re-authentication or logging out.
+
+[IMPORTANT]
+====
+* `switch_org` is a state-changing tool (`readOnlyHint: false`). Host applications that gate state-changing tools behind user confirmation will prompt the user before this tool runs.
+* The data models that exist in a target Org cannot be viewed or accessed until after you have switched into it. Use `list_orgs` to discover available Orgs and then use `switch_org` to switch.
+* After switching Orgs, the list of data model resources will stay static unless the LLM client provides dynamic resource lists.
+* The active Org selection persists across sessions and applies across all your active sessions. It resets only on re-authentication or after prolonged inactivity.
+====
+
+==== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`org_id` +
+__Required__|The ID of the org to switch to. Obtain this value from `list_orgs`.
+|====
+
+=== Example call
+
+[div tabbed-code]
+--
+[source,javascript]
+----
+const result = await callMCPTool("switch_org", {
+    org_id: 1002 // ID of the org to switch to, obtained from list_orgs.
+});
+----
+
+[source,python]
+----
+call_mcp_tool(
+    "switch_org",
+    {"org_id": 1002},  # ID of the org to switch to, obtained from list_orgs.
+)
+----
+--
+
+=== Response
+
+[source,json]
+----
+{
+  "success": true,
+  "active_org_id": 1002
+}
+----
+
+* `success`: `true` if the org switch completed successfully. If the user lacks access to the requested Org, it is set as `false` and the active Org remains unchanged.
+* `active_org_id`: The ID of the active Org.
+
+
+=== Known limitations
+
+* Signing in currently relies on a browser cookie from your ThoughtSpot cluster. If your browser blocks third-party cookies, the connection may fail to complete.
+* Re-authentication is required in the following scenarios:
+** If connection remains idle for 14 days, the session expires and requires reauthentication.
+** If your ThoughtSpot instance is temporarily unreachable when your session token renews, you may be signed out and prompted to reconnect.
 
 [#check_connectivity]
 == check_connectivity
