@@ -115,7 +115,11 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             return isDark;
         }
         // In-product (embedded) presentation always uses light mode — product UI has no theme toggle.
-        if (!isPublicSite(location.search)) return false;
+        if (!isPublicSite(location.search)){
+            const explicitChoice = localStorage.getItem('themeMode');
+            if (explicitChoice) return explicitChoice === 'dark';
+            return false;
+        }
         /* themeMode is only written when the user explicitly clicks the toggle.
            If absent, follow OS preference fresh every load. */
         const explicitChoice = localStorage.getItem('themeMode');
