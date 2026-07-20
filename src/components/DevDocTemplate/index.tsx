@@ -251,6 +251,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                 if (explicitChoice) {
                     const isDark = explicitChoice === 'dark';
                     setDarkMode(isDark);
+                    return;
                 }
                 setDarkMode(false);
                 setKey('dark');
