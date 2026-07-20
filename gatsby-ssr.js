@@ -32,11 +32,10 @@ exports.onRenderBody = ({ setHeadComponents, setPreBodyComponents }) => {
                 { href: `${SITE_URL}/llms.txt` },
                 'LLMs.txt: Complete documentation index for AI agents',
             ),
-            React.createElement(
-              'div', {
-              key: 'radiant-sprite',
-              dangerouslySetInnerHTML: { __html: RADIANT_SPRITE },
-          }),
         ),
+        React.createElement('div', {
+            key: 'radiant-sprite',
+            dangerouslySetInnerHTML: { __html: RADIANT_SPRITE },
+        }),
     ]);
 };
