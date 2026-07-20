@@ -34,7 +34,11 @@ export function renderMarkdown(text: string): string {
         (_, attrs, code) => {
             const langMatch = attrs.match(/class="language-([^"]+)"/);
             const lang = langMatch?.[1];
-            const decoded = code.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+            const decoded = code
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&amp;/g, '&');
             let highlighted = decoded;
             let detectedLang = lang;
             try {
