@@ -106,8 +106,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     });
     const [isDarkMode, setDarkMode] = useState<boolean>(() => {
         if (typeof window === 'undefined') return false;
-        // In-product (embedded) presentation always uses light mode — product UI has no theme toggle.
-        if (!isPublicSite(location.search)) return false;
         // URL param takes highest priority (set by embedding product to pass its theme).
         const urlParams = new URLSearchParams(window.location.search);
         const darkModeParam = urlParams.get('isDarkMode');
@@ -116,6 +114,8 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             localStorage.setItem('themeMode', isDark ? 'dark' : 'light');
             return isDark;
         }
+        // In-product (embedded) presentation always uses light mode — product UI has no theme toggle.
+        if (!isPublicSite(location.search)) return false;
         /* themeMode is only written when the user explicitly clicks the toggle.
            If absent, follow OS preference fresh every load. */
         const explicitChoice = localStorage.getItem('themeMode');
