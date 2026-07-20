@@ -247,6 +247,11 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         if (isBrowser()) {
             // In-product (embedded) presentation always uses light mode.
             if (!isPublicSiteOpen) {
+                const explicitChoice = localStorage.getItem('themeMode');
+                if (explicitChoice) {
+                    const isDark = explicitChoice === 'dark';
+                    setDarkMode(isDark);
+                }
                 setDarkMode(false);
                 setKey('dark');
                 return;
