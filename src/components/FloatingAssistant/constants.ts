@@ -1,6 +1,4 @@
-export const CLOUDFLARE_URL =
-    process.env.CLOUDFLARE_URL ||
-    'https://spottercode.thoughtspot.app';
+export const CLOUDFLARE_URL = "https://spotter-code-staging.thoughtspot-485.workers.dev"; // Replace with your Cloudflare Workers URL in production
 
 export const LOADING_PHASES = [
     'Processing your request...',
