@@ -1,4 +1,6 @@
-export const CLOUDFLARE_URL = 'https://spotter-code-popular-questions.thoughtspot-485.workers.dev';
+export const CLOUDFLARE_URL =
+    process.env.CLOUDFLARE_URL ||
+    'https://spottercode.thoughtspot.app';
 
 export const LOADING_PHASES = [
     'Processing your request...',
