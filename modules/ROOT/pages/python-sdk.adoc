@@ -6,50 +6,19 @@
 :page-pageid: python-sdk
 :page-description: Use the ThoughtSpot Python SDK to integrate REST API v2.0 in Python applications. The SDK is an async-first, fully-typed client generated from the ThoughtSpot OpenAPI specification.
 
-// SOURCE: SCAL-323283, SCAL-216861
-// SOURCE: README — https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/python/README.md
-// SOURCE: __init__.py — version confirmed as 2.26.0; 28 API tag classes confirmed
-// SOURCE: PyPI — https://pypi.org/project/thoughtspot-rest-api-sdk/ version 2.26.0b1 (beta)
-// ⚠️ STATUS: BETA — Package is published as 2.26.0b1 (pre-release).
-//    Do NOT remove the BETA callout until Piyush Tayal confirms stable release on SCAL-216861.
-// TODO: [WRITER] Confirm stable PyPI version once SCAL-216861 exits Pending Verification.
-// TODO: [WRITER] Confirm the public GitHub repo URL. Source is at:
-//       https://github.com/thoughtspot/rest-api-sdk/tree/release/sdks/python — confirm if this URL is linkable in docs.
-// TODO: [WRITER] Confirm minimum Python version: README and design doc state 3.9+. Verify against PyPI classifier metadata.
-// TODO: [WRITER] Add nav entry once page is reviewed and ready to publish.
+[beta betaBackground]^Beta^
 
-ThoughtSpot provides an official Python SDK for REST API v2.0 — an async-first, fully-typed client generated directly from the ThoughtSpot OpenAPI specification. The SDK wraps every REST API v2.0 endpoint into a typed Python method and supports both asynchronous and synchronous invocation, transparent token refresh, automatic retries with exponential backoff, server-sent event (SSE) streaming, file uploads and downloads, and typed exception handling.
+The ThoughtSpot Python SDK is an async-first, fully-typed client generated from the ThoughtSpot REST API v2.0 OpenAPI specification. It wraps every endpoint into a typed Python method and supports both asynchronous and synchronous invocation, transparent token refresh, server-sent event (SSE) streaming, file uploads and downloads, and typed exception handling.
 
-[IMPORTANT]
-====
-// SOURCE: PyPI listing — version 2.26.0b1
-// TODO: [WRITER] Remove this callout once the stable version is published and confirmed by SDK team.
-The Python SDK is currently available as a *beta pre-release* (`2.26.0b1`) on PyPI. The API surface and behavior may change before the stable release. Do not use this SDK in production environments without first confirming the current stable version with your ThoughtSpot account team.
-====
-
-[NOTE]
-====
-The Python SDK for REST API v2.0 is introduced in the ThoughtSpot Cloud `jul.26.mt` release. For the latest REST API changes, see xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
-====
+The Python SDK version 2.26.0 is currently in Beta and available on link:https://pypi.org/project/thoughtspot-rest-api-sdk/[PyPI, window=_blank].
 
 == Prerequisites
+Before you begin, ensure that:
 
-// SOURCE: README — "compatible with Python 3.9 and above"
-// SOURCE: Design doc Section 3.2, N8 — "Broad Python support >= 3.9"
-// TODO: [WRITER] Cross-check the minimum Python version against published PyPI classifier metadata before publishing.
-
-* Python 3.9 or later
-* A ThoughtSpot Cloud instance with REST API v2.0 enabled
-* A valid ThoughtSpot user account with API access
-* `pip` package manager
+* Your environment is using Python 3.9 or later
+* You have a valid ThoughtSpot user account with API access
 
 == Install the SDK
-
-// SOURCE: README — "pip install thoughtspot-rest-api-sdk"
-// SOURCE: PyPI — https://pypi.org/project/thoughtspot-rest-api-sdk/
-// Package name confirmed: thoughtspot-rest-api-sdk
-// Version confirmed in __init__.py: __version__ = "2.26.0"
-// PyPI pre-release label: 2.26.0b1
 
 Install the latest release from PyPI:
 
@@ -58,74 +27,31 @@ Install the latest release from PyPI:
 pip install thoughtspot-rest-api-sdk
 ----
 
-To install the current beta pre-release explicitly:
+== Getting started
+The ThoughtSpot Python SDK uses a single configuration field for bearer-token based authentication: `Configuration.access_token`. That field supports multiple input shapes, so you can start with a fixed token for simple use cases or use an automatic provider for production-grade token refresh.
 
-[source,bash]
-----
-pip install thoughtspot-rest-api-sdk==2.26.0b1
-----
+The SDK is async-first, but authentication works consistently across both async and synchronous SDK methods. When you supply a callable or the built-in token provider, the SDK resolves authentication at request time, so token refresh applies transparently to all API calls.
 
-To install the latest pre-release version:
-
-[source,bash]
-----
-pip install --pre thoughtspot-rest-api-sdk
-----
-
-== Quick start
-
-// SOURCE: README — Usage section, first example block
-
-Create a `Configuration`, pass it to `ThoughtSpotRestApi`, and start making calls:
-
-[source,python]
-----
-import asyncio
-from thoughtspot_rest_api_sdk import Configuration, ThoughtSpotRestApi
-
-BASE_URL = "https://your-cluster.thoughtspot.cloud"  # <1>
-
-async def main():
-    config = Configuration(host=BASE_URL, access_token="YOUR_BEARER_TOKEN")  # <2>
-
-    # Pass Configuration directly; the client manages its own connection pool.
-    # To share one pool across several API classes, build an ApiClient
-    # explicitly and pass that instead — see Per-tag API classes.
-    async with ThoughtSpotRestApi(configuration=config) as client:
-
-        # Get the current user
-        user = await client.get_current_user_info()
-        print(user.name)
-
-        # Search users — pass a dict or a typed request model
-        users = await client.search_users({"record_offset": 0, "record_size": 10})
-        for u in users:
-            print(u.name)
-
-asyncio.run(main())
-----
-<1> Replace with your ThoughtSpot cluster URL.
-<2> Replace with a valid bearer token. For production use, see xref:#authentication[Authentication] for token provider options.
-
-== Authentication
-
-// SOURCE: README — Authentication section (all three modes confirmed)
-// SOURCE: Design doc Section 5.1, C11/C12/C13
-
-The SDK accepts three authentication modes, all set on `Configuration.access_token`:
+=== Supported authentication options
+The SDK supports a static token string, the built-in token provider, or your own callable token in `Configuration`.
 
 [width="100%",cols="1,2,3"]
 [options="header"]
 |====
 |Mode |When to use |How to configure
-|Static token |Short-lived scripts, testing |Pass the bearer token string directly
-|Built-in token provider |Production — password or trusted auth |Use `ThoughtSpotTokenProvider`; mints and refreshes automatically
-|Custom callable |Custom identity provider or token store |Pass a sync or async function that returns a token string
-|====
 
-=== Option 1 — Static bearer token
+|Static token |Use for short-lived scripts, testing purposes, or when your application already has a valid token. |Pass the bearer token string directly.
 
-// SOURCE: README — "1. Static token — when you already hold a bearer token"
+|Custom callable |Custom identity provider or token store when your application fetches or refreshes tokens through its own identity flow. |Pass a sync or async function that returns a token string.
+
+|Built-in token provider a|Recommended in production environments when:
+
+* You are authenticating directly against ThoughtSpot
+* You want the SDK to manage token refresh
+* You want to avoid writing your own token lifecycle code. |Use `ThoughtSpotTokenProvider`.
+
+=== Option 1: Static bearer token
+Pass a bearer token string directly in the SDK configuration.
 
 [source,python]
 ----
@@ -134,25 +60,22 @@ from thoughtspot_rest_api_sdk import Configuration, ThoughtSpotRestApi
 config = Configuration(host=BASE_URL, access_token="YOUR_BEARER_TOKEN")
 ----
 
-=== Option 2 — Built-in token provider (recommended for production)
+In this mode, the SDK sends the token in the authorization header on each request. If the token expires, you must replace it manually.
 
-// SOURCE: README — "2. Built-in provider — ThoughtSpotTokenProvider mints a token from /auth/token/full"
-// The provider caches the token and only re-mints when near expiry.
-// Collapses concurrent refreshes into a single call.
-// Supply exactly one of password (basic auth) or secret_key (trusted authentication).
-// TODO: [WRITER] Confirm the exact module import path for ThoughtSpotTokenProvider with the SDK team.
-//       README shows: from thoughtspot_rest_api_sdk import Configuration, ThoughtSpotTokenProvider
-//       __init__.py confirms ThoughtSpotTokenProvider is exported from the top-level package.
+=== Option 2: Built-in token provider
+The SDK includes a built-in `ThoughtSpotTokenProvider` for applications that require automatic token minting and refresh without writing their own token manager.
 
-`ThoughtSpotTokenProvider` mints a token from `/api/rest/2.0/auth/token/full` and refreshes it transparently. Supply exactly one of `password` (basic auth) or `secret_key` (trusted authentication):
+This provider calls ThoughtSpot's `/auth/token/full` endpoint, caches the returned token until it nears expiry, and refreshes it automatically when needed. It also avoids redundant refreshes by collapsing concurrent refresh requests into a single token mint operation.
+
+For basic authentication, specify `password`:
 
 [source,python]
 ----
 from thoughtspot_rest_api_sdk import Configuration, ThoughtSpotRestApi, ThoughtSpotTokenProvider
 
-BASE_URL = "https://your-cluster.thoughtspot.cloud"
+BASE_URL = "https://your-cluster.thoughtspot.cloud" # Replace with your ThoughtSpot cluster URL.
 
-# Basic auth — supply password
+# Basic authentication, supply password
 provider = ThoughtSpotTokenProvider(BASE_URL, "USERNAME", password="PASSWORD")
 config = Configuration(host=BASE_URL, access_token=provider)
 
@@ -161,19 +84,15 @@ async with ThoughtSpotRestApi(configuration=config) as client:
     print(user.name)
 ----
 
-For trusted authentication, supply `secret_key` instead of `password`:
+For trusted authentication, supply `secret_key`:
 
 [source,python]
 ----
 provider = ThoughtSpotTokenProvider(BASE_URL, "USERNAME", secret_key="YOUR_SECRET_KEY")
 ----
 
-=== Option 3 — Custom callable
-
-// SOURCE: README — "3. Your own callable — for any other identity source"
-// The callable is invoked on every request and may be sync or async.
-
-Pass any callable that returns a bearer token string. The callable is invoked on every request, making it the natural refresh hook:
+=== Option 3: Custom token callable
+If your application already knows how to fetch or refresh tokens, you can pass a zero-argument function instead of a token string. The function can be synchronous or asynchronous, and the SDK invokes it for each request.
 
 [source,python]
 ----
@@ -183,15 +102,38 @@ async def token_supplier() -> str:
 config = Configuration(host=BASE_URL, access_token=token_supplier)
 ----
 
-== Client patterns
+This pattern gives you full control over how tokens are sourced. For example, your callable can retrieve a token from an in-memory cache, an external identity provider, or a secrets-backed broker.
 
-// SOURCE: README — Usage section, all sub-sections confirmed
+== How to use
+Create a `Configuration`, pass it to an `ApiClient`, and make calls through `ThoughtSpotRestApi` or a focused per-tag class such as `UsersApi` or `MetadataApi`.
+
+[source,python]
+----
+import asyncio
+from thoughtspot_rest_api_sdk import Configuration, ThoughtSpotRestApi
+
+BASE_URL = "https://your-cluster.thoughtspot.cloud" # Replace with your ThoughtSpot cluster URL.
+
+async def main():
+    config = Configuration(host=BASE_URL, access_token="YOUR_BEARER_TOKEN") # Replace with a valid bearer token.
+    # Pass Configuration directly; the client manages its own connection pool.
+    # To share one pool across several API classes, build an ApiClient
+    # explicitly and pass that instead. See the Per-tag API classes section.
+    async with ThoughtSpotRestApi(configuration=config) as client:
+
+        # Get current user
+        user = await client.get_current_user_info()
+        print(user.name)
+
+        # Search with a request body (dict or the typed request model)
+        users = await client.search_users({"record_offset": 0, "record_size": 10})
+        for u in users:
+            print(u.name)
+
+asyncio.run(main())
+----
 
 === Synchronous usage
-
-// SOURCE: README — "Synchronous usage — every method has a blocking *_sync variant"
-// No event loop or await required — suitable for Django, Flask, scripts, notebooks.
-
 Every async method has a blocking `*_sync` variant. No event loop or `await` is needed:
 
 [source,python]
@@ -204,14 +146,9 @@ client = ThoughtSpotRestApi(configuration=config)
 user = client.get_current_user_info_sync()
 print(user.name)
 ----
-
 This makes the SDK usable from synchronous frameworks such as Django, Flask, scripts, and Jupyter notebooks.
 
 === Per-tag API classes
-
-// SOURCE: README — "Per-tag API classes"
-// SOURCE: __init__.py — 28 per-tag classes confirmed
-
 `ThoughtSpotRestApi` exposes every endpoint on one class. For a focused surface, instantiate a per-tag class against a shared `ApiClient`. All classes share the same connection pool and authentication:
 
 [source,python]
@@ -226,7 +163,6 @@ async with ApiClient(config) as api_client:
 
 The following per-tag classes are available:
 
-// SOURCE: __init__.py — all 28 classes confirmed from the package exports
 [width="100%",cols="1,2"]
 [options="header"]
 |====
@@ -262,9 +198,6 @@ The following per-tag classes are available:
 |====
 
 === Accessing response status and headers
-
-// SOURCE: README — "Accessing response status and headers — *_with_http_info variant"
-
 Each method has a `*_with_http_info` (and `*_sync_with_http_info`) variant that returns status code, headers, and deserialized data together:
 
 [source,python]
@@ -275,12 +208,8 @@ print(response.headers)
 print(response.data)
 ----
 
-== Streaming (SSE)
-
-// SOURCE: README — Streaming section
-// Endpoints that return SSE streams expose an additional *_stream async generator.
-
-Endpoints that return server-sent event (SSE) streams expose an additional `*_stream` async generator that yields events as they arrive:
+=== Streaming (SSE)
+Endpoints that return SSE streams expose an additional `*_stream` async generator that yields events as they arrive:
 
 [source,python]
 ----
@@ -295,13 +224,6 @@ async for event in client.send_agent_conversation_message_streaming_stream(
     if event.get("type") == "text-chunk":
         print(event.get("content", ""), end="", flush=True)
 ----
-
-// TODO: [WRITER] Confirm the full list of SSE-enabled endpoints with the SDK team.
-//       The README example shows send_agent_conversation_message_streaming_stream only.
-
-== File uploads and downloads
-
-// SOURCE: README — File uploads and File downloads sections
 
 === File uploads
 
@@ -333,17 +255,13 @@ data = await client.export_liveboard_report(
 Path("report.pdf").write_bytes(data)
 ----
 
-== Error handling
-
-// SOURCE: README — Error handling section
-// All exception classes confirmed from __init__.py exports.
-
+=== Error handling
 API errors raise typed exceptions. Catch by HTTP status code, or catch the base `ApiException`:
 
 [source,python]
 ----
 from thoughtspot_rest_api_sdk.exceptions import (
-    ApiException,                   # base class — all API errors
+    ApiException,                   # base class, all API errors
     BadRequestException,            # 400
     UnauthorizedException,          # 401
     ForbiddenException,             # 403
@@ -364,10 +282,7 @@ except ApiException as e:
 
 Every exception exposes `.status`, `.reason`, `.body`, `.data`, and `.headers`.
 
-== Retries
-
-// SOURCE: README — Retries section (all details confirmed)
-
+=== Retries
 Retries are *off by default*. Enable automatic retries with exponential backoff and jitter by setting `retries` on `Configuration`:
 
 [source,python]
@@ -387,37 +302,77 @@ config.retry_methods = {"GET", "PUT", "DELETE"}
 ----
 ====
 
-== Configuration reference
-
-// SOURCE: README — Configuration table (confirmed options)
-// TODO: [WRITER] The README table was truncated at cert_file/key_file in the tool response.
-//       Confirm the full Configuration options table — specifically proxy, timeout,
-//       connection_pool_size, and any other options — with the SDK team or by reviewing
-//       the configuration.py source file in the repo before publishing.
-
+=== Configuration reference
 [width="100%",cols="2,1,4"]
 [options="header"]
 |====
 |Option |Default |Description
-|`host` |— |Cluster URL, for example `https://your-cluster.thoughtspot.cloud`
-|`access_token` |`None` |Bearer token string, `ThoughtSpotTokenProvider`, or a callable returning a token
-|`verify_ssl` |`True` |Set to `False` for clusters with self-signed certificates
-|`ssl_ca_cert` / `ca_cert_data` |`None` |Custom CA bundle — file path or PEM string
-|`cert_file` / `key_file` |`None` |Client certificate and private key for mTLS
-|`retries` |`0` (off) |Number of retries on eligible errors; enables exponential backoff with jitter
-|`retry_methods` |All methods |Set of HTTP methods eligible for retry, for example `{"GET", "PUT", "DELETE"}`
+| `access_token` | `None` | Bearer token string, or a callable returning a token
+| `verify_ssl` | `True` | Set `False` for clusters with self-signed certificates
+| `ssl_ca_cert` / `ca_cert_data` | `None` | Custom CA bundle (file path / PEM string)
+| `cert_file` / `key_file` | `None` | Client certificate and key for mutual TLS
+| `proxy` | `None` | Proxy URL, for example, `http://127.0.0.1:8888`
+| `connection_pool_maxsize` | `100` | Maximum number of concurrent connections
+| `timeout` | `None` | Default request timeout, in seconds (float) or an `httpx.Timeout`
+| `connect_timeout` / +
+`read_timeout` / +
+`write_timeout` / +
+`pool_timeout` | `None` | Per-phase default timeouts in seconds; phases left unset default to 300s
+| `default_headers` | `{}` | Headers added to every request
+| `retries` | `None` (off) | Max retry attempts; set `> 0` to enable automatic retries
+| `retry_backoff_factor` | `0.5` | Base seconds for exponential backoff (plus jitter)
+| `retry_max_backoff` | `30` | Cap on a single retry's sleep, in seconds
+| `retry_statuses` | `{429, 502, 503, 504}` | Status codes that trigger a retry
+| `retry_methods` | all | Restrict retries to specific HTTP methods
 |====
 
-// TODO: [WRITER] Add proxy, timeout, and connection_pool_size rows once confirmed from configuration.py.
+The default request timeout is **300s** when nothing is configured. The timeout and header options are constructor arguments:
 
-== Related resources
+[source,python]
+----
+config = Configuration(
+    host=BASE_URL,
+    access_token="...",
+    connect_timeout=5,
+    read_timeout=60,
+    default_headers={"X-My-App": "demo"},
+)
+----
 
-// TODO: [WRITER] Confirm all links are live and point to the correct pages before publishing.
+A single call can still override these:
+`await client.search_users({...}, _request_timeout=30, _headers={"X-Trace": "1"})`.
+`_request_timeout` accepts a float (all phases) or a `(connect, read)` tuple of floats.
+
+[NOTE]
+====
+For clusters with self-signed certificates, disable verification:
+
+[source,python]
+----
+config = Configuration(host=BASE_URL, access_token="YOUR_BEARER_TOKEN", verify_ssl=False)
+----
+====
+
+=== Updating configuration at runtime
+
+To apply a new `Configuration` to an existing client, for example, after rotating
+credentials or changing timeouts, call `apply_configuration`:
+
+[source,python]
+----
+client.apply_configuration(Configuration(host=BASE_URL, access_token=NEW_TOKEN))
+----
+This rebuilds the underlying API client. For continuous token refresh, you do not
+need this. Set `access_token` to a callable; it is invoked
+on every request.
+
+== Documentation for API endpoints
+
+The full list of available methods is on the `ThoughtSpotRestApi` class. For more information, see link:https://github.com/thoughtspot/rest-api-sdk/blob/release/sdks/python/thoughtspot_rest_api_sdk/api/thought_spot_rest_api.py[thoughtspot_rest_api_sdk/api/thought_spot_rest_api.py, window=_blank].
+
+== Additional resources
 
 * xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
-* xref:rest-api-v2-reference.adoc[REST API v2.0 reference]
-* xref:rest-api-sdk-libraries.adoc[REST API SDK libraries]
 * link:https://pypi.org/project/thoughtspot-rest-api-sdk/[thoughtspot-rest-api-sdk on PyPI, window=_blank]
 * link:https://github.com/thoughtspot/rest-api-sdk/tree/release/sdks/python[Python SDK source on GitHub, window=_blank]
-// TODO: [WRITER] Confirm the GitHub URL above is the correct publicly linkable URL.
 * link:https://developers.thoughtspot.com/docs/rest-api-v2[REST API v2.0 Playground, window=_blank]
