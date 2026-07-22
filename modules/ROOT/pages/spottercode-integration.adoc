@@ -15,6 +15,95 @@ This guide walks you through the process of adding SpotterCode to your IDE.
 * Ensure that the latest version of Node.js is installed in your environment. This is required for building embedding code with the SDK.
 * Ensure that you have access to a ThoughtSpot instance and can view the objects and resources that you want to embed or access via the REST API.
 
+[#_authenticate_spottercode]
+== Authenticating to SpotterCode
+The SpotterCode MCP Server at `https://spottercode.thoughtspot.app/mcp` requires authentication. Authentication enables SpotterCode to make API calls to your ThoughtSpot instance on your behalf, which is required to use the `run-ts-workflow` skill for tasks such as generating secret keys, configuring CORS and CSP allowlists, and fetching object IDs.
+
+SpotterCode supports two authentication mechanisms:
+
+* OAuth and SAML authentication
+* Bearer token authentication
+
+=== OAuth and SAML authentication
+
+This is the primary authentication flow for developers connecting an MCP client interactively.
+
+. When your MCP client connects to the `https://spottercode.thoughtspot.app/mcp` endpoint for the first time, a dialog appears requesting your ThoughtSpot instance URL.
+. Enter your ThoughtSpot instance URL (for example, `https://your-org.thoughtspot.cloud`).
+. You are redirected to the ThoughtSpot SAML login flow for your instance.
+. After successful login, SpotterCode obtains a bearer token for your session and stores the session information securely.
+. Subsequent MCP requests from your IDE agent use the session token automatically and you will not be prompted to log in again until the session expires.
+
+[NOTE]
+====
+The session token is stored in a secure backend store. Contact your ThoughtSpot administrator if you encounter repeated authentication prompts.
+====
+
+=== Bearer token authentication
+For programmatic or CI/CD scenarios where an MCP client cannot perform an interactive login, SpotterCode accepts a bearer token directly.
+
+In your MCP client configuration, pass the `Authorization` header in the following format:
+
+[source,text]
+----
+Authorization: Bearer <token>@<host>
+----
+
+Where:
+
+* `<token>` is a valid ThoughtSpot bearer token obtained from the ThoughtSpot REST API.
+* `<host>` is your ThoughtSpot instance hostname (for example, `your-org.thoughtspot.cloud`).
+
+SpotterCode extracts and validates the token and host, then injects the authentication context into each MCP tool request.
+
+[TIP]
+====
+To obtain a bearer token, use the xref:authentication.adoc[ThoughtSpot REST API v2 authentication endpoints] or trusted authentication. For more information, see xref:trusted-authentication.adoc[Trusted authentication].
+====
+
+=== MCP Server endpoint for documentation retrieval
+
+If you only need documentation and REST API reference retrieval, use the following MCP Server URL which unauthenticated endpoint:
+
+----
+`\https://spottercode.thoughtspot.app/mcp/docs`
+----
+
+This endpoint provides access to the `get-rest-api-reference` and `get-developer-docs-reference` skills only. The `run-ts-workflow` skill is not available through this endpoint.
+
+To use this endpoint in your IDE, replace the authenticated MCP server URL in your configuration:
+
+For Cursor (`mcp.json`)::
+[source,JSON]
+----
+{
+  "mcpServers": {
+    "SpotterCode": {
+      "url": "https://spottercode.thoughtspot.app/mcp/docs"
+    }
+  }
+}
+----
+
+For Claude Code (CLI)::
+[source,Bash]
+----
+claude mcp add --transport http SpotterCode https://spottercode.thoughtspot.app/mcp/docs
+----
+
+For Visual Studio Code (`mcp.json`)::
+[source,JSON]
+----
+{
+  "servers": {
+    "SpotterCode": {
+      "url": "https://spottercode.thoughtspot.app/mcp/docs",
+      "type": "http"
+    }
+  }
+}
+----
+
 == Integrate SpotterCode with Cursor
 
 You can add the SpotterCode MCP Server URL to Cursor using the one-click installation link or the `mcp.json` file.
@@ -74,7 +163,7 @@ To add SpotterCode as a custom connector:
 
 . Go to **Customize** > **Connectors**
 . Click the `+` icon and select **Add custom connector**.
-. Enter the SpotterCode MCP server URL: `https://spottercode.thoughtspot.app/mcp`.
+. Enter the SpotterCode MCP server URL.
 . Click **Add**.
 
 This configuration automatically enables SpotterCode in Claude AI chat and Claude Code for users of the Claude account.
