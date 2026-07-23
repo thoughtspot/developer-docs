@@ -315,7 +315,104 @@ curl -X POST \
 ----
 
 
-[#csp-cors-hosts]
+
+    // SOURCE: SCAL-320438
+    // TODO: [WRITER] Confirm with Prashant Borkar whether this section belongs under
+    //       "CSP allowlists" or as a standalone top-level section under "Configure security settings".
+    //       Also confirm the exact REST API field name for adding custom schemes via
+    //       POST /api/rest/2.0/system/security-settings/configure.
+    // TODO: [WRITER] Confirm the full list of supported custom schemes beyond
+    //       capacitor:// and ionic:// with the engineering team.
+
+    [#custom-app-schemes]
+    ==== Allow custom app schemes for mobile and hybrid embeds
+
+    [.badge.badge--info]#ThoughtSpot Cloud 26.8.0.cl#
+
+    If you are embedding ThoughtSpot in a mobile or hybrid application built with frameworks such as Capacitor or Ionic, your application may use a custom URL scheme (for example, `capacitor://localhost` or `ionic://localhost`) rather than an `https://` origin.
+
+    To allow these origins to embed ThoughtSpot content, add the custom scheme URL to the *CSP visual embed hosts* and *CORS whitelisted domains* allowlists.
+
+    [IMPORTANT]
+    ====
+    *Security caveat — understand before allowlisting custom schemes*
+
+    Allowlisting a shared app scheme such as `capacitor://localhost` or `ionic://localhost` does *not* uniquely identify your application. Any application on the same device that uses the same framework presents the same origin to the browser. This means:
+
+    * Allowlisting `capacitor://localhost` grants embedding access to *all* Capacitor-based apps on that device, not just yours.
+    * Treat custom-scheme allowlisting as *enabling functionality*, not as an access control boundary.
+    * Security for these embeds must be enforced through *authentication* — use xref:trusted-auth-sdk.adoc[`AuthType.TrustedAuthTokenCookieless`] (cookieless trusted auth) to ensure that only authenticated users in your application can access ThoughtSpot content.
+    * Do *not* rely on origin allowlisting alone as a security mechanism for custom-scheme embeds.
+    ====
+
+    ===== Add a custom scheme to CSP visual embed hosts
+
+    . On your ThoughtSpot application instance, go to *Develop* > *Customizations* > *Security settings*.
+    . Click *Edit*.
+    . In the *CSP visual embed hosts* text box, add your custom scheme URL. For example:
+    +
+    ----
+    capacitor://localhost
+    ----
+    . Click *Save changes*.
+
+    ===== Add a custom scheme to CORS whitelisted domains
+
+    . On your ThoughtSpot application instance, go to *Develop* > *Customizations* > *Security settings*.
+    . Click *Edit*.
+    . In the *CORS whitelisted domains* text box, add your custom scheme URL. For example:
+    +
+    ----
+    capacitor://localhost
+    ----
+    . Click *Save changes*.
+
+    ===== Add a custom scheme via REST API
+
+    // TODO: [WRITER] Confirm the exact request body field name for custom scheme CSP hosts
+    //       in POST /api/rest/2.0/system/security-settings/configure with Prashant Borkar.
+    //       The field may be `visual_embed_hosts` (same as standard CSP hosts) or a separate field.
+
+    Send a `POST` request to the `POST /api/rest/2.0/system/security-settings/configure` endpoint and add the custom scheme URL to the `visual_embed_hosts` and `cors_whitelisted_urls` arrays:
+
+    [source,cURL]
+    ----
+    curl -X POST 'https://{ThoughtSpot-Host}/api/rest/2.0/system/security-settings/configure' \
+         -H 'Authorization: Bearer {token}' \
+         -H 'Content-Type: application/json' \
+         -d '{
+               "org_preferences": [
+                 {
+                   "visual_embed_hosts": [
+                     "capacitor://localhost"
+                   ],
+                   "cors_whitelisted_urls": [
+                     "capacitor://localhost"
+                   ]
+                 }
+               ]
+             }'
+    ----
+
+    [NOTE]
+    ====
+    After allowlisting the custom scheme, initialize the Visual Embed SDK using `AuthType.TrustedAuthTokenCookieless` in your Capacitor or Ionic application:
+
+    [source,JavaScript]
+    ----
+    import { init, AuthType } from '@thoughtspot/visual-embed-sdk';
+
+    init({
+        thoughtSpotHost: 'https://your-thoughtspot-instance.thoughtspot.cloud',
+        authType: AuthType.TrustedAuthTokenCookieless,
+        getAuthToken: () => fetch('/api/get-token')
+            .then(r => r.json())
+            .then(d => d.token),
+    });
+    ----
+    ====
+
+    [#csp-cors-hosts]
 ==== Domain name format for CSP and CORS configuration
 
 [IMPORTANT]
