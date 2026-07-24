@@ -41,6 +41,7 @@ const LeftSideBar = (props: {
     const { width, ref, height } = useResizeDetector();
 
     const expandedTabsRef = useRef({});
+    const lastScrolledPageIdRef = useRef<string | null>(null);
 
     const isMaxTabletResolution = !(props.docWidth < MAX_TABLET_RESOLUTION);
     const isMaxMobileResolution = !(props.docWidth < MAX_MOBILE_RESOLUTION);
@@ -84,7 +85,30 @@ const LeftSideBar = (props: {
             toggleExpandOnTab,
             props.curPageid,
         );
-    }, [props.curPageid, isMaxMobileResolution, navContent]);
+
+        // Every navigation is a full page reload, so the sidebar always
+        // remounts scrolled to the top. Bring the active link back into view
+        // once per navigation (guarded by curPageid) so a resize or category
+        // switch on the same page doesn't re-trigger and jump the scroll
+        // position out from under the user. navContent starts out empty on
+        // mount and is filled in a render later, so don't mark the page as
+        // "scrolled" until the active link actually exists to scroll to.
+        // On mobile widths, .aside is display:none until leftNavOpen is
+        // true (index.scss:365-381) — scrollIntoView on a hidden element
+        // is a no-op, so wait for the nav to actually be visible (desktop/
+        // tablet is always visible; mobile only once opened) before
+        // marking this navigation as handled.
+        const isAsideVisible = isMaxMobileResolution || props.leftNavOpen;
+        if (lastScrolledPageIdRef.current !== props.curPageid && isAsideVisible) {
+            const activeLink = (ref.current as HTMLDivElement)?.querySelector(
+                'a.active',
+            );
+            if (activeLink) {
+                lastScrolledPageIdRef.current = props.curPageid;
+                activeLink.scrollIntoView({ block: 'center' });
+            }
+        }
+    }, [props.curPageid, isMaxMobileResolution, navContent, props.leftNavOpen]);
 
     const renderLeftNav = () => {
         return isMaxMobileResolution ? (
