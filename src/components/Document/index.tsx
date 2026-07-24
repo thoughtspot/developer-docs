@@ -31,6 +31,7 @@ const Document = (props: {
         const handleMouseUp = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             if (target.closest('.selection-cta-button')) return;
+            if (target.closest('.floating-assistant__panel, .floating-assistant__chip-ring')) return;
 
             // If mouse didn't move (plain click, not a drag-select), don't re-show
             const moved = Math.abs(e.clientX - mouseDownX) > 3 || Math.abs(e.clientY - mouseDownY) > 3;
