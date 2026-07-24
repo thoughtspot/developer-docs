@@ -8,6 +8,190 @@
 
 This page documents the changes introduced in each release of the Visual Embed SDK. For information about the REST API v2.0 changes, see the xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog].
 
+// ============================================================
+// SOURCE: src/embed/conversation.ts, src/embed/spotter-viz-utils.ts,
+//         src/types.ts (visual-embed-sdk main branch, verified 2026-07-10)
+// SOURCE: SCAL-310399, SCAL-312622, SCAL-293483, SCAL-309017
+// TODO: [WRITER] Confirm calendar month label — "August 2026" if release ships in
+//       late July / early August 2026. Verify with release team.
+// TODO: [WRITER] Confirm whether Action enum values for Analyst actions
+//       (Action.ShowAnalysts, Action.CreateAnalyst, Action.EditAnalyst,
+//       Action.MakeCopyAnalyst, Action.ShareAnalyst, Action.DeleteAnalyst)
+//       are present in the released types.ts for SDK 1.51.0. They are referenced
+//       in SCAL-312622 but were not confirmed in types.ts source at time of authoring.
+//       Run a grep on the tagged SDK 1.51.0 release before publishing.
+// ============================================================
+
+== Version 1.51.x, August 2026
+
+[width="100%", cols="1,4"]
+|====
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== Spotter Analysts
+// SOURCE: src/embed/conversation.ts @version SDK: 1.51.0 | ThoughtSpot: 26.8.0.cl
+// SOURCE: SCAL-310399, SCAL-312622
+The Visual Embed SDK 1.51.0 introduces controls for the Spotter Analysts feature in embedded applications. The Analysts section in the Spotter sidebar is disabled by default in the embed mode.
+
+When enabled, the SDK provides the following controls to customize the Spotter interface:
+
+Custom labels (in `SpotterSidebarViewConfig`)::
+* `spotterAnalystLabel` +
+Custom singular label for the Analyst entity. Default: `Analyst`.
+* `spotterAnalystsLabel` +
+Custom label for the Analysts sidebar section. Default: `Analysts`.
+
+Starter prompts (in `SpotterChatViewConfig`)::
+* `enableStarterPrompts` — When set to `true`, shows onboarding starter prompts on initial load. Default: `false`.
+
+Action IDs for `hideActions` or `disableActions`:::
+* `Action.ShowAnalysts` +
+* `Action.CreateAnalyst` +
+* `Action.EditAnalyst` +
+* `Action.MakeCopyAnalyst` +
+* `Action.ShareAnalyst` +
+* `Action.DeleteAnalyst`
+
+
+When set to `true`, displays onboarding starter prompts in the Spotter chat interface on initial load. Supported on `SpotterEmbed`, `LiveboardEmbed`, and `AppEmbed`. +
+Default: `false` +
+
+
+// TODO: [WRITER] Verify these Action enum values exist in the SDK 1.51.0 release of types.ts.
+//       Source: SCAL-312622 Jira description. Not yet confirmed in types.ts grep at authoring time.
+
+New action IDs for (Analyst actions)::
+
+* `Action.ShowAnalysts` +
+Controls visibility of the Analysts section in the sidebar.
+* `Action.CreateAnalyst` +
+Controls the Create Analyst action.
+* `Action.EditAnalyst` +
+Controls the Edit Analyst action.
+* `Action.MakeCopyAnalyst` +
+Controls the Make a Copy action.
+* `Action.ShareAnalyst` +
+Controls the Share Analyst action.
+* `Action.DeleteAnalyst` +
+Controls the Delete Analyst action.
+
+Example: embed Spotter with custom Analyst labels and restricted actions:
+
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    Action,
+    AuthType,
+    init,
+} from '@thoughtspot/visual-embed-sdk';
+
+init({
+    thoughtSpotHost: 'https://your-thoughtspot-host',
+    authType: AuthType.TrustedAuthTokenCookieless,
+    getAuthToken: () => fetch('/api/token').then(r => r.json()).then(d => d.token),
+});
+
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    frameParams: { width: '100%', height: '100%' },
+    worksheetId: '<%=datasourceGUID%>',
+    spotterSidebar: {
+        spotterAnalystLabel: 'Assistant',       // Default: "Analyst"
+        spotterAnalystsLabel: 'My Assistants',  // Default: "Analysts"
+    },
+    spotterChat: {
+        enableStarterPrompts: true, // Default: false
+    },
+    hideActions: [
+        Action.CreateAnalyst,
+        Action.DeleteAnalyst,
+    ],
+});
+
+spotterEmbed.render();
+----
+
+For more information, see xref:embed-spotter.adoc#spotter-analysts[Spotter Analysts in embedded applications].
+
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== SpotterViz loading state customization
+// SOURCE: src/embed/spotter-viz-utils.ts @version SDK: 1.51.0 | ThoughtSpot Cloud: 26.8.0.cl
+// SOURCE: SCAL-309017
+The Visual Embed SDK 1.51.0 extends the `SpotterVizConfig` interface with two new properties for customizing the SpotterViz panel loading state on embedded Liveboards and full-application embeds.
+
+`loaderHeadline`::
+Custom headline text shown in the SpotterViz loading state. Replaces the default loading headline. +
+
+`loaderTips`::
+Custom array of `SpotterVizLoaderTip` objects displayed as tips during the SpotterViz loading state. Replaces the default loading tips. +
+
+`SpotterVizLoaderTip` interface:
+
+[source,TypeScript]
+----
+interface SpotterVizLoaderTip {
+    label: string; // Short label rendered alongside the tip (e.g., "Tip")
+    text: string;  // Tip body text
+}
+----
+
+Example usage:
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed-container', {
+    liveboardId: '<%=liveboardGUID%>',
+    spotterViz: {
+        brandName: 'MyBrand',
+        brandHeadline: "Hi, I'm",
+        description: 'Ask questions about your data',
+        inputChatPlaceholder: 'What would you like to know?',
+        loaderHeadline: 'Crunching the numbers...',
+        loaderTips: [
+            { label: 'Tip', text: 'Try asking about revenue by region' },
+            { label: 'Tip', text: 'Use natural language — no SQL needed' },
+            { label: 'Tip', text: 'Ask for comparisons, trends, and breakdowns' },
+        ],
+    },
+    frameParams: { width: '100%', height: '100%' },
+});
+
+embed.render();
+----
+
+// TODO: [WRITER] Confirm with the SpotterViz team whether there is a maximum
+//       recommended or enforced limit on the number of loaderTips entries.
+
+For more information, see xref:embed-spotterViz.adoc[SpotterViz in embedded Liveboards].
+
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== HostEvent.Navigate — object format support
+// SOURCE: src/types.ts (visual-embed-sdk main) — HostEvent.Navigate object format comment
+// SOURCE: SDK: 1.51.0 | ThoughtSpot Cloud: 26.8.0.cl (confirmed from types.ts source)
+The `HostEvent.Navigate` event now supports an object format in addition to the existing string path format. Use the object format to replace the current browser history entry instead of pushing a new entry.
+
+[source,JavaScript]
+----
+// String format — push new history entry (existing behavior, unchanged)
+appEmbed.trigger(HostEvent.Navigate, 'home');
+----
+
+[source,JavaScript]
+----
+// Object format — replace current history entry (new in SDK 1.51.0)
+appEmbed.trigger(HostEvent.Navigate, { path: 'home', replace: true });
+----
+Supported embed types: `AppEmbed`.
+
+// TODO: [WRITER] Confirm whether `replace: false` is a valid option (push behavior)
+//       or whether omitting `replace` defaults to push behavior.
+
+|====
 
 == Version 1.50.x, July 2026
 
@@ -22,6 +206,7 @@ The Visual Embed SDK 1.50.0 introduces the `SpotterVizConfig` interface and `Spo
 A new `SpotterVizConfig` interface is available on `LiveboardViewConfig` and `AppViewConfig` for the `spotterViz` object. This object provides branding customization controls for customizing the SpotterViz panel experience.
 
 To customize app interactions, visibility of the UI elements, and style and appearance of the SpotterViz panel, the SDK also introduces CSS variables, action IDs, and embed and host event identifiers. For more information, see xref:embed-spotterViz.adoc[SpotterViz in embedded Liveboards].
+
 
 |[tag greenBackground]#NEW FEATURE# a|
 

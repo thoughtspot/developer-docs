@@ -5,6 +5,10 @@
 :page-pageid: rest-api__lesson-02
 :description: A lesson on a simple implementation of the V2.0 using Python
 
+[IMPORTANT]
+====
+The workflows and examples in this tutorial use a legacy version of the ThoughtSpot REST API link:https://github.com/thoughtspot/thoughtspot_rest_api_python[ThoughtSpot Community SDK, window=_blank]. We recommend using the xref:python-sdk.adoc[ThoughtSpot-provided Python SDK for REST API v2], which supports both asynchronous and synchronous invocation, transparent token refresh, server-sent event (SSE) streaming, file uploads and downloads, and error handling.
+====
 
 == Get started
 We'll use the files from the link:https://github.com/thoughtspot/tse-api-tutorial[tse-api-tutorial GitHub repository, window=_blank] that you downloaded at the beginning of the tutorial.
@@ -65,9 +69,8 @@ import requests
 import json
 
 thoughtspot_url = 'https://{}.thoughtspot.cloud'
-org_id = 1613534286
+org_id = 0
 api_version = '2.0'
-
 ----
 
 Now, let's construct the starting portion of any API endpoint URL and define the most basic headers that will be used by every call:
@@ -77,12 +80,12 @@ Now, let's construct the starting portion of any API endpoint URL and define the
 ...
 base_url = '{thoughtspot_url}/api/rest/{version}/'.format(thoughtspot_url=thoughtspot_url, version=api_version)
 api_headers = {
-    'X-Requested-By': 'ThoughtSpot', 
+    'X-Requested-By': 'ThoughtSpot',
     'Accept': 'application/json'
 }
 ----
 
-== 02 - Use a Session object
+== 02 - Use a session object
 
 Rather than setting the full configuration for each HTTP request, you can construct a `Session` object from the `requests` library, which keeps an open HTTP connection and maintains settings like headers and cookies between individual HTTP actions.
 
@@ -99,7 +102,7 @@ requests_session = requests.Session()
 requests_session.headers.update(api_headers)
 
 # Define the JSON message, in Python object syntax (close but not exactly JSON)
-json_post_data = { // a request body }
+json_post_data = { # a request body }
 
 # Set the URL of the endpoint
 url = base_url + "{api_endpoint_ending}"
@@ -123,7 +126,7 @@ In the REST API V2.0 Playground:
 
 . Go to *Authentication* > *Get Full Access Token*.
 . Specify the parameters.
-. Copy the JSON body from the right side of the Playground. Python dicts use the same syntax, but you must update booleans to be *uppercase*.
+. Copy the JSON body from the right side of the Playground. Python dicts use the same syntax, but you must capitalize Python's boolean keywords (`True`/`False`).
 . Replace any hard-coded values with the *global variables* you declared so that you can easily update requests at the top of your script and ensure those values change everywhere they are used:
 +
 [,python]
@@ -137,13 +140,13 @@ json_post_data = {
   "password": "y0urP@ssword",
   "validity_time_in_sec": 3600,
   "org_id": org_id,
-  "auto_create": False  # make sure to uppercase in Python
+  "auto_create": False  # capitalize booleans in Python
 }
 ----
 
 . Make a `.post()` request using the `Session` object. +
 +
-We expect a JSON response on success, which you can access using the `.json()` method of the `Response` object. 
+We expect a JSON response on success, which you can access using the `.json()` method of the `Response` object.
 +
 
 From the Playground, we can see that there is a `token` property in the response.
@@ -152,14 +155,13 @@ From the Playground, we can see that there is a `token` property in the response
 +
 [,python]
 ----
-....
+...
 resp = requests_session.post(url=url, json=json_post_data)
 resp_json = resp.json()
 print(json.dumps(resp_json, indent=2))
 token = resp_json["token"]
 print("Here's the token:")
 print(token)
-....
 ----
 
 ==== Run the script to test
@@ -199,7 +201,7 @@ Unfortunately, making a REST API request to a web server can result in any numbe
 Good coding involves testing for and handling error situations.
 
 === Using try and except in Python
-Python code raises `link:https://docs.python.org/3/tutorial/errors.html[Exceptions, target=_blank]` when an error is encountered. 
+Python code raises `link:https://docs.python.org/3/tutorial/errors.html[Exceptions, window=_blank]` when an error is encountered.
 
 If an `Exception` is raised and is not *handled*, the script exits and displays the message provided with the Exception and other details of what failed.
 
@@ -210,28 +212,28 @@ Every HTTP request can potentially result in an error, and we don't want to cont
 The most generic `try...except` block will capture *any* `Exception`:
 [,python]
 ----
-try: 
+try:
     resp = requests_session.post(url=url, json=json_post_data)
     resp_json = resp.json()  # Returns JSON body of resp to Python Dict
     print(resp_json)
     token = resp_json["token"]
 
-except Exception as e: 
-	# do whatever is necessary in exception case
+except Exception as e:
+    # do whatever is necessary in exception case
 
 # Code after the try block will now run even after Exception
 ----
 
 === Checking for requests HTTPError exceptions
-The `requests` library does not raise an `Exception` when an HTTP request completes "properly", that is to say a well-formed HTTP response is received from a request.
+The `requests` library does not raise an `Exception` when an HTTP request completes "properly," that is to say a well-formed HTTP response is received from a request.
 
 However, as you saw in the previous lesson, HTTP responses include a *Status Code* that indicates if the requested action was a *Success* or an *Error*.
 
-To raise `Exceptions` when the response does not include a *Success* status code, call the `Response.raise_for_status()` method for each call, which throws the specific `requests.exceptions.HTTPError` `Exception` when a 400 series or 500 status code is returned:
+To raise `Exceptions` when the response does not include a *Success* status code, call the `Response.raise_for_status()` method for each call, which throws the specific `requests.exceptions.HTTPError` `Exception` when a 400 or 500 series status code is returned:
 
 [source,python]
 ----
-try: 
+try:
     resp = requests_session.post(url=url, json=json_post_data)
     resp.raise_for_status()
     print(resp)
@@ -265,7 +267,7 @@ json_post_data = {
   "password": "y0urP@ssword",
   "validity_time_in_sec": 3600,
   "org_id": org_id,
-  "auto_create": False  # make sure to uppercase in Python
+  "auto_create": False  # capitalize booleans in Python
 }
 
 try:
@@ -309,7 +311,7 @@ try:
 ...
 ----
 
-You may have noticed many steps that are repeated each time for any given request. 
+You may have noticed many steps that are repeated each time for any given request.
 
 In the next lesson, we'll cover using a *library* that wraps most of these repeated steps, so that you can focus simply on the logic of your API workflows.
 

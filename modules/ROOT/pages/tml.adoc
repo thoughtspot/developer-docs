@@ -5,6 +5,7 @@
 :page-title: TML
 :page-pageid: tml
 :page-description: The TML API endpoints allow you to export and import TML files
+// SOURCE: SCAL-307283, SCAL-317357
 
 ThoughtSpot Modeling Language (TML) is a scriptable format developed by ThoughtSpot for exporting, modifying, and migrating metadata objects such as Models, Views, Tables, Liveboards, and Answers. TML files allow you to manage and version control these objects outside the ThoughtSpot UI, supporting workflows like bulk changes, migration between environments, and programmatic edits via REST API. Users can use link:https://docs.thoughtspot.com/cloud/latest/tml[TML] to model data and build analytics content in the test environment in a flat-file format, and then import and deploy it in their environments.
 
@@ -17,6 +18,7 @@ The TML syntax varies per object type. However, all TMLs follow a general patter
 See the following pages for the detailed syntax of TML files for each object type: +
 
 * link:https://docs.thoughtspot.com/cloud/latest/tml-answers[TML for Answers, window=_blank] +
+* link:https://docs.thoughtspot.com/cloud/latest/tml-collections[TML for Collections, window=_blank] +
 * link:https://docs.thoughtspot.com/cloud/latest/tml-connections[TML for Connections, window=_blank] +
 * link:https://docs.thoughtspot.com/cloud/latest/tml-joins[TML for Joins, window=_blank] +
 * link:https://docs.thoughtspot.com/cloud/latest/tml-liveboards[TML for Liveboards, window=_blank] +
@@ -75,6 +77,63 @@ If you import only a Model object, it may take some time for the Model to become
 
 However, if you import a Model along with Liveboards, answers, and other dependent objects in a single API call, the imported objects will be immediately available for use.
 ====
+
+[#personalized-views-portability]
+=== Personalized Views portability [earlyAccess eaBackground]#Early Access#
+
+Personalized Views support improved portability across ThoughtSpot environments. When importing a Personalized View TML set the `enable_personalized_view_upsert` to `true` in the API request to `POST /api/rest/2.0/metadata/tml/import`. ThoughtSpot then checks the target environment for an existing Personalized View with a matching `obj_id`. If a match is found, the import updates the existing view rather than creating a duplicate. If no match is found, a new Personalized View is created.
+
+To enable this feature for your instance, contact your ThoughtSpot administrator.
+
+Two new fields are added to the TML, make it easier to migrate Personalized Views between environments without creating duplicates.
+
+`author`:::
+A new `author` field is added to the Personalized View TML during export. This field is used to delegate ownership to another user during import.
+
+`obj_id`:::
+A new `obj_id` field provides stable cross-environment object identity for inter-Org deployments. Use the same `obj_id` value across environments to ensure consistent identity during migrations.
+
+
+
+==== Example for a Personalized View TML with Object ID
+
+[source,yaml]
+----
+  views:
+  - view_guid: ff83055b-a867-43e7-978e-106e907e1912
+    obj_id: California-LT-ff83855b
+    name: California - LT
+    view_filters:
+    - column:
+      - Retail Sales - Classic::Store State
+      oper: in
+      values:
+      - California
+    is_public: false
+    author:
+      username: user1
+      user_email: user1@thoughtspot.com
+----
+
+==== Limitation without this feature enabled
+
+ThoughtSpot's link:https://docs.thoughtspot.com/cloud/latest/personalized-liveboard-views[personalized Liveboard views] let users apply filters and save configurations as named views on a Liveboard.
+In multi-environment deployments (for example, a Dev instance and a Prod instance), these user-saved views can be lost when a Liveboard is updated and re-imported using the xref:tml.adoc[TML import API] or the UI *Import TML* option.
+If the import is performed by an administrator account, all personalized views saved by end users are removed as part of this replacement.
+
+Why this happens?::
+
+Personalized views are stored as user-owned objects linked to the Liveboard's GUID.
+When an admin imports a Liveboard TML that matches an existing GUID, the import operation overwrites the Liveboard, and the associated user views are not carried forward.
+
+Workarounds::
+. Import as a non-admin user -
++
+The simplest workaround is to perform the final TML import in the production environment using a *non-admin user account* that has edit access to the Liveboard, rather than an admin account.
+Because non-admin users do not have the authority to overwrite user-linked metadata during import, ThoughtSpot preserves the existing personalized views attached to the Liveboard.
+. Embed existing saved views in the TML before import -
++
+You can export the current saved views from the production Liveboard, append them to the updated TML, and then import the combined TML.
 
 == Import TML objects asynchronously
 The REST v1 and v2  `metadata/tml/import` APIs import TML objects synchronously. When you try to import large and complex metadata objects, the synchronous import operation takes more time to process data and sometimes can result in a timeout error.
@@ -322,6 +381,7 @@ If Orgs are enabled on your instance, the API returns task status only for objec
 |**403**|Forbidden access
 |**500**|Unexpected Error
 |====
+
 
 == Export a TML
 To export the TML data, your account must have the `DATAMANAGEMENT` (Can manage data) or `ADMINISTRATION` (Can administer ThoughtSpot) privilege.
