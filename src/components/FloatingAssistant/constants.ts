@@ -1,4 +1,6 @@
-export const CLOUDFLARE_URL = 'http://localhost:8001';
+export const CLOUDFLARE_URL =
+    process.env.CLOUDFLARE_URL ||
+    'https://spottercode.thoughtspot.app';
 
 export const LOADING_PHASES = [
     'Processing your request...',
