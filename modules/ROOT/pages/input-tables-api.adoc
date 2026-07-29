@@ -1,0 +1,203 @@
+= Input Tables API reference
+:toc: true
+:toclevels: 2
+
+:page-title: Input Tables API
+:page-pageid: input-tables-api
+:page-description: Use the Input Tables REST API v2.0 endpoints to create, update, and delete input table records in ThoughtSpot programmatically.
+:keywords: input tables, REST API, create input table, update input table, delete input table, writable tables
+:product-version: 26.8.0.cl
+:jira-ref: SCAL-319440
+
+// SOURCE: SCAL-319440 | ThoughtSpot Cloud 26.8.0.cl
+// TODO: [WRITER] Confirm the Jira key for the Input Tables REST API feature — SCAL-319440 is the
+//       best match found at time of authoring. Verify with the Data platform / DM team.
+// TODO: [WRITER] Confirm whether Input Tables require a specific license or feature flag to be
+//       enabled on the ThoughtSpot instance before these APIs are available.
+// TODO: [WRITER] Confirm whether `input_table_identifier` accepts both the GUID and the table
+//       name, or only one of these. Verify with the platform team.
+// TODO: [WRITER] Confirm the required privilege name for input table write operations.
+//       "Can manage data" is assumed — verify with the access control team.
+// TODO: [WRITER] Add a conceptual overview link once an Input Tables concept page exists.
+// TODO: [WRITER] Request confirmed example payloads from the Data platform team to replace
+//       the illustrative examples in this page before publishing.
+
+ThoughtSpot introduces REST API v2.0 endpoints for managing input table records
+programmatically. Input tables are writable tables in ThoughtSpot that allow you to push
+data directly into ThoughtSpot without an external data pipeline. Use these APIs to create
+new input tables, insert or update records, and delete records at scale.
+
+
+== Supported operations
+
+* <<create-input-table,Create an input table>> — `POST /api/rest/2.0/input-tables/create`
+* <<update-input-table,Update records in an input table>> — `POST /api/rest/2.0/input-tables/{input_table_identifier}/update`
+* <<delete-input-table,Delete records from an input table>> — `POST /api/rest/2.0/input-tables/{input_table_identifier}/delete`
+
+=== Required permissions
+
+// TODO: [WRITER] Confirm the exact privilege required. "Can manage data" is assumed.
+To use Input Tables API endpoints, `DATAMANAGEMENT` (*Can manage data*) or `ADMINISTRATION` (*Can administer ThoughtSpot*) privilege is required. If Role-Based Access Control (RBAC) is enabled on your ThoughtSpot instance, the `CAN_MANAGE_INPUT_TABLES` (*Can manage input tables*) privilege is required.
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+[#create-input-table]
+== Create an input table
+
+Creates an input table and links it to a ThoughtSpot model (worksheet). An input table is a user-editable table stored in the model's external Cloud Data Warehouse (CDW) connection. It lets analysts enter or import data directly from the ThoughtSpot UI without requiring access to the underlying warehouse.
+
+=== Resource URL
+
+----
+POST /api/rest/2.0/input-tables/create
+----
+
+=== Request parameters
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+
+|`table_name`
+|string
+|Yes
+|Name of the input table to create. Must be unique within the Org.
+
+|`table_definition`
+|array of objects
+|Yes
+a|Describes the table schema. Each object requires: +
+
+* `referenced_columns` - List of column GUIDs from the linked model to include as read-only reference columns in the input table. These columns anchor the input data to existing model dimensions. +
+* `name` (string) — Column display name. +
+* `data_type` (string) — Warehouse data type. For example, `VARCHAR`, `INT64`, `DATE`, `BOOL`. +
+* `type` (string) — Semantic role of the column: `ATTRIBUTE` for dimension columns or `MEASURE` for numeric columns. +
+
+|`model_identifier`
+|string
+|Yes
+|GUID or name of the Model to link the input table to.
+
+|===
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/create' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "table_name": "table_name4",
+  "model_identifier": "model_identifier4",
+  "table_definition": {
+    "new_columns": [
+      {
+        "name": "name2",
+        "data_type": "data_type0",
+        "type": "ATTRIBUTE"
+      }
+    ],
+    "referenced_columns": [
+      "referenced_columns9"
+    ]
+  }
+}'
+----
+
+=== Example response
+
+[source,JSON]
+----
+{
+  "input_table_identifier": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+}
+----
+
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+[#update-input-table]
+== Update records in an input table
+
+Writes rows of data into an existing input table. The supplied rows replace the current contents of the table. Partial updates to individual rows are not supported; re-submit all rows on every write.
+
+=== Resource URL
+
+----
+POST /api/rest/2.0/input-tables/{input_table_identifier}/update
+----
+=== Request parameters
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+|`input_table_identifier` |string |Yes |GUID or name of the input table to update. Pass the input table GUID as the path parameter in the API request.
+|`rows` |array of objects |Yes |Rows to insert or update. Each object maps column name to value. Column names must match the table schema.
+|===
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/f47ac10b-58cc-4372-a567-0e02b2c3d479/update' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "columns": ["region", "target_revenue", "effective_date"],
+    "rows": [
+      ["West", "1500000", "2025-01-01"],
+      ["East", "2000000", "2025-01-01"]
+    ]
+  }'
+----
+
+=== Example response
+
+[source,JSON]
+----
+{
+  "rows_loaded": 2
+}
+----
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+[#delete-input-table]
+== Delete an input table
+
+This operation unlinks the input table from its Model, removes it from the connection metadata, and drops the physical table from the Cloud Data Warehouse.
+
+Deleting an input table does not delete the linked model. However, any Answers or Liveboards that reference columns from the deleted input table will lose access to that data and may return errors until the affected visualizations are updated.
+
+=== Resource URL
+
+----
+POST /api/rest/2.0/input-tables/{input_table_identifier}/delete
+----
+
+=== Request parameters
+
+[cols="1,1,1,3", options="header"]
+|===
+|Parameter |Type |Required |Description
+|`input_table_identifier` |string |Yes |GUID or name of the input table. Pass the input table GUID as the path parameter in the API request.
+|===
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/f47ac10b-58cc-4372-a567-0e02b2c3d479/delete' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+
+----
+
+=== Example response
+A successful deletion returns the 204 response code.
+
+== Additional resources
+
+* xref:rest-api-v2-reference.adoc[REST API v2.0 reference]
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
+
