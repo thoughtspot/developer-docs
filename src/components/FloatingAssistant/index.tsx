@@ -434,6 +434,7 @@ const FloatingAssistant: React.FC = () => {
             {!isOpen && !isClosing && (
                 <div
                     className={`floating-assistant__chip-ring${isSuspended ? ' floating-assistant__chip-ring--suspended' : ''}`}
+                    style={{ top: isEmbedded ? '10px' : '120px' }}
                 >
                     <button
                         className="floating-assistant__chip"

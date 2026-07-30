@@ -53,7 +53,7 @@ const NavContent = (props: {
             </div>
             {/* AskDocs lives in the top SecondaryHeader on the standalone site;
                 that bar is hidden in-product, so surface it here instead. */}
-            {!props.isPublicSiteOpen && (
+            {/* {!props.isPublicSiteOpen && (
                 <div className="leftNav-askdocs-wrapper">
                     <button
                         type="button"
@@ -63,7 +63,7 @@ const NavContent = (props: {
                         AskDocs <span className="leftNav-askdocs__beta">Beta</span>
                     </button>
                 </div>
-            )}
+            )} */}
             <nav>
                 <h2 className="heading">{props.navTitle}</h2>
                 <div
