@@ -126,7 +126,7 @@ module.exports = {
                 'admin-api', 'database-api', 'orgs-api', 'search-data-api', 'materialization-api',
                 'liveboard-data-api', 'liveboard-export-api', 'push-data', 'logs-api',
                 'audit-logs', 'tml', 'collections', 'connections',
-                'connection-config', 'connections-api', 'api-user-management', 'rbac', 'graphql-guide',
+                'connection-config', 'connections-api', 'api-user-management', 'rbac',
                 'webhooks-rest-api', 'rest-v2-changelog', 'rest-v1-changelog',
             ],
         },
@@ -150,8 +150,6 @@ module.exports = {
             label: "What's new",
             pageIds: [
                 'whats-new', 'fixed-issues', 'known-issues', 'deprecated-features',
-                'embed-sdk-changelog', 'mobile-sdk-changelog',
-                'rest-v2-changelog', 'rest-v1-changelog', 'mcp-server-changelog',
             ],
         },
     ],
