@@ -10,7 +10,7 @@ import SpotterCodeLogo from './SpotterCodeLogo';
 import { LOADING_PHASES, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH, PANEL_DEFAULT_WIDTH, LOADING_PHASE_DELAYS, ERROR_MESSAGES } from './constants';
 import { Message } from './types';
 import { renderMarkdown, formatTimestamp, formatDuration, getPageId, stripMarkdown } from './helpers';
-import { fetchSuggestedQuestions, streamAgentResponse } from './api';
+import { fetchSuggestedQuestions, streamAgentResponse, sendFeedback } from './api';
 
 const SparkleIcon = () => (
     <Icon id={IconID.AI_SPARKLE_SELECTED} size={IconSize.XLARGE} color={IconColor.BLUE} />
@@ -72,7 +72,7 @@ const FloatingAssistant: React.FC = () => {
         }, 250);
     };
 
-    const giveFeedback = (idx: number, type: 'up' | 'down') => {
+    const giveFeedback = (idx: number, type: 'up' | 'down', message: Message) => {
         const isUnfill = feedbackGiven[idx] === type;
         setFeedbackGiven((prev: Record<number, 'up' | 'down'>) => {
             const next = { ...prev };
@@ -86,6 +86,12 @@ const FloatingAssistant: React.FC = () => {
             setToastExiting(false);
             setShowFeedbackToast(true);
             feedbackToastTimer.current = setTimeout(hideToast, 2500);
+
+            if (message.traceId) {
+                sendFeedback(message.traceId, message.observationId, type).catch(() => {
+                    // Feedback is best-effort — a failed submission shouldn't disrupt the chat UI.
+                });
+            }
         }
     };
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -181,6 +187,22 @@ const FloatingAssistant: React.FC = () => {
     const abortRef = useRef<AbortController | null>(null);
     const userScrolledRef = useRef(false);
 
+    const [isSuspended, setIsSuspended] = useState(false);
+    const panelRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        const handler = (e: CustomEvent<{ suspended: boolean }>) => {
+            setIsSuspended(e.detail.suspended);
+            if (e.detail.suspended) {
+                const active = document.activeElement as HTMLElement | null;
+                if (active && panelRef.current?.contains(active)) {
+                    active.blur();
+                }
+            }
+        };
+        window.addEventListener('spotter-code-suspend', handler as EventListener);
+        return () => window.removeEventListener('spotter-code-suspend', handler as EventListener);
+    }, []);
+
     useEffect(() => {
         setIsOpen(true);
     }, []);
@@ -217,10 +239,10 @@ const FloatingAssistant: React.FC = () => {
     };
 
     useEffect(() => {
-        if (isOpen && inputRef.current) {
+        if (isOpen && !isSuspended && inputRef.current) {
             inputRef.current.focus();
         }
-    }, [isOpen]);
+    }, [isOpen, isSuspended]);
 
     useEffect(() => {
         const el = inputRef.current;
@@ -230,10 +252,10 @@ const FloatingAssistant: React.FC = () => {
     }, [input]);
 
     useEffect(() => {
-        if (quotedText) {
+        if (quotedText && !isSuspended) {
             setTimeout(() => inputRef.current?.focus(), 100);
         }
-    }, [quotedText]);
+    }, [quotedText, isSuspended]);
 
     useEffect(() => {
         const handler = (e: CustomEvent<{ location: Location }>) => {
@@ -318,10 +340,15 @@ const FloatingAssistant: React.FC = () => {
         let collectedSteps: string[] = [];
         let finalContent: string = ERROR_MESSAGES.DEFAULT;
         let aborted = false;
+        let traceId: string | undefined;
+        let observationId: string | undefined;
 
         try {
             for await (const event of streamAgentResponse(updatedMessages, pageId, abortRef.current.signal)) {
-                if (event.type === 'text') {
+                if (event.type === 'trace') {
+                    traceId = event.traceId;
+                    observationId = event.observationId ?? event.generationId;
+                } else if (event.type === 'text') {
                     accumulated += event.content;
                     setStreamingText(accumulated);
                 } else if (event.type === 'tool-start') {
@@ -347,6 +374,8 @@ const FloatingAssistant: React.FC = () => {
                     content: finalContent,
                     toolSteps: collectedSteps.length > 0 ? collectedSteps : undefined,
                     durationMs: Date.now() - startTime,
+                    traceId,
+                    observationId,
                 }]);
             }
             setStreamingText('');
@@ -403,11 +432,14 @@ const FloatingAssistant: React.FC = () => {
     return (
         <>
             {!isOpen && !isClosing && (
-                <div className="floating-assistant__chip-ring">
+                <div
+                    className={`floating-assistant__chip-ring${isSuspended ? ' floating-assistant__chip-ring--suspended' : ''}`}
+                >
                     <button
                         className="floating-assistant__chip"
                         onClick={() => setIsOpen(true)}
                         aria-label="Open SpotterCode assistant"
+                        disabled={isSuspended}
                     >
                         <SparkleIcon />
                     </button>
@@ -416,7 +448,8 @@ const FloatingAssistant: React.FC = () => {
 
             {(isOpen || isClosing) && (
                 <div
-                    className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}${isEmbedded ? ' floating-assistant__panel--embedded' : ''}`}
+                    ref={panelRef}
+                    className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}${isEmbedded ? ' floating-assistant__panel--embedded' : ''}${isSuspended ? ' floating-assistant__panel--suspended' : ''}`}
                     style={{ width: panelWidth }}
                 >
                     <div className="floating-assistant__resize-handle" onMouseDown={onResizeMouseDown} />
@@ -571,14 +604,14 @@ const FloatingAssistant: React.FC = () => {
                                                     <button
                                                         className={`fa-feedback-btn${feedbackGiven[i] === 'down' ? ' fa-feedback-btn--active' : ''}`}
                                                         aria-label="Thumbs down"
-                                                        onClick={() => giveFeedback(i, 'down')}
+                                                        onClick={() => giveFeedback(i, 'down', msg)}
                                                     >
                                                         <Icon id={feedbackGiven[i] === 'down' ? IconID.THUMB_DOWN_UNDO : IconID.THUMB_DOWN} size={IconSize.SMALL} color={feedbackGiven[i] === 'down' ? IconColor.BLUE : IconColor.GRAY} />
                                                     </button>
                                                     <button
                                                         className={`fa-feedback-btn${feedbackGiven[i] === 'up' ? ' fa-feedback-btn--active' : ''}`}
                                                         aria-label="Thumbs up"
-                                                        onClick={() => giveFeedback(i, 'up')}
+                                                        onClick={() => giveFeedback(i, 'up', msg)}
                                                     >
                                                         <Icon id={feedbackGiven[i] === 'up' ? IconID.THUMB_UP_UNDO : IconID.THUMB_UP} size={IconSize.SMALL} color={feedbackGiven[i] === 'up' ? IconColor.BLUE : IconColor.GRAY} />
                                                     </button>
@@ -679,7 +712,7 @@ const FloatingAssistant: React.FC = () => {
                     </div>
 
                     <div className="floating-assistant__footer">
-                        SpotterCode responses should be reviewed.{' '}
+                        You are interacting with an AI system. Responses should be reviewed.{' '}
                         <a href="https://developers.thoughtspot.com/docs/SpotterCode" target="_blank" rel="noopener noreferrer">
                             Learn more
                         </a>

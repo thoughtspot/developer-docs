@@ -28,3 +28,19 @@ export async function* streamAgentResponse(
 
     yield* parseSseStream(response);
 }
+
+export async function sendFeedback(
+    traceId: string,
+    observationId: string | undefined,
+    value: 'up' | 'down',
+): Promise<void> {
+    const response = await fetch(`${CLOUDFLARE_URL}${API_PATHS.FEEDBACK}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ traceId, observationId, value }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Feedback API error: ${response.status}`);
+    }
+}

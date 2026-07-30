@@ -98,6 +98,10 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     // breadcrumsData is derived after processedNavMap is built (see useMemo below)
     const [activeCategory, setActiveCategory] = useState<DocCategory>('guides');
     const [showSearch, setShowSearch] = useState(false);
+
+    useEffect(() => {
+        window.dispatchEvent(new CustomEvent('spotter-code-suspend', { detail: { suspended: showSearch } }));
+    }, [showSearch]);
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
     const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(() => {
@@ -453,18 +457,16 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         const customStyles = {
             overlay: {
                 background: 'rgba(50,57,70, 0.9)',
-                zIndex: 10,
+                zIndex: 1100,
             },
             content: {
                 top: '50px',
-                left: 'auro',
+                left: 'auto',
                 right: 'auto',
                 bottom: 'auto',
                 width: isMaxMobileResolution ? '40%' : '100%',
                 margin: 'auto',
-                transform: `translate(${
-                    isMaxMobileResolution ? '80%' : '0'
-                }, 70px)`,
+                transform: 'translate(0, 70px)',
                 border: 'none',
                 height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',

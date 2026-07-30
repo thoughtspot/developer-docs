@@ -19,6 +19,7 @@ export const LOADING_PHASE_DELAYS = [0, 1200, 2800, 4800, 7000];
 export const API_PATHS = {
     SUGGESTED_QUESTIONS: '/suggested-questions',
     AGENT: '/agent/embed-assistant',
+    FEEDBACK: '/agent/embed-assistant/feedback',
 } as const;
 
 export const ERROR_MESSAGES = {
