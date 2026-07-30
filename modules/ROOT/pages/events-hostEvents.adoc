@@ -7,9 +7,9 @@
 :page-description: Events allow the host application to trigger actions in or payloads from the embedded ThoughtSpot components.
 
 [#host-events]
-Host events provide programmatic entry points to actions that your host or embedding application can trigger into the embedded ThoughtSpot iframe to perform the same operations a user can perform in the UI, such as opening filters, editing, saving, pinning, drilling, or navigating to an answer.
+Host events provide programmatic entry points to actions that your host or embedding application can trigger in the embedded ThoughtSpot iframe to perform the same operations a user can perform in the UI, such as opening filters, editing, saving, pinning, drilling, or navigating to an answer.
 
-Host events use the `.trigger()` method to send the event message to embedded ThoughtSpot components in the `.trigger(hostEvent, data)` format. The host events are part of the *HostEvent* object; for example, `HostEvent.SetVisibleTabs`.
+Host events use the `.trigger()` method to send the event message to embedded ThoughtSpot components in the `.trigger(hostEvent, data)` format. The host events are part of the `HostEvent` object; for example, `HostEvent.SetVisibleTabs`.
 
 == Event categories
 
@@ -24,7 +24,7 @@ Host events can be categorized based on their schema and what they do:
 
 == Configuring host events
 
-To configure a host event, use the `.trigger()`.
+To configure a host event, use the `.trigger()` method.
 
 The following example uses `HostEvent.SetVisibleTabs` to show specific tabs whose IDs are specified in the payload. Any tabs whose IDs are not included in this array are hidden.
 
@@ -47,7 +47,7 @@ In your host events implementation, you can choose to trigger an action without 
 
 ==== Parameters for HostEvent.Pin
 
-The *Pin* action is available on the charts and tables generated from a search query, saved Answers, and visualizations on a Liveboard. Generally, when a user initiates the pin action, the *Pin to Liveboard* modal opens, and the user is prompted to specify the Liveboard to pin the object. The modal also allows the user to add or edit the title text of the visualization and create a new Liveboard if required.
+The *Pin* action is available on the charts and tables generated from a search query, saved Answers, and visualizations on a Liveboard. Generally, when a user initiates the pin action, the *Pin to Liveboard* modal opens, and the user is prompted to specify the Liveboard to pin the object to. The modal also allows the user to add or edit the title text of the visualization and create a new Liveboard if required.
 
 With `HostEvent.Pin`, you can automate the pin workflow to programmatically add an Answer or visualization to a Liveboard. For example, to pin an object to an existing Liveboard, use the following parameters in the host event object:
 
@@ -56,15 +56,13 @@ __String__. GUID of the saved Answer or visualization to pin to a Liveboard. Not
 * `liveboardId` +
 __String__. GUID of the Liveboard to pin the Answer. If there is no Liveboard, you must specify the `newLiveboardName` to create a new Liveboard.
 * `newVizName` +
-__String__. Name string for the Answer that will be added as a visualization to the Liveboard. Note that each time the user clicks, a new visualization object with a new GUID is generated.
+__String__. Name string for the visualization. When specified, it adds a new visualization or creates a copy of the Answer or visualization specified in `vizId`. Note that each time this event is triggered, a new visualization object with a new GUID is generated.
 * `tabId` +
 __String__. GUID of the Liveboard tab. Adds the Answer to the Liveboard tab specified in the code.
-* `newLiveboardName`
+* `newLiveboardName` +
 __String__. Name string for the new Liveboard. Creates a new Liveboard object with the specified name.
 * `newTabName` +
 __String__. Name string for the new Liveboard tab. Adds a new tab to the Liveboard specified in the code.
-* `newVizName` +
-__String__. Name string for the visualization. When specified, it adds a new visualization or creates a copy of the Answer or visualization specified in `vizId`.
 
 In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to add a specific visualization to a specific Liveboard tab:
 
@@ -83,12 +81,12 @@ In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is init
 [source,JavaScript]
 ----
  const pinResponse = await searchEmbed.trigger(HostEvent.Pin, {
-     newVizName: `Sales by region`,
+     newVizName: "Sales by region",
      liveboardId: "5eb4f5bd-9017-4b87-bf9b-8d2bc9157a5b",
  })
 ----
 
-In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to create a new Liveboard with a tab, and then pin the Answer or visualization to it.
+In this example, when the `HostEvent.Pin` is triggered, the *Pin* action is initiated to create a new Liveboard with a tab, and then pin the Answer or visualization to it:
 
 [source,JavaScript]
 ----
@@ -113,7 +111,7 @@ For `HostEvent.SaveAnswer`, you can pass the pre-defined attributes such as name
 * `name` +
 __String__. Name string for the Answer object.
 * `description` +
-__String__. Description text for the Answer
+__String__. Description text for the Answer.
 
 [source,JavaScript]
 ----
@@ -130,19 +128,67 @@ If `HostEvent.SaveAnswer` does not include any parameters, the event triggers th
 searchEmbed.trigger(HostEvent.SaveAnswer);
 ----
 
-
 === Retrieving and updating filters
-
 The SDK provides the following events for filter retrieval and updates:
 
-* `HostEvent.GetFilters` to get the filters that are currently applied on an embedded Liveboard. You can use this event to inspect the current filter state or to retrieve filter values.
-* `HostEvent.UpdateFilters` to update the filters applied on an embedded Liveboard.
-* `HostEvent.OpenFilter` to open the filter panel for the specified column.
-* `HostEvent.UpdateRuntimeFilters` to update xref:runtime-filters.adoc[Runtime filters]. +
-Runtime filters are applied at runtime, that is, when loading the embedded ThoughtSpot content. Runtime filters can also be updated after the load time using `HostEvent.UpdateRuntimeFilters`. You can add a UI option or button in your embedding app and assign the `HostEvent.UpdateRuntimeFilters` to trigger the `UpdateRuntimeFilters` event when that button is clicked.
-+
+==== HostEvent.GetFilters
+You can use this event to inspect the current filter state or to retrieve filter values. The `HostEvent.GetFilters` returns an array of filter objects representing the filters currently applied on the embedded Liveboard. Each filter object includes the following additional properties:
+
+`applicable_viz`::
+An object describing which visualizations on the Liveboard this filter applies to. Includes the following properties: +
+* `type`. __String__. Scope of the filter. +
+** `ALL` means the filter applies to all visualizations. +
+** `SPECIFIC` means the filter applies only to the visualization IDs listed in `viz_ids`.
+* `viz_ids`. __Array of strings__. Array of visualization GUIDs to which the filter applies. Populated only when `type` is `SPECIFIC`.
+
+`linking`::
+An object describing the filter-linking state of this filter. Includes the following properties: +
+* `is_linked`. __Boolean__. Is `true` if this filter is linked to other filters on the Liveboard.
+* `linked_columns`. __Array of strings__. Array of column names or GUIDs that this filter is linked to.
+
+[source,JSON]
+----
+[
+  {
+    "column": "Region",
+    "operator": "EQ",
+    "values": ["West"],
+    "applicable_viz": {
+      "type": "SPECIFIC",
+      "viz_ids": ["viz-guid-1", "viz-guid-2"]
+    },
+    "linking": {
+      "is_linked": true,
+      "linked_columns": ["Country"]
+    }
+  },
+  {
+    "column": "Date",
+    "operator": "BW_INC",
+    "values": ["2024-01-01", "2024-12-31"],
+    "applicable_viz": {
+      "type": "ALL",
+      "viz_ids": []
+    },
+    "linking": {
+      "is_linked": false,
+      "linked_columns": []
+    }
+  }
+]
+----
+
+==== HostEvent.UpdateFilters
+Updates the filters applied on an embedded Liveboard. For more information and examples, see xref:HostEvent.adoc#_updatefilters[HostEvent reference documentation].
+
+==== HostEvent.OpenFilter
+Opens the filter panel for the specified column. For more information and examples, see xref:HostEvent.adoc#_openfilter[HostEvent reference documentation].
+
+==== HostEvent.UpdateRuntimeFilters
+xref:runtime-filters.adoc[Runtime filters] are applied at runtime, that is, when loading the embedded ThoughtSpot content. Runtime filters can also be updated after the load time using `HostEvent.UpdateRuntimeFilters`. You can add a UI option or button in your embedding app and assign `HostEvent.UpdateRuntimeFilters` to a button to trigger the event when that button is clicked.
+
 In this example, the host event is assigned to a button that updates runtime filters when clicked. When `HostEvent.UpdateRuntimeFilters` is triggered, the filters are updated with the attributes specified in the code.
-+
+
 [source,JavaScript]
 ----
  document.getElementById('updateFilters').addEventListener('click', e => {
@@ -163,12 +209,12 @@ In this example, the host event is assigned to a button that updates runtime fil
 === Filtering from the selection
 Filtering from a selection on a chart or table can be implemented by combining the `EmbedEvent.VizPointClick` or `EmbedEvent.VizPointDoubleClick` events with the `HostEvent.UpdateRuntimeFilters` event.
 
-The callback function from the `VizPointClick` event will need to read the response, parse out the attributes from the response that will be sent to the Runtime Filters object, and then send the attributes and their target fields in the format used by `UpdateRuntimeFilters`.
+The callback function from the `VizPointClick` event will need to read the response, parse out the attributes from the response that will be sent to the Runtime Filters object, and then send the attributes and their target fields in the format used by `HostEvent.UpdateRuntimeFilters`.
 
 === Using vizId to target a specific visualization
 If a host event allows the `vizId` parameter, you can use it to target a specific visualization where applicable. For example, to trigger the *Edit* action on a specific visualization in an embedded Liveboard, you can specify the `vizId` parameter in the host event payload.
 
-In the following example, the host event triggers the **Edit** action on the specified visualization in a Liveboard embed:
+In the following example, the host event triggers the *Edit* action on the specified visualization in a Liveboard embed:
 
 [source,JavaScript]
 ----
@@ -181,7 +227,7 @@ liveboardEmbed.trigger(HostEvent.Edit, {
 });
 ----
 
-If `vizId` is not specified, the edit action is triggered at the Liveboard level, instead of the visualization layer.
+If `vizId` is not specified, the *Edit* action is triggered at the Liveboard level, instead of the visualization layer.
 
 In Spotter embed, `vizId` is a required parameter for several host events. If it is not specified in the host event, the event trigger fails and results in an error indicating that the visualization context is missing.
 
@@ -192,7 +238,7 @@ In the above example, if the visualization with the `730496d6-6903-4601-937e-2c6
 
 
 == Host event behavior in single-layer and multi-layer UI scenarios
-In single‑layer UI, such as a single visualization embed, Spotter embed, or Liveboards listing page in full application embed, a host event call typically results in a single visible action. However, in multi-modal or multi-layer UI, such as Spotter on Liveboard embed, a visualization opened from a Liveboard, or any experience with dialogs on top of a base page, a host event call can trigger multiple handlers at once. For example, the `HostEvent.OpenFilter` can open filters on both the visualization page in the overlay and the underlying Liveboard.
+In single-layer UI, such as a single visualization embed, Spotter embed, or Liveboards listing page in full application embed, a host event call typically results in a single visible action. However, in multi-modal or multi-layer UI, such as Spotter on Liveboard embed, a visualization opened from a Liveboard, or any experience with dialogs on top of a base page, a host event call can trigger multiple handlers at once. For example, the `HostEvent.OpenFilter` can open filters on both the visualization page in the overlay and the underlying Liveboard.
 
 For context-aware routing and per‑context payload validation, we recommend using the host events framework with page context. For more information, see xref:events-context-aware-routing.adoc[Context-based execution of host events].
 
@@ -251,7 +297,6 @@ video::./images/hostEvent.mp4[width=100%,options="autoplay,loop"]
 
 ++++
 <a href="{{previewPrefix}}/playground/liveboard" id="preview-in-playground" target="_blank">Try it out in Playground</a>
-</div>
 ++++
 
 == Event enumerations and examples
