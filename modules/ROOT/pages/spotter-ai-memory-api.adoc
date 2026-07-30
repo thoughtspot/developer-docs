@@ -2,9 +2,9 @@
 :toc: true
 :toclevels: 2
 
-:page-title: Spotter memory migration API
+:page-title: Spotter training memory migration API
 :page-pageid: spotter-memory-migration
-:page-description: Use the AI memory REST API v2.0 endpoints to export and import Spotter training memory across ThoughtSpot environments.
+:page-description: Use the AI memory REST API v2 endpoints to export and import Spotter training memory across ThoughtSpot environments.
 :keywords: Spotter memory, AI memory, memory migration, memory export, memory import, Spotter training, REST API
 
 [beta betaBackground]#Beta#
@@ -23,24 +23,24 @@ The API endpoints support importing and exporting memory with rules defined at t
 == Memory migration workflow
 Spotter accumulates training memory, which includes *rules* (business logic) and *recipes* (query patterns), as users interact with data models. To migrate Spotter memory from one data model to another, or from a source environment to a target environment:
 
-. <<export-memory, Export Spotter memory from source>>  +
+. <<export-memory, Export Spotter memory from source>> +
 Call `POST /api/rest/2.0/ai/memory/export` with the GUIDs of the data models to migrate.
 . <<update-memory-file, Update the exported file content>> +
 Save and modify the exported file as needed.
-. <<import-memory, Import Spotter memory>>  +
+. <<import-memory, Import Spotter memory>> +
 Call `POST /api/rest/2.0/ai/memory/import` to import Spotter memory content into ThoughtSpot. You can validate the import operation using the dry run operation and review `import_summaries` and `failures` before proceeding.
 
 === Required permissions
-To use Spotter memory migration APIs, the user requires *Can manage Spotter* or *Can use Spotter* privilege and edit access to memory on corresponding data model sources.
+To use Spotter memory migration APIs, the user requires the following privileges:
+
+* *Can manage Spotter* and at least view access to the data model.
+* *Can use Spotter* and edit access to the data model, or `SPOTTER_COACHING_PRIVILEGE` to import memory entries.
+
+Users with administration access can also export and import Spotter memory.
 
 [#export-memory]
 == Exporting Spotter memory
 The `/api/rest/2.0/ai/memory/export` API endpoint allows you to export the Spotter memory records, including rules and recipes for the specified data models as a single YAML payload. The payload can be edited locally and re-submitted through the import memory API. The exported file can be reviewed, edited, and imported into a ThoughtSpot Org or another environment.
-
-[TIP]
-====
-Filter the export by data model GUIDs and a time window to export only memory entries created or updated within a specific period.
-====
 
 === Request parameters
 [cols="2,4", options="header"]
@@ -80,7 +80,7 @@ curl -X POST \
 The API returns a response object with the following details:
 
 * `content` +
-The serialized memory payload in the YAML format. The exported file includes an array of memories, including rules and recipes added in the Spotter memory, and data model GUID and object ID if present.
+The serialized memory payload in YAML format. The exported file includes an array of memories, including rules and recipes added to Spotter memory, and data model GUID and object ID if present.
 * `type` +
 Indicates if the memory type is `RULE` or `RECIPE`. If the type is `RULE`, the response shows the rule definition. If the type is `RECIPE`, the contents of the recipe such as task, steps, TML tokens are included in the response.
 * `datamodel_sources` +
@@ -411,7 +411,7 @@ curl -X POST \
 }'
 ----
 
-==== Example response
+=== Example response
 
 [source,JSON]
 ----
@@ -516,7 +516,7 @@ To avoid validation errors:
 
 * Ensure that the memory file and its content do not exceed the xref:spotter-ai-memory-api.adoc#memory-file-limits[limits]. A data model referenced by more than one `ALWAYS_APPLY_RULES` item is rejected. Ensure that you combine them into a single item's `rules` list.
 * The content string does not include any unknown keys at the top level, within an item, or under `content`.
-* Ensure that the `type` for each item is set to the three supported values (`RULE`, `RECIPE`, and `ALWAYS_APPLY_RULES`, and the `content` string for each memory entry matches that type's shape and all required fields are defined.
+* Ensure that the `type` for each item is set to the three supported values (`RULE`, `RECIPE`, and `ALWAYS_APPLY_RULES`), and the `content` string for each memory entry matches that type's shape and all required fields are defined.
 * Ensure that there are no non-string or empty `tags`. Certain tags reserved for internal use are stripped automatically before the item is stored.
 
 [#validation-error-reference]
