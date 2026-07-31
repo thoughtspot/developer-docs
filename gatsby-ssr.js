@@ -12,7 +12,7 @@ exports.onRenderBody = ({ setHeadComponents, setPreBodyComponents }) => {
     ]);
 
     // Visually-hidden body element — picked up by agent crawlers that parse the DOM
-    // but ignore <head> link tags (Mintlify llms-txt-directive-html check).
+    // but ignore <head> link tags.
     setPreBodyComponents([
         React.createElement(
             'div',
