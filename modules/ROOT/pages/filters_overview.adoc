@@ -35,7 +35,7 @@ xref:runtime-filters.adoc#_maximum_filter_count[Runtime filter limit] for more i
 
 4. link:https://docs.thoughtspot.com/cloud/latest/liveboard-filters[Liveboard filters, window=_blank] +
 Liveboard filters apply to all visualizations on the Liveboard and are visible as UI components at the top of a Liveboard page. When a filter is clicked, a modal with filter options appropriate for the data type is displayed. +
-Liveboard users can add or modify filters as needed. If you are embedding a Liveboard that includes preset filters, you can programmatically update, reset, or remove filters using the `HostEvent.UpdateFilters`.
+Liveboard users can add or modify filters as needed. If you are embedding a Liveboard that includes preset filters, you can programmatically update, reset, or remove filters using `HostEvent.UpdateFilters`.
 
 5. link:https://docs.thoughtspot.com/cloud/latest/liveboard-filters-cross[Liveboard cross filters, window=_blank] +
 Cross filters are ad-hoc filters based on user selection. These filters are used for brushing and linking Liveboard visualizations. +
@@ -55,7 +55,7 @@ All operations result in a `WHERE` clause being applied to the queries generated
 A data filter object in ThoughtSpot typically includes the following attributes:
 
 `column`, `columnName`, **or** `columnId`::
-The name of the column to filter on. For example, `item type` or `product`. The column value must match the actual column name in the ThoughtSpot model. If the model uses column aliases, use the base column name, not the alias. This attribute is defined as `col1`, `col2`, `col3` in the object URLs and REST API requests, as `columnName` in the `runtimeFilters` array in the Visual Embed SDK. The filter object for host events in the SDK allows `column` or `columnName`.
+The name of the column to filter on. For example, `item type` or `product`. The column value must match the actual column name in the ThoughtSpot model. If the model uses column aliases, use the base column name, not the alias. This attribute is defined as `col1`, `col2`, `col3` in the object URLs and REST API requests, and as `columnName` in the `runtimeFilters` array in the Visual Embed SDK. The filter object for host events in the SDK allows `column` or `columnName`.
 +
 If there are multiple columns with the same name, you can use the `WORKSHEET_NAME::COLUMN_NAME` format; for example, `"(Sample) Retail - Apparel::city"`.
 
@@ -63,7 +63,7 @@ If there are multiple columns with the same name, you can use the `WORKSHEET_NAM
 The supported operators include:
 +
 [width="80%" cols="1,2,2"]
-[options='header']
+[options="header"]
 |===
 |Operator|Description|Number of Values
 
@@ -122,6 +122,7 @@ The supported operators include:
 | `IN`
 | is included in this list of values
 | multiple
+
 | `NOT_IN`
 | is not included in this list of values
 | multiple
@@ -220,19 +221,38 @@ liveboardEmbed.trigger(HostEvent.UpdateFilters, {
 ----
 
 === GetFilters and GetParameters events
-If you want to build your own filter UI within the embedding app, you can find out details of the Liveboard and runtime filters that are defined using the link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_getfilters[HostEvent.GetFilters]. There is an equivalent link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_getparameters[HostEvent.GetParameters] to get the currently set Parameter values:
+If you want to build your own filter UI within the embedding app, you can find out details of the Liveboard and runtime filters that are defined using `HostEvent.GetFilters`.
+
+**GetFilters**
 
 [source,JavaScript]
 ----
 const data = await liveboardEmbed.trigger(HostEvent.GetFilters);
 console.log('data', data);
+----
 
+Each filter object in the `HostEvent.GetFilters` response includes two additional fields:
+
+* `applicable_viz`: indicates whether the filter applies to `ALL` visualizations or only `SPECIFIC` ones (with a `viz_ids` array).
+* `linking`: indicates whether the filter is linked to other filters, and which columns it is linked to (`is_linked`, `linked_columns`).
+
+For more information, see xref:events-hostEvents.adoc#_hostevent_getfilters[HostEvent.GetFilters] and xref:HostEvent.adoc#_getfilters[HostEvent reference documentation].
+
+
+**GetParameters** +
+To get the currently set Parameter values, use `HostEvent.GetParameters`:
+
+[source,JavaScript]
+----
 liveboardEmbed.trigger(HostEvent.GetParameters).then((parameter) => {
     console.log('parameters', parameter);
 });
 ----
 
-Note that `HostEvent.GetFilters` and `HostEvent.GetParameters` return a promise directly rather than taking a callback function as their second argument.
+[NOTE]
+====
+`HostEvent.GetFilters` and `HostEvent.GetParameters` return a promise directly rather than taking a callback function as their second argument.
+====
 
 === FilterChanged and ParameterChanged events
 You can also listen for the user's interactions with the filters using the link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent#_filterchanged[EmbedEvent.FilterChanged].
@@ -267,7 +287,7 @@ When updating filters using `HostEvent.UpdateFilters`, you must include the date
 The following table lists the supported filter types and examples for each type:
 
 [width="100%" cols="3,8"]
-[options='header']
+[options="header"]
 |=====
 |Type| Description
 
@@ -460,7 +480,7 @@ The `override_filters` value is a JSON array of filter objects, with each object
 
 [IMPORTANT]
 ====
-* The `override_filters` accepts a JSON array directly, not an object that wraps the array.
+* The `override_filters` parameter accepts a JSON array directly, not an object that wraps the array.
 * Specifying two or more filter objects that target the same date column returns the error, `more than one filter objects are not allowed for date type column <column_name>`. However, columns with other data type do not have this restriction. Multiple filter objects on the same non-date column are merged.
 ====
 
@@ -508,6 +528,7 @@ Valid values for rolling date filters include: +
 * `TODAY` - The current calendar day.
 * `TOMORROW` - The next calendar day.
 * `THIS_PERIOD` - The current period (for example, this quarter).
+* `LAST_PERIOD` - The previous single period (for example, last month).
 * `NEXT_PERIOD` - The next single period (for example, next month).
 * `LAST_N_PERIOD` - The last _N_ complete periods.
 * `NEXT_N_PERIOD` - The next _N_ complete periods.
@@ -536,7 +557,7 @@ Valid values for `datePeriod` include:
 * `MONTH` - Calendar month
 * `QUARTER` - Calendar quarter
 * `YEAR`  - Calendar year
-* `HOUR` - Hour (`dateTime` columns only)
+* `HOUR` - Hour (`datetime` columns only)
 * `MINUTE` - Minute (`datetime` columns only)
 * `SECOND` - Second (`datetime` columns only)
 
@@ -675,7 +696,7 @@ Name of the month in uppercase. Required for `MONTH_YEAR`.
 Refer to the following table for examples of JSON object for date filters:
 
 [width="100%" cols="3,8"]
-[options='header']
+[options="header"]
 |=====
 |Date filter type | Example
 
@@ -918,3 +939,5 @@ Refer to the following documentation for more information:
 There is no specific event to update `search_query filters` in the `SearchEmbed` component or the Liveboard edit mode.
 
 You can set your app to listen to link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent#_querychanged[EmbedEvent.QueryChanged] and trigger the link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_gettml[HostEvent.GetTML] event to get a new TML generated for the `search_query` string after an update.
+
+////
