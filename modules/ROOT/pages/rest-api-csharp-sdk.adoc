@@ -1,0 +1,340 @@
+= C# SDK for REST APIs
+:toc: true
+:toclevels: 3
+
+:page-title: REST API C# SDK
+:page-pageid: rest-api-sdk-csharp
+:page-description: Use the C# SDK to call ThoughtSpot REST API v2 endpoints from .NET applications.
+
+The link:https://github.com/thoughtspot/rest-api-sdk/tree/release/sdks/csharp[REST API C# SDK, window=_blank] provides a client library to interact with ThoughtSpot REST API v2 endpoints from `.NET` applications. The SDK targets `net8.0` and ships both synchronous and asynchronous variants of every API method.
+
+The SDK package is available on link:https://www.nuget.org/packages/ThoughtSpot.RestApi.Sdk[NuGet, window=_blank].
+
+== Before you begin
+
+Before you begin, check the following prerequisites:
+
+* Your environment targets .NET 8 (`net8.0`) or later.
+* You have access to a ThoughtSpot instance and the following information:
+** The URL of your ThoughtSpot instance
+** User credentials (username and password, or a secret key for trusted authentication)
+* You have user privileges and object permissions to view, edit, or create ThoughtSpot objects and resources.
+
+== Import the SDK
+
+Install the package:
+
+Using the .NET CLI::
+
+[source,bash]
+----
+dotnet add package ThoughtSpot.RestApi.Sdk --version 2.27.0
+----
+
+Using the NuGet Package Manager console::
+
+[source,bash]
+----
+Install-Package ThoughtSpot.RestApi.Sdk -Version 2.27.0
+----
+
+== API client configuration
+All SDK clients are configured with an `ApiClientConfiguration` record. Provide your ThoughtSpot instance URL and one authentication option, then build your client using `CreateAsync`.
+
+`CreateAsync` is the recommended entry point. It is required for SSE streaming methods and for automatic token refresh when using `Username`+`Password`, `Username`+`SecretKey`, or `TokenProvider`.
+
+[source,csharp]
+----
+using ThoughtSpot.RestApi.Sdk;
+using ThoughtSpot.RestApi.Sdk.Api;
+using ThoughtSpot.RestApi.Sdk.Model;
+
+var config = new ApiClientConfiguration
+{
+    Host     = "https://your-thoughtspot-instance.thoughtspot.cloud",
+    Username = "your-username",
+    Password = "your-password",
+};
+
+var api = await ThoughtSpotRestApi.CreateAsync(config);
+----
+
+=== Configuration options
+[width="100%", cols="2,2,4"]
+[options="header"]
+|====
+|Option|Default|Description
+|`Host`|—|Required. Base URL of your ThoughtSpot instance, for example, `\https://my-cluster.thoughtspot.cloud`.
+|`Username` / `Password`|`null`|Credentials for password-based authentication. The SDK fetches and refreshes a bearer token automatically.
+|`Username` / `SecretKey`|`null`|Credentials for trusted authentication. Use when Trusted Authentication is enabled on your instance.
+|`TokenProvider`|`null`|An async callback (`Func<CancellationToken, Task<string>>`) invoked before every request. You own caching and refresh logic inside this function.
+|`BearerToken`|`null`|[.deprecated]#Deprecated# Static bearer token. Does not refresh — requests fail with 401 after the token expires. Use `TokenProvider` or `CreateAsync` for automatic refresh instead.
+|`TokenValiditySeconds`|`300`|How long (in seconds) a fetched token is considered valid before the SDK refreshes it. The value is sent to the server and used client-side.
+|`ConnectTimeout`|60 seconds|TCP connection establishment timeout. Matches the Java SDK's `connectTimeoutMillis` default.
+|`ReadTimeout`|300 seconds|Time allowed to read a response after the connection is established. Matches the Java SDK's `readTimeoutMillis` default.
+|`WriteTimeout`|300 seconds|Time allowed to send a request body. Matches the Java SDK's `writeTimeoutMillis` default.
+|`IgnoreSslErrors`|`false`|Disables SSL certificate validation. Use only for development or test environments with self-signed certificates.
+|`EnableRetries`|`false`|Set to `true` to enable the built-in Polly retry pipeline.
+|`RetryPipeline`|`null`|A custom Polly `ResiliencePipeline<HttpResponseMessage>`. Used only when `EnableRetries` is `true`. Falls back to `RetryConfiguration.Default` when `null`.
+|`DefaultHeaders`|Empty|Headers added to every outgoing request.
+|====
+
+== Authentication
+The SDK supports four authentication modes. The first three use automatic token management and require `CreateAsync`.
+
+=== Username and password
+The SDK fetches a bearer token on startup, caches it, and refreshes it automatically 30 seconds before it expires. No token management is required in application code.
+
+[source,csharp]
+----
+var config = new ApiClientConfiguration
+{
+    Host     = "https://your-thoughtspot-instance.thoughtspot.cloud",
+    Username = "your-username",
+    Password = "your-password",
+};
+
+var api = await ThoughtSpotRestApi.CreateAsync(config);
+var me = await api.GetCurrentUserInfoAsync();
+Console.WriteLine($"Logged in as: {me.Name}");
+----
+
+=== Username and secret key (trusted authentication)
+Use this mode when Trusted Authentication is enabled on your ThoughtSpot instance. The SDK authenticates on behalf of the specified user using the xref:trusted-auth-secret-key.adoc[secret key generated on your instance].
+
+[source,csharp]
+----
+var config = new ApiClientConfiguration
+{
+    Host      = "https://your-thoughtspot-instance.thoughtspot.cloud",
+    Username  = "your-username",
+    SecretKey = "your-secret-key",
+};
+
+var api = await ThoughtSpotRestApi.CreateAsync(config);
+----
+
+=== Token provider
+Use this mode when you manage tokens externally, for example, through an identity provider or a secrets vault. The `TokenProvider` delegate is invoked before every request. Implement your own caching and refresh logic inside the delegate.
+
+[source,csharp]
+----
+var config = new ApiClientConfiguration
+{
+    Host          = "https://your-thoughtspot-instance.thoughtspot.cloud",
+    TokenProvider = async cancellationToken =>
+        await myIdentityProvider.FetchBearerAsync(cancellationToken),
+};
+
+var api = await ThoughtSpotRestApi.CreateAsync(config);
+----
+
+=== Static bearer token (deprecated)
+
+[CAUTION]
+====
+`BearerToken` is deprecated. A static token does not refresh. When it expires, all requests fail with HTTP 401. Use `Username`+`Password`, `Username`+`SecretKey`, or `TokenProvider` instead.
+====
+
+[source,csharp]
+----
+#pragma warning disable CS0618 // suppress obsolete warning
+var config = new ApiClientConfiguration
+{
+    Host        = "https://your-thoughtspot-instance.thoughtspot.cloud",
+    BearerToken = "your-static-bearer-token",
+};
+#pragma warning restore CS0618
+var api = await AuthenticationApi.CreateAsync(config);
+----
+
+== Per-tag API classes and the aggregate client
+The SDK exposes the ThoughtSpot REST API surface through two complementary access styles:
+
+* **28 per-tag API classes**: Each covers one functional area. Use a focused class when you only need a narrow surface (for example, `UsersApi`, `MetadataApi`, or `AIApi`).
+* **`ThoughtSpotRestApi`**: Aggregates all 28 API classes behind a single object. Use this when your application calls endpoints across multiple areas.
+
+Both styles are created with `CreateAsync` and take the same `ApiClientConfiguration`:
+
+[source,csharp]
+----
+// Using the aggregate client
+var api = await ThoughtSpotRestApi.CreateAsync(config);
+var users = await api.SearchUsersAsync(new SearchUsersRequest());
+
+// Using a focused per-tag class
+var usersApi = await UsersApi.CreateAsync(config);
+var users    = await usersApi.SearchUsersAsync(new SearchUsersRequest());
+----
+
+== Synchronous and asynchronous usage
+Every method has both an asynchronous variant (`XxxAsync`) and a blocking synchronous variant (the same name without the `Async` suffix). Use the synchronous variant from code that cannot use `await`.
+
+[source,csharp]
+----
+// Async (recommended)
+var me = await api.GetCurrentUserInfoAsync();
+
+// Synchronous (blocking)
+var me = api.GetCurrentUserInfo();
+Console.WriteLine(me.Name);
+----
+
+== Access response status and headers
+
+Every method has a `WithHttpInfo` / `WithHttpInfoAsync` variant that returns an `ApiResponse<T>` wrapping the HTTP status code, response headers, and deserialized data.
+
+[source,csharp]
+----
+var response = await api.GetCurrentUserInfoWithHttpInfoAsync();
+Console.WriteLine(response.StatusCode);  // e.g. 200
+Console.WriteLine(response.Data.Name);
+----
+
+== Streaming (SSE)
+Endpoints that return server-sent events (SSE) expose a `XxxStreamAsync` method returning `IAsyncEnumerable<string>`. This enables real-time streaming of AI responses from Spotter endpoints. Streaming requires the API class to be built with `CreateAsync`.
+
+[source,csharp]
+----
+var aiApi = await AIApi.CreateAsync(config);
+
+await foreach (var chunk in aiApi.SendAgentConversationMessageStreamingStreamAsync(
+    conversationIdentifier: conversationId,
+    sendAgentConversationMessageStreamingRequest: new SendAgentConversationMessageStreamingRequest
+    {
+        Messages = new List<string> { "What is the total revenue by region?" },
+    }))
+{
+    Console.Write(chunk);
+}
+----
+
+== File uploads
+Multipart endpoints, for example, DBT and Style Customization, accept a `FileParameter` built from a `Stream` with an optional filename and content type.
+
+[source,csharp]
+----
+await using var stream = File.OpenRead("project.zip");
+await dbtApi.DbtConnectionAsync(
+    connectionName: "my-connection",
+    databaseName:   "MY_DB",
+    importType:     "ZIP_FILE",
+    fileContent:    new FileParameter("project.zip", stream));
+----
+
+[NOTE]
+====
+The SDK automatically rewinds seekable upload streams before each retry attempt. If a stream is not seekable, the SDK aborts with a non-retryable error rather than sending incomplete data.
+====
+
+== File downloads
+Export endpoints return a `FileParameter` wrapping the response stream, filename, and content type.
+
+[source,csharp]
+----
+var file = await reportsApi.ExportLiveboardReportAsync(
+    new ExportLiveboardReportRequest
+    {
+        MetadataIdentifier = liveboardId,
+        FileFormat         = "PDF",
+    });
+
+await using var output = File.Create("report.pdf");
+await file.Content.CopyToAsync(output);
+----
+
+== Error handling
+Failed calls throw `ThoughtSpot.RestApi.Sdk.Client.ApiException`. The exception exposes:
+
+* `ErrorCode` — the HTTP status code.
+* `Message` — a human-readable error message.
+* `ErrorContent` — the deserialized error response body.
+* `Headers` — the HTTP response headers.
+
+[source,csharp]
+----
+try
+{
+    var users = await api.SearchUsersAsync(new SearchUsersRequest());
+}
+catch (ThoughtSpot.RestApi.Sdk.Client.ApiException ex)
+{
+    Console.WriteLine($"HTTP {ex.ErrorCode}: {ex.Message}");
+    Console.WriteLine(ex.ErrorContent);
+}
+----
+
+== Retries
+Retries are disabled by default. Set `EnableRetries = true` on `ApiClientConfiguration` to enable the built-in Polly pipeline — up to three attempts with exponential backoff (1 s / 2 s / 4 s) and up to 500 ms of random jitter, applied on network errors and `429`, `500`, `502`, and `503` responses.
+
+[source,csharp]
+----
+var config = new ApiClientConfiguration
+{
+    Host          = "https://your-thoughtspot-instance.thoughtspot.cloud",
+    Username      = "your-username",
+    Password      = "your-password",
+    EnableRetries = true,
+};
+----
+
+To apply a custom pipeline to a single client instance, set `RetryPipeline`:
+
+[source,csharp]
+----
+var config = new ApiClientConfiguration
+{
+    Host          = "https://your-thoughtspot-instance.thoughtspot.cloud",
+    Username      = "your-username",
+    Password      = "your-password",
+    EnableRetries = true,
+    RetryPipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
+        .AddRetry(new RetryStrategyOptions<HttpResponseMessage> { MaxRetryAttempts = 5 })
+        .Build(),
+};
+----
+
+To set a global fallback pipeline used by all instances that do not supply a `RetryPipeline`:
+
+[source,csharp]
+----
+RetryConfiguration.Default = new ResiliencePipelineBuilder<HttpResponseMessage>()
+    .AddRetry(new RetryStrategyOptions<HttpResponseMessage> { MaxRetryAttempts = 5 })
+    .Build();
+----
+
+== Runtime reconfiguration
+You can swap the host, credentials, or timeouts at runtime without restarting your application. Call `ApplyConfigurationAsync` on any API client with a new `ApiClientConfiguration`.
+
+The swap is atomic. A single CPU instruction replaces the entire HTTP stack. In-flight requests complete against the old configuration before the underlying resources are disposed.
+
+[source,csharp]
+----
+var newConfig = config with
+{
+    Host     = "https://new-cluster.thoughtspot.cloud",
+    Username = "new-username",
+    Password = "new-password",
+};
+
+await api.ApplyConfigurationAsync(newConfig);
+----
+
+== Supported versions
+
+[width="100%", cols="2,2"]
+[options="header"]
+|====
+|ThoughtSpot release|Recommended SDK version
+|ThoughtSpot Cloud 26.8.0.cl|v2.27.0 or later
+|====
+
+
+== Additional resources
+
+* link:https://www.nuget.org/packages/ThoughtSpot.RestApi.Sdk[ThoughtSpot.RestApi.Sdk on NuGet, window=_blank]
+* link:https://github.com/thoughtspot/rest-api-sdk/tree/release/sdks/csharp[SDK source on GitHub, window=_blank]
+* For information about authentication types, see xref:authentication.adoc[REST API v2 authentication].
+* Browse the +++<a href="{{navprefix}}/restV2-playground">REST API v2 Playground</a>+++ for interactive API reference.
+* For information about supported API endpoints, see xref:rest-api-v2-reference.adoc[REST API v2 reference].
+* For information about new and deprecated features, see xref:rest-apiv2-changelog.adoc[REST API v2 changelog].
