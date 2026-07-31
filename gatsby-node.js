@@ -78,6 +78,13 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
                         node {
                             document { title }
                             pageAttributes { pageid }
+                            fields { markdownBody }
+                            parent {
+                                ... on File {
+                                    sourceInstanceName
+                                    relativePath
+                                }
+                            }
                         }
                     }
                 }
@@ -85,17 +92,55 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
         `);
 
         if (result.errors) {
-            reporter.warn(`llms.txt generation: GraphQL errors — ${JSON.stringify(result.errors)}`);
+            reporter.warn(`Build-time generation: GraphQL errors — ${JSON.stringify(result.errors)}`);
             return;
         }
 
-        const pageMap = {};
+        // pageData keyed by pageid: { title, docPath }
+        // docPath is the URL-path segment (e.g. '/getting-started', '/tutorials/intro')
+        // derived from getDocLinkFromEdge so tutorials with subdirectories resolve correctly.
+        const pageData = {};
+        let mdCount = 0;
+        // Pages whose markdown exceeds this limit are truncated with a continuation link.
+        // Keeps all pages within the agent-score page-size threshold while preserving crawlability.
+        const MAX_MD_CHARS = 95_000;
+
         result.data.allAsciidoc.edges.forEach(({ node }) => {
             const pageid = node.pageAttributes?.pageid;
             const title = node.document?.title;
-            if (pageid && title) pageMap[pageid] = title;
+            const markdownBody = node.fields?.markdownBody;
+            const relativePath = node.parent?.relativePath || '';
+            // Auto-generated per-symbol SDK reference pages (scripts/Converter/index.ts) —
+            // represented in llms.txt by the single curated VisualEmbedSdk entry, not individually.
+            const isTypedocGenerated = relativePath.startsWith('generated/typedoc/');
+
+            if (!pageid || pageid.startsWith('nav-')) return;
+
+            const docPath = getDocLinkFromEdge({ node }); // e.g. '/getting-started' or '/tutorials/category/page'
+            if (title) pageData[pageid] = { title, docPath, isTypedocGenerated };
+
+            // Write static .md file — serves at /docs<docPath>.md for agent crawlers
+            if (markdownBody) {
+                let body = markdownBody;
+                if (body.length > MAX_MD_CHARS) {
+                    // Trim at the last complete line within the limit
+                    const cut = body.lastIndexOf('\n', MAX_MD_CHARS);
+                    body = body.slice(0, cut > MAX_MD_CHARS * 0.8 ? cut : MAX_MD_CHARS);
+                    body += `\n\n---\n\n> **Content truncated.** This page exceeds the inline size limit. View the complete documentation at [${SITE_URL}${docPath}](${SITE_URL}${docPath})\n`;
+                }
+                const header = `# ${title ?? pageid}\n\n> For the complete documentation index, see [llms.txt](${SITE_URL}/llms.txt)\n\nSource: ${SITE_URL}${docPath}\n\n`;
+                fsExtra.outputFileSync(
+                    `${__dirname}/public${docPath}.md`,
+                    header + body,
+                );
+                mdCount++;
+            }
         });
 
+        reporter.info(`[md-gen] Wrote ${mdCount} .md files`);
+
+        // Generate llms.txt — curated sections first, then any remaining pages
+        const coveredIds = new Set();
         const lines = [
             '# ThoughtSpot Developer Documentation',
             '',
@@ -104,11 +149,29 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
         ];
 
         for (const section of LLMS_SECTIONS) {
-            lines.push(`## ${section.label}`);
+            const sectionLines = [];
             for (const pageId of section.pageIds) {
-                const title = pageMap[pageId];
-                if (title) lines.push(`- [${title}](${SITE_URL}/${pageId})`);
+                const data = pageData[pageId];
+                if (data) {
+                    sectionLines.push(`- [${data.title}](${SITE_URL}${data.docPath}.md)`);
+                    coveredIds.add(pageId);
+                }
             }
+            if (sectionLines.length) {
+                lines.push(`## ${section.label}`);
+                lines.push(...sectionLines);
+                lines.push('');
+            }
+        }
+
+        // Add pages that exist as Asciidoc nodes but aren't in any LLMS_SECTIONS entry.
+        // Excludes typedoc-generated pages — those are covered by the curated VisualEmbedSdk entry.
+        const uncovered = Object.entries(pageData).filter(
+            ([id, data]) => !coveredIds.has(id) && !data.isTypedocGenerated,
+        );
+        if (uncovered.length) {
+            lines.push('## Additional documentation');
+            uncovered.forEach(([, { title, docPath }]) => lines.push(`- [${title}](${SITE_URL}${docPath}.md)`));
             lines.push('');
         }
 
@@ -116,9 +179,9 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
             `${__dirname}/public/llms.txt`,
             lines.join('\n'),
         );
-        reporter.info(`llms.txt generated with ${Object.keys(pageMap).length} pages`);
+        reporter.info(`llms.txt: ${coveredIds.size} curated + ${uncovered.length} additional = ${coveredIds.size + uncovered.length} total pages`);
     } catch (err) {
-        reporter.warn(`llms.txt generation failed: ${err.message}`);
+        reporter.warn(`Build-time generation failed: ${err.message}`);
     }
 };
 exports.createPages = async function ({ actions, graphql }) {
