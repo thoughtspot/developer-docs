@@ -98,10 +98,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     // breadcrumsData is derived after processedNavMap is built (see useMemo below)
     const [activeCategory, setActiveCategory] = useState<DocCategory>('guides');
     const [showSearch, setShowSearch] = useState(false);
-
-    useEffect(() => {
-        window.dispatchEvent(new CustomEvent('spotter-code-suspend', { detail: { suspended: showSearch } }));
-    }, [showSearch]);
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
     const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(() => {
@@ -461,10 +457,10 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             },
             content: {
                 top: '50px',
-                left: 'auto',
-                right: 'auto',
+                left: 0,
+                right: 0,
                 bottom: 'auto',
-                width: isMaxMobileResolution ? '40%' : '100%',
+                width: isMaxMobileResolution ? '40%' : 'calc(100% - 32px)',
                 margin: 'auto',
                 transform: 'translate(0, 70px)',
                 border: 'none',
@@ -479,6 +475,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                 isOpen={showSearch}
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
+                portalClassName="DocsSearchModalPortal"
             >
                 <div
                     id="docsModal"
