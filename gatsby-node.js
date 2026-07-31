@@ -101,6 +101,9 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
         // derived from getDocLinkFromEdge so tutorials with subdirectories resolve correctly.
         const pageData = {};
         let mdCount = 0;
+        // Pages whose markdown exceeds this limit are truncated with a continuation link.
+        // Keeps all pages within the agent-score page-size threshold while preserving crawlability.
+        const MAX_MD_CHARS = 95_000;
 
         result.data.allAsciidoc.edges.forEach(({ node }) => {
             const pageid = node.pageAttributes?.pageid;
@@ -118,10 +121,17 @@ exports.onPostBuild = async ({ graphql, reporter }) => {
 
             // Write static .md file — serves at /docs<docPath>.md for agent crawlers
             if (markdownBody) {
+                let body = markdownBody;
+                if (body.length > MAX_MD_CHARS) {
+                    // Trim at the last complete line within the limit
+                    const cut = body.lastIndexOf('\n', MAX_MD_CHARS);
+                    body = body.slice(0, cut > MAX_MD_CHARS * 0.8 ? cut : MAX_MD_CHARS);
+                    body += `\n\n---\n\n> **Content truncated.** This page exceeds the inline size limit. View the complete documentation at [${SITE_URL}${docPath}](${SITE_URL}${docPath})\n`;
+                }
                 const header = `# ${title ?? pageid}\n\n> For the complete documentation index, see [llms.txt](${SITE_URL}/llms.txt)\n\nSource: ${SITE_URL}${docPath}\n\n`;
                 fsExtra.outputFileSync(
                     `${__dirname}/public${docPath}.md`,
-                    header + markdownBody,
+                    header + body,
                 );
                 mdCount++;
             }
