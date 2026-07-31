@@ -187,22 +187,6 @@ const FloatingAssistant: React.FC = () => {
     const abortRef = useRef<AbortController | null>(null);
     const userScrolledRef = useRef(false);
 
-    const [isSuspended, setIsSuspended] = useState(false);
-    const panelRef = useRef<HTMLDivElement | null>(null);
-    useEffect(() => {
-        const handler = (e: CustomEvent<{ suspended: boolean }>) => {
-            setIsSuspended(e.detail.suspended);
-            if (e.detail.suspended) {
-                const active = document.activeElement as HTMLElement | null;
-                if (active && panelRef.current?.contains(active)) {
-                    active.blur();
-                }
-            }
-        };
-        window.addEventListener('spotter-code-suspend', handler as EventListener);
-        return () => window.removeEventListener('spotter-code-suspend', handler as EventListener);
-    }, []);
-
     useEffect(() => {
         setIsOpen(true);
     }, []);
@@ -239,10 +223,10 @@ const FloatingAssistant: React.FC = () => {
     };
 
     useEffect(() => {
-        if (isOpen && !isSuspended && inputRef.current) {
+        if (isOpen && inputRef.current) {
             inputRef.current.focus();
         }
-    }, [isOpen, isSuspended]);
+    }, [isOpen]);
 
     useEffect(() => {
         const el = inputRef.current;
@@ -252,10 +236,10 @@ const FloatingAssistant: React.FC = () => {
     }, [input]);
 
     useEffect(() => {
-        if (quotedText && !isSuspended) {
+        if (quotedText) {
             setTimeout(() => inputRef.current?.focus(), 100);
         }
-    }, [quotedText, isSuspended]);
+    }, [quotedText]);
 
     useEffect(() => {
         const handler = (e: CustomEvent<{ location: Location }>) => {
@@ -433,14 +417,13 @@ const FloatingAssistant: React.FC = () => {
         <>
             {!isOpen && !isClosing && (
                 <div
-                    className={`floating-assistant__chip-ring${isSuspended ? ' floating-assistant__chip-ring--suspended' : ''}`}
+                    className="floating-assistant__chip-ring"
                     style={{ top: isEmbedded ? '10px' : '120px' }}
                 >
                     <button
                         className="floating-assistant__chip"
                         onClick={() => setIsOpen(true)}
                         aria-label="Open SpotterCode assistant"
-                        disabled={isSuspended}
                     >
                         <SparkleIcon />
                     </button>
@@ -449,8 +432,7 @@ const FloatingAssistant: React.FC = () => {
 
             {(isOpen || isClosing) && (
                 <div
-                    ref={panelRef}
-                    className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}${isEmbedded ? ' floating-assistant__panel--embedded' : ''}${isSuspended ? ' floating-assistant__panel--suspended' : ''}`}
+                    className={`floating-assistant__panel${isClosing ? ' closing' : ''}${!isLandingPage ? ' floating-assistant__panel--conversation' : ''}${isEmbedded ? ' floating-assistant__panel--embedded' : ''}`}
                     style={{ width: panelWidth }}
                 >
                     <div className="floating-assistant__resize-handle" onMouseDown={onResizeMouseDown} />
