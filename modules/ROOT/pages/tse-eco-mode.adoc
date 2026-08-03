@@ -1,86 +1,32 @@
 = Cluster maintenance and upgrade
 :toc: true
-:toclevels: 1
+:toclevels: 2
 
 :page-title: Update cluster state
 :page-pageid: tse-cluster
-:page-description:  If you are using a ThoughtSpot Cloud cluster in the economy mode in your embedded deployments, use the APIs to restart an inactive cluster.
+:page-description: If you are using a ThoughtSpot Cloud cluster in the economy mode in your embedded deployments, use the APIs to restart an inactive cluster.
 
 At any given time, a ThoughtSpot application instance can be in any one of the following states:
 
 * `ACTIVE` +
-Indicates that the cluster is active and user activity is detected.
+When the cluster is running and user activity is detected.
 * `UNDER_MAINTENANCE` +
-Indicates that the cluster is down for maintenance due to upgrade or patching.
-* `STOPPED`
-Indicates that the cluster is stopped and no user activity is detected.
+When the cluster is temporarily unavailable because maintenance, upgrade, or patching is in progress.
+* `STOPPED` +
+When the cluster is inactive and no user activity is detected.
 * `STARTING`/`PENDING` +
-The cluster is currently starting, or some other workflow is running on the cluster.
+When the cluster is starting, or another workflow is currently in progress.
 
-== Cluster status during upgrade
+== Check whether a cluster is under maintenance
+To determine whether a cluster is under maintenance, send a `GET` request to one of the following endpoints:
 
-// SOURCE: SCAL-320519
-// TODO: [WRITER] Verify the following deprecation statement with the cluster operations/TSE
-//       team before publishing:
-//       1. Is the Ephemeral Read-Only mode fully deprecated, or is only the name changing?
-//       2. What state does the cluster enter during upgrade from 26.8.0.cl — is `UNDER_MAINTENANCE`
-//          the only state, with no user access at all?
-//       3. Does the `under_maintenance` field in the API response remain, or is it also deprecated?
-//       Update the NOTE block and surrounding text once engineering confirms the new behavior.
+* `GET /api/rest/2.0/system/banner` (Recommended)
+* `GET /tspublic/v1/admin/banner`  (legacy REST API framework)
 
-With ThoughtSpot's Minimal Downtime Ephemeral Mode upgrade option, ThoughtSpot performs cluster upgrades in the background. During an upgrade, the cluster enters a transient state and the cluster state changes to `UNDER_MAINTENANCE`.
+These APIs return banner information that indicates whether maintenance is in progress. Embedded applications can also use the banner text to inform users about the current cluster status.
 
-[NOTE]
-====
-[.version-badge.deprecated]#Deprecated# ThoughtSpot Cloud 26.8.0.cl +
-The Ephemeral Read-Only mode — which previously allowed users limited read-only access (create and view data, with changes discarded after upgrade) during cluster upgrades — is deprecated as of ThoughtSpot Cloud 26.8.0.cl. +
-+
-Clusters undergoing maintenance now enter the `UNDER_MAINTENANCE` state. Contact ThoughtSpot Support for details on upgrade scheduling and expected downtime.
-// TODO: [WRITER] If limited access is still available under a different mechanism or name,
-//       update this NOTE to describe the new behavior instead of stating "no user access."
-====
+=== REST API v2 request
 
-////
-NOTE TO WRITER: The following paragraph described the old Ephemeral (Read-Only) mode behavior.
-Reason: The read-only mode during upgrades is deprecated in 26.8.0.cl (SCAL-320519).
-Action required: Review before publishing. If any form of limited access during upgrade is
-still supported, update the paragraph below to describe the new behavior. Delete this block
-to confirm removal once the new behavior is documented.
-
-When the upgrade starts, the ThoughtSpot instance operates in the Ephemeral (Read-Only mode)
-and the cluster state changes to `UNDER_MAINTENANCE`. This means that during the upgrade, the
-system is in a transient state yet allows users to create and view data. However, any new objects
-created during the upgrade will be lost.
-////
-
-ThoughtSpot users can determine if their instance is under maintenance by sending a `GET` request to one of the following API endpoints:
-
-* REST API v1 endpoint +
-`GET /tspublic/v1/admin/banner`
-* REST API v2 endpoint +
-`GET /api/rest/2.0/system/banner`
-
-ThoughtSpot Embedded application users can also view the banner text by calling the above APIs.
-
-=== REST v1 API request
-
-.cURL
-[source,cURL]
-----
-curl -X GET \
---header 'Accept: application/json' \
-'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/admin/banner'
-----
-
-.Request URL
-
-----
-https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/admin/banner
-----
-
-=== REST v2 API request
-
-.cURL
 [source,cURL]
 ----
 curl -X GET \
@@ -88,36 +34,44 @@ curl -X GET \
 'https://{ThoughtSpot-Host}/api/rest/2.0/system/banner'
 ----
 
-.Request URL
+=== REST API v1 request
+
+[source,cURL]
 ----
-https://{ThoughtSpot-Host}/api/rest/2.0/system/banner
+curl -X GET \
+--header 'Accept: application/json' \
+'https://{ThoughtSpot-Host}/callosum/v1/tspublic/v1/admin/banner'
 ----
+
 
 === API response
+In the API response, check the following fields:
 
-If the cluster is in maintenance mode, the API returns the following response:
+* `under_maintenance`: A Boolean value that indicates whether the cluster is currently under maintenance.
+* `banner_text`: A user-facing message that describes the current system state.
+
+[NOTE]
+====
+Administrators of an embedded application can configure custom banner text to communicate maintenance status to users.
+====
+
+.Example response when the cluster is under maintenance
 ----
-{"banner_text":"This system is currently being upgraded and is in ephemeral mode. You can continue to use it to visualize data. Any objects you create or modify during this period will be lost when the upgrade is complete.","under_maintenance":true}
+{"banner_text":"This system is currently under maintenance. Check back in a few hours.","under_maintenance":true}
 ----
 
-// TODO: [WRITER] The banner_text above references "ephemeral mode" which is now deprecated.
-//       Confirm with the platform team whether the API response banner_text is also updated
-//       in 26.8.0.cl, and update this example if so.
-
-If the cluster is not in maintenance mode, the API returns the following response:
+.Example response when the cluster is operating normally
 ----
 {"banner_text":"This system is functioning normally. No maintenance is in progress.","under_maintenance":false}
 ----
 
-Administrators of the ThoughtSpot Embedded app can create their custom banner text and display it to indicate the cluster upgrade status.
+== Idle sensing and economy mode
+If you use a ThoughtSpot Cloud instance for embedded deployments, you can enable idle sensing to reduce cost and allow the cluster to operate in economy mode.
 
-== Idle sensing
-If you are using a ThoughtSpot Cloud instance for embedded deployments in your development or production environment, you can enable idle sensing to save costs and allow your cluster to operate in `economy` mode.
+When idle sensing is enabled, the cluster automatically stops after a period of inactivity. The default idle threshold is 120 minutes. To enable this feature on your cluster, contact ThoughtSpot Support.
 
-If idle sensing is enabled on your cluster, your cluster will be automatically stopped if there is no user activity detected for a given time threshold. By default, the idle time threshold is set to 120 minutes. To enable this feature on your clusters, contact ThoughtSpot Support.
-
-=== Get information about the status of a cluster
-By default, a ThoughtSpot cluster running the `economy` mode stops if there is no user activity for two hours. When a user tries to access a cluster that's in the `STOPPED` state, the API calls will return the `"cluster-state": "Stopped"` in the response header.
+=== Get the status of an inactive cluster
+When a cluster in economy mode has no user activity for 120 minutes, it transitions to the `STOPPED` state. If a user accesses a stopped cluster, the response headers include the cluster state.
 
 [source,cURL]
 ----
@@ -131,15 +85,13 @@ By default, a ThoughtSpot cluster running the `economy` mode stops if there is n
   Cluster-State: Stopped
 ----
 
-To restart the cluster, complete the steps described in the following section.
+If the cluster is stopped, restart it by using the API described in the next section.
 
-== Start an inactive cluster using API
-On a regular ThoughtSpot Cloud cluster, users can restart an inactive cluster using `CAPTCHA`. However, on embedded instances, the `CAPTCHA`-based cluster activation is not supported. Instead, the embedded  application user can send a `GET` request to their instance with the following query parameters in the request URL:
+=== Start an inactive cluster using API
+On a standard ThoughtSpot Cloud cluster, users can restart an inactive cluster by using a Completely Automated Public Turing test to tell Computers and Humans Apart (CAPTCHA). For embedded deployments, CAPTCHA-based activation is not supported. Instead, send a GET request with the required query parameters:
 
 * `tse=true`
 * `start_cluster=true`
-
-For example, to start an inactive cluster, send a `GET` request in the following parameters:
 
 .Production environment
 [source,http]
@@ -147,49 +99,51 @@ For example, to start an inactive cluster, send a `GET` request in the following
 https://{ThoughtSpot-Host}/?tse=true&start_cluster=true
 ----
 
-**Staging environment**
-
+.Staging environment
 [source,http]
 ----
 https://{cluster-name}.thoughtspotstaging.cloud/?tse=true&start_cluster=true
 ----
 
-**Development environment**
-
+.Development environment
 [source,http]
 ----
 https://{cluster-name}.thoughtspotdev.cloud/?tse=true&start_cluster=true
 ----
 
-In the request header, you must include the `security-key`. This `security-key` is used to authenticate your request when xref:trusted-auth-secret-key.adoc#trusted-auth-enable[trusted authentication is enabled]. ThoughtSpot Embedded users can obtain the `security key` for their instance or Org context from their ThoughtSpot administrator.
+=== Required headers
+In the request header, you must include `security-key` and `X-Thoughtspot-Org-Id`.
 
+`security-key`::
+Is required to authenticate your request when xref:trusted-auth-secret-key.adoc#trusted-auth-enable[trusted authentication is enabled]. ThoughtSpot Embedded users can obtain the `security-key` for their instance or Org context from their ThoughtSpot administrator.
+
+`X-Thoughtspot-Org-Id`::
 If your instance has Orgs:
-
 * Specify the Org ID in the request header along with the security key of that specific Org context. If the security key does not match the Org ID, the API returns an error.
-* If the request header includes only the security key with no Org ID, it's considered to be the security key of the global Org context (ALL Orgs). If it does not match the key generated for the All Orgs context, the API returns an error.
-
+* If the request header includes only the security key with no Org ID, it's considered to be the security key of the global Org context (**All Orgs**). If it does not match the key generated for the All Orgs context, the API returns an error.
++
 When the cluster becomes available, users are logged into the Org context based on the key provided in the request.
 
 The following example shows the cURL request for restarting a cluster:
 
-[source, cURL]
+[source,cURL]
 ----
 $ curl -X GET 'https://<cluster-name>.thoughtspot.cloud/?tse=true&start_cluster=true'  \
  -H  'X-Thoughtspot-Org-Id: {Org_Id}' \
  -H  'security-key: e8ade677-c3f1-461d-8b7f-7f0fe4e024f0'
 ----
 
-If the `GET` request is successful, the cluster starts.
+If the `GET` request is successful, the cluster starts. When the cluster becomes available, users are signed in to the Org context associated with the provided key.
 
-== Response header
+=== Response header values
 Note the cluster state in the response header:
 
 * `STARTING` +
-Indicates that the cluster is starting. It may take a few minutes for the cluster to become active.
+If the cluster is starting. It may take a few minutes to become active.
 * `UNKNOWN` +
-Indicates a possible error. Contact your administrator or ThoughtSpot Support if the cluster does not start in 5-10 minutes.
+A possible error occurred. If the cluster does not start within 5 to 10 minutes, contact your administrator or ThoughtSpot Support.
 
-[source,]
+[source,http]
 ----
  HTTP/1.1 200 OK
  Server: awselb/2.0
@@ -200,7 +154,7 @@ Indicates a possible error. Contact your administrator or ThoughtSpot Support if
  Cluster-State: Starting
 ----
 
-== Response codes
+=== Response codes
 [options="header", cols="1,4"]
 |===
 |HTTP status code|Description
