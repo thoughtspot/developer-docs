@@ -80,16 +80,20 @@ var api = await ThoughtSpotRestApi.CreateAsync(config);
 |====
 
 == Authentication
-The SDK supports the following authentication modes. The first three use automatic token management and require `CreateAsync`.
+The SDK supports the following authentication modes. These modes use automatic token management and require `CreateAsync`.
 
 * xref:rest-api-csharp-sdk.adoc#username-and-password[Username and password]
-* xref:rest-api-csharp-sdk.adoc#username-and-secretKey[Username and secret key]
+* xref:rest-api-csharp-sdk.adoc#username-and-secret-key[Username and secret key]
 * xref:rest-api-csharp-sdk.adoc#token-provider[Token provider]
-* xref:rest-api-csharp-sdk.adoc#static-bearer-token[Static bearer token]
+
+[NOTE]
+====
+The SDK also accepts a static BearerToken. However, a static token does not refresh and when it expires, all requests fail with HTTP 401. Use the `Username` and `Password`, `Username` and `SecretKey`, or `TokenProvider` modes instead.
+====
 
 [#username-and-password]
 === Username and password
-The SDK fetches a bearer token on startup, caches it, and refreshes it automatically 30 seconds before it expires. No token management is required in application code.
+The SDK calls the `fullAccessToken` API internally with the provided credentials to obtain a bearer token on startup. The token is cached and refreshed automatically 30 seconds before it expires. No token management is required in your application code.
 
 [source,csharp]
 ----
@@ -105,9 +109,9 @@ var me = await api.GetCurrentUserInfoAsync();
 Console.WriteLine($"Logged in as: {me.Name}");
 ----
 
-[#username-and-secretKey]
+[#username-and-secret-key]
 === Username and secret key (trusted authentication)
-Use this mode when Trusted authentication is enabled on your ThoughtSpot instance. The SDK authenticates on behalf of the specified user using the xref:trusted-auth-secret-key.adoc[secret key generated on your instance].
+Use this mode when Trusted authentication is enabled on your ThoughtSpot instance. The SDK calls the `fullAccessToken` API internally with the provided username and xref:trusted-auth-secret-key.adoc[secret key] to obtain a bearer token on startup. The token is cached and refreshed automatically 30 seconds before it expires. No token management is required in your application code.
 
 [source,csharp]
 ----
@@ -135,26 +139,6 @@ var config = new ApiClientConfiguration
 };
 
 var api = await ThoughtSpotRestApi.CreateAsync(config);
-----
-
-[#static-bearer-token]
-=== Static bearer token (deprecated)
-
-[CAUTION]
-====
-`BearerToken` is deprecated. A static token does not refresh. When it expires, all requests fail with HTTP 401. Use `Username`+`Password`, `Username`+`SecretKey`, or `TokenProvider` instead.
-====
-
-[source,csharp]
-----
-#pragma warning disable CS0618 // suppress obsolete warning
-var config = new ApiClientConfiguration
-{
-    Host        = "https://your-thoughtspot-instance.thoughtspot.cloud",
-    BearerToken = "your-static-bearer-token",
-};
-#pragma warning restore CS0618
-var api = await AuthenticationApi.CreateAsync(config);
 ----
 
 == Per-tag API classes and the aggregate client
@@ -190,7 +174,6 @@ Console.WriteLine(me.Name);
 ----
 
 == Access response status and headers
-
 Every method has a `WithHttpInfo` / `WithHttpInfoAsync` variant that returns an `ApiResponse<T>` wrapping the HTTP status code, response headers, and deserialized data.
 
 [source,csharp]
@@ -269,11 +252,11 @@ Failed calls throw `ThoughtSpot.RestApi.Sdk.Client.ApiException`. The exception 
 ----
 try
 {
-    var users = await api.SearchUsersAsync(new SearchUsersRequest());
+    await api.SearchUsersAsync(new SearchUsersRequest());
 }
 catch (ThoughtSpot.RestApi.Sdk.Client.ApiException ex)
 {
-    Console.WriteLine($"HTTP {ex.ErrorCode}: {ex.Message}");
+    Console.WriteLine($"{ex.ErrorCode}: {ex.Message}");
     Console.WriteLine(ex.ErrorContent);
 }
 ----
