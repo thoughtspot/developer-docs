@@ -87,6 +87,140 @@ Creates an import TML tasks and processes TMLs asynchronously
 * +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Ffetch-async-import-task-status">POST /api/rest/2.0/metadata/tml/async/status</a>+++ +
 Fetches status of import tasks
 
+=== Best practices for async TML import
+
+Use the following guidelines to configure and manage async TML import tasks effectively.
+
+==== Choose the right import policy
+
+[width="100%", cols="1,3,2,2"]
+[options='header']
+|====
+|Policy|Behavior|Recommended use case|Limits and risks
+
+|`ALL_OR_NONE`
+|All objects are validated and saved in a single database write.
+If any object fails, no objects are written.
+|Small, tightly coupled object sets requiring atomicity.
+|Limit to approximately 50 TML objects per task.
+Exceeding this risks OOM errors or database write failures.
+Liveboard size affects this limit; Liveboards averaging approximately 30 visualizations are a useful sizing baseline.
+
+|`VALIDATE_ONLY`
+|Objects are validated in memory.
+No changes are written to the database.
+|Pre-import validation before committing to a production import.
+|All changes accumulate in memory.
+Very large tasks risk OOM errors.
+
+|`PARTIAL`
+|Objects that pass validation are written.
+Failed objects are skipped without dropping subentities.
+If a subentity (such as a visualization) fails, the parent object (such as a Liveboard) also fails and is not written.
+|Large-scale migrations where some failures are expected.
+Resubmit failed objects as a new task after fixing errors.
+|Recommended policy for large imports.
+Objects are written incrementally, reducing memory pressure.
+
+|`PARTIAL_OBJECT`
+|Objects that pass validation are written.
+If a subentity (visualization, join, or RLS rule) fails, the parent object is written with a warning and the failed subentity is dropped.
+|Large-scale migrations where pipeline continuity matters more than completeness.
+|Recommended when a missing visualization or dropped join is acceptable in the target environment.
+|====
+
+[NOTE]
+====
+If you use custom scripts to batch imports with `ALL_OR_NONE`, the net result across batches is effectively the same as `PARTIAL` behavior—some batches succeed and some fail.
+Use the `PARTIAL` policy directly for large-volume imports rather than scripting `ALL_OR_NONE` batches.
+====
+
+[IMPORTANT]
+====
+Use `PARTIAL` or `PARTIAL_OBJECT` for large import operations.
+`ALL_OR_NONE` and `VALIDATE_ONLY` process all objects in memory or in a single database transaction, which can cause OOM errors on large tasks.
+====
+
+==== Size your import tasks
+
+* For `ALL_OR_NONE` and `VALIDATE_ONLY`, limit tasks to approximately 50 TML objects.
+There is no hard code limit, but larger tasks risk OOM errors or failed database writes.
+The safe upper bound depends on Liveboard complexity.
+Liveboards with an average of approximately 30 visualizations each provide a reasonable sizing baseline.
+
+* For `PARTIAL` and `PARTIAL_OBJECT`, there is no per-task object limit enforced by the API.
+These policies write objects incrementally and are appropriate for large migration workloads.
+
+* The API payload size limit is 500 MB per request (infrastructure limit).
+Contact ThoughtSpot Support if your use case requires a larger limit.
+
+// TODO: verify with engineering — confirm whether the ~50-object guideline counts TML strings in the array, or total distinct objects including dependents.
+
+==== Avoid parallel imports of the same object
+
+Never submit tasks that include the same object in more than one active task simultaneously.
+Concurrent writes to the same object cause a version conflict, and one of the tasks will fail.
+
+Design your import pipeline so that each object appears in at most one active import task at a time.
+Sequence tasks, do not parallelize them across the same objects.
+
+==== Monitor the task queue and status
+
+The async import queue supports a maximum of 100 concurrent tasks.
+Submitting more than 100 tasks at once causes the excess tasks to be rejected with a `FAILED` status immediately.
+
+Poll the `POST /api/rest/2.0/metadata/tml/async/status` endpoint to check task status.
+
+[width="100%", cols="1,4"]
+[options='header']
+|====
+|Status value|Description
+
+|`IN_QUEUE`
+|The task is waiting to be processed.
+The queue limit is 100 concurrent tasks.
+Tasks submitted beyond the limit are rejected immediately with status `FAILED`.
+
+|`IN_PROGRESS`
+|The task is being processed.
+
+|`COMPLETED`
+|The task processing is complete.
+`COMPLETED` does not mean every object imported successfully.
+Individual objects within the task have their own statuses.
+Inspect per-object status in the response to identify failures.
+
+|`FAILED`
+|The task failed.
+Possible causes: the queue was full at submission time, a policy-level failure occurred, or an unrecoverable error was encountered during processing.
+|====
+
+*Recommended polling intervals:*
+
+* Minimum polling interval: 30 seconds.
+* For large tasks: poll every 1 minute. Large tasks take proportionally longer to complete.
+
+==== Use API parameters correctly
+
+The following parameters in `POST /api/rest/2.0/metadata/tml/async/import` require careful use:
+
+`create_new`::
+Set `create_new: true` only when you want to create objects with new GUIDs, not update existing objects.
+Setting this parameter on objects that already exist creates duplicates.
+Do not set this parameter unless you are certain that new objects should be created.
+
+`skip_diff_check`::
+Set `skip_diff_check: true` only when you want to force a re-import of a TML file that has not changed since the previous import.
+By default, ThoughtSpot identifies unchanged objects and skips them to reduce import time.
+Enable this parameter only when unchanged files must be explicitly reprocessed.
+
+`enable_large_metadata_validation`::
+// TODO: verify with engineering — confirm purpose, behavior, and recommended use of `enable_large_metadata_validation` before publishing.
+
+==== Schedule large imports during off-peak hours
+
+Large TML migrations can temporarily increase system resource usage.
+Schedule bulk async imports during off-peak hours to reduce the risk of impacting users who are actively using the cluster.
 === Schedule import tasks
 
 You can import TML objects asynchronously by scheduling TML import tasks via `POST` request to POST `/api/rest/2.0/metadata/tml/async/import` API endpoint. You can send the following parameters in the API request body:
