@@ -41,7 +41,7 @@ Install-Package ThoughtSpot.RestApi.Sdk -Version 2.27.0
 == API client configuration
 All SDK clients are configured with an `ApiClientConfiguration` record. Provide your ThoughtSpot instance URL and one authentication option, then build your client using `CreateAsync`.
 
-`CreateAsync` is the recommended entry point. It is required for SSE streaming methods and for automatic token refresh when using `Username`+`Password`, `Username`+`SecretKey`, or `TokenProvider`.
+`CreateAsync` is the recommended entry point. It is required for server-sent event (SSE) streaming methods and for automatic token refresh when using `Username`+`Password`, `Username`+`SecretKey`, or `TokenProvider`.
 
 [source,csharp]
 ----
@@ -66,9 +66,9 @@ var api = await ThoughtSpotRestApi.CreateAsync(config);
 |Option|Default|Description
 |`Host`|—|Required. Base URL of your ThoughtSpot instance, for example, `\https://my-cluster.thoughtspot.cloud`.
 |`Username` / `Password`|`null`|Credentials for password-based authentication. The SDK fetches and refreshes a bearer token automatically.
-|`Username` / `SecretKey`|`null`|Credentials for trusted authentication. Use when Trusted Authentication is enabled on your instance.
+|`Username` / `SecretKey`|`null`|Credentials for trusted authentication. Use when Trusted authentication is enabled on your instance.
 |`TokenProvider`|`null`|An async callback (`Func<CancellationToken, Task<string>>`) invoked before every request. You own caching and refresh logic inside this function.
-|`BearerToken`|`null`|[.deprecated]#Deprecated# Static bearer token. Does not refresh — requests fail with 401 after the token expires. Use `TokenProvider` or `CreateAsync` for automatic refresh instead.
+|`BearerToken`|`null`|[.version-badge.deprecated]#Deprecated# Static bearer token. Does not refresh. Requests fail with 401 after the token expires. Use `TokenProvider` or `CreateAsync` for automatic refresh instead.
 |`TokenValiditySeconds`|`300`|How long (in seconds) a fetched token is considered valid before the SDK refreshes it. The value is sent to the server and used client-side.
 |`ConnectTimeout`|60 seconds|TCP connection establishment timeout. Matches the Java SDK's `connectTimeoutMillis` default.
 |`ReadTimeout`|300 seconds|Time allowed to read a response after the connection is established. Matches the Java SDK's `readTimeoutMillis` default.
@@ -80,8 +80,14 @@ var api = await ThoughtSpotRestApi.CreateAsync(config);
 |====
 
 == Authentication
-The SDK supports four authentication modes. The first three use automatic token management and require `CreateAsync`.
+The SDK supports the following authentication modes. The first three use automatic token management and require `CreateAsync`.
 
+* xref:rest-api-csharp-sdk.adoc#username-and-password[Username and password]
+* xref:rest-api-csharp-sdk.adoc#username-and-secretKey[Username and secret key]
+* xref:rest-api-csharp-sdk.adoc#token-provider[Token provider]
+* xref:rest-api-csharp-sdk.adoc#static-bearer-token[Static bearer token]
+
+[#username-and-password]
 === Username and password
 The SDK fetches a bearer token on startup, caches it, and refreshes it automatically 30 seconds before it expires. No token management is required in application code.
 
@@ -99,8 +105,9 @@ var me = await api.GetCurrentUserInfoAsync();
 Console.WriteLine($"Logged in as: {me.Name}");
 ----
 
+[#username-and-secretKey]
 === Username and secret key (trusted authentication)
-Use this mode when Trusted Authentication is enabled on your ThoughtSpot instance. The SDK authenticates on behalf of the specified user using the xref:trusted-auth-secret-key.adoc[secret key generated on your instance].
+Use this mode when Trusted authentication is enabled on your ThoughtSpot instance. The SDK authenticates on behalf of the specified user using the xref:trusted-auth-secret-key.adoc[secret key generated on your instance].
 
 [source,csharp]
 ----
@@ -114,6 +121,7 @@ var config = new ApiClientConfiguration
 var api = await ThoughtSpotRestApi.CreateAsync(config);
 ----
 
+[#token-provider]
 === Token provider
 Use this mode when you manage tokens externally, for example, through an identity provider or a secrets vault. The `TokenProvider` delegate is invoked before every request. Implement your own caching and refresh logic inside the delegate.
 
@@ -129,6 +137,7 @@ var config = new ApiClientConfiguration
 var api = await ThoughtSpotRestApi.CreateAsync(config);
 ----
 
+[#static-bearer-token]
 === Static bearer token (deprecated)
 
 [CAUTION]
@@ -191,6 +200,7 @@ Console.WriteLine(response.StatusCode);  // e.g. 200
 Console.WriteLine(response.Data.Name);
 ----
 
+[#streaming-sse]
 == Streaming (SSE)
 Endpoints that return server-sent events (SSE) expose a `XxxStreamAsync` method returning `IAsyncEnumerable<string>`. This enables real-time streaming of AI responses from Spotter endpoints. Streaming requires the API class to be built with `CreateAsync`.
 
@@ -210,10 +220,12 @@ await foreach (var chunk in aiApi.SendAgentConversationMessageStreamingStreamAsy
 ----
 
 == File uploads
-Multipart endpoints, for example, DBT and Style Customization, accept a `FileParameter` built from a `Stream` with an optional filename and content type.
+Multipart endpoints, for example, dbt and Style Customization, accept a `FileParameter` built from a `Stream` with an optional filename and content type.
 
 [source,csharp]
 ----
+var dbtApi = await DbtApi.CreateAsync(config);
+
 await using var stream = File.OpenRead("project.zip");
 await dbtApi.DbtConnectionAsync(
     connectionName: "my-connection",
@@ -232,6 +244,8 @@ Export endpoints return a `FileParameter` wrapping the response stream, filename
 
 [source,csharp]
 ----
+var reportsApi = await ReportsApi.CreateAsync(config);
+
 var file = await reportsApi.ExportLiveboardReportAsync(
     new ExportLiveboardReportRequest
     {
@@ -246,10 +260,10 @@ await file.Content.CopyToAsync(output);
 == Error handling
 Failed calls throw `ThoughtSpot.RestApi.Sdk.Client.ApiException`. The exception exposes:
 
-* `ErrorCode` — the HTTP status code.
-* `Message` — a human-readable error message.
-* `ErrorContent` — the deserialized error response body.
-* `Headers` — the HTTP response headers.
+* `ErrorCode`: the HTTP status code.
+* `Message`: a human-readable error message.
+* `ErrorContent`: the deserialized error response body.
+* `Headers`: the HTTP response headers.
 
 [source,csharp]
 ----
@@ -265,7 +279,7 @@ catch (ThoughtSpot.RestApi.Sdk.Client.ApiException ex)
 ----
 
 == Retries
-Retries are disabled by default. Set `EnableRetries = true` on `ApiClientConfiguration` to enable the built-in Polly pipeline — up to three attempts with exponential backoff (1 s / 2 s / 4 s) and up to 500 ms of random jitter, applied on network errors and `429`, `500`, `502`, and `503` responses.
+Retries are disabled by default. Set `EnableRetries = true` on `ApiClientConfiguration` to enable the built-in Polly pipeline, up to three attempts with exponential backoff (1 s / 2 s / 4 s) and up to 500 ms of random jitter, applied on network errors and `429`, `500`, `502`, and `503` responses.
 
 [source,csharp]
 ----
@@ -306,7 +320,7 @@ RetryConfiguration.Default = new ResiliencePipelineBuilder<HttpResponseMessage>(
 == Runtime reconfiguration
 You can swap the host, credentials, or timeouts at runtime without restarting your application. Call `ApplyConfigurationAsync` on any API client with a new `ApiClientConfiguration`.
 
-The swap is atomic. A single CPU instruction replaces the entire HTTP stack. In-flight requests complete against the old configuration before the underlying resources are disposed.
+The swap is atomic. In-flight requests complete against the old configuration before the underlying resources are disposed.
 
 [source,csharp]
 ----
@@ -334,7 +348,7 @@ await api.ApplyConfigurationAsync(newConfig);
 
 * link:https://www.nuget.org/packages/ThoughtSpot.RestApi.Sdk[ThoughtSpot.RestApi.Sdk on NuGet, window=_blank]
 * link:https://github.com/thoughtspot/rest-api-sdk/tree/release/sdks/csharp[SDK source on GitHub, window=_blank]
-* For information about authentication types, see xref:authentication.adoc[REST API v2 authentication].
-* Browse the +++<a href="{{navprefix}}/restV2-playground">REST API v2 Playground</a>+++ for interactive API reference.
-* For information about supported API endpoints, see xref:rest-api-v2-reference.adoc[REST API v2 reference].
-* For information about new and deprecated features, see xref:rest-apiv2-changelog.adoc[REST API v2 changelog].
+* xref:authentication.adoc[REST API v2 authentication]
+* +++<a href="{{navprefix}}/restV2-playground">REST API v2 Playground</a>+++
+* xref:rest-api-v2-reference.adoc[REST API v2 reference]
+* xref:rest-apiv2-changelog.adoc[REST API v2 changelog]
