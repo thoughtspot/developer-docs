@@ -48,9 +48,15 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
 	    {
-            label: '26.7.0.cl',
+            label: '26.8.0.cl',
             link: ' ',
             subLabel: 'Cloud (Latest)',
+            iframeUrl: 'https://developer-docs-26-8-0-cl.vercel.app/docs/',
+        },
+	    {
+            label: '26.7.0.cl',
+            link: '26.7.0.cl',
+            subLabel: 'Cloud',
             iframeUrl: 'https://developer-docs-26-7-0-cl.vercel.app/docs/',
         },
         {
@@ -64,12 +70,6 @@ module.exports = {
            link: '26.5.0.cl',
            subLabel: 'Cloud',
            iframeUrl: 'https://developer-docs-26-5-0-cl.vercel.app/docs/',
-       },
-       {
-           label: '26.4.0.cl',
-           link: '26.4.0.cl',
-           subLabel: 'Cloud',
-           iframeUrl: 'https://developer-docs-26-4-0-cl.vercel.app/docs/',
        },
        {
            label: '26.3.0.sw',
