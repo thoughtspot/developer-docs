@@ -284,7 +284,6 @@ To add domain names to the CORS allowlist, complete these steps:
 * For cluster-wide configuration, click the *All Orgs* tab.
 * To configure settings at the Primary Org level, click the *Primary Org* tab.
 * To configure CORS settings at the Org level, switch the Org context via the Org switcher in the top navigation bar.
-
 . On the *Develop* page, go to *Customizations* > *Security settings*.
 . Click *Edit*.
 . In the *CORS whitelisted domains* text box, add the domain names. For valid domain name formats, see xref:security-settings.adoc#csp-cors-hosts[Domain name format for CSP and CORS configuration].
@@ -317,7 +316,6 @@ curl -X POST \
 }'
 ----
 
-
 [#custom-app-schemes]
 ==== Allow custom app schemes for mobile and hybrid embeds
 If you are embedding ThoughtSpot in a mobile or hybrid application built with frameworks such as Capacitor or Ionic, your application may use a custom URL scheme (for example, `capacitor://localhost` or `ionic://localhost`) rather than an `https://` origin.
@@ -328,15 +326,16 @@ To allow these origins to embed ThoughtSpot content, add the custom scheme URL t
 ====
 Before allowlisting custom schemes, note that allowlisting a shared app scheme such as `capacitor://localhost` or `ionic://localhost` does not uniquely identify your application. Any application on the same device that uses the same framework presents the same origin to the browser. This means:
 
-* Allowlisting `capacitor://localhost` grants embedding access to *all* Capacitor-based apps on that device, not just yours.
-* Treat custom-scheme allowlisting as *enabling functionality*, not as an access control boundary.
-* Security for these embeds must be enforced through *authentication* — use xref:trusted-auth-sdk.adoc[`AuthType.TrustedAuthTokenCookieless`] (cookieless trusted auth) to ensure that only authenticated users in your application can access ThoughtSpot content.
-* Do *not* rely on origin allowlisting alone as a security mechanism for custom-scheme embeds.
+* Allowlisting `capacitor://localhost` grants embedding access to all Capacitor-based apps on that device, not just your app.
+* Custom-scheme allowlisting enables the feature but cannot be used as an access control boundary. Do not rely on origin allowlisting alone as a security mechanism for custom-scheme embeds.
+* Security for these embeds must be enforced through authentication. Use xref:trusted-auth-sdk.adoc[`AuthType.TrustedAuthTokenCookieless`] (cookieless trusted auth) to ensure that only authenticated users in your app can access ThoughtSpot content.
 ====
 
 ===== Add a custom scheme to CSP visual embed hosts
 
 . On your ThoughtSpot application instance, go to *Develop* > *Customizations* > *Security settings*.
+* For cluster-wide configuration, click the *All Orgs* tab. CSP Visual Embed hosts configuration is allowe only at the instance level.
+* To configure CORS settings at the Org level, click the *Primary Org* tab, and set the Org context via the Org switcher in the top navigation bar.
 . Click *Edit*.
 . In the *CSP visual embed hosts* text box, add your custom scheme URL. For example:
 +
@@ -357,20 +356,38 @@ Send a request to the `POST /api/rest/2.0/system/security-settings/configure` en
 
 [source,cURL]
 ----
+curl -X POST \
+ --url 'https://{ThoughtSpot-Host}/api/rest/2.0/system/security-settings/configure' \
+ -H 'Authorization: Bearer {token}' \
+ -H 'Content-Type: application/json' \
+ --data-raw '{
+  "cluster_preferences": {
+    "cors_whitelisted_urls": [
+      "capacitor://localhost"
+    ],
+    "csp_settings": {
+      "visual_embed_hosts": [
+        "capacitor://localhost"
+      ]
+    }
+  }
+}'
+----
+
+
+[source,cURL]
+----
 curl -X POST 'https://{ThoughtSpot-Host}/api/rest/2.0/system/security-settings/configure' \
  -H 'Authorization: Bearer {token}' \
  -H 'Content-Type: application/json' \
- --data-raw  '{
-   "org_preferences": [
-     {
-        "visual_embed_hosts": [
-          "capacitor://localhost"
-        ],
-        "cors_whitelisted_urls": [
-          "capacitor://localhost"
-        ]
-     }
-   ]
+  --data-raw '{
+  "org_preferences": [
+    {
+      "cors_whitelisted_urls": [
+        "capacitor://localhost"
+      ]
+    }
+  ]
 }'
 ----
 
@@ -398,9 +415,9 @@ init({
 
 * You can add multiple domains to the CORS and CSP Visual Embed allowlists on the **Develop** **Customizations** > **Security Settings** page. Ensure that the CORS and CSP allowlists do not exceed 4096 characters.
 * *Protocol in the domain URL*:
-** CSP hosts - The UI allows adding a domain URL with or without the protocol (`http/https`). However, to avoid long URLs in the CSP header, you can exclude the protocol in the domain URL strings.
-** CORS hosts — The UI allows adding a domain URL with the protocol (`http/https`). If the domain URLs are using `https`, you can exclude the protocol in domain URL strings, because ThoughtSpot assigns `https` to the URLs by default.
-** For localhost and non-HTTPS URLs — For non-HTTPs domains or localhost such as `localhost:3000`, if you add the domain without the protocol, the `https` protocol will be assigned to the URL by default. Due to this, the localhost domain with `http` (`\http://localhost:3000`) might result in a CSP or CORS error. Therefore, include the `http` protocol in the domain name strings for non-HTTPS domains and localhost.
+** CSP hosts: The UI allows adding a domain URL with or without the protocol (`http/https`). However, to avoid long URLs in the CSP header, you can exclude the protocol in the domain URL strings.
+** CORS hosts: The UI allows adding a domain URL with the protocol (`http/https`). If the domain URLs are using `https`, you can exclude the protocol in domain URL strings, because ThoughtSpot assigns `https` to the URLs by default.
+** For localhost and non-HTTPS URLs: For non-HTTPs domains or localhost such as `localhost:3000`, if you add the domain without the protocol, the `https` protocol will be assigned to the URL by default. Due to this, the localhost domain with `http` (`\http://localhost:3000`) might result in a CSP or CORS error. Therefore, include the `http` protocol in the domain name strings for non-HTTPS domains and localhost.
 * **Port**: If your domain URL has a non-standard port such as 8080, specify the port number in the domain name string.
 * **Websocket endpoints**: +
 You can add Websocket (`wss://`) endpoints for external tool script integrations, for example, tools that open WebSocket connections from the browser. Only hosts explicitly listed with `wss://` are permitted.
@@ -438,6 +455,13 @@ a|Domain URL strings without port
 If your domain URL has a non-standard port, for example `mysite.com:8080`, make sure you add the port number in the domain name string.
 
 |[tag greenBackground tick]#✓# Supported |[tag greenBackground tick]#✓# Supported  2*|[tag greenBackground tick]#✓# Supported
+
+|URLs with custom schemes such as: +
+`capacitor://localhost` +
+`ionic://localhost`
+
+|[tag greenBackground tick]#✓# Supported |[tag greenBackground tick]#✓# Supported a|[tag greenBackground tick]#✓# Supported |[tag greenBackground tick]#✓# Supported
+
 |Wildcard (`\*`) ,  (`.*`) for domain URL +
  |[tag greenBackground tick]#✓# Supported |[tag greenBackground tick]#✓# Supported a|[tag orangeBackground tick]#✓# Partial support +
 
