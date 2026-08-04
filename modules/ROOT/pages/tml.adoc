@@ -29,10 +29,14 @@ See the following pages for the detailed syntax of TML files for each object typ
 
 For TML modification tips and recommendations, see xref:modify-tml.adoc[TML modification].
 
+
+////
 [NOTE]
 ====
-Worksheets are deprecated in ThoughtSpot and replaced by Models from 10.12.0.cl onwards.
+Worksheets are deprecated in ThoughtSpot and replaced by Models.
 ====
+////
+
 
 == TML import and export via REST API
 
@@ -58,17 +62,6 @@ To import TML representation of the metadata objects into ThoughtSpot, use one o
 * xref:tml-api.adoc#import[POST /tspublic/v1/metadata/tml/import] (REST API v1)
 
 //While the v1 API accepts a string containing a JSON array of TML objects to upload, in YAML or JSON format, the v2 accepts it only in the JSON format.
-
-There are multiple kinds of imports possible:
-
-* `PARTIAL` imports all objects that validate successfully, and ignores objects that do not validate successfully.
-* `ALL_OR_NONE` imports the objects that validate successfully.
-* `VALIDATE_ONLY` validates the objects but does not import them.
-* `PARTIAL_OBJECT` (only applicable to REST API v2)
-imports objects that validate successfully and skips the objects that do not validate successfully. If the import fails for a visualization object in a Liveboard TML, the Liveboard will be imported without that visualization object. Similarly, if importing a relationship in a logical table fails, the table TML will be imported with warnings in the API response.
-
-You can also specify additional parameters to set the Org context and skip CDW validation checks for Table TMLs.
-
 [NOTE]
 ====
 If you import only a Model object, it may take some time for the Model to become available in the ThoughtSpot system. You may need to wait for a few seconds to create answers and Liveboards.
@@ -192,13 +185,18 @@ Inspect per-object status in the response to identify failures.
 
 |`FAILED`
 |The task failed.
-Possible causes: the queue was full at submission time, a policy-level failure occurred, or an unrecoverable error was encountered during processing.
+This could be due to multiple reasons such as - the queue was full at submission time, a policy-level failure occurred, or an unrecoverable error was encountered during processing.
 |====
 
 *Recommended polling intervals:*
 
-* Minimum polling interval: 30 seconds.
-* For large tasks: poll every 1 minute. Large tasks take proportionally longer to complete.
+The status API enforces a rate limit of 100 requests per minute.
+Exceeding this limit returns an error.
+
+For practical use:
+
+* For small tasks, poll no more frequently than every 30 seconds.
+* For large tasks, a polling interval of 1 minute is recommended, as larger tasks take proportionally longer to complete.
 
 ==== Use API parameters correctly
 
@@ -216,11 +214,27 @@ Enable this parameter only when unchanged files must be explicitly reprocessed.
 
 `enable_large_metadata_validation`::
 // TODO: verify with engineering — confirm purpose, behavior, and recommended use of `enable_large_metadata_validation` before publishing.
+Set to `true` if the database contains multiple thousands of tables.
+When enabled, ThoughtSpot validates schema one table at a time, which helps circumvent metadata fetching limitations of the Cloud Data Warehouse (CDW).
+Default: `false`.
+
+`enable_personalized_view_upsert`::
+Set to `true` to enable update and insert of personalized views in a Liveboard during TML import.
+When enabled, personalized views are preserved or created as part of the import operation instead of being discarded.
+Default: `false`.
++
+[IMPORTANT]
+====
+This parameter requires the improved personalized views management feature to be enabled on your ThoughtSpot instance.
+If the feature is not enabled, setting `enable_personalized_view_upsert: true` returns a `400 Bad Request` error: `enable_personalized_view_upsert is not supported`.
+// TODO: verify with engineering — confirm what enables isImprovedPersonalizedViewsManagementEnabled() (release gate, tscli flag, or support request) and whether this is on by default in 26.8.0.cl or requires explicit enablement.
+====
 
 ==== Schedule large imports during off-peak hours
 
 Large TML migrations can temporarily increase system resource usage.
 Schedule bulk async imports during off-peak hours to reduce the risk of impacting users who are actively using the cluster.
+
 
 === Schedule import tasks
 
