@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
-import { isPublicSite } from '../../utils/app-utils';
+import { isPublicSite, isTutorialsPath } from '../../utils/app-utils';
 import { CUSTOM_PAGE_ID } from '../../configs/doc-configs';
 import { Alert, Icon, IconID, IconSize, IconColor, LoadingIndicator } from '@thoughtspot/radiant-react';
 import '@thoughtspot/radiant-react/styles';
@@ -38,17 +38,12 @@ const AssistantAvatar = () => (
     </div>
 );
 
-// Tutorials pages have their own footer navigation (Previous/Next/Done) that this
-// fixed, always-on-top panel has no awareness of — hide the widget there entirely
-// rather than fight over screen space. Path-segment check so it's robust to the
-// {{navprefix}} prefix (e.g. /docs/tutorials/... in production vs /tutorials/...
-// locally).
-const isTutorialsPath = (pathname: string) =>
-    pathname.split('/').filter(Boolean).includes('tutorials');
-
 const FloatingAssistant: React.FC = () => {
     const [pageId, setPageId] = useState<string | undefined>(getPageId);
     const [isEmbedded, setIsEmbedded] = useState(false);
+    // Tutorials pages have their own footer navigation (Previous/Next/Done) that this
+    // fixed, always-on-top panel has no awareness of — hide the widget there entirely
+    // rather than fight over screen space.
     const [isTutorialsPage, setIsTutorialsPage] = useState(
         () => typeof window !== 'undefined' && isTutorialsPath(window.location.pathname),
     );

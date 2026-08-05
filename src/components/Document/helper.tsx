@@ -3,6 +3,7 @@ import hljs from 'highlight.js';
 import { FiCopy } from '@react-icons/all-files/fi/FiCopy';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
+import { isTutorialsPath } from '../../utils/app-utils';
 import selectors from '../../constants/selectorsContant';
 
 export const enableCopyToClipboard = (
@@ -51,7 +52,7 @@ export const enableCopyToClipboard = (
 export const customizeDocContent = () => {
     /*
      * Restructure code blocks to have a permanent header bar:
-     *   lang label (left)  ·  copy button (right)
+     *   lang label (left)  ·  Ask SpotterCode + copy button (right)
      *
      * Covers all listing/literal blocks regardless of [source,lang] annotation.
      * For annotated blocks, lang is read from code[data-lang] and the code element
@@ -60,6 +61,12 @@ export const customizeDocContent = () => {
      *
      * Guard against double-processing on re-render.
      */
+    // The SpotterCode assistant is hidden entirely on tutorials pages (see
+    // FloatingAssistant) — its "Ask SpotterCode" CTA here would just dispatch
+    // spotter-code-ask to nothing. Keep the copy button everywhere, including there.
+    const hideAskSpotterCode =
+        typeof window !== 'undefined' && isTutorialsPath(window.location.pathname);
+
     document.querySelectorAll<HTMLElement>(
         '.listingblock>.content>pre, .literalblock>.content>pre',
     ).forEach((pre) => {
@@ -83,14 +90,16 @@ export const customizeDocContent = () => {
         const rightGroup = document.createElement('div');
         rightGroup.classList.add('code-block-header-actions');
 
-        const ctaLink = document.createElement('button');
-        ctaLink.classList.add('ctaButton');
-        ctaLink.innerText = 'Ask SpotterCode';
-        ctaLink.addEventListener('click', () => {
-            const code = copySource.innerText.trim();
-            window.dispatchEvent(new CustomEvent('spotter-code-ask', { detail: { quotedText: code } }));
-        });
-        rightGroup.appendChild(ctaLink);
+        if (!hideAskSpotterCode) {
+            const ctaLink = document.createElement('button');
+            ctaLink.classList.add('ctaButton');
+            ctaLink.innerText = 'Ask SpotterCode';
+            ctaLink.addEventListener('click', () => {
+                const code = copySource.innerText.trim();
+                window.dispatchEvent(new CustomEvent('spotter-code-ask', { detail: { quotedText: code } }));
+            });
+            rightGroup.appendChild(ctaLink);
+        }
 
         /* Copy button — icon style */
         const buttonElement = document.createElement('button');
