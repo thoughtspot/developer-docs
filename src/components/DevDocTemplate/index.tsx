@@ -106,8 +106,20 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     });
     const [isDarkMode, setDarkMode] = useState<boolean>(() => {
         if (typeof window === 'undefined') return false;
+        // URL param takes highest priority (set by embedding product to pass its theme).
+        const urlParams = new URLSearchParams(window.location.search);
+        const darkModeParam = urlParams.get('isDarkMode');
+        if (darkModeParam !== null) {
+            const isDark = darkModeParam === 'true';
+            localStorage.setItem('themeMode', isDark ? 'dark' : 'light');
+            return isDark;
+        }
         // In-product (embedded) presentation always uses light mode — product UI has no theme toggle.
-        if (!isPublicSite(location.search)) return false;
+        if (!isPublicSite(location.search)){
+            const explicitChoice = localStorage.getItem('themeMode');
+            if (explicitChoice) return explicitChoice === 'dark';
+            return false;
+        }
         /* themeMode is only written when the user explicitly clicks the toggle.
            If absent, follow OS preference fresh every load. */
         const explicitChoice = localStorage.getItem('themeMode');
@@ -235,6 +247,12 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         if (isBrowser()) {
             // In-product (embedded) presentation always uses light mode.
             if (!isPublicSiteOpen) {
+                const explicitChoice = localStorage.getItem('themeMode');
+                if (explicitChoice) {
+                    const isDark = explicitChoice === 'dark';
+                    setDarkMode(isDark);
+                    return;
+                }
                 setDarkMode(false);
                 setKey('dark');
                 return;
@@ -265,6 +283,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                 const newDarkMode = darkModeParam === 'true';
                 setDarkMode(newDarkMode);
                 localStorage.setItem('theme', newDarkMode ? 'dark' : 'light');
+                localStorage.setItem('themeMode', newDarkMode ? 'dark' : 'light');
             }
         }
     }, [location.search]);
@@ -434,18 +453,16 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         const customStyles = {
             overlay: {
                 background: 'rgba(50,57,70, 0.9)',
-                zIndex: 10,
+                zIndex: 1100,
             },
             content: {
                 top: '50px',
-                left: 'auro',
-                right: 'auto',
+                left: 0,
+                right: 0,
                 bottom: 'auto',
-                width: isMaxMobileResolution ? '40%' : '100%',
+                width: isMaxMobileResolution ? '40%' : 'calc(100% - 32px)',
                 margin: 'auto',
-                transform: `translate(${
-                    isMaxMobileResolution ? '80%' : '0'
-                }, 70px)`,
+                transform: 'translate(0, 70px)',
                 border: 'none',
                 height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',
@@ -458,6 +475,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                 isOpen={showSearch}
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
+                portalClassName="DocsSearchModalPortal"
             >
                 <div
                     id="docsModal"

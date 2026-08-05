@@ -241,12 +241,6 @@ const SecondaryHeader = (props: {
                                     {CATEGORY_LABELS[cat]}
                                 </button>
                             ))}
-                            <button
-                                className="secondary-header__mobile-item"
-                                onClick={() => { navigate('/ask-docs'); setMobileMenuOpen(false); }}
-                            >
-                                AskDocs
-                            </button>
                         </div>
                     )}
                 </div>
@@ -257,13 +251,6 @@ const SecondaryHeader = (props: {
                     <Dropdown location={location} isMobile={false} />
                 </div>
 
-                {/* Desktop only: AskDocs link */}
-                <button
-                    className="secondary-header__askdocs"
-                    onClick={() => navigate('/ask-docs')}
-                >
-                    AskDocs <span className="secondary-header__beta">Beta</span>
-                </button>
             </div>
         </nav>
     );

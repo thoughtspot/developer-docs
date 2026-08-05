@@ -1,0 +1,691 @@
+= Spotter memory migration API
+:toc: true
+:toclevels: 2
+
+:page-title: Spotter memory migration API
+:page-pageid: spotter-memory-migration
+:page-description: Use the AI memory REST API v2 endpoints to export and import Spotter memory across ThoughtSpot environments.
+:keywords: Spotter memory, AI memory, memory migration, memory export, memory import, Spotter memory, REST API
+
+[beta betaBackground]#Beta#
+
+ThoughtSpot provides public REST API v2 endpoints to import and export memory for the following purposes:
+
+* To promote validated Spotter knowledge from a development environment to production.
+* To replicate a gold-standard Spotter configuration across multiple Orgs at scale.
+* To back up and restore Spotter memory as part of your deployment pipeline.
+
+[NOTE]
+====
+The API endpoints support importing and exporting memory defined at the model level. Exporting or importing user memory and analyst memory are currently not supported.
+====
+
+== Memory migration workflow
+Spotter accumulates memory, which includes rules (business logic) and recipes (query patterns), as users interact with data models. To migrate Spotter memory from one data model to another, or from a source environment to a target environment:
+
+. <<export-memory, Export Spotter memory from source>> +
+Call `POST /api/rest/2.0/ai/memory/export` with the GUIDs of the data models to migrate.
+. <<update-memory-file, Update the exported file content>> +
+Save and modify the exported file as needed.
+. <<import-memory, Import Spotter memory>> +
+Call `POST /api/rest/2.0/ai/memory/import` to import Spotter memory content into ThoughtSpot. You can validate the import operation using the dry run operation and review `import_summaries` and `failures` before proceeding.
+
+=== Required permissions
+To use Spotter memory migration APIs, the user requires the following privileges:
+
+* *Can manage Spotter* and at least view access to the data model.
+* *Can use Spotter* and edit access to the data model, or `SPOTTER_COACHING_PRIVILEGE` to import memory entries.
+
+Users with administration access can also export and import Spotter memory.
+
+[#export-memory]
+== Exporting Spotter memory
+The `/api/rest/2.0/ai/memory/export` API endpoint lets you export Spotter memory records for the specified data models as a single YAML payload. You can review the exported data, modify its contents, and re-import it into a ThoughtSpot Org or another environment. While the exported payload is human-readable, we do not recommend modifying its structure before re-importing it, as doing so may corrupt or invalidate the memory.
+
+=== Request parameters
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `sources`
+a|__Array of strings__. A list of data models from which you want to export.
+Specify the following attributes:
+
+* `type`. __String__. The source object type. Default value is `DATA_MODEL`. This is the default source type for Spotter memory, which includes the rules, recipes, and always-apply rules attached directly to a data model.
+* `identifiers`. __Array of strings__. GUIDs or object IDs of the data models.
+||
+|===
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/memory/export'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "sources": [
+    {
+      "type": "DATA_MODEL",
+      "identifiers": [
+        "cd252e5c-b552-49a8-821d-3eadaa049cca"
+      ]
+    }
+  ]
+}'
+----
+
+=== Example response
+The API returns a response object with the following details:
+
+* `content` +
+The serialized memory payload in YAML format. The exported file includes an array of memories, including rules and recipes added to Spotter memory, and data model GUID and object ID if present.
+* `type` +
+Indicates if the memory type is `RULE` or `RECIPE`. If the type is `RULE`, the response shows the rule definition. If the type is `RECIPE`, the contents of the recipe such as task, steps, TML tokens are included in the response.
+* `datamodel_sources` +
+GUID and object ID of the data model object.
+
+You can edit it locally and import it into your environment using the import memory API endpoint.
+
+[source,JSON]
+----
+{
+   "content":{
+      "memories":[
+         {
+            "type":"RULE",
+            "content":{
+               "rule_definition":"Revenue is defined as Sales Monthly."
+            },
+            "datamodel_sources":[
+               {
+                  "guid":"cd252e5c-b552-49a8-821d-3eadaa049cca",
+                  "obj_id":"SampleRetail-Apparel-cd252e5c"
+               }
+            ],
+            "tags":[
+
+            ]
+         },
+         {
+            "type":"RULE",
+            "content":{
+               "rule_definition":"Hot products: top 20 products by sales."
+            },
+            "datamodel_sources":[
+               {
+                  "guid":"cd252e5c-b552-49a8-821d-3eadaa049cca",
+                  "obj_id":"SampleRetail-Apparel-cd252e5c"
+               }
+            ],
+            "tags":[
+               "GLOBAL"
+            ]
+         },
+         {
+            "type":"RULE",
+            "content":{
+               "rule_definition":"Sales operations are organized into three geographic regions: east, midwest, and west."
+            },
+            "datamodel_sources":[
+               {
+                  "guid":"cd252e5c-b552-49a8-821d-3eadaa049cca",
+                  "obj_id":"SampleRetail-Apparel-cd252e5c"
+               }
+            ],
+            "tags":[
+               "GLOBAL"
+            ]
+         },
+         {
+            "type":"RECIPE",
+            "content":{
+               "user_query":"Weekly sales for June",
+               "recipe":{
+                  "task":"Show total sales by week for the month of June",
+                  "steps":[
+                     {
+                        "instruction":"Query sales by weekly date filtered to June month",
+                        "analytical_mappings":{
+                           "tml_tokens":[
+                              "[sales]",
+                              "[date].weekly",
+                              "[date] = 'june'"
+                           ],
+                           "formulas":[
+
+                           ]
+                        }
+                     }
+                  ]
+               }
+            },
+            "datamodel_sources":[
+               {
+                  "guid":"cd252e5c-b552-49a8-821d-3eadaa049cca",
+                  "obj_id":"SampleRetail-Apparel-cd252e5c"
+               }
+            ],
+            "tags":[
+
+            ]
+         },
+         {
+            "type":"RECIPE",
+            "content":{
+               "user_query":"What is the total sales by date?",
+               "recipe":{
+                  "brief_summary":"Visualizes total sales revenue over time on a daily basis.",
+                  "nl_query":"What is the total sales by date?",
+                  "lossy_tml_tokens":"[date] [sales]",
+                  "lossy_formulas":[
+
+                  ]
+               }
+            },
+            "datamodel_sources":[
+               {
+                  "guid":"cd252e5c-b552-49a8-821d-3eadaa049cca",
+                  "obj_id":"SampleRetail-Apparel-cd252e5c"
+               }
+            ],
+            "tags":[
+
+            ]
+         },
+         {
+            "type":"ALWAYS_APPLY_RULES",
+            "content":{
+               "rules":[
+                  "When asking for 'top' results without specifying a number, default to top 20",
+                  "Use sales column as primary metric; if sales data unavailable, fall back to quantity purchased column"
+               ]
+            },
+            "datamodel_sources":[
+               {
+                  "guid":"cd252e5c-b552-49a8-821d-3eadaa049cca",
+                  "obj_id":"SampleRetail-Apparel-cd252e5c"
+               }
+            ],
+            "tags":[
+
+            ]
+         }
+      ]
+   }
+}
+----
+
+[#update-memory-file]
+== Updating the memory file content
+The export memory API endpoint returns a YAML payload with a single top-level `memories` key holding a list of memory items. It includes the following object properties:
+
+* `type` +
+A typed `content` block, indicating `RULE` or `RECIPE`.
+* `datamodel_sources` list +
+GUID and object ID of the data models.
+* `tags` __Optional__.
+
+You can modify this file, add target data models, and submit it back through the import memory API endpoint.
+
+[IMPORTANT]
+====
+When editing a memory record, do not manually add new entries, especially under ALWAYS_APPLY_RULES. You can modify the values or remove the existing entries. If you must add new entries, use the UI workflow to ensure the memory entries are created in the correct format.
+====
+
+[source,yaml]
+----
+memories:
+- type: RULE
+  content:
+    rule_definition: "Revenue is defined as Sales Monthly."
+  datamodel_sources:
+  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
+    obj_id: RetailSales-3bc18302
+  tags: []
+
+- type: RULE
+  content:
+    rule_definition: "Hot products: top 20 products by sales."
+  datamodel_sources:
+  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
+    obj_id: RetailSales-3bc18302
+  tags:
+  - GLOBAL
+
+- type: RULE
+  content:
+    rule_definition: "Sales operations are organized into three geographic regions: east, midwest, and west."
+  datamodel_sources:
+  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
+    obj_id: RetailSales-3bc18302
+  tags:
+  - GLOBAL
+
+- type: RECIPE
+  content:
+    user_query: "Weekly sales for June"
+    recipe:
+      task: "Show total sales by week for the month of June"
+      steps:
+      - instruction: "Query sales by weekly date filtered to June month"
+        analytical_mappings:
+          tml_tokens:
+          - "[sales]"
+          - "[date].weekly"
+          - "[date] = 'june'"
+          formulas: []
+  datamodel_sources:
+  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
+    obj_id: RetailSales-3bc18302
+  tags: []
+
+- type: RECIPE
+  content:
+    user_query: "What is the total sales by date?"
+    recipe:
+      brief_summary: "Visualizes total sales revenue over time on a daily basis."
+      nl_query: "What is the total sales by date?"
+      lossy_tml_tokens: "[date] [sales]"
+      lossy_formulas: []
+  datamodel_sources:
+  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
+    obj_id: RetailSales-3bc18302
+  tags: []
+
+- type: ALWAYS_APPLY_RULES
+  content:
+    rules:
+    - "When asking for 'top' results without specifying a number, default to top 20"
+    - "Use sales column as primary metric; if sales data unavailable, fall back to quantity purchased column"
+  datamodel_sources:
+  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
+    obj_id: RetailSales-3bc18302
+  tags: []
+----
+
+A file can contain multiple `RULE` and multiple `RECIPE` items for a data model, but at most one `ALWAYS_APPLY_RULES` item per data model.
+
+=== Memory item fields
+[cols="2,4", options="header"]
+|===
+| Field | Description
+| `type` | Type can be `RULE`, `RECIPE`, or `ALWAYS_APPLY_RULES`. +
+
+* `RULE`. A single semantic rule. The content for this type must include `rule_definition` and the data model IDs.
+* `RECIPE`. A serialized string that includes responses to the natural-language query.
+* `ALWAYS_APPLY_RULES`. Mandatory rules that must always apply when generating queries for the data model. The content must include a `rules` list.
+| `content` | Type-specific content block.
+| `datamodel_sources` a| The data models the memory attaches to. Each item must list at least one source. Each entry identifies a data model via:
+
+* `guid`: the data model GUID.
+* `obj_id`: A stable object ID, resolved to a GUID server-side.
+
+If both are supplied, `obj_id` takes precedence and `guid` is ignored entirely; `guid` takes effect only when `obj_id` is absent. Exported files populate `guid` and, if present, `obj_id` as well.
+
+[IMPORTANT]
+====
+When `obj_id` is present, the accompanying `guid` is not used as a fallback. If an `obj_id` does not exist in the target environment, that item fails with `UNRESOLVED_SOURCE`. Remove or replace the stale `obj_id` values before importing across environments.
+====
+
+| `tags` |Free-form labels.
+||
+|===
+
+[#memory-file-limits]
+=== Limits
+Note the following limits for the import file and its content:
+
+[cols="2,1", options="header"]
+|===
+| Limit | Default
+| Uploaded file size | 10 MiB
+| Total memory items | 10,000
+| `rule_definition` length | 1,000 characters
+| `user_query` length | 1,000 characters
+| `recipe` length | 2,000 characters
+| `rules` combined length (`ALWAYS_APPLY_RULES`) | 2,000 characters +
+The `rules` limit in `ALWAYS_APPLY_RULES` applies to the combined length across all entries in the list, not per entry.
+| Tags per item | 10
+| Characters per tag | 50
+||
+|===
+
+[#structure-rules]
+=== Structural rules
+* The document must be a mapping with a `memories` key whose value is a list.
+* Unknown keys at the top level, within an item, or under `content` are rejected.
+* Each item's `type` must be one of the three supported values, and `content` must match that type's shape.
+* Null, empty-string, or incorrect type values in a required field are treated as missing.
+* Non-string or empty `tags` entries are dropped; certain tags reserved for internal use are stripped automatically before the item is stored.
+
+[#cross-item-rules]
+=== Cross-item rules
+A data model referenced by more than one `ALWAYS_APPLY_RULES` item is rejected. Combine them into a single item's `rules` list.
+
+[#import-memory]
+== Importing Spotter memory
+The `/api/rest/2.0/ai/memory/import` API endpoint imports Spotter memory content from a YAML payload into a target data model in your ThoughtSpot environment. Use this API endpoint to migrate Spotter memory with rules and recipes when seeding a new data model, or moving content across Orgs or between different environments.
+
+[IMPORTANT]
+====
+* The import operation *replaces* the existing memory of the target data models with the YAML content. The import operation uses a targeted replacement model, not an append.
+//To incrementally sync changes, export the relevant memory filtered by time window using the export memory API endpoint, merge with your existing file manually, and upload the merged result.
+* The import replaces memory entries only for the data models referenced in the uploaded file.
+* Since import replaces the existing memory entries, ThoughtSpot strongly recommends using the `dry_run` mode to validate before committing the content to the data model.
+* The API operation does not include semantic or column-level validation, so you must ensure that the column names are valid in the target environment.
+* If any part of the import fails, all changes are rolled back.
+====
+
+=== Request parameters
+
+Pass the following parameters in the API request body.
+
+[cols="2,4", options="header"]
+|===
+| Parameter | Description
+| `content`
+|__String__. The full contents of the Spotter memory payload YAML file passed as a string. The content structure is the same as the payload received from the export memory API endpoint. The memory payload will be imported to the data models specified in the `datamodel_sources` property of the content string. For more information about the contents and structure of the import file, see xref:spotter-ai-memory-api.adoc#update-memory-file[Updating the memory file content].
+
+| `dry_run`
+a|__Boolean__. Controls whether the import runs as a preview or executes for real. +
+
+* When set to `true`, the API validates the memory payload and returns preview counts without writing anything to the target data models. ThoughtSpot recommends running a dry run first to inspect validation errors before committing. +
+* When set to `false`, the API executes the import. The import replaces the existing global memories on the data models referenced in the payload with the entries supplied in the payload. If the import fails, ThoughtSpot rolls back the target to its pre-import state. +
+||
+|===
+
+=== Dry run operation
+The import operation deletes and replaces the existing global memories on the referenced data models. ThoughtSpot strongly recommends using a `dry_run` to validate the payload and preview the results.
+
+* If the API returns validation errors, verify the `validation_failures` and `diagnostics` fields in the API response and fix errors if any.
+* If the API returns a clean preview without any validation errors, call the API again with `dry_run` set as `false`.
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/memory/export'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "content": "{   \"content\": \"memories:\\n- type: RULE\\n  content:\\n    rule_definition:   Revenue is defined as Sales Monthly.\\n  datamodel_sources:\\n  - guid:   62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n    obj_id:   RetailSales-3bc18302\\n  tags: []\\n- type: RULE\\n  content:\\n   rule_definition: \\\"Hot products: top 20 products by sales.\\\"\\n   datamodel_sources:\\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n   obj_id: RetailSales-3bc18302\\n  tags: []\\n- type: RULE\\n  content:\\n      rule_definition: \\\"Sales operations are organized into three geographic   regions: east, midwest, and west.\\\"\\n  datamodel_sources:\\n  - guid:   62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n    obj_id:   RetailSales-3bc18302\\n  tags:\\n  - GLOBAL\\n- type: RECIPE\\n   content:\\n    user_query: Weekly sales for June\\n    recipe: \\\"{\\\\\\\"task\\\\\\\":   \\\\\\\"Show total sales by week for the month of June\\\\\\\", \\\\\\\"steps\\\\\\\":   [{\\\\\\\"instruction\\\\\\\": \\\\\\\"Query sales by weekly date filtered to June   month\\\\\\\", \\\\\\\"analytical_mappings\\\\\\\": {\\\\\\\"tml_tokens\\\\\\\": [\\\\\\\"[sales]\\\\\\\",    \\\\\\\"[date].weekly\\\\\\\", \\\\\\\"[date] = '\''june'\''\\\\\\\"], \\\\\\\"formulas\\\\\\\": []}}]}\\\"\\n     datamodel_sources:\\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n   obj_id: RetailSales-3bc18302\\n  tags: []\\n- type: RECIPE\\n   content:\\n    user_query: Compare this quarter'\''s sales with previous quarter   by region\\n    recipe: \\\"{\\\\\\\"task\\\\\\\": \\\\\\\"Compare total sales by region for   this quarter versus previous quarter\\\\\\\", \\\\\\\"steps\\\\\\\":   [{\\\\\\\"instruction\\\\\\\": \\\\\\\"Query total sales by region for this quarter   compared to previous quarter\\\\\\\", \\\\\\\"analytical_mappings\\\\\\\":   {\\\\\\\"tml_tokens\\\\\\\": [\\\\\\\"sales\\\\\\\", \\\\\\\"date = '\''this quarter'\''\\\\\\\", \\\\\\\"date =    '\''last quarter'\''\\\\\\\", \\\\\\\"region\\\\\\\"], \\\\\\\"formulas\\\\\\\": []}}]}\\\"\\n   datamodel_sources:\\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n   obj_id: RetailSales-3bc18302\\n  tags: []\\n- type: RECIPE\\n   content:\\n    user_query: What is the total sales by date?\\n    recipe: |-\\n       1. Brief Answer Summary\\n      {\\n      \\\"brief_summary\\\": \\\"Visualizes   total sales revenue over time on a daily basis.\\\",\\n      \\\"nl_query\\\": \\\"What    is the total sales by date?\\\",\\n      \\\"display_tml_tokens\\\": \\\"\\\"\\n   }\\n\\n      2. Call NLSV2_Tool with these arguments\\n      {\\n   \\\"lossy_tml_tokens\\\": \\\"[date] [sales]\\\",\\n          \\\"lossy_formulas\\\": []\\n        }\\n  datamodel_sources:\\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n       obj_id: RetailSales-3bc18302\\n  tags: []\\n- type:   ALWAYS_APPLY_RULES\\n  content:\\n    rules:\\n    - \\\"When asking for '\''top'\''   results without specifying a number, default to top 20\\\"\\n    - \\\"Use sales   column as primary metric; if sales data unavailable, fall back to quantity   purchased column\\\"\\n  datamodel_sources:\\n  - guid:   62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n    obj_id:   RetailSales-3bc18302\\n  tags: []\\n\"   }",
+  "dry_run": true
+}'
+----
+
+=== Example response
+
+[source,JSON]
+----
+{
+    "status": "SUCCESS",
+    "summary": [
+      {
+        "memory_type": "RULES",
+        "source": {
+          "identifier": "62f3e9b5-4fcc-4352-b8ad-fdddc2287506",
+          "type": "DATA_MODEL"
+        },
+        "existing_record_count": 3,
+        "deleted_record_count": 3,
+        "inserted_record_count": 3,
+        "failed_record_count": 0
+      },
+      {
+        "memory_type": "RECIPES",
+        "source": {
+          "identifier": "62f3e9b5-4fcc-4352-b8ad-fdddc2287506",
+          "type": "DATA_MODEL"
+        },
+        "existing_record_count": 3,
+        "deleted_record_count": 3,
+        "inserted_record_count": 3,
+        "failed_record_count": 0
+      },
+      {
+        "memory_type": "ALWAYS_APPLY_RULES",
+        "source": {
+          "identifier": "62f3e9b5-4fcc-4352-b8ad-fdddc2287506",
+          "type": "DATA_MODEL"
+        },
+        "existing_record_count": 0,
+        "deleted_record_count": 0,
+        "inserted_record_count": 1,
+        "failed_record_count": 0
+      }
+    ],
+    "validation_failures": [],
+    "diagnostics": [],
+    "operation_id": "62f3e9b5-4fcc-4352-b8ad-fdddc2287506"
+  }
+----
+
+
+=== Response parameters
+Based on the status of the import operation, the API returns a response code. Note that the `200` response does not guarantee a successful import. Verify the `status` field in the response body to ensure there are no validation errors.
+
+[cols="2,5", options="header"]
+|===
+| Parameter | Description
+| `status`
+| Terminal status of the import operation. After an import operation, the 200 response can include one of the following status values:
+
+* `SUCCESS` to indicate a successful import.
+* `VALIDATION_FAILED`. File or row-level validation failed before any data was written. Inspect `validation_failures` for per-item error details.
+* `FAILED` to indicate that the import operation has failed. Verify the diagnostics section. +
+A `sub_status` of `ROLLED_BACK` means all changes are rolled back and the original memory is intact. +
+A `sub_status` of `FAILURE` indicates a non-rollback error.
+| `summary`
+a| Per data model and memory type result entries. Null when the import failed before any record processing occurred. Each entry in the `summary` array covers one (memory type, target data model) combination.
+
+* `memory_type`: Type of memory these counts apply to: `RULES`, `RECIPES`, or `ALWAYS_APPLY_RULES`.
+* `source`: Data source type and ID. Type is always `DATA_MODEL`.
+* `existing_record_count`: Number of memory entries of this type that existed on the target data model before the import.
+* `deleted_record_count`: Number of existing entries that were deleted during the import operation.
+* `inserted_record_count`: Number of entries from the memory file that were inserted.
+* `failed_record_count`: Number of records of this type that failed validation or processing.
+
+| `validation_failures`
+a| Per-item validation failure entries.
+
+* `line_number`: Best-effort line number of the offending item in the YAML file. May be null when the line cannot be determined.
+* `reason`: Machine-readable category for the failure. For more information, see xref:spotter-ai-memory-api.adoc#validation-error-reference[Validation errors].
+* `field_name`: Dotted path to the offending field within the item. For example, `content.rule_definition`. Absent when the failure is at the item level rather than the field level.
+* `message`: Human-readable description of the failure.
+
+| `diagnostics`
+a| Diagnostic message groups for fatal errors, rollbacks, and non-fatal warnings, each grouped by severity.
+
+`sub_status`::
+Severity or disposition of this diagnostic group: +
+** `WARNING`: The import succeeded but with non-fatal caveats. For example, some older memory entries could not be fully cleaned up.
+** `FAILURE`: A fatal error prevented the import from completing. The state of memory on the target may be unpredictable.
+** `ROLLED_BACK`: The insert of new memory entries failed. Every successful insert was undone and the original memory is intact.
+** `UNKNOWN`: Uncategorized diagnostic.
+
+`messages`::
+Human-readable messages for this diagnostic group.
+
+| `operation_id`
+a| Server-generated identifier for this import operation. Include this value in support tickets to correlate server-side logs with the request.
+||
+|===
+
+=== Validations reference
+The payload is fully validated before anything is written irrespective of the `dry_run` parameter setting. If any item fails validation, the entire import is rejected, with the failure details returned in the response.
+
+To avoid validation errors:
+
+* Ensure that the memory file and its content do not exceed the xref:spotter-ai-memory-api.adoc#memory-file-limits[limits]. A data model referenced by more than one `ALWAYS_APPLY_RULES` item is rejected. Ensure that you combine them into a single item's `rules` list.
+* The content string does not include any unknown keys at the top level, within an item, or under `content`.
+* Ensure that the `type` for each item is set to the three supported values (`RULE`, `RECIPE`, and `ALWAYS_APPLY_RULES`), and the `content` string for each memory entry matches that type's shape and all required fields are defined.
+* Ensure that there are no non-string or empty `tags`. Certain tags reserved for internal use are stripped automatically before the item is stored.
+
+[#validation-error-reference]
+=== Validation error reference
+
+If the validation fails, the API returns `200` with a terminal `status` of `VALIDATION_FAILED` or `FAILED`, and includes the details in the `validation_failures` and `diagnostics` sections of the API response.
+
+* *VALIDATION_FAILED*: Indicates schema or semantic validation failure. Inspect `validation_failures` and fix the items. Each entry in `validation_failures` carries one of the following error types:
+
+** `SCHEMA`: Indicates that YAML structure is invalid or malformed.
+** `VALIDATION`: Indicates that a required field is missing, exceeds the limit, or an incorrect GUID.
+** `CHAR_LIMIT`: Indicates that a content field exceeds the character limit.
+** `UNRESOLVED_SOURCE`: A referenced data model GUID could not be resolved on the target. Check that all GUIDs in the memory file correspond to data models that exist on the target environment.
+** `ACCESS_DENIED`: The user making the API request does not have edit access on a referenced data model.
+* *FAILED*: Indicates incomplete import. Inspect `diagnostics` to verify the errors.
+
+==== Validation failure response
+
+Invalid data model::
+[source,json]
+----
+{
+    "status": "VALIDATION_FAILED",
+    "summary": null,
+    "validation_failures": [
+        {
+            "line_number": 2,
+            "reason": "UNRESOLVED_SOURCE",
+            "field_name": "datamodel_sources[0].guid",
+            "message": "unknown datamodel guid: 62f3e9b5-4fcc-4352-b8ad-fdddc228750"
+        }
+    ],
+    "diagnostics": [
+        {
+            "sub_status": "FAILURE",
+            "messages": [
+                "unknown datamodel guid: 62f3e9b5-4fcc-4352-b8ad-fdddc228750"
+            ]
+        }
+    ],
+    "operation_id": null
+}
+----
+
+Inaccessible data models::
+[source,json]
+----
+{
+    "status": "VALIDATION_FAILED",
+    "summary": null,
+    "validation_failures": [
+        {
+            "line_number": 2,
+            "reason": "ACCESS_DENIED",
+            "field_name": "datamodel_sources[0]",
+            "message": "Insufficient permissions on datamodel '62f3e9b5-4fcc-4352-b8ad-fdddc2287506'"
+        },
+        {
+            "line_number": 8,
+            "reason": "ACCESS_DENIED",
+            "field_name": "datamodel_sources[0]",
+            "message": "Insufficient permissions on datamodel '62f3e9b5-4fcc-4352-b8ad-fdddc2287506'"
+        }
+    ],
+    "diagnostics": [
+        {
+            "sub_status": "FAILURE",
+            "messages": [
+                "Memory import validation failed with 2 error(s): Insufficient permissions on datamodel '44444444-4444-4444-4444-444444444444'; Insufficient permissions on datamodel '33333333-3333-3333-3333-333333333333'"
+            ]
+        }
+    ],
+    "operation_id": null
+}
+----
+
+Character-limit validations::
+[source,json]
+----
+{
+    "status": "VALIDATION_FAILED",
+    "summary": [],
+    "validation_failures": [
+        {
+            "line_number": 3,
+            "reason": "CHAR_LIMIT",
+            "field_name": "content.rule_definition",
+            "message": "content.rule_definition is 1073 characters; max allowed is 1000"
+        },
+        {
+            "line_number": 49,
+            "reason": "CHAR_LIMIT",
+            "field_name": "content.user_query",
+            "message": "content.user_query is 1150 characters; max allowed is 1000"
+        },
+        {
+            "line_number": 49,
+            "reason": "CHAR_LIMIT",
+            "field_name": "content.recipe",
+            "message": "content.recipe is 3574 characters; max allowed is 2000"
+        }
+    ],
+    "diagnostics": [
+        {
+            "sub_status": "FAILURE",
+            "messages": [
+                "Validation failures present; fix them and re-run to see the DRY_RUN preview."
+            ]
+        }
+    ],
+    "operation_id": "f0c0b5f3-6b48-4f20-9ebf-67e1b6bcd4e5"
+}
+----
+
+Import success response::
+
+[source,JSON]
+----
+{
+  "status": "SUCCESS",
+  "summary": [
+    {
+      "memory_type": "RULES",
+      "source": {
+        "identifier": "62f3e9b5-4fcc-4352-b8ad-fdddc2287506",
+        "type": "DATA_MODEL"
+      },
+      "existing_record_count": 3,
+      "deleted_record_count": 3,
+      "inserted_record_count": 2,
+      "failed_record_count": 0
+    },
+    {
+      "memory_type": "RECIPES",
+      "source": {
+        "identifier": "62f3e9b5-4fcc-4352-b8ad-fdddc2287506",
+        "type": "DATA_MODEL"
+      },
+      "existing_record_count": 7,
+      "deleted_record_count": 7,
+      "inserted_record_count": 4,
+      "failed_record_count": 0
+    },
+    {
+      "memory_type": "ALWAYS_APPLY_RULES",
+      "source": {
+        "identifier": "62f3e9b5-4fcc-4352-b8ad-fdddc2287506",
+        "type": "DATA_MODEL"
+      },
+      "existing_record_count": 0,
+      "deleted_record_count": 0,
+      "inserted_record_count": 1,
+      "failed_record_count": 0
+    }
+  ],
+  "validation_failures": [],
+  "diagnostics": [],
+  "operation_id": "10f7b113-7872-403b-a3ab-0152dc591b54"
+}
+----
+
+== Additional resources
+
+* link:https://docs.thoughtspot.com/cloud/latest/spotter-memory[Spotter memory documentation, window=_blank]
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fai%2Fexport-memory"> REST API Playground - Export memory endpoint </a>+++
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fai%2Fimport-memory">REST API Playground - Import memory endpoint</a>+++
