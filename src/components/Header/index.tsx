@@ -12,6 +12,7 @@ import { FiHelpCircle } from '@react-icons/all-files/fi/FiHelpCircle';
 import { FiExternalLink } from '@react-icons/all-files/fi/FiExternalLink';
 import { FiBook } from '@react-icons/all-files/fi/FiBook';
 import { FiBookOpen } from '@react-icons/all-files/fi/FiBookOpen';
+import { FiCompass } from '@react-icons/all-files/fi/FiCompass';
 
 import TSLogo from '../../assets/svg/ts-logo-white-developer.svg';
 import t from '../../utils/lang-utils';
@@ -56,6 +57,13 @@ const Header = (props: {
             icon: FiBook,
         },
         {
+            name: 'Tutorials',
+            sub: 'Self-paced, hands-on developer tutorials',
+            link: '/docs/tutorials/tutorials-overview',
+            icon: FiCompass,
+            external: false,
+        },        
+        {
             name: 'Training',
             sub: 'ThoughtSpot Embedded learning paths',
             link: 'https://training.thoughtspot.com/path/thoughtspot-embedded',
@@ -85,17 +93,17 @@ const Header = (props: {
     ];
 
     const renderDropdownItems = (
-        items: { name: string; sub: string; link: string; icon: any }[],
+        items: { name: string; sub: string; link: string; icon: any; external?: boolean }[],
         onClose?: () => void,
     ) =>
         items.map((item) => {
             const Icon = item.icon;
+            const isExternal = item.external !== false;
             return (
                 <a
                     key={item.name}
                     href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     className="header-dropdown-item"
                     role="menuitem"
                     onClick={onClose}
@@ -107,9 +115,11 @@ const Header = (props: {
                         <span className="dropdown-item-name">{item.name}</span>
                         <span className="dropdown-item-sub">{item.sub}</span>
                     </span>
-                    <IconContext.Provider value={{ className: 'external-link-icon' }}>
-                        <FiExternalLink />
-                    </IconContext.Provider>
+                    {isExternal && (
+                        <IconContext.Provider value={{ className: 'external-link-icon' }}>
+                            <FiExternalLink />
+                        </IconContext.Provider>
+                    )}
                 </a>
             );
         });

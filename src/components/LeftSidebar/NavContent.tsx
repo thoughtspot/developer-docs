@@ -16,6 +16,7 @@ const NavContent = (props: {
     isDarkMode: boolean;
     setDarkMode: Function;
     searchClickHandler: Function;
+    isTutorialsNav?: boolean;
 }) => {
     return (
         <aside
@@ -69,7 +70,7 @@ const NavContent = (props: {
                 <div
                     className={`navWrapper ${
                         props.isPublicSiteOpen ? 'withHeaderFooter' : ''
-                    }`}
+                    } ${props.isTutorialsNav ? 'tutorialsNavWrapper' : ''}`}
                     dangerouslySetInnerHTML={{
                         __html: props.navContent,
                     }}

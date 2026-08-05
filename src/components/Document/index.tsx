@@ -177,6 +177,10 @@ const Document = (props: {
     };
 
     const isHomePage = props.pageid === HOME_PAGE_ID;
+    // tutorials-overview is a card-grid landing page with no real body text to
+    // copy, and the toolbar's float:right lands far from the (empty) breadcrumb
+    // above the wide card grid — just hide it here.
+    const hideCopyPage = props.pageid === 'tutorials-overview';
 
     return (
         <div
@@ -202,7 +206,7 @@ const Document = (props: {
                     pageid={props.pageid}
                 />
             )}
-            {!isHomePage && props.isPublicSiteOpen && (
+            {!isHomePage && !hideCopyPage && props.isPublicSiteOpen && (
                 <div className="document-toolbar">
                     <CopyPageDropdown pageTitle={props.docTitle} markdownBody={props.markdownBody} />
                 </div>

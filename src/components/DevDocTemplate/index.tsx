@@ -184,6 +184,16 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         typeof window !== 'undefined' &&
         new URLSearchParams(location.search).get('_iframe') === '1';
 
+    // tutorials-overview is a card-grid landing page (like home) — no in-page
+    // nav to browse, so skip the left sidebar entirely and let the cards use
+    // the full width.
+    const hideLeftNav = curPageNode.pageAttributes.pageid === 'tutorials-overview';
+
+    // Tutorials are reached from the Header's Resources dropdown, not a
+    // secondary-header tab — hide the standalone-site tab bar on those pages.
+    // (The in-product minimal nav-toggle bar is a separate branch, unaffected.)
+    const showSecondaryHeader = activeCategory !== 'tutorials';
+
     const isGQPlayGround =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
     const isPlayGround =
@@ -205,8 +215,18 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             doc.querySelectorAll('a[href]').forEach((a) => {
                 const href = a.getAttribute('href') || '';
                 // hrefs are like /docs/pageid or /pageid — extract the last segment
-                const pageId = href.split('?')[0].split('/').filter(Boolean).pop();
-                if (pageId) map[pageId] = cat as DocCategory;
+                const segments = href.split('?')[0].split('/').filter(Boolean);
+                const lastSegment = segments.pop();
+                if (!lastSegment) return;
+                // Tutorials module pages use compound pageids like {subdir}__{finalSegment}
+                // (see getTutorialLinkFromEdge in gatsby-utils.js) — hrefs are
+                // /tutorials/{subdir}/{finalSegment}, so reconstruct the real pageid
+                // instead of just the URL's last segment, or every tutorial's same-named
+                // step (e.g. every "step-01") would collide on one lookup key.
+                const tutorialsIdx = segments.indexOf('tutorials');
+                const subdir = tutorialsIdx !== -1 ? segments[tutorialsIdx + 1] : undefined;
+                const pageId = subdir ? `${subdir}__${lastSegment}` : lastSegment;
+                map[pageId] = cat as DocCategory;
             });
         });
         return map;
@@ -447,7 +467,11 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         });
     }
 
-    const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
+    // tutorials-overview is a card-grid landing page like home — it has no in-page
+    // headings worth a right-nav TOC, and the extra 260px it reserves squashes the cards.
+    const shouldShowRightNav =
+        params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID &&
+        params[TS_PAGE_ID_PARAM] !== 'tutorials-overview';
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
@@ -509,26 +533,29 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
     const renderDocTemplate = () => (
         <>
             {renderSearch()}
-            <div className="leftNavContainer">
-                <LeftSidebar
-                    backLink={getParentBackButtonLink()}
-                    navTitle={navTitle}
-                    navContent={activeNavContent}
-                    docWidth={width}
-                    location={location}
-                    setLeftNavOpen={setLeftNavOpen}
-                    leftNavOpen={leftNavOpen}
-                    isPublicSiteOpen={isPublicSiteOpen}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={setDarkMode}
-                    isDarkMode={isDarkMode}
-                    curPageid={curPageNode.pageAttributes.pageid}
-                    searchClickHandler={() => {
-                        setShowSearch(true);
-                        if (!isMaxMobileResolution) setLeftNavOpen(false);
-                    }}
-                />
-            </div>
+            {!hideLeftNav && (
+                <div className="leftNavContainer">
+                    <LeftSidebar
+                        backLink={getParentBackButtonLink()}
+                        navTitle={navTitle}
+                        navContent={activeNavContent}
+                        docWidth={width}
+                        location={location}
+                        setLeftNavOpen={setLeftNavOpen}
+                        leftNavOpen={leftNavOpen}
+                        isPublicSiteOpen={isPublicSiteOpen}
+                        isMaxMobileResolution={isMaxMobileResolution}
+                        setDarkMode={setDarkMode}
+                        isDarkMode={isDarkMode}
+                        curPageid={curPageNode.pageAttributes.pageid}
+                        isTutorialsNav={activeCategory === 'tutorials'}
+                        searchClickHandler={() => {
+                            setShowSearch(true);
+                            if (!isMaxMobileResolution) setLeftNavOpen(false);
+                        }}
+                    />
+                </div>
+            )}
             {isAskDocsPage ? (
                 <div className="documentBody">
                     <AskDocs />
@@ -755,13 +782,15 @@ if (isVersionedIframe) {
                 ></div>
                 {!isIframeMode && !isVersionedIframe && (
                     isPublicSiteOpen ? (
-                        <SecondaryHeader
-                            activeCategory={activeCategory}
-                            onCategoryChange={setActiveCategory}
-                            location={location}
-                            leftNavOpen={leftNavOpen}
-                            setLeftNavOpen={setLeftNavOpen}
-                        />
+                        showSecondaryHeader && (
+                            <SecondaryHeader
+                                activeCategory={activeCategory}
+                                onCategoryChange={setActiveCategory}
+                                location={location}
+                                leftNavOpen={leftNavOpen}
+                                setLeftNavOpen={setLeftNavOpen}
+                            />
+                        )
                     ) : !isMaxMobileResolution && (
                         // In-product presentation has no tabs — show just the nav
                         // toggle so the sidebar stays reachable on narrow viewports.
@@ -789,7 +818,7 @@ if (isVersionedIframe) {
                                     ? (!isMaxMobileResolution
                                         ? { height: 'calc(100lvh - 48px)' }
                                         : { height: '100lvh' })
-                                    : { height: 'calc(100lvh - 65px - 44px)' }
+                                    : { height: showSecondaryHeader ? 'calc(100lvh - 65px - 44px)' : 'calc(100lvh - 65px)' }
                     }
                 >
                     {isPlayGround ? (

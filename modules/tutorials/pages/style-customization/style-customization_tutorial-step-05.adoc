@@ -1,0 +1,117 @@
+= Step 5: Menu items
+:toc!:
+
+:page-title: Step 5: Menu items
+:page-pageid: style-customization__step-05
+:page-description: Hide, disable, and trigger ThoughtSpot menu items and custom actions from the embedded application.
+
+ThoughtSpot menus are accessible in the top right corner with the ellipsis icon (`...`) or via a right-click on a chart axis or data point. The `...` menu is referred to as the *More* options menu.
+
+On Liveboards, a top menu for the Liveboard and a separate menu for each visualization is available. The menu from right-clicking a data point is referred to as the *Context menu*.
+
+== Hiding or disabling items
+Individual menu items are controlled by their capabilities and are referred to as *Actions*. The Visual Embed SDK reference guide for link:https://developers.thoughtspot.com/docs/Enumeration_Action[Actions^] contains a complete list of named capabilities.
+
+In the Playground, select the checkbox for `Modify available actions`. You'll see the following code in the code editor:
+
+[source,javascript]
+----
+  disabledActions: [],
+  disabledActionReason: "Reason for disabling",
+  // visibleActions: [], /* Removes all actions if empty array */
+  hiddenActions: [],
+  /* Use either visibleActions or hiddenActions */
+----
+
+If you want to show only a small set of selected menu items, use `visibleActions` (an allowlist) and comment out `hiddenActions` (a deny list).
+
+Let's show only the `DownloadAsPdf` action:
+
+[source,javascript]
+----
+  disabledActions: [],
+  disabledActionReason: "Reason for disabling",
+  visibleActions: [Action.DownloadAsPdf], /* Removes all actions if empty array */
+  //hiddenActions: [],
+  /* Use either visibleActions or hiddenActions */
+----
+
+When you click *Run*, the Liveboard reloads with only a single menu item in the *More* options menu as specified in the `visibleActions` array.
+
+[NOTE]
+====
+The above example also hides the right-click context menu items, including the *Drill down* action (`Action.DrillDown`).
+====
+
+The `disabledActions` array keeps the item in the menu but grays it out, and shows `disabledActionReason` when hovering over the disabled action.
+
+== Triggering hidden menu items with HostEvents
+ThoughtSpot Visual Embed SDK defines two types of events:
+
+* link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent[EmbedEvents^] - to listen to actions within ThoughtSpot components
+* link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent[HostEvents^] - to send messages to the ThoughtSpot components from the embedding application.
+
+If a menu item has been hidden, you can still send in a *HostEvent* to cause the same behavior.
+
+In the Playground, select the *Use Host Event* checkbox. You'll see the following code block in the code editor:
+
+[source,javascript]
+----
+ document.getElementById('tryBtn').addEventListener('click', e => {
+      // Trigger events can be added here to bind to try button click!
+      // eg use the Reload Event so that clicking on "Try event" button reloads the embed:
+      embed.trigger(HostEvent.Reload);
+ });
+----
+
+The above code block adds a click event to the *Try Event* button above the preview panel in the Playground. Clicking *Try Event* triggers the `HostEvent`.
+
+Let's replace the default `Reload` event with `DownloadAsPdf`:
+
+[source,javascript]
+----
+ document.getElementById('tryBtn').addEventListener('click', e => {
+     // Trigger events can be added here to bind to try button click!
+     // eg use the Reload Event so that clicking on "Try event" button reloads the embed:
+     embed.trigger(HostEvent.DownloadAsPdf);
+ });
+----
+
+Testing this requires the following steps:
+
+1. Click *Run* to reload the embedded component.
+2. Click *Try Event*.
+
+You should see the PDF export modal dialog button pop up within the embedded component area.
+
+If you do not want the modal dialog to appear, you could instead use the ThoughtSpot REST API to accomplish the task either within the browser or in a back-end process. This allows for choosing vastly different behaviors than those allowed by the ThoughtSpot modal dialogs.
+
+== Adding new menu items with custom actions
+ThoughtSpot allows you to add new items called *xref:custom-actions.adoc[custom actions]* to the menu system, either to the *More* options menu on a given visualization of a Liveboard or the context menu that appears when a single point is right-clicked.
+
+The *Callback* custom actions require a three-part setup:
+
+1. Define the custom action within ThoughtSpot, with a particular *id*.
+2. Assign the custom action to the visualization.
+3. Add the `EmbedEvent.CustomAction` listener within the Visual Embed SDK code.
+
+To try it out, select the `Handle custom actions` checkbox. You'll see the following code block in the code editor:
+
+[source,javascript]
+----
+ .on(EmbedEvent.CustomAction, payload => {
+     const customActionId = 'insert Custom Action ID here';
+     if (payload.id === customActionId || payload.data.id === customActionId) {
+         console.log('Custom Action event:', payload.data);
+     }
+ })
+----
+
+Some link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent[EmbedEvents^] such as `VizPointClick` fire off without involving the menu system and function similarly to context menu custom action.
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/style-customization/step-04">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/style-customization/step-06">Next &rarr;</a>
+</div>
+++++

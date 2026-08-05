@@ -13,6 +13,7 @@ export type DocCategory =
     | 'rest-api'
     | 'mcp-server'
     | 'spottercode'
+    | 'tutorials'
     | 'whats-new';
 
 export const CATEGORY_LABELS: Record<DocCategory, string> = {
@@ -22,6 +23,7 @@ export const CATEGORY_LABELS: Record<DocCategory, string> = {
     'rest-api': 'REST APIs',
     'mcp-server': 'MCP server',
     spottercode: 'SpotterCode',
+    tutorials: 'Tutorials',
     'whats-new': "What's new",
 };
 
@@ -35,6 +37,7 @@ export const CATEGORY_LANDING: Record<DocCategory, string> = {
     'rest-api': '/rest-apis',
     'mcp-server': '/mcp-integration',
     spottercode: '/SpotterCode',
+    tutorials: '/tutorials/tutorials-overview',
     'whats-new': '/whats-new',
 };
 
@@ -49,6 +52,7 @@ export const CATEGORY_NAV_ID: Record<DocCategory, string> = {
     'rest-api': 'nav-rest-api',
     'mcp-server': 'nav-mcp-server',
     spottercode: 'nav-spottercode',
+    tutorials: 'nav-tutorials',
     'whats-new': 'nav',
 };
 
@@ -114,6 +118,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
     spottercode: [
         'SpotterCode', 'integrate-SpotterCode', 'spottercode-prompting-guide',
     ],
+    tutorials: [],
     'whats-new': [
         'whats-new', 'fixed-issues', 'known-issues', 'deprecated-features',
         'embed-sdk-changelog', 'mobile-sdk-changelog',
@@ -137,6 +142,11 @@ const SecondaryHeader = (props: {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
+    // 'tutorials' intentionally excluded — reachable from the Header's Resources
+    // dropdown instead of a secondary-header tab, and the secondary header is
+    // hidden altogether on tutorials pages (see DevDocTemplate). The category
+    // config for 'tutorials' (label/landing/nav id/pageids) still exists below —
+    // it's what makes nav-tutorials.adoc resolve as the active sidebar there.
     const categories: DocCategory[] = [
         'guides', 'embedding', 'rest-api', 'mcp-server', 'spottercode', 'whats-new',
     ];

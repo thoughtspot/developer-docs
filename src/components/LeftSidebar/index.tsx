@@ -35,6 +35,7 @@ const LeftSideBar = (props: {
     setDarkMode: Function;
     curPageid: string;
     searchClickHandler: Function;
+    isTutorialsNav?: boolean;
 }) => {
     const params = queryStringParser(props.location.search);
     const [navContent, setNavContent] = useState('');
@@ -143,6 +144,7 @@ const LeftSideBar = (props: {
                         setDarkMode={props.setDarkMode}
                         isDarkMode={props.isDarkMode}
                         searchClickHandler={props.searchClickHandler}
+                        isTutorialsNav={props.isTutorialsNav}
                     />
                 </ResizableBox>
             </div>
@@ -159,6 +161,7 @@ const LeftSideBar = (props: {
                     setDarkMode={props.setDarkMode}
                     isDarkMode={props.isDarkMode}
                     searchClickHandler={props.searchClickHandler}
+                    isTutorialsNav={props.isTutorialsNav}
                 />
             </div>
         );

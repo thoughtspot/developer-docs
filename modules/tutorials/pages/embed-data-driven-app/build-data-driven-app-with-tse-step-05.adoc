@@ -1,0 +1,73 @@
+= Step 5: Wire in a custom action
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Step 5: Wire in a custom action
+:page-pageid: embed-data-driven-app__step-05
+:page-description: Add a custom action so managers can escalate a listing straight from the Liveboard into your internal ticketing tool.
+
+Your team doesn't just want to look at the data.
+When a manager spots a listing with a maintenance issue dragging down occupancy, they want to escalate it into your internal ticketing tool without leaving the portal.
+That's a custom action.
+
+[source,javascript]
+----
+import {
+  LiveboardEmbed,
+  AuthType,
+  init,
+  EmbedEvent,
+  CustomActionTarget,    // <1>
+  CustomActionPosition,  // <1>
+} from '@thoughtspot/visual-embed-sdk';
+
+function renderLiveboard() {
+  const liveboardEmbed = new LiveboardEmbed(container, {
+    frameParams: { width: '100%', height: '100%' },
+    liveboardId: 'YOUR_LIVEBOARD_GUID',
+    customActions: [
+      {
+        name: 'Flag for maintenance',
+        id: 'flag-maintenance',
+        target: CustomActionTarget.VIZ,
+        position: CustomActionPosition.PRIMARY,
+      },
+    ],
+  });
+
+  liveboardEmbed.on(EmbedEvent.LiveboardRendered, () => console.log('Liveboard rendered'));
+
+  liveboardEmbed.on(EmbedEvent.CustomAction, (payload) => {
+    if (payload.data.id === 'flag-maintenance') {
+      handleCustomAction(payload.data);
+    }
+  });
+
+  liveboardEmbed.render();
+}
+
+function handleCustomAction(data) {
+  const panel = document.getElementById('detail-panel');
+  panel.classList.remove('hidden');
+  panel.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+  // In production: POST this payload to your ticketing API
+}
+----
+<1> `CustomActionTarget` and `CustomActionPosition` must be imported from the SDK.
+
+`CustomActionTarget` decides where the button appears (`VIZ`, `LIVEBOARD`, `SPOTTER`, or `ANSWER`).
+`CustomActionPosition` decides primary toolbar vs. overflow menu.
+If you only want this visible on the bookings Liveboard and not every board in the instance, `metadataIds`, `groupId`, and `orgId` scope it further.
+
+[NOTE]
+====
+Defining the action in the embed config rather than in the ThoughtSpot UI is the current recommended pattern precisely because it lives in your own repo.
+It gets reviewed and deployed like any other code change, instead of being a separate config someone forgets exists.
+====
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/embed-data-driven-app/step-04">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/embed-data-driven-app/step-06">Next &rarr;</a>
+</div>
+++++
