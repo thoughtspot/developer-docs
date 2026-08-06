@@ -7,6 +7,7 @@ import LinkableHeader from '../LinkableHeader';
 import WasThisHelpful from '../WasThisHelpful';
 import CopyPageDropdown from '../CopyPageDropdown';
 import { HOME_PAGE_ID } from '../../configs/doc-configs';
+import { isTutorialsPath } from '../../utils/app-utils';
 import parse, { HTMLReactParserOptions, domToReact, attributesToProps } from 'html-react-parser';
 
 const Document = (props: {
@@ -29,6 +30,10 @@ const Document = (props: {
         let mouseDownY = 0;
 
         const handleMouseUp = (e: MouseEvent) => {
+            // The SpotterCode assistant is hidden entirely on tutorials pages (see
+            // FloatingAssistant and Document/helper.tsx) — don't surface this CTA there either.
+            if (isTutorialsPath(window.location.pathname)) return;
+
             const target = e.target as HTMLElement;
             if (target.closest('.selection-cta-button')) return;
             if (target.closest('.floating-assistant__panel, .floating-assistant__chip-ring')) return;
