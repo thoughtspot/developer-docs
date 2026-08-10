@@ -1,0 +1,292 @@
+= Parse callback payloads with tse-data-classes
+:toc: true
+
+:page-title: Parse ThoughtSpot callback payloads with the tse-data-classes package
+:page-pageid: custom-action-callback-data-classes
+:page-description: Use the tse-data-classes npm package to parse and access JSON payloads returned by ThoughtSpot callback custom actions.
+
+The `tse-data-classes` npm package provides TypeScript classes that simplify parsing and accessing the JSON payload returned by callback custom actions. Use this package instead of writing custom payload parsers from scratch.
+
+[NOTE]
+====
+This page covers the `tse-data-classes` package approach for TypeScript projects. For vanilla JavaScript examples and general callback setup instructions, see xref:custom-actions-callback.adoc[Callback custom actions].
+====
+
+[div boxDiv boxFullWidth]
+--
++++<h5>Feature highlights</h5>+++
+
+* Install `tse-data-classes` from npm — no manual class implementation required.
+* Five classes cover all callback action targets: Search, Answer, Liveboard visualization, REST API v2 search data, and REST API v2 answer data.
+* All classes extend `TabularData` and share the same properties and methods, including `getDataAsTable()`.
+* TypeScript type interfaces are included for all payload shapes.
+--
+
+[IMPORTANT]
+====
+The `tse-data-classes` package was last verified against ThoughtSpot 10.15. Review the following compatibility notes before using these classes in your implementation:
+
+* *Liveboard new experience*: The Liveboard callback payload structure changed with the new Liveboard experience (SDK v1.19.0, enabled by default on all instances). Verify that `LiveboardActionData.createFromJSON()` correctly parses your payload before deploying. See the link:https://developers.thoughtspot.com/docs/api-changelog[SDK changelog] for details.
+* *Spotter custom actions*: When a callback custom action targets a Spotter interface using `CustomActionTarget.SPOTTER`, the payload does not contain tabular data. Do not pass a Spotter action payload to any `tse-data-classes` class — doing so produces undefined behavior. Check `payload.data.id` before calling `createFromJSON()`.
+* *Generic event listeners on AppEmbed*: If you register `EmbedEvent.CustomAction` on a full application embed (`AppEmbed`), the listener fires for all custom action targets including Spotter. Add an action ID check before passing the payload to a data class.
+====
+
+== Install the package
+
+[source,bash]
+----
+npm install tse-data-classes
+----
+
+Import the classes and type interfaces you need:
+
+[source,javascript]
+----
+import { ActionData, ActionDataType } from 'tse-data-classes';
+----
+
+[#available-classes]
+== Available classes
+
+The following classes are available in the package. All classes extend `TabularData` and share the same properties and methods.
+
+[width="100%",cols="2,4,2"]
+|===
+|Class |Use case |Does NOT apply to
+
+|`ActionData`
+|Callback action triggered from the main menu or primary action button on a Search result or saved Answer. Also handles `EmbedEvent.Data` events.
+|Liveboard visualizations; context menu actions
+
+|`ContextActionData`
+|Callback action triggered from a context menu (right-click) on a Search result or saved Answer.
+|Liveboard visualizations; main menu actions
+
+|`LiveboardActionData`
+|Callback action triggered from the **More** options menu (⋮) of a Liveboard visualization.
+|Search results; saved Answers; context menus
+
+|`SearchData`
+|Data returned by the REST API v2 `/searchdata` endpoint.
+|Embedded callback events
+
+|`AnswerData`
+|Data returned by the REST API v2 `/fetch-answer-data` endpoint.
+|Embedded callback events
+|===
+
+[#tabular-data]
+== TabularData properties and methods
+
+All classes inherit the following properties and methods from the `TabularData` base class:
+
+[width="100%",cols="2,1,4"]
+|===
+|Property or method |Type |Description
+
+|`columnNames`
+|`string[]`
+|Returns the names of all columns in the payload, in the order they appear.
+
+|`nbrColumns`
+|`number`
+|Returns the total number of columns.
+
+|`nbrRows`
+|`number`
+|Returns the total number of data rows.
+
+|`originalData`
+|`object`
+|Returns the raw, unparsed JSON payload object as received from the callback event.
+
+|`getDataAsTable(columnNames?: string[])`
+|`any[][]`
+|Returns data as a two-dimensional row-oriented array. Pass an optional array of column name strings to extract specific columns. If omitted, all columns are returned. Column name matching is case-sensitive.
+|===
+
+=== getDataAsTable()
+
+[source,javascript]
+----
+getDataAsTable(columnNames?: string[]): any[][]
+----
+
+[cols="1,3"]
+|===
+|Parameter |Description
+
+|`columnNames`
+|Optional. An array of column name strings to extract. Column name matching is case-sensitive. If omitted or empty, all columns are returned.
+|===
+
+The method returns an array of rows, where each row is an array of cell values in the order of the requested columns:
+
+[source,javascript]
+----
+// Returns all columns as a 2D row array
+const allData = actionData.getDataAsTable();
+
+// Returns specific columns only
+const subset = actionData.getDataAsTable(['Product', 'Quantity']);
+// Example output: [ ['Widget A', 120], ['Widget B', 85] ]
+----
+
+[#type-interfaces]
+== TypeScript type interfaces
+
+Use the following interfaces to type your callback payload handler:
+
+[width="100%",cols="2,4"]
+|===
+|Interface |Describes
+
+|`ActionDataType`
+|Payload shape for `EmbedEvent.CustomAction` on a Search result or saved Answer (main menu action).
+
+|`ContextActionDataType`
+|Payload shape for `EmbedEvent.CustomAction` triggered from a context menu.
+
+|`LiveboardDataType`
+|Data structure returned by the REST API v2 Liveboard data endpoint.
+
+|`SearchDataType`
+|Data structure returned by the REST API v2 `/searchdata` endpoint.
+
+|`AnswerDataType`
+|Data structure returned by the REST API v2 `/fetch-answer-data` endpoint.
+|===
+
+[#parse-answer]
+== Parse Answer and Search result payloads
+
+Use the `ActionData` class for callback actions triggered from the main menu or primary action button on a Search result or saved Answer.
+
+[source,javascript]
+----
+import { ActionData, ActionDataType } from 'tse-data-classes';
+
+searchEmbed.on(EmbedEvent.CustomAction, (payload) => {
+    // TODO: verify with engineering — confirm whether createFromJSON() expects
+    // the full payload object or payload.data for tse-data-classes v1.x.
+    if (payload.data.id === 'show-data') {
+        const actionData = ActionData.createFromJSON(payload as ActionDataType);
+
+        // Access column names
+        console.log('Columns:', actionData.columnNames);
+
+        // Retrieve all data as a 2D row array
+        const table = actionData.getDataAsTable();
+        console.log('Data rows:', table);
+
+        // Retrieve specific columns only
+        const subset = actionData.getDataAsTable(['Product', 'Revenue']);
+        console.log('Subset:', subset);
+    }
+});
+----
+
+[#parse-liveboard]
+== Parse Liveboard visualization payloads
+
+Use the `LiveboardActionData` class for callback actions triggered from the **More** options menu (⋮) of a Liveboard visualization.
+
+[source,javascript]
+----
+import { LiveboardActionData } from 'tse-data-classes';
+
+const embed = new LiveboardEmbed('#embed', {
+    liveboardId: 'e40c0727-01e6-49db-bb2f-5aa19661477b',
+    vizId: '8d2e93ad-cae8-4c8e-a364-e7966a69a41e',
+});
+
+embed.on(EmbedEvent.CustomAction, (payload) => {
+    if (payload.data.id === 'show-data') {
+        const liveboardActionData = LiveboardActionData.createFromJSON(payload);
+
+        // Access column names
+        console.log('Columns:', liveboardActionData.columnNames);
+
+        // Get all rows as a 2D array
+        const table = liveboardActionData.getDataAsTable();
+        console.log('Data rows:', table);
+
+        const dataElement = document.getElementById('show-data');
+        dataElement.style.display = 'block';
+    }
+});
+
+embed.render();
+----
+
+NOTE: `LiveboardActionData` only applies to callback actions in the **More** options menu (⋮) of a Liveboard visualization. For context menu actions, use `ContextActionData`. For Search and Answer main-menu actions, use `ActionData`.
+
+[#parse-context]
+== Parse context menu action payloads
+
+Use the `ContextActionData` class for callback actions triggered from the context menu (right-click) on a Search result or saved Answer.
+
+[source,javascript]
+----
+import { ContextActionData, ContextActionDataType } from 'tse-data-classes';
+
+searchEmbed.on(EmbedEvent.CustomAction, (payload) => {
+    if (payload.data.id === 'context-action') {
+        const contextData = ContextActionData.createFromJSON(
+            payload.data as ContextActionDataType
+        );
+
+        // Iterate selected attributes (dimensions) and measures
+        contextData.originalData.data.contextMenuPoints.selectedPoints.forEach((point) => {
+            point.selectedAttributes.forEach((attr) => {
+                console.log(`${attr.column.name}: ${attr.value}`);
+            });
+            point.selectedMeasures.forEach((measure) => {
+                console.log(`${measure.column.name}: ${measure.value}`);
+            });
+        });
+    }
+});
+----
+
+[#parse-rest-api]
+== Parse REST API v2 data responses
+
+Use `SearchData` and `AnswerData` to parse responses from the ThoughtSpot REST API v2 data endpoints. These classes use the same `TabularData` properties and methods as the embedded callback classes.
+
+=== SearchData
+
+[source,javascript]
+----
+import { SearchData, SearchDataType } from 'tse-data-classes';
+
+// response is the JSON body from POST /api/v2/searchdata
+const searchData = SearchData.createFromJSON(response as SearchDataType);
+
+console.log('Columns:', searchData.columnNames);
+console.log('Row count:', searchData.nbrRows);
+
+// Get all data as a 2D row array
+const table = searchData.getDataAsTable();
+----
+
+=== AnswerData
+
+[source,javascript]
+----
+import { AnswerData, AnswerDataType } from 'tse-data-classes';
+
+// response is the JSON body from POST /api/v2/metadata/answer/data
+const answerData = AnswerData.createFromJSON(response as AnswerDataType);
+
+// Extract specific columns
+const filtered = answerData.getDataAsTable(['Product', 'Sales']);
+----
+
+== Additional resources
+
+* link:https://www.npmjs.com/package/tse-data-classes[tse-data-classes on npm, window=_blank]
+* link:https://github.com/thoughtspot/tse-advanced-step-by-step-source[tse-advanced-step-by-step-source on GitHub, window=_blank]
+* xref:custom-actions-callback.adoc[Callback custom actions]
+* xref:callback-response-payload.adoc[Callback JSON response payloads]
+* link:https://github.com/thoughtspot/ts_everywhere_resources/blob/master/apis/dataclasses.js[dataclasses.js — legacy reference, window=_blank]
