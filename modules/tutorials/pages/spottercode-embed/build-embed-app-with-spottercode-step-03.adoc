@@ -1,63 +1,92 @@
-= Step 3: Make it host-specific
+= Step 3: Embed Spotter: Extend it to conversational analytics
 :toc!:
 :linkattrs:
 :sectanchors:
-:page-title: Step 3: Make it host-specific
+:page-title: Step 3: Embed Spotter: Extend it to conversational analytics
 :page-pageid: spottercode-embed__step-03
 :page-description: Prompt SpotterCode to add a runtime filter so each host sees only their own listing data.
 
-A shared Liveboard shows every listing on the platform.
-You need each host to see only their own.
-Prompt for a runtime filter scoped to the logged-in host:
+Dashboard shipped. Now the second use case: hosts asking follow-up questions in their own words instead of hunting through Liveboard filters.
 
 [source]
 ----
-Show a code example for embedding a Liveboard with a runtime filter
-where host_id equals the logged-in user's ID, using the Visual Embed SDK for React.
+"I want to embed ThoughtSpot Spotter below the dashboard so hosts can ask follow-up
+questions about their listing data. Use the available tools to get the information
+and generate the code."
 ----
 
-SpotterCode returns:
+[div videoContainer]
+--
+video::./images/mktng-tutorials/add-spotter.mp4[width=100%,options="autoplay,loop"]
+--
 
-[source,javascript]
+[source,jsx]
 ----
-import {
-  LiveboardEmbed,
-  useEmbedRef,
-  HostEvent,
-  RuntimeFilterOp,
-} from '@thoughtspot/visual-embed-sdk/react';
+import { SpotterEmbed } from '@thoughtspot/visual-embed-sdk/react';
 
-const HostDashboard = ({ hostId }) => {
-  const embedRef = useEmbedRef();
-
-  const onLiveboardRendered = () => {
-    embedRef.current.trigger(HostEvent.UpdateRuntimeFilters, [
-      {
-        columnName: 'host_id',
-        operator: RuntimeFilterOp.EQ,
-        values: [hostId],
-      },
-    ]);
-  };
-
-  return (
-    <LiveboardEmbed
-      ref={embedRef}
-      liveboardId="YOUR_LIVEBOARD_GUID"
-      onLiveboardRendered={onLiveboardRendered}
-    />
-  );
+const HostInsights = ({ hostModelId }) => {
+    return (
+        <SpotterEmbed
+            worksheetId={hostModelId}
+            hideSampleQuestions={false}
+        />
+    );
 };
 
-export default HostDashboard;
+export default HostInsights;
 ----
 
-[NOTE]
-====
-*Why this step matters for the course, not just the demo:* this is the moment your prompt has to carry business context ("the logged-in user's ID") that isn't in any doc.
-SpotterCode generates the mechanism; you still supply the SpotStay-specific meaning.
-====
+Drop `HostInsights` directly under `HostDashboard` on the same portal page, no separate authentication flow to build.
 
+[#lock-down-for-external-users]
+=== Step 1: Lock it down for external users
+
+Hosts aren't internal ThoughtSpot users. You don't want them downloading raw data or seeing ThoughtSpot-native sharing options that don't make sense in the SpotStay portal.
+
+[source]
+----
+"How do I hide the Download and Share actions on an embedded Liveboard, and disable
+SpotIQ analysis with a custom message, using the Visual Embed SDK?"
+----
+
+[source,jsx]
+----
+<LiveboardEmbed
+    ref={embedRef}
+    liveboardId="spotstay-listing-performance-lb"
+    onLiveboardRendered={onLiveboardRendered}
+    hiddenActions={[Action.Download, Action.Share]}
+    disabledActions={[Action.SpotIQAnalyze]}
+    disabledActionReason="Not available on host accounts"
+/>
+----
+
+[#wire-to-real-data]
+=== Step 2: Wire it to real data
+
+Everything so far used a placeholder Model ID. You still need the actual Model ID for SpotStay's listing data, no need to dig through the ThoughtSpot UI by hand.
+
+[source]
+----
+"Generate a REST API request to find the Model ID for a data object named
+'SpotStay Listings', using ThoughtSpot REST API v2."
+----
+
+[source,bash]
+----
+curl -X POST 'https://your-thoughtspot-host/api/rest/2.0/metadata/search' \
+  -H 'Authorization: Bearer <your_access_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "metadata": [{ "type": "LOGICAL_TABLE", "name_pattern": "SpotStay Listings" }],
+    "record_size": 5
+  }'
+----
+
+[div videoContainer]
+--
+video::./images/mktng-tutorials/working-spotter-embed.mp4[width=100%,options="autoplay,loop"]
+--
 ++++
 <div class="tutorial-pagination">
 <a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/spottercode-embed/step-02">&larr; Previous</a>
