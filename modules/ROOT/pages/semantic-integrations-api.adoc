@@ -1,0 +1,409 @@
+= Snowflake Semantic View integration APIs
+:toc: true
+:toclevels: 3
+
+:page-title: Snowflake Semantic View integration APIs
+:page-pageid: semantic-integrations-api
+:page-description: Use the ThoughtSpot REST API v2.0 endpoints to create, search, import, and delete Snowflake Semantic View integration configurations programmatically.
+
+// SOURCE: SCAL-309867
+// SOURCE: scaligent/prism/src/public-apis/semantic-integrations.graphql (master)
+// SOURCE: scaligent/prism/src/public-apis/docs/descriptions/semantic-integrations/ (master)
+
+ThoughtSpot 26.9.0.cl introduces REST API v2.0 endpoints for managing Snowflake Semantic View integrations. These APIs allow administrators and data managers to create, search, import, and delete semantic integration configurations programmatically, without using the ThoughtSpot UI.
+
+== Overview
+
+Snowflake Semantic Views provide a governed semantic layer for data in Snowflake, including named measures, dimensions, and business-logic formulas. When you create a semantic integration in ThoughtSpot, the platform reads the semantic view definition from Snowflake and generates a corresponding ThoughtSpot data model (Worksheet). The model inherits the column names, descriptions, and formula definitions from the Snowflake Semantic View.
+
+You can use the semantic integration APIs to automate the following tasks:
+
+* Create a semantic integration that links a Snowflake Semantic View to a ThoughtSpot data model.
+* Search and list existing semantic integrations.
+* Re-import a semantic integration to refresh the ThoughtSpot model after the source Snowflake Semantic View has changed.
+* Delete a semantic integration and its generated ThoughtSpot model.
+
+[NOTE]
+====
+The semantic integration APIs are available on ThoughtSpot Cloud instances from 26.9.0.cl.
+Snowflake is the only supported CDW connector type (`RDBMS_SNOWFLAKE`).
+====
+
+== Prerequisites
+
+To use these APIs, the authenticated user must have one of the following privileges:
+
+* `ADMINISTRATION` (*Can administer ThoughtSpot*)
+* `DATAMANAGEMENT` (*Can manage data*)
+
+If Role-Based Access Control (RBAC) is enabled on your instance, the user must also have:
+
+* `CAN_CREATE_OR_EDIT_CONNECTIONS` (*Can create/edit Connections*)
+* *Can manage data models*
+
+== API endpoints
+
+[width="100%"]
+[options="header"]
+|=====
+| Method | Endpoint | Description
+| `POST` | `/api/rest/2.0/semantic-integrations/create` | Creates a new semantic integration by reading a Snowflake Semantic View and generating a ThoughtSpot data model.
+| `POST` | `/api/rest/2.0/semantic-integrations/search` | Returns a list of semantic integrations matching the specified filter criteria.
+| `POST` | `/api/rest/2.0/semantic-integrations/{semantic_integration_identifier}/import` | Re-imports semantic updates from the CDW source and refreshes the associated ThoughtSpot data model.
+| `POST` | `/api/rest/2.0/semantic-integrations/{semantic_integration_identifier}/delete` | Deletes a semantic integration and its generated ThoughtSpot data model.
+|=====
+
+[#create-semantic-integration]
+== Create a semantic integration
+
+`POST /api/rest/2.0/semantic-integrations/create`
+
+Creates a new semantic integration by reading the specified Snowflake Semantic View and generating a corresponding ThoughtSpot data model. On success, the response includes the integration GUID, the generated model GUID, and a per-formula import report.
+
+=== Required privileges
+
+`ADMINISTRATION` or `DATAMANAGEMENT`. If RBAC is enabled: `CAN_CREATE_OR_EDIT_CONNECTIONS` and *Can manage data models*.
+
+=== Request parameters
+
+[width="100%"]
+[options="header"]
+|=====
+| Parameter | Type | Required | Description
+| `connection_identifier` | String | Yes | GUID or name of the Snowflake connection in ThoughtSpot.
+| `name` | String | Yes | Display name for the semantic integration. Must be unique.
+| `database_name` | String | Yes | Database name in the Snowflake CDW that contains the semantic view.
+| `schema_name` | String | Yes | Schema name in the Snowflake CDW that contains the semantic view.
+| `semantic_view_name` | String | Yes | Name of the Snowflake Semantic View to integrate.
+| `type` | String | Yes | CDW connector type. Only accepted value: `RDBMS_SNOWFLAKE`.
+| `description` | String | No | Optional description for the semantic integration.
+| `tags` | Array<String> | No | Tag GUIDs or names to associate with the integration.
+|=====
+
+=== Response fields
+
+[width="100%"]
+[options="header"]
+|=====
+| Field | Type | Description
+| `id` | String | GUID of the newly created semantic integration.
+| `name` | String | Display name of the semantic integration.
+| `model_id` | String | GUID of the ThoughtSpot data model generated for this integration.
+| `model_name` | String | Display name of the generated ThoughtSpot data model.
+| `semantic_report` | Object | Per-formula import report. See <<_semantic_report_fields>>.
+|=====
+
+[#semantic-report-fields]
+=== Semantic report fields
+
+The `semantic_report` object contains a summary and a list of per-formula import results.
+
+`summary` fields:
+
+[width="100%"]
+[options="header"]
+|=====
+| Field | Type | Description
+| `total` | Integer | Total number of formulas in the Snowflake Semantic View.
+| `imported` | Integer | Number of formulas successfully imported.
+| `failed` | Integer | Number of formulas that failed to import.
+| `skipped` | Integer | Number of formulas that were skipped.
+|=====
+
+`formulas` array — each entry contains:
+
+[width="100%"]
+[options="header"]
+|=====
+| Field | Type | Description
+| `id` | String | Formula GUID in the generated ThoughtSpot model.
+| `name` | String | Formula name.
+| `description` | String | Formula description.
+| `source_expression` | String | Original CDW expression.
+| `translated_formula` | String | Equivalent ThoughtSpot formula expression.
+| `import_status` | String | One of `IMPORTED`, `FAILED`, or `SKIPPED`.
+| `change_status` | String | One of `NEW`, `UPDATED`, or `UNCHANGED`. Null on initial create (populated by import).
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/semantic-integrations/create' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "connection_identifier": "<snowflake-connection-guid-or-name>",
+  "name": "Sales Semantic View",
+  "database_name": "SALES_DB",
+  "schema_name": "PUBLIC",
+  "semantic_view_name": "SALES_SEMANTIC_VIEW",
+  "type": "RDBMS_SNOWFLAKE",
+  "description": "Semantic integration for the Sales Snowflake Semantic View"
+}'
+----
+
+=== Example response
+
+[source,JSON]
+----
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "Sales Semantic View",
+  "model_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "model_name": "Sales Semantic View",
+  "semantic_report": {
+    "summary": {
+      "total": 5,
+      "imported": 4,
+      "failed": 0,
+      "skipped": 1
+    },
+    "formulas": [
+      {
+        "id": "formula-guid-001",
+        "name": "Total Revenue",
+        "description": "Sum of all revenue",
+        "source_expression": "SUM(revenue)",
+        "translated_formula": "sum(revenue)",
+        "import_status": "IMPORTED",
+        "change_status": null
+      }
+    ]
+  }
+}
+----
+
+[#search-semantic-integrations]
+== Search semantic integrations
+
+`POST /api/rest/2.0/semantic-integrations/search`
+
+Returns a paginated list of semantic integrations matching the specified criteria. Returns all integrations if no filters are specified.
+
+=== Required privileges
+
+`ADMINISTRATION` or `DATAMANAGEMENT`. If RBAC is enabled: `CAN_CREATE_OR_EDIT_CONNECTIONS` and *Can manage data models*.
+
+=== Request parameters
+
+[width="100%"]
+[options="header"]
+|=====
+| Parameter | Type | Required | Description
+| `pattern` | String | No | Substring filter to narrow search results by integration name.
+| `author_identifiers` | Array<String> | No | Filter by the GUID or username of the user who created the integration.
+| `connection_identifiers` | Array<String> | No | Filter by the GUID or name of the Snowflake connection associated with the integration.
+| `sort_options` | Object | No | Sort configuration. See <<_sort_options>>.
+| `record_offset` | Integer | No | Number of records to skip for pagination. Minimum: 0. Default: 0.
+| `record_size` | Integer | No | Maximum number of records to return. Use `0` to return all records. Default: 10.
+|=====
+
+[#sort-options]
+==== Sort options
+
+[width="100%"]
+[options="header"]
+|=====
+| Field | Type | Description
+| `field_name` | String | Sort field. One of: `NAME`, `AUTHOR`, `CREATED_TIME`, `MODIFIED_TIME`.
+| `order` | String | Sort direction. `ASC` for ascending, `DESC` for descending.
+|=====
+
+=== Response fields
+
+Returns an array of objects, each with the following fields:
+
+[width="100%"]
+[options="header"]
+|=====
+| Field | Type | Description
+| `id` | String | GUID of the semantic integration.
+| `name` | String | Display name of the semantic integration.
+| `description` | String | Description of the semantic integration. Null if not set.
+| `model_id` | String | GUID of the associated ThoughtSpot data model.
+| `model_name` | String | Display name of the associated ThoughtSpot data model.
+| `import_type` | String | How the semantic definition was sourced. `CDW` for Snowflake Semantic View; `FILE` for file upload.
+| `type` | String | CDW connector type. Currently always `RDBMS_SNOWFLAKE`.
+| `connection_id` | String | GUID of the Snowflake connection.
+| `connection_name` | String | Display name of the Snowflake connection.
+| `author_id` | String | GUID of the user who created the integration.
+| `author_name` | String | Username of the user who created the integration.
+| `creation_time_in_millis` | Float | Creation time in Unix epoch milliseconds.
+| `modification_time_in_millis` | Float | Last modification time in Unix epoch milliseconds.
+| `tags` | Array | Tags associated with the integration, each with `id` and `name`.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/semantic-integrations/search' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "connection_identifiers": ["<snowflake-connection-guid-or-name>"],
+  "sort_options": {
+    "field_name": "MODIFIED_TIME",
+    "order": "DESC"
+  },
+  "record_size": 20,
+  "record_offset": 0
+}'
+----
+
+[#import-semantic-integration]
+== Import a semantic integration
+
+`POST /api/rest/2.0/semantic-integrations/{semantic_integration_identifier}/import`
+
+Re-imports semantic updates from the Snowflake CDW source for an existing integration, and rebuilds the corresponding ThoughtSpot data model. Use this endpoint after the source Snowflake Semantic View has been updated (formulas added, removed, or modified) to bring the ThoughtSpot model back in line with the CDW definition.
+
+[NOTE]
+====
+Importing updates is not supported for integrations created using the file upload option in the ThoughtSpot UI. To refresh a file-upload-based integration, use the ThoughtSpot UI.
+====
+
+The import operation:
+
+* Preserves the integration GUID, name, and `model_id`. Only the formula set is refreshed.
+* Returns the same `semantic_report` response as create, with an additional `change_status` per formula indicating whether each formula is `NEW`, `UPDATED`, or `UNCHANGED` since the previous import.
+
+=== Required privileges
+
+`ADMINISTRATION` or `DATAMANAGEMENT`. If RBAC is enabled: `CAN_CREATE_OR_EDIT_CONNECTIONS` and *Can manage data models*.
+
+=== Path parameters
+
+[width="100%"]
+[options="header"]
+|=====
+| Parameter | Type | Required | Description
+| `semantic_integration_identifier` | String | Yes | GUID or name of the semantic integration to re-import.
+|=====
+
+=== Response fields
+
+Same as <<create-semantic-integration,create>>, with the addition of the `change_status` field in each formula entry:
+
+[width="100%"]
+[options="header"]
+|=====
+| `change_status` value | Description
+| `NEW` | Formula is new since the previous import.
+| `UPDATED` | Formula definition changed since the previous import.
+| `UNCHANGED` | Formula is unchanged since the previous import.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/semantic-integrations/Sales%20Semantic%20View/import' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{}'
+----
+
+=== Example response
+
+[source,JSON]
+----
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "Sales Semantic View",
+  "model_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "model_name": "Sales Semantic View",
+  "semantic_report": {
+    "summary": {
+      "total": 6,
+      "imported": 5,
+      "failed": 0,
+      "skipped": 1
+    },
+    "formulas": [
+      {
+        "id": "formula-guid-001",
+        "name": "Total Revenue",
+        "description": "Sum of all revenue",
+        "source_expression": "SUM(revenue)",
+        "translated_formula": "sum(revenue)",
+        "import_status": "IMPORTED",
+        "change_status": "UNCHANGED"
+      },
+      {
+        "id": "formula-guid-002",
+        "name": "Net Profit",
+        "description": "Revenue minus costs",
+        "source_expression": "SUM(revenue) - SUM(costs)",
+        "translated_formula": "sum(revenue) - sum(costs)",
+        "import_status": "IMPORTED",
+        "change_status": "NEW"
+      }
+    ]
+  }
+}
+----
+
+[#delete-semantic-integration]
+== Delete a semantic integration
+
+`POST /api/rest/2.0/semantic-integrations/{semantic_integration_identifier}/delete`
+
+Permanently deletes the specified semantic integration and its generated ThoughtSpot data model from the system.
+
+[WARNING]
+====
+Deletion is permanent and cannot be undone. If you need to restore the integration, use the `create` endpoint to re-import the Snowflake Semantic View.
+====
+
+=== Required privileges
+
+`ADMINISTRATION` or `DATAMANAGEMENT`. If RBAC is enabled: `CAN_CREATE_OR_EDIT_CONNECTIONS` and *Can manage data models*.
+
+=== Path parameters
+
+[width="100%"]
+[options="header"]
+|=====
+| Parameter | Type | Required | Description
+| `semantic_integration_identifier` | String | Yes | GUID or name of the semantic integration to delete.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/semantic-integrations/Sales%20Semantic%20View/delete' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{}'
+----
+
+A successful delete returns HTTP `200` with an empty response body.
+
+== Error responses
+
+[width="100%"]
+[options="header"]
+|=====
+| Code | Description
+| 400 | Bad Request — required parameter missing or invalid value (for example, unsupported `type`).
+| 401 | Unauthorized — authentication token missing, expired, or invalid.
+| 403 | Forbidden — the caller lacks the required privilege.
+| 404 | Not Found — no semantic integration exists with the given identifier.
+|=====
+
+== Related resources
+
+* xref:connections.adoc[Data connections]
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
+* xref:rest-api-v2-reference.adoc[REST API v2.0 reference]
