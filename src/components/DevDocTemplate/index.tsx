@@ -12,7 +12,7 @@ import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { Analytics } from '@vercel/analytics/react';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
-import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
+import { passThroughHandler, fetchChild, getPageIdFromHref } from '../../utils/doc-utils';
 import Header from '../Header';
 import SecondaryHeader, { DocCategory, CATEGORY_PAGEIDS, CATEGORY_NAV_ID } from '../SecondaryHeader';
 import LeftSidebar from '../LeftSidebar';
@@ -184,15 +184,12 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         typeof window !== 'undefined' &&
         new URLSearchParams(location.search).get('_iframe') === '1';
 
-    // tutorials-overview is a card-grid landing page (like home) — no in-page
-    // nav to browse, so skip the left sidebar entirely and let the cards use
-    // the full width.
-    const hideLeftNav = curPageNode.pageAttributes.pageid === 'tutorials-overview';
-
-    // Tutorials are reached from the Header's Resources dropdown, not a
-    // secondary-header tab — hide the standalone-site tab bar on those pages.
-    // (The in-product minimal nav-toggle bar is a separate branch, unaffected.)
-    const showSecondaryHeader = activeCategory !== 'tutorials';
+    // tutorials-overview and the walkthroughs overview are card-grid landing
+    // pages (like home) — no in-page nav to browse, so skip the left sidebar entirely
+    // and let the cards use the full width.
+    const hideLeftNav = ['tutorials-overview', 'walkthroughs'].includes(
+        curPageNode.pageAttributes.pageid,
+    );
 
     const isGQPlayGround =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
@@ -205,27 +202,21 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
 
     /* Build pageId → category map by parsing hrefs from each category's nav HTML.
      * This means writers only need to update nav-*.adoc — no TypeScript changes needed.
-     * Excludes the merged in-product nav, which isn't a real tab/category. */
+     * Skips any merged nav key that isn't a real tab/category (e.g. the in-product nav,
+     * or a content-only nav file like nav-release-notes.adoc that a category points to
+     * via CATEGORY_NAV_ID rather than being a category itself) — otherwise `cat` ends up
+     * as a bogus DocCategory and CATEGORY_NAV_ID[activeCategory] later resolves to
+     * undefined, crashing on the `.startsWith` call in activeNavContent below. */
     const pageIdToCategoryMap = React.useMemo(() => {
         if (typeof window === 'undefined') return {};
+        const knownCategories = new Set(Object.keys(CATEGORY_NAV_ID));
         const map: Record<string, DocCategory> = {};
         Object.entries(processedNavMap).forEach(([cat, html]) => {
-            if (cat === IN_PRODUCT_NAV_KEY) return;
+            if (cat === IN_PRODUCT_NAV_KEY || !knownCategories.has(cat)) return;
             const doc = new DOMParser().parseFromString(html as string, 'text/html');
             doc.querySelectorAll('a[href]').forEach((a) => {
-                const href = a.getAttribute('href') || '';
-                // hrefs are like /docs/pageid or /pageid — extract the last segment
-                const segments = href.split('?')[0].split('/').filter(Boolean);
-                const lastSegment = segments.pop();
-                if (!lastSegment) return;
-                // Tutorials module pages use compound pageids like {subdir}__{finalSegment}
-                // (see getTutorialLinkFromEdge in gatsby-utils.js) — hrefs are
-                // /tutorials/{subdir}/{finalSegment}, so reconstruct the real pageid
-                // instead of just the URL's last segment, or every tutorial's same-named
-                // step (e.g. every "step-01") would collide on one lookup key.
-                const tutorialsIdx = segments.indexOf('tutorials');
-                const subdir = tutorialsIdx !== -1 ? segments[tutorialsIdx + 1] : undefined;
-                const pageId = subdir ? `${subdir}__${lastSegment}` : lastSegment;
+                const pageId = getPageIdFromHref(a.getAttribute('href'));
+                if (!pageId) return;
                 map[pageId] = cat as DocCategory;
             });
         });
@@ -467,11 +458,12 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         });
     }
 
-    // tutorials-overview is a card-grid landing page like home — it has no in-page
-    // headings worth a right-nav TOC, and the extra 260px it reserves squashes the cards.
+    // tutorials-overview and the walkthroughs overview are card-grid landing
+    // pages like home — they have no in-page headings worth a right-nav TOC, and the
+    // extra 260px it reserves squashes the cards.
     const shouldShowRightNav =
         params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID &&
-        params[TS_PAGE_ID_PARAM] !== 'tutorials-overview';
+        !['tutorials-overview', 'walkthroughs'].includes(params[TS_PAGE_ID_PARAM]);
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
@@ -548,7 +540,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                         setDarkMode={setDarkMode}
                         isDarkMode={isDarkMode}
                         curPageid={curPageNode.pageAttributes.pageid}
-                        isTutorialsNav={activeCategory === 'tutorials'}
+                        isTutorialsNav={activeCategory === 'tutorials' || activeCategory === 'walkthroughs'}
                         searchClickHandler={() => {
                             setShowSearch(true);
                             if (!isMaxMobileResolution) setLeftNavOpen(false);
@@ -574,6 +566,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                                 docTitle={docTitle}
                                 docContent={docContent}
                                 breadcrumsData={breadcrumsData}
+                                showWalkthroughsCrumb={activeCategory === 'walkthroughs'}
                                 isPublicSiteOpen={isPublicSiteOpen}
                                 markdownBody={curPageNode.fields?.markdownBody}
                             />
@@ -782,15 +775,13 @@ if (isVersionedIframe) {
                 ></div>
                 {!isIframeMode && !isVersionedIframe && (
                     isPublicSiteOpen ? (
-                        showSecondaryHeader && (
-                            <SecondaryHeader
-                                activeCategory={activeCategory}
-                                onCategoryChange={setActiveCategory}
-                                location={location}
-                                leftNavOpen={leftNavOpen}
-                                setLeftNavOpen={setLeftNavOpen}
-                            />
-                        )
+                        <SecondaryHeader
+                            activeCategory={activeCategory}
+                            onCategoryChange={setActiveCategory}
+                            location={location}
+                            leftNavOpen={leftNavOpen}
+                            setLeftNavOpen={setLeftNavOpen}
+                        />
                     ) : !isMaxMobileResolution && (
                         // In-product presentation has no tabs — show just the nav
                         // toggle so the sidebar stays reachable on narrow viewports.
@@ -818,7 +809,7 @@ if (isVersionedIframe) {
                                     ? (!isMaxMobileResolution
                                         ? { height: 'calc(100lvh - 48px)' }
                                         : { height: '100lvh' })
-                                    : { height: showSecondaryHeader ? 'calc(100lvh - 65px - 44px)' : 'calc(100lvh - 65px)' }
+                                    : { height: 'calc(100lvh - 65px - 44px)' }
                     }
                 >
                     {isPlayGround ? (

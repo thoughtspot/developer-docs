@@ -17,6 +17,7 @@ const Document = (props: {
     isPublicSiteOpen: boolean;
     shouldShowRightNav: boolean;
     breadcrumsData: any;
+    showWalkthroughsCrumb?: boolean;
     markdownBody?: string;
 }) => {
     const openAssistantWithQuote = (text: string) => {
@@ -182,10 +183,10 @@ const Document = (props: {
     };
 
     const isHomePage = props.pageid === HOME_PAGE_ID;
-    // tutorials-overview is a card-grid landing page with no real body text to
-    // copy, and the toolbar's float:right lands far from the (empty) breadcrumb
-    // above the wide card grid — just hide it here.
-    const hideCopyPage = props.pageid === 'tutorials-overview';
+    // tutorials-overview and walkthroughs are card-grid landing pages with
+    // no real body text to copy, and the toolbar's float:right lands far from the
+    // (empty) breadcrumb above the wide card grid — just hide it here.
+    const hideCopyPage = ['tutorials-overview', 'walkthroughs'].includes(props.pageid);
 
     return (
         <div
@@ -209,6 +210,7 @@ const Document = (props: {
                 <Breadcrums
                     breadcrumsData={props.breadcrumsData}
                     pageid={props.pageid}
+                    showWalkthroughsCrumb={props.showWalkthroughsCrumb}
                 />
             )}
             {!isHomePage && !hideCopyPage && props.isPublicSiteOpen && (

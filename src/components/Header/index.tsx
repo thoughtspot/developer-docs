@@ -12,7 +12,6 @@ import { FiHelpCircle } from '@react-icons/all-files/fi/FiHelpCircle';
 import { FiExternalLink } from '@react-icons/all-files/fi/FiExternalLink';
 import { FiBook } from '@react-icons/all-files/fi/FiBook';
 import { FiBookOpen } from '@react-icons/all-files/fi/FiBookOpen';
-import { FiCompass } from '@react-icons/all-files/fi/FiCompass';
 
 import TSLogo from '../../assets/svg/ts-logo-white-developer.svg';
 import t from '../../utils/lang-utils';
@@ -56,13 +55,6 @@ const Header = (props: {
             link: 'https://docs.thoughtspot.com/home',
             icon: FiBook,
         },
-        {
-            name: 'Tutorials',
-            sub: 'Self-paced, hands-on developer tutorials',
-            link: '/docs/tutorials/tutorials-overview',
-            icon: FiCompass,
-            external: false,
-        },        
         {
             name: 'Training',
             sub: 'ThoughtSpot Embedded learning paths',
