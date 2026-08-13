@@ -106,7 +106,12 @@ const LeftSideBar = (props: {
             );
             if (activeLink) {
                 lastScrolledPageIdRef.current = props.curPageid;
-                activeLink.scrollIntoView({ block: 'center' });
+                // 'nearest' is a no-op once the link is already visible. 'center' isn't —
+                // it nudges toward exact-center even when already in view, and since this
+                // sidebar has no scroll room to spare on most pages (content fits exactly),
+                // that nudge has nowhere to go but the window itself, which is what was
+                // sliding the fixed header out of view on some walkthrough pages.
+                activeLink.scrollIntoView({ block: 'nearest' });
             }
         }
     }, [props.curPageid, isMaxMobileResolution, navContent, props.leftNavOpen]);
