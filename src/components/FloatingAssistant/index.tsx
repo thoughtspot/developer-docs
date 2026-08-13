@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useFloatingAssistant } from '../../contexts/FloatingAssistantContext';
-import { isPublicSite } from '../../utils/app-utils';
+import { isPublicSite, isTutorialsPath } from '../../utils/app-utils';
 import { CUSTOM_PAGE_ID } from '../../configs/doc-configs';
 import { Alert, Icon, IconID, IconSize, IconColor, LoadingIndicator } from '@thoughtspot/radiant-react';
 import '@thoughtspot/radiant-react/styles';
@@ -41,6 +41,12 @@ const AssistantAvatar = () => (
 const FloatingAssistant: React.FC = () => {
     const [pageId, setPageId] = useState<string | undefined>(getPageId);
     const [isEmbedded, setIsEmbedded] = useState(false);
+    // Tutorials pages have their own footer navigation (Previous/Next/Done) that this
+    // fixed, always-on-top panel has no awareness of — hide the widget there entirely
+    // rather than fight over screen space.
+    const [isTutorialsPage, setIsTutorialsPage] = useState(
+        () => typeof window !== 'undefined' && isTutorialsPath(window.location.pathname),
+    );
     const {
         isOpen,
         setIsOpen,
@@ -264,6 +270,14 @@ const FloatingAssistant: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        const handler = (e: CustomEvent<{ location: Location }>) => {
+            setIsTutorialsPage(isTutorialsPath(e.detail.location.pathname));
+        };
+        window.addEventListener('gatsby-route-update', handler as EventListener);
+        return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
+    }, []);
+
+    useEffect(() => {
         const handler = (e: CustomEvent<{ quotedText: string }>) => {
             setQuotedText(e.detail.quotedText);
             setIsOpen(true);
@@ -412,6 +426,7 @@ const FloatingAssistant: React.FC = () => {
     const isLandingPage = messages.length === 0 && !isLoading;
 
     if (pageId === CUSTOM_PAGE_ID.API_PLAYGROUND) return null;
+    if (isTutorialsPage) return null;
 
     return (
         <>

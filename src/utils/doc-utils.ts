@@ -69,6 +69,24 @@ const getParentHref = (current) => {
     return null;
 };
 
+/**
+ * Reconstructs a page's pageid from an href found in nav content. Tutorials/
+ * walkthroughs module pages use compound pageids ({subdirectory}__{finalSegment},
+ * see getTutorialLinkFromEdge in gatsby-utils.js) while their nav links use the
+ * human-readable URL (/tutorials/{subdirectory}/{finalSegment}) — this bridges
+ * the two so matching works regardless of the {{navprefix}} substitution ('' on
+ * LOCAL, '/docs' otherwise), since only the trailing segments are inspected.
+ */
+export const getPageIdFromHref = (href?: string | null): string | null => {
+    if (!href) return null;
+    const segments = href.split('?')[0].split('/').filter(Boolean);
+    const lastSegment = segments.pop();
+    if (!lastSegment) return null;
+    const tutorialsIdx = segments.indexOf('tutorials');
+    const subdir = tutorialsIdx !== -1 ? segments[tutorialsIdx + 1] : undefined;
+    return subdir ? `${subdir}__${lastSegment}` : lastSegment;
+};
+
 export const getBreadcrumsPath = (data: any, pageid?: string) => {
     if (!pageid) {
         return [];
@@ -77,7 +95,8 @@ export const getBreadcrumsPath = (data: any, pageid?: string) => {
     return data.reduce((previous, current) => {
         if (
             current.href === `?pageid=${pageid}` ||
-            current.href === `/${SITE_PREFIX}/${pageid}`
+            current.href === `/${SITE_PREFIX}/${pageid}` ||
+            getPageIdFromHref(current.href) === pageid
         ) {
             // To avoid having link for the same page we are setting href to null
             return [{ name: current.name, href: null }];

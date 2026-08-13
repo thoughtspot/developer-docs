@@ -1,0 +1,109 @@
+= Step 3: Embed Spotter: extend it with conversational analytics
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Step 3: Embed Spotter: Extend it with conversational analytics
+:page-pageid: spottercode-embed__step-03
+:page-description: Prompt SpotterCode to embed Spotter beneath the Liveboard, hide actions for external users, and find the Model ID.
+
+The Liveboard is in place. Now for the second use case: hosts can ask follow-up questions in their own words instead of hunting through Liveboard filters.
+
+[source,text]
+----
+"I want to embed ThoughtSpot Spotter below the Liveboard so hosts can ask follow-up
+questions about their listing data. Use the available tools to get the information
+and generate the code."
+----
+
+[div videoContainer]
+--
+video::./images/mktng-tutorials/add-spotter.mp4[width=100%,options="autoplay,loop"]
+--
+
+[source,javascript]
+----
+import { SpotterEmbed } from '@thoughtspot/visual-embed-sdk/react';
+
+const HostInsights = ({ hostModelId }) => {
+    return (
+        <SpotterEmbed
+            worksheetId={hostModelId}
+            hideSampleQuestions={false}
+        />
+    );
+};
+
+export default HostInsights;
+----
+
+Drop `HostInsights` directly beneath `HostDashboard` on the same portal page; no separate authentication flow is required.
+
+[#lock-down-for-external-users]
+=== Step 1: Lock it down for external users
+
+Hosts aren't internal ThoughtSpot users. You don't want them downloading raw data or seeing ThoughtSpot-native sharing options that don't make sense in the SpotStay portal.
+
+[source,text]
+----
+"How do I hide the Download and Share actions on an embedded Liveboard, and disable
+SpotIQ analysis with a custom message, using the Visual Embed SDK?"
+----
+
+[source,javascript]
+----
+<LiveboardEmbed
+    ref={embedRef}
+    liveboardId="spotstay-listing-performance-lb"
+    onLiveboardRendered={onLiveboardRendered}
+    hiddenActions={[Action.Download, Action.Share]}
+    disabledActions={[Action.SpotIQAnalyze]}
+    disabledActionReason="Not available on host accounts"
+/>
+----
+
+[#wire-to-real-data]
+=== Step 2: Wire it to real data
+
+Everything so far used a placeholder Model ID. You still need the actual Model ID for SpotStay's listing data, and you do not need to dig through the ThoughtSpot UI by hand.
+If SpotterCode is not authenticated to your cluster, ask it to generate the REST API
+request and run the request yourself:
+
+[source,text]
+----
+"Generate a REST API request to find the Model ID for a data object named
+'SpotStay Listings', using ThoughtSpot REST API v2."
+----
+
+If SpotterCode is authenticated to your cluster, ask it to run the lookup directly:
+
+[source,text]
+----
+"Find the Model ID for a data object named 'SpotStay Listings' on my cluster."
+----
+
+SpotterCode connects as you, runs the lookup, and returns the ID — no copying `curl` commands, no switching tabs. The same pattern works for finding Liveboard GUIDs, checking CORS settings, or inspecting any metadata on your cluster.
+
+If you prefer to run the lookup manually, use the following REST API request:
+
+[source,bash]
+----
+curl -X POST 'https://spotstay.thoughtspot.cloud/api/rest/2.0/metadata/search' \
+  -H 'Authorization: Bearer <your_access_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "metadata": [{ "type": "LOGICAL_TABLE", "name_pattern": "SpotStay Listings" }],
+    "record_size": 5
+  }'
+----
+
+
+[div videoContainer]
+--
+video::./images/mktng-tutorials/working-spotter-embed.mp4[width=100%,options="autoplay,loop"]
+--
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/spottercode-embed/step-02">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/spottercode-embed/step-04">Next &rarr;</a>
+</div>
+++++

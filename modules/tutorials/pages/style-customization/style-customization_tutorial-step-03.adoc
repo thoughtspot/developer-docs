@@ -1,0 +1,151 @@
+= Step 3: CSS styles
+:toc!:
+
+:page-title: Step 3: CSS styles
+:page-pageid: style-customization__step-03
+:page-description: Use the customizations framework to apply CSS variables and selectors to embedded ThoughtSpot content.
+
+The Visual Embed SDK has a `customizations` framework for adding CSS and other overrides.
+
+In the Playground, select the *Apply custom styles* checkbox. The code panel shows a large block of code with various options for CSS customization:
+
+[NOTE]
+====
+The `customizations` code goes in the `init()` function, whereas the other customizations are applied when the embedded component initializes.
+====
+
+[source,javascript]
+----
+customizations: {
+    style: {
+        customCSSUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/css-variables.css", // location of your style sheet
+
+        // To apply overrides for your style sheet in this init, provide variable values below, eg
+        customCSS: {
+            variables: {
+                "--ts-var-button--secondary-background": "#F0EBFF",
+                "--ts-var-button--secondary--hover-background": "#E3D9FC",
+                "--ts-var-root-background": "#F7F5FF",
+            },
+        },
+    },
+},
+----
+
+== Variables and selectors
+ThoughtSpot provides many pre-defined xref:customize-css-styles.adoc[CSS variables] to control the styling of the embedded component UI and its elements.
+
+The style definitions can all be declared directly within the `variables` block of the `customCSS` code.
+
+The customization framework also allows using any CSS selector to target specific elements with changes that do not have a defined variable. Selectors can be declared within the `rules_UNSTABLE` block inside `customCSS`. However, selectors may change with new releases as elements of ThoughtSpot are updated.
+
+Let's add a selector to the code in our Playground. First, comment out the `customCSSUrl` line, then add the `rules_UNSTABLE` block below `variables`:
+
+[source,javascript]
+----
+customizations: {
+    style: {
+        // customCSSUrl: "https://cdn.jsdelivr.net/gh/thoughtspot/custom-css-demo/css-variables.css", // location of your style sheet
+
+        // To apply overrides for your style sheet in this init, provide variable values below, eg
+        customCSS: {
+            variables: {
+                "--ts-var-button--secondary-background": "#F0EBFF",
+                "--ts-var-button--secondary--hover-background": "#E3D9FC",
+                "--ts-var-root-background": "#F7F5FF",
+            },
+            rules_UNSTABLE: {
+
+            }
+        },
+    },
+},
+----
+
+Variables declare a __single__ property, therefore are defined as `"{var-name}" : "{value}"`, whereas selectors allow you to assign several properties to the selected elements.
+
+[NOTE]
+====
+Selectors apply properties to elements with many layers of styling. Always add `!important` after each property to ensure the browser overrides whatever other style rules may be applied for the same property.
+====
+
+One use case of the `rules_UNSTABLE` section is `xref:css-customization.adoc#font-declarations[@font-face]` declarations, which have many properties for one selector.
+
+We'll switch the main font to link:https://fonts.google.com/specimen/Poppins[Poppins^], available from Google Fonts:
+
+. Add the `--ts-var-root-font-family` variable to declare the new font. +
+Note that you'll need to use this exact name value in `@font-face` declarations.
+. Add a selector block within the `rules_UNSTABLE` block.
+. Include xref:css-customization.adoc#_font_declarations[font declarations].
++
+[source,javascript]
+----
+// ...
+ customCSS: {
+     variables: {
+         "--ts-var-button--secondary-background": "#F0EBFF",
+         "--ts-var-button--secondary--hover-background": "#E3D9FC",
+         "--ts-var-root-background": "#F7F5FF",
+         "--ts-var-root-font-family": "Poppins"
+     },
+     rules_UNSTABLE: {
+         '/* ff-400 */ @font-face': {
+             'font-family': "Poppins",
+             'font-style': 'normal',
+             'font-weight': '400',
+             'font-display': 'swap',
+             'src': "url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2')"
+         }
+     }
+ },
+----
++
+Notice the format shows the selector as the __key__, then an object block containing individual key-value pairs for the properties. Because the selector is an object key, but all `@font-face` declarations start the same way, we add a unique CSS comment at the beginning to allow for multiple `@font-face` declarations.
+
+. Click *Run*.
+. Notice the Liveboard reload with the `Poppins` font for most of the text.
+
+== CSS files
+You can collect a set of variables and selectors into a CSS file, rather than declaring them in the JavaScript code block.
+CSS files can be included from any domain, but they must be added to the *CSP style-src domains* and *CSP font-src* domains on the *Develop* > *Customizations* -> *Security settings* page.
+
+Both `\https://cdn.jsdelivr.net` and `\https://fonts.gstatic.com` sites are automatically added to ThoughtSpot's CSP allowlist.
+
+In your CSS file, the global variables must be declared in the `:root { }` block, while `@font-face` declarations of a named font can be placed anywhere:
+
+[,css]
+----
+:root {
+  --ts-var-button--primary-background: #2359B6;
+  --ts-var-button--primary--hover-background: blue;
+  --ts-var-button--primary--font-family: Poppins,Helvetica,Arial,sans-serif;;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2) format('woff2');
+}
+
+.bk-filter-option {
+  display: none!important;
+}
+----
+
+== Hide elements
+As seen in the CSS file example above, one of the use cases for selectors is to hide embed component elements that do not have a configuration option.
+
+`display: none!important` is the most typical property to accomplish this, but you may choose any CSS rule that causes the desired effect.
+
+Make sure that the selector you use is specific and does not affect other elements that you don't intend to hide.
+
+If you have been hiding certain elements via CSS selectors, link:https://community.thoughtspot.com/s/ideas[contact ThoughtSpot^] to request configuration options for such elements, so that the overall configurations can be expanded over time. Similarly, provide feedback on properties that variables are unavailable by submitting an idea to the link:https://community.thoughtspot.com/s/ideas[ThoughtSpot Community^].
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/style-customization/step-02">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/style-customization/step-04">Next &rarr;</a>
+</div>
+++++
