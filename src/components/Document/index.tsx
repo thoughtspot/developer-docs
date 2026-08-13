@@ -183,10 +183,11 @@ const Document = (props: {
     };
 
     const isHomePage = props.pageid === HOME_PAGE_ID;
-    // tutorials-overview and walkthroughs are card-grid landing pages with
-    // no real body text to copy, and the toolbar's float:right lands far from the
-    // (empty) breadcrumb above the wide card grid — just hide it here.
-    const hideCopyPage = ['tutorials-overview', 'walkthroughs'].includes(props.pageid);
+    // The walkthroughs overview is a card-grid landing page with no real body
+    // text to copy, and the toolbar's float:right lands far from the (empty)
+    // breadcrumb above the wide card grid — just hide it there. tutorials-overview
+    // shows the copy button like any other tutorial content page.
+    const hideCopyPage = props.pageid === 'walkthroughs';
 
     return (
         <div

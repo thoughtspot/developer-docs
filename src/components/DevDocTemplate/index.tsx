@@ -184,12 +184,11 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         typeof window !== 'undefined' &&
         new URLSearchParams(location.search).get('_iframe') === '1';
 
-    // tutorials-overview and the walkthroughs overview are card-grid landing
-    // pages (like home) — no in-page nav to browse, so skip the left sidebar entirely
-    // and let the cards use the full width.
-    const hideLeftNav = ['tutorials-overview', 'walkthroughs'].includes(
-        curPageNode.pageAttributes.pageid,
-    );
+    // The walkthroughs overview is a card-grid landing page (like home) — no
+    // in-page nav to browse, so skip the left sidebar entirely and let the
+    // cards use the full width. tutorials-overview is presented like any other
+    // tutorial content page (left nav + right TOC), same as its own lessons.
+    const hideLeftNav = curPageNode.pageAttributes.pageid === 'walkthroughs';
 
     const isGQPlayGround =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
@@ -226,6 +225,14 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
     /* Detect active category from current page ID */
     useEffect(() => {
         const currentPageId = curPageNode.pageAttributes.pageid;
+        // tutorials-overview is also linked from nav.adoc's own "Tutorials" section
+        // (so it has a real breadcrumb entry), which would otherwise dynamically
+        // claim it under 'guides' and show the wrong sidebar. Force it under
+        // 'tutorials' so it gets nav-tutorials.adoc's sidebar like its own lessons.
+        if (currentPageId === 'tutorials-overview') {
+            setActiveCategory('tutorials');
+            return;
+        }
         // First try the auto-derived map from nav files
         if (pageIdToCategoryMap[currentPageId]) {
             setActiveCategory(pageIdToCategoryMap[currentPageId]);
@@ -458,12 +465,13 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         });
     }
 
-    // tutorials-overview and the walkthroughs overview are card-grid landing
-    // pages like home — they have no in-page headings worth a right-nav TOC, and the
-    // extra 260px it reserves squashes the cards.
+    // The walkthroughs overview is a card-grid landing page like home — it has
+    // no in-page headings worth a right-nav TOC, and the extra 260px it reserves
+    // squashes the cards. tutorials-overview gets the normal right nav, same as
+    // any other tutorial content page.
     const shouldShowRightNav =
         params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID &&
-        !['tutorials-overview', 'walkthroughs'].includes(params[TS_PAGE_ID_PARAM]);
+        params[TS_PAGE_ID_PARAM] !== 'walkthroughs';
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
