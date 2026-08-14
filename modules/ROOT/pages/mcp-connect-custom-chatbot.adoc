@@ -161,6 +161,119 @@ The above example:
 * Sends the required headers with the authentication token and ThoughtSpot host URL in MCP requests.
 * Wraps the MCP client as a tool and passes it into `GoogleGenAI` so Gemini can call ThoughtSpot tools as part of answering a user's query.
 
+
+[#accessing-full-tool-responses]
+== Accessing full tool responses
+
+By default, Spotter's MCP tools return a simplified response optimized for host agent understanding: step headings and thinking narration while Spotter works, any clarifications or caveats it raises, and the answer as a title, search query, embeddable `iframe_url`, and an `answer_id` you can save to a dashboard.
+For most integrations, this is the right balance of relevant context without unnecessary token use.
+
+Some integrations need to display granular metadata about Spotter's internal tool calls, such as the columns in the data model used to answer the question or the details behind fetching memory.
+For those cases only, you can enable the full response to receive the raw event stream.
+Enabling it is a deliberate tradeoff: you take on higher token costs on every turn and take on work the default response does for you.
+Use the default unless you have a specific requirement the default cannot meet.
+
+=== Default vs. full response
+
+[cols="2,3,3", options="header"]
+|====
+||Default response +
+(optimized for agent understanding)|Full response +
+(higher token costs)
+
+|Progress and narration
+|Step headings, thinking narration, clarifications, and caveats
+|Same
+
+|The answer
+|Title, search query, TML tokens, embeddable `iframe_url`, `answer_id`
+|Title, search query, TML tokens, plus raw metadata — no preconstructed `iframe_url`; you build it yourself
+
+|Additional metadata
+|Not included
+|Formulas, parameters, subqueries, chart type, data source ID
+
+|Context cost
+|Lower
+|Meaningfully higher — the full metadata payload is sent on every `get_session_updates` response
+|====
+
+Neither response includes the underlying result data. In both cases, values are rendered inside the visualization itself.
+
+=== When to use it
+
+* *Default response (recommended)* — the user reads the answer from the visualization.
+Start here if you are unsure. You can switch to the full response later without changing your session or message flow, because only the content of the updates changes.
+
+* *Full response* — use when your agent needs to explain the analysis behind the answer — for example, full tool call metadata, memories used, and dataset instructions referenced — so users can confirm their question was interpreted correctly.
+
+[NOTE]
+====
+The full response's metadata — token breakdown, formulas, parameters, subqueries, and more — is sent with every `get_session_updates` response.
+In longer conversations or high-volume integrations, this adds substantial extra token usage compared to the default response.
+====
+
+=== Enabling the full response
+
+Add `enable-raw-session-updates=true` to your MCP endpoint URL:
+
+Bearer token MCP endpoint:
+[source]
+----
+https://agent.thoughtspot.app/token/mcp?api-version=latest&enable-raw-session-updates=true
+----
+
+OAuth-authenticated MCP endpoint:
+[source]
+----
+https://agent.thoughtspot.app/mcp?api-version=latest&enable-raw-session-updates=true
+----
+
+=== Constructing the answer iframe yourself
+
+With the full response enabled, the raw answer event does not include a preconstructed `iframe_url`.
+Build it from fields in the event's `metadata` object.
+
+Sample raw answer event:
+
+[source,json]
+----
+{
+  "id": "qiZ_1idPqVFr",
+  "type": "answer",
+  "group_id": "33bhxx6PYH1X",
+  "metadata": {
+    "sage_query": "top 10 [product] sort by [sales]",
+    "session_id": "a5174918-6db0-4214-a0fc-f46da38851c4",
+    "gen_no": 2,
+    "transaction_id": "2a5f389c-ba37-447a-85cb-1b43d1d77a69",
+    "generation_number": 1,
+    "tml_phrases": [
+      "top 10 [product] sort by [sales]"
+    ],
+    "title": "Top 10 products by sales",
+    "worksheet_id": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+    "type": "thinking"
+  },
+  "title": "Top 10 products by sales"
+}
+----
+
+Construct the `iframe_url` from the metadata fields:
+
+[source,javascript]
+----
+const iframeUrl =
+  `${clusterUrl}/?tsmcp=true#/embed/conv-assist-answer` +
+  `?sessionId=${evt.metadata.session_id}` +
+  `&genNo=${evt.metadata.gen_no}` +
+  `&acSessionId=${evt.metadata.transaction_id}` +
+  `&acGenNo=${evt.metadata.generation_number}`;
+----
+
+For the complete event schema, see the xref:spotter-agent-apis.adoc#_api_response_2[Spotter Agent API, window=_blank].
+
+
 == Verifying the integration
 
 To verify the integration:

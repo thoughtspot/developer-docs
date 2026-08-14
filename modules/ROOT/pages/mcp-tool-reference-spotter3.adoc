@@ -161,8 +161,29 @@ call_mcp_tool(
 --
 
 === Response
+Each poll returns a wrapper object with an `is_done` flag and a `session_updates` array. Session updates stream across multiple polling calls. Accumulate them all before rendering the final answer.
 
-Poll returning intermediate updates with the "is_thinking" response:
+`session_updates` objects use three `type` values:
+
+[cols="1,1,3", options="header"]
+|====
+|Type|`is_thinking`|Description
+
+|`step_notification`|`true`
+|A short heading announcing the step Spotter is about to start, such as `Searching data models` or `Running query`.
+Step headings arrive as soon as Spotter begins each step, before the narration text for that step.
+Render these immediately so the user sees progress in real time.
+
+|`text_chunk`|`true` (thinking) or `false` (final)
+|A fragment of Spotter's narration. Concatenate chunks to form the complete narration string.
+When `is_thinking` is `false`, the chunk is part of the final answer narration, not an intermediate thinking step.
+
+|`answer`|`false`
+|The analytical result. Contains a title, the ThoughtSpot search query used, an embeddable `iframe_url`, and an `answer_id` for creating dashboards.
+Exactly one `answer` update is present per question.
+|====
+
+Poll returning intermediate updates:
 
 [source,json]
 ----
@@ -171,14 +192,19 @@ Poll returning intermediate updates with the "is_thinking" response:
   "session_updates": [
     {
       "is_thinking": true,
-      "type": "text-chunk",
-      "text": "Let me look at your sales data by region..."
+      "type": "step_notification",
+      "text": "Searching data models"
+    },
+    {
+      "is_thinking": true,
+      "type": "text_chunk",
+      "text": " to find the most relevant dataset for your question..."
     }
   ]
 }
 ----
 
-Poll returning final updates:
+Poll returning the final answer:
 
 [source,json]
 ----
@@ -186,26 +212,37 @@ Poll returning final updates:
   "is_done": true,
   "session_updates": [
     {
-      "is_thinking": false,
-      "type": "text-chunk",
-      "text": "Data broken down by region..."
+      "is_thinking": true,
+      "type": "step_notification",
+      "text": "Running query"
+    },
+    {
+      "is_thinking": true,
+      "type": "text_chunk",
+      "text": "Running the query against the sales data model..."
     },
     {
       "is_thinking": false,
-      "type": "text",
+      "type": "text_chunk",
       "text": "I'm interpreting 'last quarter' as Q4 2025 (October–December), based on a fiscal year starting in April."
     },
     {
       "is_thinking": false,
       "type": "answer",
-      "answer_title": "Total Sales by Region — Q4 2025",
-      "answer_query": "total sales by region last quarter",
-      "iframe_url": "https://your-instance.thoughtspot.cloud/embed/...",
-      "answer_id": "answer-guid-xyz789"
+      "answer_id": "{\"session_id\":\"1a3d...\",\"gen_no\":2}",
+      "answer_title": "Total sales by region",
+      "answer_data_source_id": "cd252e5c-...",
+      "answer_query": "[sales] [region]",
+      "iframe_url": "https://your-instance.thoughtspot.cloud/?tsmcp=true#/embed/conv-assist-answer?..."
     }
   ]
 }
 ----
+
+[NOTE]
+====
+The `step_notification` type was introduced alongside the default response format. Step headings always arrive before the narration text for that step.
+====
 
 === Handling streamed responses
 Spotter queries are processed asynchronously and streamed in real time. This means the full response is never contained in a single `get_session_updates` call.
@@ -219,7 +256,61 @@ A typical response sequence might look like:
 . Intermediate conclusions: partial results or contextual notes before the final answer.
 . The final answer: one or more `answer` updates containing the visualization title, the underlying query, and the embeddable iframe URL.
 
-This means a complete response might span 5–20+ `get_session_updates` calls and contain many `session_update` objects before `is_done` becomes `true`. All of this content — the thinking, the narration, and the final answer — should be accumulated and presented together to give the user the full picture.
+This means a complete response might span 5–20+ `get_session_updates` calls and contain many `session_update` objects before `is_done` becomes `true`. All of this content, the thinking, the narration, and the final answer, should be accumulated and presented together to give the user the full picture.
+
+
+[#full-response]
+=== Full response (raw event stream)
+
+By default, `get_session_updates` returns a simplified response optimized for host agent understanding.
+For integrations that need granular metadata about Spotter's internal tool calls, you can enable the full raw event stream.
+
+For guidance on when to use the full response and how to enable it, see xref:mcp-connect-custom-chatbot.adoc#accessing-full-tool-responses[Accessing full tool responses].
+
+==== Default response format
+
+Three update types. Flat, fixed keys. `is_thinking` is the top-level flag that distinguishes intermediate reasoning from the final answer.
+
+[source,json]
+----
+{"is_thinking":true,"type":"step_notification","text":"Searching for Datasets"}
+{"is_thinking":true,"type":"text_chunk","text":" to find the most relevant dataset..."}
+{"is_thinking":false,"type":"answer",
+ "answer_id":"{\"session_id\":\"1a3d...\",\"gen_no\":2}",
+ "answer_title":"Total sales by region",
+ "answer_data_source_id":"cd252e5c-...",
+ "answer_query":"[sales] [region]",
+ "iframe_url":"https://your-instance.thoughtspot.cloud/?tsmcp=true#/embed/conv-assist-answer?..."}
+----
+
+==== Full response format (raw upstream events)
+
+When `enable-raw-session-updates=true` is appended to your MCP endpoint URL, `get_session_updates` returns the raw Spotter event stream.
+The full response does not include a preconstructed `iframe_url`. You must build it yourself. For guidance, see xref:mcp-connect-custom-chatbot.adoc#accessing-full-tool-responses[Accessing full tool responses].
+
+[source,json]
+----
+{"type":"ack","node_id":"pvzWZ8wdaL0w"}
+{"type":"conv_title","title":"Total revenue by region","conv_id":"iZ87F742SMkA"}
+{"type":"notification","group_id":"5aOOckJ31v8d","code":"TOOL_CALL_NOTIFICATION",
+ "metadata":{"type":"thinking","tool_name":"search_datasets",
+             "tool_args":{"keywords":["revenue","region","sales"]},
+             "tool_code":"SEARCHING_DATASETS","tool_title":"Searching for Datasets"}}
+{"id":"m2xDLBXcPF5D","type":"text-chunk","group_id":"br31Y9vnKmDp",
+ "metadata":{"format":"markdown","type":"thinking"},"content":" to find a"}
+{"id":"SpzpcgHBt_Pm","type":"answer","group_id":"TlhE-TPW05tu",
+ "title":"total sales by region",
+ "answer_id":"{\"session_id\":\"fc3bd346-...\",\"gen_no\":2}",
+ "metadata":{"sage_query":"[sales] [region]","session_id":"fc3bd346-...","gen_no":2,
+             "transaction_id":"8e5654f3-...","generation_number":1,
+             "warning_details":[{"warningType":"CHART_INTENT_APPLIED"},
+                                {"warningType":"CHART_INTENT_DETECTED"}],
+             "ambiguous_phrases":null,"query_intent":null,
+             "tml_phrases":["[sales] [region]"],"cached":false,
+             "sub_queries":null,"worksheet_id":"cd252e5c-...","type":"thinking"}}
+----
+
+For the complete event schema, see the xref:spotter-agent-apis.adoc#_api_response_2[Spotter Agent API, window=_blank].
 
 === Type definition: session_update
 
