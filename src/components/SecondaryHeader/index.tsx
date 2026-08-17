@@ -59,7 +59,7 @@ export const CATEGORY_NAV_ID: Record<DocCategory, string> = {
 export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
     all: [],
     guides: [
-        'introduction', 'ask-docs', 'development-and-deployment', 'thoughtspot-objects',
+        'introduction', 'development-and-deployment', 'thoughtspot-objects',
         'variables', 'parameterze-metdata', 'deploy-with-tml-apis', 'git-provider-integration',
         'modify-tml', 'publish-data-overview', 'parameterize-metadata', 'publish-to-orgs',
         'git-integration', 'git-configuration', 'git-api', 'guid-mapping',
@@ -127,7 +127,7 @@ const SecondaryHeader = (props: {
     location: Location;
     leftNavOpen: boolean;
     setLeftNavOpen: Function;
-    // In-product (embedded) presentation has no category tabs/AskDocs — render just the
+    // In-product (embedded) presentation has no category tabs — render just the
     // mobile nav-toggle so the left sidebar stays reachable on narrow viewports.
     minimal?: boolean;
 }) => {
@@ -241,12 +241,6 @@ const SecondaryHeader = (props: {
                                     {CATEGORY_LABELS[cat]}
                                 </button>
                             ))}
-                            <button
-                                className="secondary-header__mobile-item"
-                                onClick={() => { navigate('/ask-docs'); setMobileMenuOpen(false); }}
-                            >
-                                AskDocs
-                            </button>
                         </div>
                     )}
                 </div>
@@ -256,14 +250,6 @@ const SecondaryHeader = (props: {
                 <div className="secondary-header__mobile-version">
                     <Dropdown location={location} isMobile={false} />
                 </div>
-
-                {/* Desktop only: AskDocs link */}
-                <button
-                    className="secondary-header__askdocs"
-                    onClick={() => navigate('/ask-docs')}
-                >
-                    AskDocs <span className="secondary-header__beta">Beta</span>
-                </button>
             </div>
         </nav>
     );

@@ -23,7 +23,8 @@ import '../../assets/styles/index.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './playGround/RESTAPI';
 import GraphQLPlayGround from './playGround/GraphQL';
-import { AskDocs } from './askDocs';
+// AskDocs page removed — ask-docs.adoc was moved out of this project.
+// import { AskDocs } from './askDocs';
 import AnnouncementBanner from '../AnnouncementBanner';
 import {
     TS_HOST_PARAM,
@@ -179,7 +180,8 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         isApiPlayground ||
         isVersionedIframe;
 
-    const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
+    // AskDocs page removed — ask-docs.adoc was moved out of this project.
+    // const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
     /* Build pageId → category map by parsing hrefs from each category's nav HTML.
      * This means writers only need to update nav-*.adoc — no TypeScript changes needed.
@@ -511,11 +513,12 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                     }}
                 />
             </div>
+            {/* AskDocs page removed — ask-docs.adoc was moved out of this project.
             {isAskDocsPage ? (
                 <div className="documentBody">
                     <AskDocs />
                 </div>
-            ) : (
+            ) : ( */}
                 <div
                     className={`documentBody ${
                         isHomePage ? 'doc-home' : 'doc-wrapper-detail'
@@ -544,7 +547,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                         )}
                     </div>
                 </div>
-            )}
+            {/* )} */}
         </>
     );
 
