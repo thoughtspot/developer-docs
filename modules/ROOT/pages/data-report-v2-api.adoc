@@ -1,1 +1,376 @@
-Unknown tool: github_get_file
+= Data and Report APIs
+:toc: true
+:toclevels: 3
+
+:page-title: data-apis
+:page-pageid: fetch-data-and-report-apis
+:page-description: Data and Report APIs
+
+== Data APIs
+ThoughtSpot provides the following REST API v2 endpoints to fetch data:
+
+* xref:#_search_data_api[`POST /api/rest/2.0/searchdata`] to search data from a given data source.
+* xref:#_fetch_liveboard_api[`POST /api/rest/2.0/metadata/liveboard/data`] to get data from a Liveboard.
+* xref:#_fetch_answer_data_api[`POST /api/rest/2.0/metadata/answer/data`] to get data from a saved Answer.
+
+If Role-Based Access Control (RBAC) is enabled, the `DATADOWNLOADING` (Can download Data) privilege is required to use these APIs. Alternatively, if the granular data download RBAC privileges are enabled for your ThoughtSpot instance, the `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) is required.
+
+=== Search data API
+
+The `/api/rest/2.0/searchdata` endpoint requires you to specify the data source object ID and a query string for a successful API call. You can also define additional parameters such as `runtime_filter`, `runtime_sort`, and `runtime_param_override` to apply runtime overrides on the data set.
+
+==== Data source
+To search data via API call, you require at least view access to the data source object. The data source object can be a Model, View, or Table.
+
+You can specify the data source object GUID in the `logical_table_identifier`. The search data endpoint doesn't support searching data from multiple Models, Views, or Tables in a single API request.
+
+To find the GUID of the Model, View, or Table, use one of the following methods:
+
+Get data object GUID via API::
+
+Send an API request to the `/api/rest/2.0/metadata/search` endpoint with the following parameters in the metadata array: +
+
++
+.**Example**
+[source,JSON]
+----
+ "metadata": [
+    {
+      "identifier": "my_model",
+      "type": "LOGICAL_TABLE"
+    }
+  ]
+----
+
++
+If you don't know the exact name of the data source object, specify the metadata `type` as `LOGICAL_TABLE` in your API request, and then copy the GUID of the data object from the API response.
+
+Find the GUID of the data object via UI::
+. Log in to your ThoughtSpot application instance:
+. Navigate to **Data workspace**.
++
+----
+https://<your-thoughtspot-instance>/#/data/tables/
+----
++
+. On the **Data workspace** > **Data objects** page, select the data object. For example, if the data source object is a Model, click **Models** and then open the Model.
+. In the address bar of the web browser, note the GUID of the data source object.  For example, in the following address string, the GUID is `9d93a6b8-ca3a-4146-a1a1-e908b71b963f`:
++
+----
+https://<your-thoughtspot-instance>/#/data/tables/9d93a6b8-ca3a-4146-a1a1-e908b71b963f
+----
+
+. Copy the GUID.
+
+==== Search query
+
+include::{path}/search-query-string.adoc[]
+
+.**Example**
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/searchdata' \
+  -H 'Authorization: Bearer {access-token}
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "query_string": "[sales][store]",
+  "logical_table_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+}'
+----
+
+////
+==== Using tokens generated from Spotter APIs as raw data
+
+For every natural language query and follow-up question, Spotter APIs such as `/api/rest/2.0/ai/answer/create`, `/api/rest/2.0/ai/agent/converse/sse`, return tokens in the API response. You can use these tokens as raw data to generate an Answer from ThoughtSpot via search data API.
+
+===== Request example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/searchdata'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "query_string": "by [city], [product], [item type] = [item type].'\''jackets'\'', [region] = [region].'\''west'\'', sort by sum [sales] descending",
+  "logical_table_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
+  "data_format": "COMPACT",
+  "record_offset": 0,
+  "record_size": 10
+}'
+----
+
+===== API response
+
+If the API request is successful, ThoughtSpot returns the Answer data for the query string sent in the API request.
+////
+
+=== Fetch Liveboard Data API
+To get data from a Liveboard object and its visualizations via `POST /api/rest/2.0/metadata/liveboard/data` endpoint, your user account must have at least view access to the Liveboard specified in the API request.
+
+The API request body must include the name or GUID of the Liveboard to fetch data. To get specific visualizations from a given Liveboard, add the names or GUIDs of the visualizations in the  `visualization_identifiers` array.
+
+==== Example
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/liveboard/data' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "d084c256-e284-4fc4-b80c-111cb606449a",
+  "data_format": "COMPACT",
+  "visualization_identifiers": [
+    "a9655c18-9855-4a73-9e7b-ff4fb6da334b",
+    "bf4c9814-82c1-4ec4-b879-57eae2134cb4",
+    "8c46d2b6-94c7-4ba7-a628-6e74e297f973",
+    "f6ef5d1f-cddb-4547-8b66-af4d5f4da5ad"
+  ]
+}'
+----
+
+[#transient-lb-content]
+==== Liveboard data with unsaved changes
+
+include::{path}/transient-lb-content.adoc[]
+
+.**Sample browser fetch request**
+
+[source,TypeScript]
+----
+const embedRef = useEmbedRef<typeof LiveboardEmbed>();
+  const handleFilterChanged: MessageCallback = () => {
+    embedRef.current
+      .trigger(HostEvent.getExportRequestForCurrentPinboard)
+      .then((transientPinboardContent) => {
+        console.log(transientPinboardContent.data);
+
+        const payload = {
+          metadata_identifier: "abc",
+          data_format: "COMPACT",
+          record_offset: 0,
+          record_size: 10,
+          transient_content: JSON.stringify(transientPinboardContent.data),
+        };
+
+        fetch(
+          `https://{ThoughtSpot-Host}/api/rest/2.0/metadata/liveboard/data`,
+          {
+            method: "POST",
+            headers: {
+              Authorization:
+                "Bearer xxx",
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          }
+        )
+          .then((response) => response.json())
+          .then(console.log)
+          .catch(console.log);
+      });
+  };
+
+  return (
+    <LiveboardEmbed
+      ref={embedRef}
+      liveboardId={"ID"}
+      fullHeight={true}
+      onFilterChanged={handleFilterChanged}
+    />
+  );
+----
+
+See also, link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_getexportrequestforcurrentpinboard[HostEvent.getExportRequestForCurrentPinboard].
+
+
+=== Fetch Answer Data API
+
+To get data from a saved Answer object via `/api/rest/2.0/metadata/answer/data`, you need at least view access to the saved Answer.
+
+The API request body must include the name or GUID of the saved Answer.
+
+==== Example
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/answer/data' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Accept: application/json'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "9bd202f5-d431-44bf-be0b-bb9354c7a840",
+  "data_format": "COMPACT",
+  "record_offset": 0,
+  "record_size": 10
+}'
+----
+
+== Report APIs
+ThoughtSpot provides the following REST API v2 endpoints to download data as reports:
+
+* xref:#_liveboard_report_api[`POST /api/rest/2.0/report/liveboard`] to download a Liveboard or specific visualizations on the Liveboard as a PDF, PNG, or CSV file.
+* xref:#answer-report[`POST /api/rest/2.0/report/answer`] to download Answer data as a CSV, XLSX, PDF, or PNG file.
+
+=== Liveboard Report API
+The Liveboard Report API allows you to programmatically download a Liveboard or specific visualizations as a PDF, PNG, or CSV file via `POST /api/rest/2.0/report/liveboard`.
+
+To use this API endpoint, you need at least view access to the Liveboard. If Role-Based Access Control (RBAC) is enabled on your instance, you also need the `DATADOWNLOADING` privilege or one of the granular download privileges listed below.
+
+The following report types are available:
+
+PDF::
+Downloads the entire Liveboard as a PDF file.
+
+PNG::
+Downloads a single visualization on the Liveboard as a PNG file. Requires `visualization_identifiers` with a single visualization GUID.
+
+CSV::
+Downloads the data from a single visualization on the Liveboard as a CSV file. Requires `visualization_identifiers` with a single visualization GUID.
+
+==== Request parameters
+
+[width="100%" cols="2,1,4"]
+[options="header"]
+|=====
+| Parameter | Required | Description
+| `metadata_identifier` | Yes | GUID or name of the Liveboard to download.
+| `file_format` | Yes | Report format. Accepted values: `PDF`, `PNG`, `CSV`, `XLSX`.
+| `visualization_identifiers` | Conditional | Array of visualization GUIDs. Required when `file_format` is `PNG` or `CSV`. For PDF, optional — if not specified, all visualizations are included.
+| `runtime_filter` | No | Runtime filter overrides to apply.
+| `runtime_sort` | No | Runtime sort overrides to apply.
+| `runtime_param_override` | No | Runtime parameter overrides to apply.
+| `transient_content` | No | Liveboard data with unsaved changes.
+| `pdf_options` | No | PDF-specific options: `orientation` (`PORTRAIT` or `LANDSCAPE`), `truncate_tables` (boolean), `include_logo`, `footer_text`, `include_page_number`, `cover_page`, `filter_page`.
+|=====
+
+==== Example
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/liveboard' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "d084c256-e284-4fc4-b80c-111cb606449a",
+  "file_format": "PDF",
+  "pdf_options": {
+    "orientation": "LANDSCAPE",
+    "include_logo": true,
+    "include_page_number": true
+  }
+}' \
+  --output liveboard.pdf
+----
+
+[#answer-report]
+=== Answer Report API
+
+// SOURCE: SCAL-306069
+
+The `POST /api/rest/2.0/report/answer` endpoint is generally available from 26.9.0.cl. Use this endpoint to export Answer data in CSV, XLSX, PDF, or PNG format. The endpoint supports saved Answers, pinned Answers (visualizations on a Liveboard), and Spotter-generated (ad hoc) Answers.
+
+==== Prerequisites
+
+To download Answer data, the user must have at least *View* access to the Answer or Liveboard. If RBAC is enabled:
+
+* `DATADOWNLOADING` (Can download Data) — required for all export formats.
+* `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) — required for CSV and XLSX.
+* `CAN_DOWNLOAD_VISUALS` (Can download visuals) — required for PNG.
+
+==== Request parameters
+
+[width="100%" cols="2,1,4"]
+[options="header"]
+|=====
+| Parameter | Required | Description
+| `metadata_identifier` | Conditional | GUID or name of the saved Answer. For pinned Answer exports, use the parent Liveboard GUID or name and pass `viz_guid` separately.
+| `file_format` | Yes | Export format. Accepted values: `CSV`, `XLSX`, `PDF`, `PNG`.
+| `viz_guid` | No | GUID of a pinned visualization on a Liveboard. When specified, `metadata_identifier` must identify the parent Liveboard.
+| `personalised_view_identifier` | No | GUID or name of a Personalized View. When specified, the export uses data from that view.
+| `runtime_filter` | No | Runtime filter overrides to apply to the export.
+| `runtime_sort` | No | Runtime sort overrides to apply to the export.
+| `runtime_param_override` | No | Runtime parameter overrides to apply to the export.
+| `x_resolution` | No | Width of the PNG export in pixels. Range: 600–3840. Applies only when `file_format` is `PNG`. Default: 2254.
+| `y_resolution` | No | Height of the PNG export in pixels. Range: 600–3840. Applies only when `file_format` is `PNG`. Default: 1588.
+| `scaling_factor` | No | Scaling percentage for chart elements in PNG exports. Range: 80–400. Does not crop the image. Applies only when `file_format` is `PNG`.
+|=====
+
+==== Export a saved Answer
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "my-saved-answer",
+  "file_format": "CSV"
+}' \
+  --output answer.csv
+----
+
+==== Export a pinned Answer
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "<liveboard-guid-or-name>",
+  "viz_guid": "<visualization-guid>",
+  "file_format": "PDF"
+}' \
+  --output pinned-answer.pdf
+----
+
+==== Export a Spotter Answer
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "<spotter-answer-id>",
+  "file_format": "XLSX"
+}' \
+  --output spotter-answer.xlsx
+----
+
+[NOTE]
+====
+Pass the answer ID from the Spotter API response as `metadata_identifier`. XLSX and PDF formats are supported for Spotter Answers from 26.9.0.cl.
+====
+
+==== Export a PNG with custom dimensions
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "my-saved-answer",
+  "file_format": "PNG",
+  "x_resolution": 3840,
+  "y_resolution": 2160,
+  "scaling_factor": 150
+}' \
+  --output answer-4k.png
+----
