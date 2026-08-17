@@ -1,1 +1,334 @@
-Unknown tool: github_get_file
+= REST API v2.0 changelog
+:toc: true
+:toclevels: 1
+
+:page-title: REST API v2.0 changelog
+:page-pageid: rest-v2-changelog
+:page-description: Changelog of REST APIs
+
+This changelog lists the features and enhancements introduced in REST API v2.0. For information about new features and enhancements available for embedded analytics, see xref:whats-new.adoc[What's New].
+
+== Version 26.9.0.cl, September 2026
+
+=== Answer Export API enhancements — General Availability
+
+// SOURCE: SCAL-306069
+
+The `POST /api/rest/2.0/report/answer` endpoint is generally available from 26.9.0.cl. The `isAnswerExportV2Enabled` flag is enabled by default on all ThoughtSpot Cloud instances. The following enhancements are included in this release:
+
+Pinned Answer export::
+Pass `viz_guid` to export a pinned Answer (a visualization on a Liveboard) directly. Liveboard-level filters and runtime overrides are applied automatically. The `metadata_identifier` must be the parent Liveboard GUID or name.
+
+Personalized View support::
+Pass `personalised_view_identifier` to export data from a specific Personalized View of a Liveboard.
+
+Spotter Answer export::
+XLSX and PDF export formats are now supported for Spotter-generated (ad hoc) Answers, in addition to CSV and PNG.
+
+Custom PNG dimensions::
+Use `x_resolution` and `y_resolution` parameters to specify custom pixel dimensions for PNG exports. Accepted range: 600–3840 px per axis. Default: 2254 × 1588.
+
+Display scaling::
+Use `scaling_factor` (range: 80–400) to adjust the relative size of chart elements in a PNG export without cropping the image.
+
+Dynamic file naming::
+Exported files are automatically named based on the Answer title with the correct file extension (`.png`, `.pdf`, `.csv`, `.xlsx`) appended.
+
+For more information, see xref:data-report-v2-api.adoc#answer-report[Answer Report API].
+
+=== Snowflake Semantic View integration APIs
+
+// SOURCE: SCAL-309867
+
+ThoughtSpot 26.9.0.cl introduces REST API v2.0 endpoints for managing Snowflake Semantic View integrations programmatically. These APIs allow administrators and data managers to create, search, import, and delete semantic integration configurations without using the ThoughtSpot UI.
+
+[width="100%"]
+[options="header"]
+|=====
+| Method | Endpoint | Description
+| `POST` | `/api/rest/2.0/semantic-integrations/create` | Creates a new semantic integration by reading a Snowflake Semantic View and generating a ThoughtSpot data model.
+| `POST` | `/api/rest/2.0/semantic-integrations/search` | Returns a list of semantic integrations matching the specified filter criteria.
+| `POST` | `/api/rest/2.0/semantic-integrations/{semantic_integration_identifier}/import` | Re-imports semantic updates from Snowflake and refreshes the associated ThoughtSpot data model.
+| `POST` | `/api/rest/2.0/semantic-integrations/{semantic_integration_identifier}/delete` | Deletes a semantic integration and its generated ThoughtSpot data model.
+|=====
+
+Required privilege: `ADMINISTRATION` or `DATAMANAGEMENT`. If RBAC is enabled, the user also requires the `CAN_CREATE_OR_EDIT_CONNECTIONS` privilege and permission to manage data models.
+
+For more information, see xref:semantic-integrations-api.adoc[Snowflake Semantic View integration APIs].
+
+=== Spotter Memory — General Availability
+
+// SOURCE: SCAL-306173
+
+The Spotter Memory feature is generally available from 26.9.0.cl. The memory APIs introduced in 26.8.0.cl (`POST /api/rest/2.0/ai/memory/import` and `POST /api/rest/2.0/ai/memory/export`) are enabled by default on all ThoughtSpot Cloud instances. Administrators can manage and audit Spotter training data programmatically without enabling a feature flag.
+
+For more information, see xref:spotter-ai-memory-api.adoc[Spotter memory APIs].
+
+=== Spotter Agent — Conversation sharing APIs
+
+// SOURCE: SCAL-306173 (aug.26.mt)
+
+ThoughtSpot 26.9.0.cl introduces REST API v2.0 endpoints for sharing saved Spotter agent conversations with other users or groups. Shared conversations are always `READ_ONLY`.
+
+[width="100%"]
+[options="header"]
+|=====
+| Method | Endpoint | Description
+| `POST` | `/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/share` | Shares a saved Spotter conversation with specified principals. Use `grant` and `revoke` arrays to manage access.
+| `GET` | `/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-shared-content` | Returns the content of a shared Spotter conversation — messages, data sources, and answer details.
+| `GET` | `/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-share-info` | Returns sharing metadata — the list of principals the conversation is shared with and their access levels. The `is_shared_content_outdated` flag indicates if the shared snapshot is stale.
+|=====
+
+For more information, see xref:spotter-agent-apis.adoc#_sharing_spotter_conversations[Sharing Spotter conversations].
+
+=== KPI Sparkline setting in metadata search response
+
+// SOURCE: SCAL-320899
+
+The `POST /api/rest/2.0/metadata/search` API response now includes the `isSparklineEnabled` field in the `AnswerSpecHeader` object for KPI chart type answers. This boolean field indicates whether the sparkline trend line is enabled for the KPI visualization.
+
+* `true` — the sparkline trend line is enabled.
+* `false` — the sparkline is disabled.
+* Absent — the answer was saved before this release and has not been re-saved. Treat an absent field as unknown, not as `false`.
+
+=== Outline Encoding — BYOC Muze
+
+// SOURCE: SCAL-317550
+
+ThoughtSpot 26.9.0.cl promotes mark outline color to a first-class data-driven encoding channel in the Muze charting library (BYOC). Developers building custom charts with Muze can now bind a data field to `encoding.outline` to produce ordinal color palettes (for categorical fields) or continuous gradient ramps (for measures), with full legend rendering and legend-to-mark interaction.
+
+The static `outline` config (`{ fill, color, width, dash }`) remains fully backward compatible. Supported mark types: Point, Bar, Arc.
+
+=== Personalized Views TML portability — General Availability
+
+// SOURCE: SCAL-307284
+
+The Personalized Views TML portability feature introduced as Early Access in 26.8.0.cl is generally available from 26.9.0.cl.
+
+* The `author` field in Personalized View TML maps to the view owner's username or email, ensuring ownership is retained when a Liveboard is promoted across clusters or orgs.
+* The `obj_id` field provides a stable cross-environment identifier for Personalized Views.
+* Smart merge import: when importing a Liveboard TML that contains Personalized Views, ThoughtSpot preserves views that exist only in the target environment, appends new views from the imported TML, and updates views present in both.
+
+For more information, see xref:tml.adoc#personalized-views-portability[Personalized Views portability in TML].
+
+=== Connection configuration — Scheduled Liveboards process type
+
+// SOURCE: SCAL-312738
+
+ThoughtSpot 26.9.0.cl adds `SCHEDULED_LIVEBOARDS` as a new process type for Embrace connection configurations. Administrators can assign the Scheduled Liveboards process to a connection configuration, enabling ThoughtSpot to use the associated credentials when running scheduled Liveboard delivery jobs. Configurable via:
+
+* `POST /api/rest/2.0/connection/configuration/create`
+* `PUT /api/rest/2.0/connection/configuration/{configuration_identifier}/update`
+
+=== AI Context — Spotter Optimization tab
+
+// SOURCE: SCAL-277656
+
+The AI Context generation UI is revamped in 26.9.0.cl. A new *Spotter Optimization* tab is introduced in the data model editor for managing AI context, replacing the previous AI Context panel. The tab provides a more streamlined interface for reviewing and editing auto-generated descriptions for columns and joins.
+
+No changes to the AI context REST API endpoints in this release.
+
+== Version 26.8.0.cl, August 2026
+
+=== Spotter AI APIs
+
+Spotter memory APIs:::
+ThoughtSpot 26.8.0.cl introduces two new REST API v2.0 endpoints for managing Spotter memory programmatically:
+
+* `POST /api/rest/2.0/ai/memory/import` +
+Imports Spotter memory entries in bulk. Use this endpoint to seed training data or migrate Spotter memory across environments.
+* `POST /api/rest/2.0/ai/memory/export` +
+Exports all current Spotter memory entries. Use this endpoint to back up training data or audit the current training state.
+
+For more information, see xref:spotter-ai-memory-api.adoc[Spotter memory APIs].
+
+=== TML import and export
+
+New TML fields for Personalized Views::: [earlyAccess eaBackground]#Early Access#
+Two new fields have been added to the TML for Personalized Views. You can see these fields added to the TML schema when you export through the `POST /api/rest/2.0/metadata/tml/export` API.
+
+* A new `author` field is added to the Personalized View TML during export. This field is used to assign ownership during import.
+* Personalized Views now carry an `obj_id` field for stable cross-environment object identity, consistent with other object types.
+
+For more information, see xref:tml.adoc#personalized-views-portability[Personalized Views portability in TML].
+
+Collections `obj_id` support:::
+// SOURCE: SCAL-317357
+The `obj_id` attribute is now supported for the *Collections* object type in TML import and export APIs. This enables stable cross-environment identification for Collections, matching the behavior already available for Models, Liveboards, Answers, and other object types.
++
+To assign or update the `obj_id` for a Collections object, use the `POST /api/rest/2.0/metadata/identity/update` API endpoint.
++
+
+=== Roles API
+
+Granular download privileges:::
+ThoughtSpot introduces two new granular download privileges that give administrators finer control over what users can export:
+
+* *Can Download Visuals*:  Permits downloading chart and visualization images.
+* *Can Download Detailed Data*: Permits downloading raw tabular data in CSV or XLSX format.
+
+These privileges are configurable via the `POST /api/rest/2.0/roles/create` and `POST /api/rest/2.0/roles/update` API endpoints.
+
+=== Liveboard schedules API
+The `every_n_minutes` schedule frequency option is deprecated in 26.8.0.cl. Schedules configured with this frequency will continue to run during the transition period; however, ThoughtSpot recommends updating existing schedules to supported frequency options (hourly, daily, weekly, or monthly). Support for the `every_n_minutes` frequency will be removed in a future release.
+
+=== REST API C# SDK
+ThoughtSpot provides the REST API C# SDK (`ThoughtSpot.RestApi.Sdk`) to help .NET developers interact programmatically with ThoughtSpot REST API v2 endpoints. The SDK targets `net8.0` and is available on link:https://www.nuget.org/packages/ThoughtSpot.RestApi.Sdk[NuGet, window=_blank].
+
+For information about how to install and use the SDK, see xref:rest-api-sdk-csharp.adoc[C# SDK for REST APIs].
+
+== Version 26.7.0.cl, July 2026
+
+=== Spotter AI APIs
+
+Save chat AI APIs::
+ThoughtSpot introduces the following REST API endpoints and enhancements to manage saved Spotter conversations programmatically. These endpoints allow you to build custom conversation history interfaces in embedded applications without using the native Spotter UI.
+
+* `POST /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/update` +
+Updates attributes of an existing agent conversation.
+* `GET /api/rest/2.0/ai/agent/conversations` +
+Retrieves the list of saved agent conversations for the currently authenticated user.
+* `GET /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/messages` +
+Retrieves the full content of a saved conversation with Spotter agent.
+* `POST /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/update` +
+Updates the display title of a saved conversation.
+* `DELETE /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/delete` +
+Deletes a saved conversation and all its associated messages.
+* `GET /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/answers/{answer_identifier}/details` +
+Loads the full answer payload for a specific answer item in an agent conversation.
+
++
+For more information, see xref:spotter-agent-conversation-mgmt-apis.adoc[Saving and managing Spotter AI chat].
+
+Save chat settings in conversation create API::
+
+The `POST /api/rest/2.0/ai/agent/conversation/create` API endpoint is modified to allow users to save conversations by setting `enable_save_chat: true` in the API request.
+
+Agent instructions APIs::
+The following new API endpoints allow you to set and retrieve persistent behavioral instructions for the Spotter agent.
+
+* `PUT /api/rest/2.0/ai/agent/instructions/set` +
+Sets behavioral instructions for the Spotter agent. Use this endpoint to define persistent guidance that Spotter applies when responding to queries in a conversation session.
+
+* `GET /api/rest/2.0/ai/agent/instructions/get` +
+Retrieves the behavioral instructions currently configured by the administrator for the Spotter agent.
++
+For more information, see xref:spotter-agent-instructions.adoc[Spotter AI Agent instructions APIs].
+
+=== Webhooks
+
+New API endpoint::
+The `GET /api/rest/2.0/webhooks/storage-config` API endpoint allows retrieving the storage setup information required for configuring a GCS or S3 storage destination for webhook delivery.
+
+Enhancements::
+
+* The `/api/rest/2.0/webhooks/create` endpoint allows activating a webhook and configuring a GCS storage destination for webhook delivery. The API endpoint also returns GCS storage configuration details in the response.
+* The `/api/rest/2.0/webhooks/{webhook_identifier}/update` API endpoint supports configuring webhook activation status, resetting authentication, signature verification, and storage destination properties.
+* API requests to the `/api/rest/2.0/system/communication-channels/validate` now return GCS storage properties in response.
+
+=== Communication channel monitoring
+
+The `/api/rest/2.0/jobs/history/communication-channels/search` API endpoint supports the `end_epoch_time_in_millis` parameter, which allows fetching records with a specific end timestamp.
+
+=== Style customization APIs
+
+ThoughtSpot introduces the following REST API v2.0 endpoints to manage style customization settings programmatically.
+
+Style configuration::
+
+* `POST /api/rest/2.0/customization/styles/search` +
+Returns the current style configuration at the `CLUSTER` or active `ORG` scope.
+
+* `POST /api/rest/2.0/customization/styles/update` +
+Updates style settings at the `CLUSTER` or `ORG` scope.
+
+Custom fonts::
+
+* `POST /api/rest/2.0/customization/styles/fonts/upload` +
+Uploads a custom font file to ThoughtSpot.
+
+* `POST /api/rest/2.0/customization/styles/fonts/search` +
+Returns custom fonts uploaded to the instance.
+
+* `PUT /api/rest/2.0/customization/styles/fonts/{font_identifier}/update` +
+Updates a custom font record.
+
+* `DELETE /api/rest/2.0/customization/styles/fonts/{font_identifier}/delete` +
+Deletes a custom font.
+
+For more information, see xref:style-customization-api.adoc[Style customization APIs].
+
+=== Liveboard schedules
+
+* The `POST /api/rest/2.0/schedules/create` API endpoint now supports the `connection_configuration_identifier` attribute. This attribute specifies a configured Embrace connection configuration when creating a scheduled Liveboard job.
+* The `POST /api/rest/2.0/schedules/{schedule_identifier}/update` API endpoint now supports the `connection_configuration_identifier` attribute.
+
+=== Tags API
+
+The `POST /api/rest/2.0/tags/assign` and `POST /api/rest/2.0/tags/unassign` API endpoints now support Collections as a metadata object type.
+
+=== Custom actions
+
+The `POST /api/rest/2.0/customization/custom-actions/create` and `POST /api/rest/2.0/customization/custom-actions/{custom_action_identifier}/update` API endpoints now support `group_identifiers` for access control. This allows restricting custom action visibility to specific user groups.
+
+== Version 26.6.0.cl, June 2026
+
+=== Spotter AI APIs
+
+Answer Export API [earlyAccess eaBackground]#Early Access#::
+ThoughtSpot introduces the `POST /api/rest/2.0/report/answer` endpoint for exporting Answer data in CSV, XLSX, PDF, or PNG format. Requires the `isAnswerExportV2Enabled` feature flag to be enabled on the instance.
+
+For more information, see xref:data-report-v2-api.adoc#answer-report[Answer Report API].
+
+Stop Spotter response::
+The `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/stop-response` API endpoint stops an in-progress Spotter agent response for a given conversation session. The conversation session remains active after the response stops.
+
+=== Connections
+
+Connection configurations::
+ThoughtSpot introduces the following new API endpoints for managing Embrace connection configurations:
+
+* `POST /api/rest/2.0/connection/configuration/create` +
+Creates a connection configuration for an Embrace connection.
+* `GET /api/rest/2.0/connection/configuration/{configuration_identifier}` +
+Retrieves an existing connection configuration.
+* `PUT /api/rest/2.0/connection/configuration/{configuration_identifier}/update` +
+Updates an existing connection configuration.
+* `DELETE /api/rest/2.0/connection/configuration/{configuration_identifier}/delete` +
+Deletes a connection configuration.
+* `POST /api/rest/2.0/connection/configuration/search` +
+Returns a list of connection configurations matching the specified filter criteria.
+
+For more information, see xref:embrace-connection-configuration.adoc[Connection configurations].
+
+=== REST API Python SDK
+
+ThoughtSpot provides the REST API Python SDK (`thoughtspot-rest-api-sdk`) to help Python developers interact programmatically with ThoughtSpot REST API v2 endpoints. The SDK is available on link:https://pypi.org/project/thoughtspot-rest-api-sdk/[PyPI, window=_blank].
+
+For information about how to install and use the SDK, see xref:rest-api-sdk-python.adoc[Python SDK for REST APIs].
+
+== Version 26.5.0.cl, May 2026
+
+=== Spotter AI APIs
+
+The following API endpoints are deprecated in 26.5.0.cl:
+
+* `POST /api/rest/2.0/ai/agent/converse/sse` — Use `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream` instead.
+* `POST /api/rest/2.0/ai/agent/{conversation_identifier}/converse` — Use `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send` instead.
+
+New API endpoints::
+
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send` +
+Sends natural language messages to an existing Spotter agent conversation and returns the complete response synchronously.
+
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream` +
+Sends natural language messages to an existing Spotter agent conversation and returns the response as a real-time Server-Sent Events (SSE) stream.
+
+Breaking changes in `POST /api/rest/2.0/ai/agent/conversation/create`::
+The `metadata_context` object now requires `type` to be one of `AUTO_MODE` or `DATA_SOURCE`. The legacy `data_source` option is deprecated.
+
+=== REST API TypeScript SDK
+
+ThoughtSpot provides the REST API TypeScript SDK (`@thoughtspot/rest-api-sdk`) to help developers interact programmatically with ThoughtSpot REST API v2 endpoints. The SDK is available on link:https://www.npmjs.com/package/@thoughtspot/rest-api-sdk[npm, window=_blank].
+
+For information about how to install and use the SDK, see xref:rest-api-sdk-typescript.adoc[TypeScript SDK for REST APIs].
