@@ -204,487 +204,158 @@ curl -X POST \
   -H 'Accept: application/json'\
   -H 'Content-Type: application/json' \
   --data-raw '{
-  "metadata_identifier": "f605dbc7-db19-450b-8613-307118f74c3c",
+  "metadata_identifier": "e9a3b456-ba71-4d80-9678-38b25edf18dc",
+  "data_format": "COMPACT",
+  "record_offset": 0,
+  "record_size": 10
 }'
 ----
-
 
 == Report APIs
 
-ThoughtSpot provides the following REST API v2 endpoints to fetch data:
+ThoughtSpot provides the following REST API v2 endpoints to export reports:
 
-* xref:_liveboard_report_api[`POST /api/rest/2.0/report/liveboard`] +
-Download a Liveboard and its visualizations in PDF, PNG, CSV, or XLSX file format.
-* xref:#_answer_report_api[`POST /api/rest/2.0/report/answer`] +
-Download data from a saved Answer in PDF, PNG, CSV, or XLSX file format.
+* xref:#_liveboard_report_api[`POST /api/rest/2.0/report/liveboard`] to export a Liveboard as a PDF or PNG.
+* xref:#answer-report[`POST /api/rest/2.0/report/answer`] to export an Answer as PDF, PNG, CSV, or XLSX.
 
 === Liveboard Report API
 
-To download a Liveboard report via `/api/rest/2.0/report/liveboard` API, you need at least view access to the Liveboard specified in the API request.
+The `POST /api/rest/2.0/report/liveboard` endpoint exports a Liveboard in PDF or PNG format.
 
-In the `POST` request body, specify the GUID or name of the Liveboard as `metadata_identifier`. To download reports with specific visualizations, add GUIDs or names of the visualizations in the `visualization_identifiers`.
+==== Prerequisites
 
-To download visualizations from a specific Liveboard tab, specify the name or GUID of the tab in the  `tab_identifiers` parameter.
+To download a Liveboard report, the user must have at least *View* access to the Liveboard.
 
-To download a personalized view of the Liveboard, specify the view name in the `personalised_view_identifier` attribute.
-
-[IMPORTANT]
-====
-* The downloadable file returned in API response file is extensionless. You need to rename the downloaded file by typing in the relevant extension.
-* If the Liveboard includes Note tiles, ensure that you do not pass the GUID of Note tiles as `visualization_identifiers` in the API request. Attempting to do so will lead to an error, and the API will return 400 error code in response.
-* Attempting to override existing filter values with runtime filters while exporting a Liveboard will result in an error.
-* If Role-Based Access Control (RBAC) is enabled, `DATADOWNLOADING` (Can download Data) privilege is required for Liveboard exports.
-* If the granular Role-Based Access Control (RBAC) is enabled, the `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) privilege is required to export in the XLSX or CSV formats, and the `CAN_DOWNLOAD_VISUALS` (Can download visuals) privilege is required for PDF or PNG exports. In this case the `DATADOWNLOADING` privilege ceases to exist.
-====
-
-==== File Formats
-
-The default `file_format` is *CSV*.
-
-[NOTE]
-If you do not have .csv downloads enabled for your ThoughtSpot instance, select either `PDF` or `PNG` `file_format` to successfully download the report. Using any other format will cause the API to return an error.
-
-
-For *CSV* downloads,
-
-* Each visualization is exported as a separate .csv file.
-* If multiple visualizations are selected, the downloaded report is a single compressed .zip file containing all .CSV files.
-* It does not support any additional parameters to customize the page orientation and `include_cover_page`, `include_filter_page`, logo, footer text, and page numbers.
-* Charts are exported as tabular data. Downloaded reports may include columns not seen in the visualization if they were used as tokens in the underlying search query.
-
-===== Sample API payload for CSV downloads
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/liveboard' \
-  -H 'Authorization: Bearer {access-token}'\
-  -H 'Content-Type: application/json' \
---data-raw '{
-"metadata_identifier": "416052fd-ad22-4d48-be0a-e43b53109957",
-"file_format": "CSV",
-"tab_identifiers": [
-"bc6d6fb8-1e06-4617-b02f-51745e6933a6"
-]
-}'
-----
-
-For *XLSX* downloads,
-
-* Visualization is exported as an Excel workbook (.xlsx).
-* If multiple visualizations are selected, the downloaded report is a single Excel workbook (.xlsx) containing each visualization in their individual tab.
-* A maximum of 255 tabs per .xlsx workbook are allowed.
-* It does not support any additional parameters to customize the page orientation and `include_cover_page`, `include_filter_page`, logo, footer text, and page numbers.
-* Charts are exported as tabular data. Downloaded reports may include columns not seen in the visualization if they were used as tokens in the underlying search query.
-* New pivot tables generated in .xlsx workbooks using this API endpoint retain their complete visual formatting and structural integrity.
-
-===== Sample API payload for XLSX downloads
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/liveboard' \
-  -H 'Authorization: Bearer {access-token}'\
-  -H 'Content-Type: application/json' \
---data-raw '{
-"metadata_identifier": "416052fd-ad22-4d48-be0a-e43b53109957",
-"file_format": "XLSX",
-"visualization_identifiers": [
-"254c6e30-680c-41ea-aa4d-bb059f745462"
-]
-}'
-----
-
-For *PDF* downloads, you can specify additional parameters to customize the page orientation and include or exclude the cover page, logo, footer text, and page numbers.
-
-You can now also download continuous pdfs which matches the full length of your Liveboard, without breaking them into multiple A4 pages.
-
-* `page_size = CONTINUOUS` Unlike the A4 format, which introduces forced page breaks between visualizations, this continuous flow maintains your exact design and intended layout.
-+
-When `page_size = CONTINUOUS`, the `include_filter_page` option works to show/hide the filter section in the PDF page (in a continuous PDF, there is no separate filter page, but the filters are included on the same page at the top).
-* `zoom_level` offers various download size options to suit the viewer's screen dimensions, thereby enhancing legibility. This can be set only when `page_size = CONTINUOUS`. Valid values are integers in the range of 45 and 175.
-
-
-===== Sample API payload for PDF downloads
-
-[source,cURL]
-----
-curl -X POST 'https://{ThoughtSpot-Host}/api/rest/2.0/report/liveboard' \
---header 'Authorization: Bearer {access-token}' \
---header 'Content-Type: application/json' \
---data-raw '{
-  "metadata_identifier": "416052fd-ad22-4d48-be0a-e43b53109957",
-  "file_format": "PDF",
-  "visualization_identifiers": [
-    "254c6e30-680c-41ea-aa4d-bb059f745462"
-  ],
-  "pdf_options": {
-    "page_size": "CONTINUOUS",
-    "zoom_level": 105,
-    "include_cover_page": true,
-    "include_custom_logo": true,
-    "include_filter_page": true,
-    "include_page_number": true,
-    "page_orientation": "PORTRAIT",
-    "truncate_table": false,
-    "page_footer_text": "Sample footer text"
-  }
-}'
-----
-
-For *PNG* downloads, you can now define
-
-* `image_resolution`
-* `image_scale`
-* `include_header`
-
-[IMPORTANT]
-====
-* If the above settings are enabled on your instance or you are using a ThoughtSpot release 10.9.0.cl or later,
-** You will no longer be able to use the `include_cover_page`, `include_filter_page` within the `png_options`.
-** PNG download will support exporting only one tab at a time. If the `tab_identifier` is not specified, the first tab will be downloaded.
-* Due to UI limitations in the REST API Playground, you'll notice that some parameters are automatically included in the PNG options JSON. This may cause your API request to fail. As a workaround, click *View JSON* next to the `png_options`, review the parameters, remove additional parameters, and then click *Try it out*.
-
-====
-
-===== Sample API payload for PNG downloads
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/liveboard' \
-  -H 'Authorization: Bearer {access-token}'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "metadata_identifier": "416052fd-ad22-4d48-be0a-e43b53109957",
-  "file_format": "PNG",
-  "tab_identifiers": [
-    "bc6d6fb8-1e06-4617-b02f-51745e6933a6"
-  ],
-  "png_options": {
-    "include_cover_page": null,
-    "include_filter_page": null,
-    "personalised_view_id": null,
-    "image_resolution": 1920,
-    "image_scale": 100,
-    "include_header": true
-  }
-}'
-----
-
-==== Override filters
-
-If the Liveboard has filters applied, and you want to override the filters before downloading the Liveboard, you can specify the filters in the `override_filters` array.
-
-[source,JSON]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/liveboard'  \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {access-token}' \
-  --data-raw '{
-  "metadata_identifier": "9bd202f5-d431-44bf-9a07-b4f7be372125",
-  "file_format": "PNG",
-  "override_filters": [
-    {
-      "column_name": "Color",
-      "generic_filter": {
-        "op": "IN",
-        "values": [
-          "almond",
-          "turquoise"
-        ]
-      },
-      "negate": false
-    },
-    {
-      "column_name": "Commit Date",
-      "date_filter": {
-        "datePeriod": "HOUR",
-        "number": 3,
-        "type": "LAST_N_PERIOD",
-        "op": "EQ"
-      }
-    },
-    {
-      "column_name": "Sales",
-      "generic_filter": {
-        "op": "BW_INC",
-        "values": [
-          "100000",
-          "70000"
-        ]
-      },
-      "negate": true
-    }
-  ],
-  "png_options": {
-    "include_cover_page": true,
-    "include_filter_page": true
-  }
-}'
-----
-
-[#transient-lb-content]
-==== Liveboard data with unsaved changes
-
-include::{path}/transient-lb-content.adoc[]
-
-===== Sample browser fetch request
-
-[source,JavaScript]
-----
-< iframe src = "http://ts_host:port/" id = "ts-embed" > < /iframe>
-< script src = "/path/to/liveboard.js" > < /script>
-< script >
-    const embed = new LiveboardEmbed("#embed", {
-        frameParams: {},
-    });
-    async function liveboardData() {
-    const transientPinboardContent = await embed.trigger(HostEvent.getExportRequestForCurrentPinboard);
-    const liveboardDataResponse = await fetch("https://ts_host:port/api/rest/2.0/report/liveboard", {
-        method: "POST",
-        body: createFormDataObjectWith({
-            "transient_content": transientPinboardContent,
-        }),
-    });
- }
-< /script>
-----
-
-See also, link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_getexportrequestforcurrentpinboard[HostEvent.getExportRequestForCurrentPinboard].
-
-=== Answer Report API
-
-To download Answer data via `/api/rest/2.0/report/answer` API, you need at least view access to the saved Answer.
-
-In the request body, specify the GUID or name of the Answer object as `metadata_identifier`.
-
-The API supports exporting saved Answers, pinned Answers from a Liveboard, and Spotter-generated Answers. You can download Answer data in `CSV`, `XLSX`, `PNG`, and `PDF` format. The default `file_format` is `CSV`.
-
-[IMPORTANT]
-====
-* If Role-Based Access Control (RBAC) is enabled, `DATADOWNLOADING` (Can download Data) privilege is required for Answer exports.
-* If the granular Role-Based Access Control (RBAC) is enabled, the `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) privilege is required to export in the PDF, XLSX or CSV formats, and the `CAN_DOWNLOAD_VISUALS` (Can download visuals) privilege is required for PNG exports. In this case the `DATADOWNLOADING` privilege ceases to exist.
-====
+If RBAC is enabled, the user must have the `DATADOWNLOADING` (*Can download Data*) privilege or the `CAN_DOWNLOAD_VISUALS` (*Can download visuals*) privilege.
 
 ==== Example
 
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
-  -H 'Authorization: Bearer {access-token}'\
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/liveboard' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
   -H 'Content-Type: application/json' \
   --data-raw '{
-  "metadata_identifier": "9bd202f5-d431-44bf-9a07-b4f7be372125",
-  "file_format": "PNG"
-}'
+  "metadata_identifier": "<liveboard-guid-or-name>",
+  "file_format": "PDF"
+}' \
+  --output liveboard.pdf
 ----
 
-[NOTE]
-====
-* Exported files are automatically named after the Answer title, with the file extension appended based on the selected format.
-* HTML rendering is not supported for PDF exports of Answers with tables.
-====
+[#answer-report]
+=== Answer Report API
 
+// SOURCE: SCAL-306069
 
-Contact ThoughtSpot support to enable these enhanced settings for this API endpoint on your ThoughtSpot instance:
+`POST /api/rest/2.0/report/answer`
 
-* `personalised_view_identifier` [earlyAccess eaBackground]#Early Access# +
-Optional parameter to specify the GUID of the personalised view of the `PINNED` Answer object that you want to download.
-* `type` [earlyAccess eaBackground]#Early Access# +
-Used to distinguish between a saved answer and a pinned answer on a Liveboard. Setting this parameter to `PINNED` allows the API to
-accept the guid of a pinned Answer directly as the `metadata_identifier`. When
-exporting an Answer, all Liveboard-level filters, Runtime Filters, and Column
-Security Rules (CSR) are automatically applied to the export output.
+The Answer Report API is generally available from 26.9.0.cl. Use this endpoint to export Answer data in `CSV`, `XLSX`, `PDF`, or `PNG` format. The endpoint supports saved Answers, pinned Answers (visualizations on a Liveboard), and Spotter-generated (ad hoc) Answers.
 
-The `png_options` [earlyAccess eaBackground]#Early Access# support the following properties:
+==== Prerequisites
 
-[cols="1,1,3"]
-|===
-|Property |Type |Description
+To download Answer data, the user must have at least *View* access to the Answer or Liveboard.
 
-|`x_resolution`
-|Number
-|Width of the exported PNG in pixels. +
-Valid range: `600px` to `3840px`.
+If Role-Based Access Control (RBAC) is enabled, the user must have one of the following privileges:
 
-|`y_resolution`
-|Number
-|Height of the exported PNG in pixels. +
-Valid range: `600px` to `3840px`.
+* `DATADOWNLOADING` (*Can download Data*)
+* `CAN_DOWNLOAD_DETAILED_DATA` (*Can download detailed data*) — for CSV and XLSX formats
+* `CAN_DOWNLOAD_VISUALS` (*Can download visuals*) — for PNG format
 
-|`scaling`
-|Integer
-|Display scale percentage for objects rendered in the image. Adjusts the relative
-size of visual elements without cropping the image. +
-Valid range: `80%` to `500%`.
-|===
+==== Request parameters
 
-You can now export the PNG of any Answer in any aspect ratio and any scaling or zoom level. Just configure, scale, and export exactly what you need.
+[width="100%"]
+[options="header"]
+|=====
+| Parameter | Type | Required | Description
+| `metadata_identifier` | String | Yes | GUID or name of the saved Answer. For pinned Answers, use the parent Liveboard GUID or name and set `viz_guid`.
+| `file_format` | String | Yes | Export format. Accepted values: `CSV`, `XLSX`, `PDF`, `PNG`.
+| `viz_guid` | String | No | GUID of a pinned visualization on a Liveboard. Required for pinned Answer exports. Liveboard-level filters and runtime overrides are applied automatically.
+| `personalised_view_identifier` | String | No | GUID or name of a Personalized View. When specified, the export uses data from that view.
+| `runtime_filter` | Object | No | Runtime filter overrides to apply to the export.
+| `runtime_sort` | Object | No | Runtime sort overrides to apply to the export.
+| `runtime_param_override` | Object | No | Runtime parameter overrides to apply to the export.
+| `x_resolution` | Integer | No | Width of the PNG export in pixels. Accepted range: 600–3840. Applies only when `file_format` is `PNG`. Default: 2254.
+| `y_resolution` | Integer | No | Height of the PNG export in pixels. Accepted range: 600–3840. Applies only when `file_format` is `PNG`. Default: 1588.
+| `scaling_factor` | Integer | No | Scaling percentage for chart elements in PNG exports. Accepted range: 80–400. Does not crop the image. Applies only when `file_format` is `PNG`.
+|=====
 
-[#exportSpotterData]
-==== Export data generated from Spotter APIs
-To export results generated from Spotter APIs such as  `/api/rest/2.0/ai/answer/create`, `/api/rest/2.0/ai/agent/converse/sse`, and `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse`, include the session ID and generation number in the `POST` request body.
-
-When downloading a Spotter-generated Answer, do not specify the metadata object ID, because you will be exporting the data generated from a conversation session with Spotter and not a saved Answer.
-
-===== Request example
+==== Export a saved Answer
 
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
-  "file_format": "CSV",
-  "session_identifier": "ee077665-08e1-4a9d-bfdf-7b2fe0ca5c79",
-  "generation_number": 2
-}'
+  "metadata_identifier": "<answer-guid-or-name>",
+  "file_format": "CSV"
+}' \
+  --output answer.csv
 ----
 
-* `session_identifier` refers to session ID returned in the Spotter API response.
-* `generation_number` indicates the Answer generation number.
-* `file_format`  specifies the format of the output. You can export the Spotter-generated data as PNG, CSV, XLSX, or PDF file. By default, the API exports this data in PNG file format.
+==== Export a pinned Answer
 
-===== API Response
-
-If the API request is successful, ThoughtSpot returns the data in the specified file format. You can download the file to use it later or import it into your application environment.
-
-////
-===== Response codes
-[width="100%" cols="2,4"]
-[options='header']
-|===
-|HTTP status code|Description
-|**200**| Successful operation
-|**400**| Invalid parameter
-|**401**| Unauthorized access
-|**401**| Forbidden request
-|**500**| Internal error
-|===
-////
-
-== Pagination settings for Data APIs
-
-When you make REST API calls to some v2 Data endpoints to query data, the API may return many rows of data in response. By default, the following parameters are set in API requests to the v2 Data API endpoints:
-
-[source,JSON]
+[source,cURL]
 ----
-{
-  "data_format": "COMPACT",
-  "record_offset": 0,
-  "record_size": 10
-}
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "<liveboard-guid-or-name>",
+  "viz_guid": "<visualization-guid>",
+  "file_format": "PDF"
+}' \
+  --output pinned-answer.pdf
 ----
 
-[WARNING]
+==== Export a Spotter Answer
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "<spotter-answer-id>",
+  "file_format": "XLSX"
+}' \
+  --output spotter-answer.xlsx
+----
+
+[NOTE]
 ====
-Do not set `record_size` to `-1`. On ThoughtSpot instances with a large number of objects or users, this can lead to slow responses, excessive logging, and out-of-memory failures. Specify an explicit `record_size` and iterate through pages programmatically.
+To export a Spotter-generated Answer, pass the answer ID from the Spotter API response as `metadata_identifier`. XLSX and PDF formats are supported for Spotter Answers from 26.9.0.cl.
 ====
 
-The APIs return a maximum of 100000 rows of data at any given time. If you must retrieve a higher number of rows in an API call, contact ThoughtSpot Customer Support to increase the row size limit. However, if the record size and number of rows are high, the API may take a while to fetch the data, and the request may time out.
+==== Export a PNG with custom dimensions
 
-== Runtime overrides
-The Data API endpoints support the following runtime overrides:
-
-* Runtime filters
-* Runtime sorting of columns
-* Runtime Parameters
-
-=== Runtime filters
-To add runtime filters, in the `runtime_filter` property, add the `col1`, `op1`, and `val1` parameters JSON key-value format:
-
-[source,JSON]
+[source,cURL]
 ----
-"runtime_filter": {
-    "col1": "type",
-    "op1": "EQ",
-    "val1": "roasted",
-}
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/octet-stream' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "<answer-guid-or-name>",
+  "file_format": "PNG",
+  "x_resolution": 3840,
+  "y_resolution": 2160,
+  "scaling_factor": 150
+}' \
+  --output answer-4k.png
 ----
 
-To add additional filters, increment the number at the end of each parameter for each filter: for example, col2, op2, val2, and so on.
+== Related resources
 
-[source,JSON]
-----
-"runtime_filter": {
-    "col1": "type",
-    "op1": "EQ",
-    "val1": "roasted",
-    "col2": "tea",
-    "op2": "EQ",
-    "val2": "barley"
-}
-----
-
-Some operators such as allow more than one value in the `val` parameter:
-
-[source,JSON]
-----
- "runtime_filter": {
-    "col1": "tea",
-    "op1": "CONTAINS",
-    "val1": [
-      "barley",
-      "mint"
-    ],
-    "col2": "type",
-    "op2": "CONTAINS",
-    "val2": [
-      "roasted",
-      "loose leaves"
-    ]
-}
-----
-
-For more information, see xref:runtime-filters.adoc#rtOperator[Supported runtime filter operators] and xref:runtime-filters.adoc#_rest_api_v2_0_endpoints[Apply runtime filters via REST APIs].
-
-=== Runtime parameters
-
-To add runtime Parameters, in the `runtime_param_override` property, add the `param1, and `paramVal1` parameters JSON key-value format. The Parameter value must be defined as per the data type. For example, `Date Param` and `Date List Param` Parameters, specify Epoch time as value.
-
-To apply Parameter overrides on Liveboards and Answers, ensure that the Parameters are configured in the Model used for generating Liveboard visualizations and Answer.
-
-[source,JSON]
-----
- "runtime_param_override": {
-    "param1": "Double List Param",
-    "paramVal1": 0.5
- }
-----
-
-To add additional Parameter overrides, increment the number at the end of each parameter: for example, paramVal2, and so on.
-
-[source,JSON]
-----
- "runtime_param_override": {
-    "param1": "Double List Param",
-    "paramVal1": 0.5,
-    "param2": "Date Param",
-    "paramVal2": 1696932000
-  }
-----
-
-For more information, see xref:runtime-parameters.adoc[Runtime Parameter overrides].
-
-=== Runtime sort
-
-To sort columns on a Liveboard or Answer, define runtime sort properties in `runtime_sort` as a key-value pair in JSON format. The `runtime_sort` object allows `sortCol1` and `asc1` properties. To sort more columns, increment the number at the end of the parameter for each key: for example, `sortCol2`, `asc2`, `sortCol3`, `asc3`, and so on.
-
-
-[source,JSON]
-----
- "runtime_sort": {
-    "sortCol1": "sales",
-    "asc1": true,
-    "sortCol2": "region",
-    "asc2": false
-  }
-----
-
-For more information, see xref:runtime-sort.adoc#_rest_api_v2_0[Runtime sorting of columns].
-
-
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
+* xref:semantic-integrations-api.adoc[Snowflake Semantic View integration APIs]
+* xref:spotter-agent-apis.adoc[Spotter Agent APIs]
