@@ -16,7 +16,7 @@ The following figure illustrates the object model hierarchy in ThoughtSpot withi
 
 image::./images/object_model_hierarchy.png[Object Model Hierarchy]
 
-== Object identifiers
+== #Object identifiers#
 Every object in ThoughtSpot has a globally unique ID (GUID), visible in URLs and in REST API responses as the `id` or `metadata_id` property. GUIDs are unique within a ThoughtSpot instance and thus cannot repeat in different Orgs.
 
 Objects have an additional `obj_id` property that is *user-settable* and *unique per Org*. It appears as `metadata_obj_id` in responses from the `/metadata/search` REST API.
@@ -24,6 +24,96 @@ Objects have an additional `obj_id` property that is *user-settable* and *unique
 Each Org can have one object with a particular `obj_id`. The combination of `org_id` + `obj_id` is unique per instance, so it is equivalent to the object's GUID.
 
 `obj_id` allows you to export TML that can be imported into any Org on any instance, letting ThoughtSpot determine the object's GUID automatically without requiring any additional effort on your part.
+
+=== Supported object types
+
+Currently, `obj_id` is supported for the following object types:
+
+// SOURCE: PRD doc section "Requirements"; SCAL-317366 description
+
+* Answers
+* Data Model
+* Logical Tables
+* Liveboards
+* Visualizations
+* Collections
+* Personalized Views
+
+=== obj_id format and constraints
+
+// SOURCE: PRD doc section "Identity Constraints and Object-ID Specification"; SCAL-314582
+`obj_id` values must meet the following requirements:
+
+[cols="2,3", options="header"]
+|===
+|Constraint | Requirement
+
+|Allowed characters | Lowercase alphanumeric, dots, and hyphens: `[a-z0-9.-]`
+|Casing | Strictly lowercase
+|Maximum length | 64 characters
+|GUID exclusion | Must not match a standard GUID format to prevent ambiguity
+|===
+
+*Valid examples:* `sales.pipeline.v1`, `finance-ledger-prod`, `ingestion-worker-01`
+
+=== obj_id resolution
+
+// SOURCE: PRD doc section "Deterministic Keying and Distributed Consistency"; SCAL-317366
+When you pass an identifier to a REST API endpoint that accepts an `object_identifier`, ThoughtSpot resolves it in the following order:
+
+. `obj_id` (user-defined identifier)
+. GUID
+. Name
+
+This precedence means you can use `obj_id` anywhere a GUID or name is accepted in the REST API v2.0 endpoints that support the `object_identifier` field. Backward compatibility with existing GUID-based and name-based integrations is fully maintained.
+
+[NOTE]
+====
+`obj_id` resolution is scoped to the Org. An `obj_id` value is unique within a single Org. The `org_id` + `obj_id` combination uniquely identifies an object across the entire ThoughtSpot instance.
+====
+
+=== Setting and updating obj_id
+
+You can set or update `obj_id` values using the following REST API endpoints:
+
+* `POST /api/rest/2.0/metadata/update-obj-id` +
+Updates the `obj_id` for one or more metadata objects. Accepts the object's GUID (`metadata_identifier`) or its current `obj_id` (`current_obj_id`).
+
+// SOURCE: deploy-with-tml-apis.adoc; SCAL-317366
+[,json]
+----
+{
+  "metadata": [
+    {
+      "metadata_identifier": "c1e4043a-4524-4fcb-a20f-9e7aff4dc972",
+      "new_obj_id": "sales-pipeline-v1"
+    }
+  ]
+}
+----
+
+Or, using the current `obj_id`:
+
+[,json]
+----
+{
+  "metadata": [
+    {
+      "current_obj_id": "sales-pipeline-v1-c1e4043a",
+      "new_obj_id": "sales-pipeline-v1"
+    }
+  ]
+}
+----
+
+The request accepts an array, so you can update `obj_id` for multiple objects in a single API call.
+
+[NOTE]
+====
+Objects are assigned an automatic `obj_id` after the first change to the object once the feature is enabled on your instance. The auto-generated format appends the first segment of the GUID: for example, `RetailSalesRAD-KPIs-c1e4043a`. If the `metadata_obj_id` property in the `/metadata/search` response is `null`, the object has not been updated since the feature was enabled.
+====
+
+For information about using `obj_id` in CI/CD workflows, see xref:deploy-with-tml-apis.adoc[Deploy with TML APIs] and xref:development-and-deployment.adoc[Development and deployment].
 
 == Data modeling
 You must create a data model with at least one link:https://docs.thoughtspot.com/cloud/latest/connections[connection, window=_blank] and one link:https://docs.thoughtspot.com/cloud/latest/connect-data[Table, window=_blank] before you can use link:https://docs.thoughtspot.com/cloud/latest/search-data[Search data, window=_blank] to create content.
