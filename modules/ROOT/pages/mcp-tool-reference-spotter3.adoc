@@ -6,8 +6,10 @@
 :page-pageid: mcp-tool-reference-spotter3
 :page-description: Refer to this guide to learn which MCP tools are supported, input parameters used for tool calls, and the response format.
 
-The ThoughtSpot Spotter Model Context Protocol (MCP) Server integration exposes a session-based workflow for running natural language analytics queries against your ThoughtSpot data sources. The pattern is always: **create a session** → **send a message** → **poll for updates**.
+The ThoughtSpot Spotter Model Context Protocol (MCP) Server integration exposes tools for running natural language analytics queries and searching existing ThoughtSpot content. The core analytics pattern is: **create a session** → **send a message** → **poll for updates**. The `search_objects` tool is independent of this workflow and can be called at any time.
 
+* <<search_objects,search_objects>> +
+Search for existing ThoughtSpot content by name or description.
 * <<create_analysis_session,create_analysis_session>> +
 Start an analytical session.
 * <<send_session_message,send_session_message>> +
@@ -22,6 +24,266 @@ List the Orgs your account can access. (OAuth connections on Org-enabled instanc
 Switch your active Org for the current session. (OAuth connections on Org-enabled instances only)
 * <<check_connectivity,check_connectivity>> +
 Verify that the MCP Server is reachable.
+
+[#search_objects]
+== search_objects
+Search for existing ThoughtSpot content by name or description, and return the matching objects with their metadata and deep links.
+
+Use this tool when a user refers to content that already exists — for example, "open the regional sales Liveboard" or "what dashboards has Priya built."
+`search_objects` is independent of the analysis session workflow: it does not require a session and does not need to be called before `create_analysis_session`.
+
+`search_objects` returns identifiers and metadata only.
+It never returns the object's data or contents, and it does not run queries.
+To answer a data question, use the session workflow instead.
+
+=== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`query` +
+__Required__
+|The search term, matched against object names and descriptions. Must be non-empty.
+
+|`types` +
+__Optional__
+|Restrict results to these object types. Accepts an array of `LIVEBOARD`, `LIVEBOARD_VIZ`, `ANSWER`, `WORKSHEET`. Omit to search all types.
+
+|`author_name` +
+__Optional__
+|Restrict results to objects authored by this user, matched against the author's display name. Case-insensitive substring match.
+
+|`tag` +
+__Optional__
+|Restrict results to objects carrying this tag or sticker, matched by tag name. Case-insensitive substring match.
+
+|`modified_since` +
+__Optional__
+|Return only objects last modified on or after this epoch-millisecond timestamp.
+
+|`verified_only` +
+__Optional__
+|If `true`, return only objects marked as verified.
+
+|`limit` +
+__Optional__
+|Maximum number of results to return. Positive integer. Defaults to `10`.
+
+|`cursor` +
+__Optional__
+|Opaque pagination cursor returned as `next_cursor` by a previous call. Omit on the first page.
+|====
+
+=== Object types
+
+The `types` input parameter and the `type` field on each result use the same tokens.
+Any value returned in a result can be passed back as a `types` filter.
+
+[cols="1,3", options="header"]
+|====
+|Value|Meaning
+
+|`LIVEBOARD`|A Liveboard.
+|`LIVEBOARD_VIZ`|A single visualization pinned on a Liveboard. Distinct from a standalone Answer. Render this as "Liveboard viz".
+|`ANSWER`|A saved Answer.
+|`WORKSHEET`|A Worksheet or model.
+|====
+
+=== Example call
+
+[div tabbed-code]
+--
+[source,javascript]
+----
+const results = await callMCPTool("search_objects", {
+    query: "regional sales",                // Required — search term matched against object names and descriptions.
+    types: ["LIVEBOARD", "LIVEBOARD_VIZ"], // Optional — restrict to these object types.
+    author_name: "Priya",                  // Optional — case-insensitive substring match on author display name.
+    tag: "Certified",                      // Optional — case-insensitive substring match on tag name.
+    verified_only: true,                   // Optional — return only verified objects.
+    limit: 5                               // Optional — maximum results to return. Defaults to 10.
+});
+----
+
+[source,python]
+----
+call_mcp_tool(
+    "search_objects",
+    {
+        "query": "regional sales",                  # Required — search term matched against object names and descriptions.
+        "types": ["LIVEBOARD", "LIVEBOARD_VIZ"],   # Optional — restrict to these object types.
+        "author_name": "Priya",                    # Optional — case-insensitive substring match on author display name.
+        "tag": "Certified",                        # Optional — case-insensitive substring match on tag name.
+        "verified_only": True,                     # Optional — return only verified objects.
+        "limit": 5,                                # Optional — maximum results to return. Defaults to 10.
+    },
+)
+----
+--
+
+=== Response
+
+A call returns one of three outcomes.
+
+==== Successful match
+
+`status` is omitted when the search returned results.
+
+[source,json]
+----
+{
+  "results": [
+    {
+      "object_id": "b2c4e6a8-1234-4f5a-9abc-def012345678",
+      "title": "Regional Sales Performance",
+      "type": "LIVEBOARD",
+      "author_name": "Priya Raman",
+      "description": "Weekly sales tracking by region and rep.",
+      "tags": ["Sales", "Certified"],
+      "last_modified": "2026-05-15T14:30:00.000Z",
+      "verified": true,
+      "external_link": "https://your-instance.thoughtspot.cloud/#/insights/pinboard/b2c4e6a8-1234-4f5a-9abc-def012345678",
+      "query": null,
+      "confidence": 0.94
+    },
+    {
+      "object_id": "b2c4e6a8-1234-4f5a-9abc-def012345678",
+      "visualization_id": "77f1a0d3-5678-4b21-8e90-aa1122334455",
+      "title": "Sales by Region",
+      "type": "LIVEBOARD_VIZ",
+      "author_name": "Priya Raman",
+      "tags": ["Sales"],
+      "last_modified": "2026-05-15T14:30:00.000Z",
+      "verified": false,
+      "external_link": "https://your-instance.thoughtspot.cloud/#/insights/pinboard/b2c4e6a8-1234-4f5a-9abc-def012345678/77f1a0d3-5678-4b21-8e90-aa1122334455",
+      "query": "sales by region monthly",
+      "confidence": 0.81
+    }
+  ],
+  "next_cursor": "10"
+}
+----
+
+==== No results
+
+The search ran successfully but nothing matched.
+
+[source,json]
+----
+{
+  "status": "no_results",
+  "results": [],
+  "next_cursor": null
+}
+----
+
+Tell the user that nothing matched and suggest broadening the search term or removing a filter. Do not synthesize results.
+
+==== Error
+
+The search could not be completed.
+
+[source,json]
+----
+{
+  "status": "error",
+  "results": [],
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "ThoughtSpot rate limit reached. Try again shortly.",
+    "retryable": true
+  }
+}
+----
+
+If `retryable` is `true`, wait briefly and retry the same call. If `retryable` is `false`, surface the `message` to the user and do not retry automatically.
+
+=== Response fields
+
+[cols="2,1,4", options="header"]
+|====
+|Field|Type|Description
+
+|`status`|String
+|Omitted on a successful hit list.
+`no_results` means the search ran but matched nothing.
+`error` means the search failed and `error` is populated.
+
+|`results`|Array
+|Ranked list of matching objects, most relevant first. Empty for `no_results` and `error`.
+
+|`next_cursor`|String
+|Cursor to pass back as `cursor` to retrieve the next page. `null` when there are no more results. Omitted on `error`.
+
+|`error`|Object
+|Present only when `status` is `error`. Contains `code`, `message`, and `retryable`.
+|====
+
+=== Fields on each result
+
+[cols="2,1,4", options="header"]
+|====
+|Field|Type|Description
+
+|`object_id`|String
+|GUID of the object.
+For a `LIVEBOARD_VIZ` result, this is the GUID of the parent Liveboard, not the visualization.
+
+|`visualization_id`|String
+|Present only on `LIVEBOARD_VIZ` results. GUID of the specific visualization pinned on the Liveboard identified by `object_id`.
+
+|`title`|String
+|Display name of the object.
+
+|`type`|String
+|Object type: `LIVEBOARD`, `LIVEBOARD_VIZ`, `ANSWER`, or `WORKSHEET`. Can be passed back as a `types` filter.
+
+|`author_name`|String
+|Display name of the user who authored the object.
+
+|`description`|String
+|Description of the object. Omitted when the object has none.
+
+|`tags`|Array of strings
+|Names of the tags or stickers applied to the object.
+
+|`last_modified`|String
+|ISO 8601 timestamp of the last modification. For example, `2026-05-15T14:30:00.000Z`. Omitted when unavailable. Render as a plain date.
+
+|`verified`|Boolean
+|Whether the object is marked as verified.
+
+|`external_link`|String
+|Deep link to open the object in the ThoughtSpot UI. This link opens in a browser tab. It is not an embeddable iframe URL.
+
+|`query`|String
+|For an Answer or Liveboard viz, the search tokens that define it — for example, `sales by region monthly`. `null` for a Liveboard.
+
+|`confidence`|Number
+|Relevance score for the search term. Use for ranking only. Do not display this value to the user.
+|====
+
+=== Pagination
+
+`search_objects` returns up to `limit` results per call (default `10`).
+When more results are available, the response includes a `next_cursor` value.
+Pass this value back as `cursor` in the next call to retrieve the following page.
+When `next_cursor` is `null`, there are no further results.
+
+[source,javascript]
+----
+// Fetch the first page
+let response = await callMCPTool("search_objects", { query: "sales" });
+
+// Fetch the next page if a cursor was returned
+if (response.next_cursor) {
+    response = await callMCPTool("search_objects", {
+        query: "sales",
+        cursor: response.next_cursor
+    });
+}
+----
 
 [#create_analysis_session]
 == create_analysis_session
