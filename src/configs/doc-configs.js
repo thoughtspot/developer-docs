@@ -117,7 +117,7 @@ module.exports = {
                 'rest-api-v2', 'rest-apiv2-reference', 'restV2-playground',
                 'rest-apiv2-getstarted', 'api-authv2', 'rest-apiv2-js',
                 'rest-apiv2-search', 'rest-apiv2-users-search', 'rest-apiv2-groups-search',
-                'rest-apiv2-metadata-search', 'fetch-data-and-report-apis',
+                'rest-apiv2-metadata-search', 'fetch-data-and-report-apis', 'report-apis',
                 'rest-api-sdk', 'rest-api-sdk-typescript', 'rest-api-sdk-java',
                 'rest-api-getstarted', 'api-auth-session', 'catalog-and-audit',
                 'rest-api-pagination', 'runtime-sort', 'v1v2-comparison',
