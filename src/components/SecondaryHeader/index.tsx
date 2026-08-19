@@ -229,14 +229,6 @@ const SecondaryHeader = (props: {
                 <div className="secondary-header__mobile-version">
                     <Dropdown location={location} isMobile={false} />
                 </div>
-
-                {/* Desktop only: AskDocs link */}
-                <button
-                    className="secondary-header__askdocs"
-                    onClick={() => navigate('/ask-docs')}
-                >
-                    AskDocs <span className="secondary-header__beta">Beta</span>
-                </button>
             </div>
         </nav>
     );
