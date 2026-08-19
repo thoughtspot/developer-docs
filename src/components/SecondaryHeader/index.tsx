@@ -99,6 +99,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
     ],
     'rest-api': [
         'rest-apis', 'api-user-management', 'rbac', 'spotter-api', 'audit-logs', 'tml',
+        'tml-import', 'tml-export',
         'collections', 'connections', 'connection-config',
         'rest-apiv2-getstarted', 'api-authv2', 'rest-apiv2-js', 'rest-apiv2-search',
         'rest-apiv2-users-search', 'rest-apiv2-groups-search', 'rest-apiv2-metadata-search',

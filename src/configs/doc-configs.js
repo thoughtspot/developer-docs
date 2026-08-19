@@ -125,7 +125,7 @@ module.exports = {
                 'session-api', 'user-api', 'group-api', 'role-api', 'security-api',
                 'admin-api', 'database-api', 'orgs-api', 'search-data-api', 'materialization-api',
                 'liveboard-data-api', 'liveboard-export-api', 'push-data', 'logs-api',
-                'audit-logs', 'tml', 'collections', 'connections',
+                'audit-logs', 'tml', 'tml-import', 'tml-export', 'collections', 'connections',
                 'connection-config', 'connections-api', 'api-user-management', 'rbac',
                 'webhooks-rest-api', 'rest-v2-changelog', 'rest-v1-changelog',
             ],
