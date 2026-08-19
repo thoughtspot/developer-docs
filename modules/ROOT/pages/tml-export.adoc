@@ -10,15 +10,13 @@
 [#export-tml]
 To export the TML data, your account must have the `DATAMANAGEMENT` (Can manage data) or `ADMINISTRATION` (Can administer ThoughtSpot) privilege.
 
-The default format to export the objects is YAML in v1, and JSON in v2 APIs. To export the TML representation of the metadata objects from ThoughtSpot in JSON or YAML format, use one of the  following endpoints:
+The default format to export the objects is JSON. To export the TML representation of the metadata objects from ThoughtSpot in JSON or YAML format, use the following endpoint:
 
-* link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml[**POST** /api/rest/2.0/metadata/tml/export] (REST API v2)
-* xref:tml-api.adoc#export[**POST** /tspublic/v1/metadata/tml/export] (REST API v1)
+* link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml[**POST** /api/rest/2.0/metadata/tml/export]
 
-To export the TML representation of the metadata objects in a *batch*, use one of the following endpoints:
+To export the TML representation of the metadata objects in a *batch*, use the following endpoint:
 
-* link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml-batched[**POST** /api/rest/2.0/metadata/tml/export/batch] (REST API v2)
-* xref:tml-api.adoc#BatchExport[**POST** /tspublic/v1/metadata/tml/export/batch] (REST API v1)
+* link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fexport-metadata-tml-batched[**POST** /api/rest/2.0/metadata/tml/export/batch]
 
 There are several export options available with these APIs:
 
@@ -45,6 +43,14 @@ Note that the FQN of a referenced object is the same as the GUID of that object.
 
 ThoughtSpot recommends adding the fqn property before importing the TML objects into the system, because only the name of a referenced object is not sufficient to identify the referenced object during TML import. For example, if your ThoughtSpot instance has two Models with the same name, the TML import for a Liveboard that uses one of these Models would fail unless the Liveboard TML includes the FQN of the referenced object.
 The `export_fqn` attribute is useful when ThoughtSpot has multiple objects with the same name and you want to eliminate ambiguity during TML import. The `export_fqn=true` property adds the FQNs of the referenced objects in the TML export API response and saves the manual effort of adding FQNs for TML import.
+
+// PORTED from tml-api.adoc (v1) lines 235-239 — was commented out on the v1 page; confirm why before publishing.
+// RENAMED for v2: `force_create` -> `create_new`. Worksheet -> Model.
+[NOTE]
+====
+When you import multiple objects in bulk and create objects using the `create_new` attribute, the new object may refer to an existing object with the same FQN in the ThoughtSpot system instead of the other objects provided in the TML import request. For example, when you upload a TML representation of a Liveboard and the associated Model with the FQNs obtained from the TML export API, the imported Liveboard may refer to an existing Model with the same FQN in the ThoughtSpot system instead of the new Model created during the TML import. +
+If you want the new objects created during the TML import to refer to the other associated objects created during the same import operation, set the `export_fqn` attribute to `false` during TML export or remove the FQNs manually before the TML import.
+====
 
 For more information about using FQNs during import, see xref:tml-import.adoc#import-tml[Import TML].
 
@@ -74,10 +80,22 @@ When set to `true`, export column aliases of the Model if the data Model include
 This API operation supports exporting User, User Group, and Role objects only.
 To export objects in a batch, set the following additional attributes:
 
+// PORTED from tml-api.adoc (v1) line 342-347 — parameter name and allowed values were undocumented here.
+* `metadata_type` +
+Type of the metadata object to export. Use one of the following values: `USER`, `USER_GROUP`, or `ROLE`. The `ROLE` value applies only to instances on which xref:roles.adoc[Role-based access control] is enabled.
+
 * `batch_size` +
 Exports the specified number of objects in a single API request. A batch size of up to 200 objects is allowed for a single API operation.
+// PORTED from tml-api.adoc (v1) line 340 — VERIFY FOR v2: v1 default was `20`.
+The default batch size is 20.
 
 * `batch_offset` +
 Offsets the API response by the specified number. Batch offset value defines the starting position of the records for the results returned by the API.
+// PORTED from tml-api.adoc (v1) line 341 — VERIFY FOR v2: v1 default was `0`.
+The default batch offset is 0.
 
-For more information, see the API documentation in REST API v2 Playground and  xref:tml-api.adoc[Export a TML object using REST API v1].
+// PORTED from tml-api.adoc (v1) line 348 — batch-export semantics differ from the `export_dependent` documented under "Export associated objects" above.
+* `export_dependent` +
+Specifies if the dependent objects must be exported. For example, the user groups to which user objects are assigned, or the sub-groups of a user group. To get full details of the dependent objects, the API call initiator must have view or edit access to the dependent object.
+
+For more information, see the API documentation in REST API v2 Playground.
