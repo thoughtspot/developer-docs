@@ -687,4 +687,109 @@ To sort columns on a Liveboard or Answer, define runtime sort properties in `run
 
 For more information, see xref:runtime-sort.adoc#_rest_api_v2_0[Runtime sorting of columns].
 
+    [#answer-report]
+    === Answer Report API
 
+    // SOURCE: SCAL-306069
+
+    The `POST /api/rest/2.0/report/answer` endpoint is generally available from 26.9.0.cl. Use this endpoint to export Answer data in CSV, XLSX, PDF, or PNG format. The endpoint supports saved Answers, pinned Answers (visualizations on a Liveboard), and Spotter-generated (ad hoc) Answers.
+
+    ==== Prerequisites
+
+    To download Answer data, the user must have at least *View* access to the Answer or Liveboard. If RBAC is enabled:
+
+    * `DATADOWNLOADING` (Can download Data) — required for all export formats.
+    * `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) — required for CSV and XLSX.
+    * `CAN_DOWNLOAD_VISUALS` (Can download visuals) — required for PNG.
+
+    ==== Request parameters
+
+    [width="100%" cols="2,1,4"]
+    [options="header"]
+    |=====
+    | Parameter | Required | Description
+    | `metadata_identifier` | Conditional | GUID or name of the saved Answer. For pinned Answer exports, use the parent Liveboard GUID or name and pass `viz_guid` separately.
+    | `file_format` | Yes | Export format. Accepted values: `CSV`, `XLSX`, `PDF`, `PNG`.
+    | `viz_guid` | No | GUID of a pinned visualization on a Liveboard. When specified, `metadata_identifier` must identify the parent Liveboard.
+    | `personalised_view_identifier` | No | GUID or name of a Personalized View. When specified, the export uses data from that view.
+    | `runtime_filter` | No | Runtime filter overrides to apply to the export.
+    | `runtime_sort` | No | Runtime sort overrides to apply to the export.
+    | `runtime_param_override` | No | Runtime parameter overrides to apply to the export.
+    | `x_resolution` | No | Width of the PNG export in pixels. Range: 600–3840. Applies only when `file_format` is `PNG`. Default: 2254.
+    | `y_resolution` | No | Height of the PNG export in pixels. Range: 600–3840. Applies only when `file_format` is `PNG`. Default: 1588.
+    | `scaling_factor` | No | Scaling percentage for chart elements in PNG exports. Range: 80–400. Does not crop the image. Applies only when `file_format` is `PNG`.
+    |=====
+
+    ==== Export a saved Answer
+
+    [source,cURL]
+    ----
+    curl -X POST \
+      --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+      -H 'Authorization: Bearer {access-token}' \
+      -H 'Accept: application/octet-stream' \
+      -H 'Content-Type: application/json' \
+      --data-raw '{
+      "metadata_identifier": "my-saved-answer",
+      "file_format": "CSV"
+    }' \
+      --output answer.csv
+    ----
+
+    ==== Export a pinned Answer
+
+    [source,cURL]
+    ----
+    curl -X POST \
+      --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+      -H 'Authorization: Bearer {access-token}' \
+      -H 'Accept: application/octet-stream' \
+      -H 'Content-Type: application/json' \
+      --data-raw '{
+      "metadata_identifier": "<liveboard-guid-or-name>",
+      "viz_guid": "<visualization-guid>",
+      "file_format": "PDF"
+    }' \
+      --output pinned-answer.pdf
+    ----
+
+    ==== Export a Spotter Answer
+
+    [source,cURL]
+    ----
+    curl -X POST \
+      --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+      -H 'Authorization: Bearer {access-token}' \
+      -H 'Accept: application/octet-stream' \
+      -H 'Content-Type: application/json' \
+      --data-raw '{
+      "metadata_identifier": "<spotter-answer-id>",
+      "file_format": "XLSX"
+    }' \
+      --output spotter-answer.xlsx
+    ----
+
+    [NOTE]
+    ====
+    Pass the answer ID from the Spotter API response as `metadata_identifier`. XLSX and PDF formats are supported for Spotter Answers from 26.9.0.cl.
+    ====
+
+    ==== Export a PNG with custom dimensions
+
+    [source,cURL]
+    ----
+    curl -X POST \
+      --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+      -H 'Authorization: Bearer {access-token}' \
+      -H 'Accept: application/octet-stream' \
+      -H 'Content-Type: application/json' \
+      --data-raw '{
+      "metadata_identifier": "my-saved-answer",
+      "file_format": "PNG",
+      "x_resolution": 3840,
+      "y_resolution": 2160,
+      "scaling_factor": 150
+    }' \
+      --output answer-4k.png
+    ----
+    
