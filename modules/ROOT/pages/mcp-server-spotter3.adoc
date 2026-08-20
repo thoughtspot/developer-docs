@@ -68,7 +68,10 @@ The agent calls `send_session_message` with the `analytical_session_id` and the 
 ThoughtSpot confirms receipt with a `success` response and begins processing the question asynchronously. The answer is not returned in this call.
 
 4. *Agent polls `get_session_updates` for results* +
-The agent calls `get_session_updates` repeatedly in a loop until `is_done` is `true`. ThoughtSpot streams updates incrementally across multiple polls. The agent must accumulate updates from every poll. ThoughtSpot returns the following update types:
+The agent calls `get_session_updates` repeatedly in a loop until `is_done` is `true`. ThoughtSpot streams updates incrementally across multiple polls. The agent must accumulate updates from every poll.
+
+////
+ThoughtSpot returns the following update types:
 
 * `text-chunk` - real-time thinking narration from Spotter describing what it is doing, streamed in fragments. Concatenate chunks in order to form the complete narration.
 * `text` - complete standalone messages representing clarifications, caveats, or assumptions Spotter made during analysis.
@@ -77,17 +80,23 @@ The agent calls `get_session_updates` repeatedly in a loop until `is_done` is `t
 ** `answer_query` - the ThoughtSpot search query used to generate the answer.
 ** `iframe_url` - an embeddable URL for rendering an interactive ThoughtSpot visualization.
 ** `answer_id` - a unique identifier for the answer, used as input for creating a dashboard.
+////
 
-5. *A dashboard is generated from the results (optional)* +
+5. *User generates a dashboard with the results (optional)* +
 The user can choose to save answers from the conversation as a ThoughtSpot dashboard. For this workflow, the agent extracts the `answer_id` and `answer_title` from each `answer` type update collected during polling and calls `create_dashboard`. +
 ThoughtSpot creates a dashboard and returns a `dashboard_id` and a
 `dashboard_url`, a direct link to the dashboard in the ThoughtSpot UI.
 
-6. *User asks a follow-up question (optional)* +
+The other optional tool calls include:
+
+* *User asks a follow-up question (optional)* +
 The user can ask a follow-up question in the same session. The agent calls `send_session_message` again using the same `analytical_session_id`. ThoughtSpot retains the full conversation context automatically. The agent returns to step 4 to poll for the follow-up response.
 
-7. *User switches to a different Org (optional)* +
+* *User switches to a different Org (optional)* +
 If the user belongs to more than one Org and connects over OAuth, the agent calls `list_orgs` to return all accessible Orgs and flags the Org that the user is currently logged in. When the user requests a switch, the agent calls `switch_org` with the target `org_id`. For more information, see xref:mcp-tool-reference-spotter3.adoc#org-switching-tools[Org switching tools].
+
+* *Agent searches for existing content (optional)* +
+If the user refers to content that already exists, for example, "open the regional sales Liveboard", the agent calls `search_objects` with a search term and optional filters such as object type, author, tag, or verified status. `search_objects` returns a ranked list of matching objects with their metadata and deep links.
 
 == Additional resources
 * For information about MCP, see the link:https://modelcontextprotocol.io[Model Context Protocol specification, window=_blank].
