@@ -1,224 +1,22 @@
-= Data and Report APIs
+= Report APIs
 :toc: true
 :toclevels: 3
 
-:page-title: data-apis
-:page-pageid: fetch-data-and-report-apis
-:page-description: Data and Report APIs
+:page-title: report-apis
+:page-pageid: report-apis
+:page-description: Report APIs
 
-== Data APIs
-ThoughtSpot provides the following REST API v2 endpoints to fetch data:
+ThoughtSpot provides the following REST API v2 endpoints to download or export data as a file:
 
-* xref:#_search_data_api[`POST /api/rest/2.0/searchdata`] to search data from a given data source.
-* xref:#_fetch_liveboard_api[`POST /api/rest/2.0/metadata/liveboard/data`] to get data from a Liveboard.
-* xref:#_fetch_answer_data_api[`POST /api/rest/2.0/metadata/answer/data`] to get data from a saved Answer.
-
-If Role-Based Access Control (RBAC) is enabled, the `DATADOWNLOADING` (Can download Data) privilege is required to use these APIs. Alternatively, if the granular data download RBAC privileges are enabled for your ThoughtSpot instance, the `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) is required.
-
-=== Search data API
-
-The `/api/rest/2.0/searchdata` endpoint requires you to specify the data source object ID and a query string for a successful API call. You can also define additional parameters such as `runtime_filter`, `runtime_sort`, and `runtime_param_override` to apply runtime overrides on the data set.
-
-==== Data source
-To search data via API call, you require at least view access to the data source object. The data source object can be a Model, View, or Table.
-
-You can specify the data source object GUID in the `logical_table_identifier`. The search data endpoint doesn't support searching data from multiple Models, Views, or Tables in a single API request.
-
-To find the GUID of the Model, View, or Table, use one of the following methods:
-
-Get data object GUID via API::
-
-Send an API request to the `/api/rest/2.0/metadata/search` endpoint with the following parameters in the metadata array: +
-
-+
-.**Example**
-[source,JSON]
-----
- "metadata": [
-    {
-      "identifier": "my_model",
-      "type": "LOGICAL_TABLE"
-    }
-  ]
-----
-
-+
-If you don't know the exact name of the data source object, specify the metadata `type` as `LOGICAL_TABLE` in your API request, and then copy the GUID of the data object from the API response.
-
-Find the GUID of the data object via UI::
-. Log in to your ThoughtSpot application instance:
-. Navigate to **Data workspace**.
-+
-----
-https://<your-thoughtspot-instance>/#/data/tables/
-----
-+
-. On the **Data workspace** > **Data objects** page, select the data object. For example, if the data source object is a Model, click **Models** and then open the Model.
-. In the address bar of the web browser, note the GUID of the data source object.  For example, in the following address string, the GUID is `9d93a6b8-ca3a-4146-a1a1-e908b71b963f`:
-+
-----
-https://<your-thoughtspot-instance>/#/data/tables/9d93a6b8-ca3a-4146-a1a1-e908b71b963f
-----
-
-. Copy the GUID.
-
-==== Search query
-
-include::{path}/search-query-string.adoc[]
-
-.**Example**
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/searchdata' \
-  -H 'Authorization: Bearer {access-token}
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "query_string": "[sales][store]",
-  "logical_table_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-}'
-----
-
-////
-==== Using tokens generated from Spotter APIs as raw data
-
-For every natural language query and follow-up question, Spotter APIs such as `/api/rest/2.0/ai/answer/create`, `/api/rest/2.0/ai/agent/converse/sse`, return tokens in the API response. You can use these tokens as raw data to generate an Answer from ThoughtSpot via search data API.
-
-===== Request example
-
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/searchdata'  \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {AUTH_TOKEN}' \
-  --data-raw '{
-  "query_string": "by [city], [product], [item type] = [item type].'\''jackets'\'', [region] = [region].'\''west'\'', sort by sum [sales] descending",
-  "logical_table_identifier": "cd252e5c-b552-49a8-821d-3eadaa049cca",
-  "data_format": "COMPACT",
-  "record_offset": 0,
-  "record_size": 10
-}'
-----
-
-===== API response
-
-If the API request is successful, ThoughtSpot returns the Answer data for the query string sent in the API request.
-////
-
-=== Fetch Liveboard Data API
-To get data from a Liveboard object and its visualizations via `POST /api/rest/2.0/metadata/liveboard/data` endpoint, your user account must have at least view access to the Liveboard specified in the API request.
-
-The API request body must include the name or GUID of the Liveboard to fetch data. To get specific visualizations from a given Liveboard, add the names or GUIDs of the visualizations in the  `visualization_identifiers` array.
-
-==== Example
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/liveboard/data' \
-  -H 'Authorization: Bearer {access-token}'\
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "metadata_identifier": "d084c256-e284-4fc4-b80c-111cb606449a",
-  "data_format": "COMPACT",
-  "visualization_identifiers": [
-    "a9655c18-9855-4a73-9e7b-ff4fb6da334b",
-    "bf4c9814-82c1-4ec4-b879-57eae2134cb4",
-    "8c46d2b6-94c7-4ba7-a628-6e74e297f973",
-    "f6ef5d1f-cddb-4547-8b66-af4d5f4da5ad"
-  ]
-}'
-----
-
-[#transient-lb-content]
-==== Liveboard data with unsaved changes
-
-include::{path}/transient-lb-content.adoc[]
-
-.**Sample browser fetch request**
-
-[source,TypeScript]
-----
-const embedRef = useEmbedRef<typeof LiveboardEmbed>();
-  const handleFilterChanged: MessageCallback = () => {
-    embedRef.current
-      .trigger(HostEvent.getExportRequestForCurrentPinboard)
-      .then((transientPinboardContent) => {
-        console.log(transientPinboardContent.data);
-
-        const payload = {
-          metadata_identifier: "abc",
-          data_format: "COMPACT",
-          record_offset: 0,
-          record_size: 10,
-          transient_content: JSON.stringify(transientPinboardContent.data),
-        };
-
-        fetch(
-          `https://{ThoughtSpot-Host}/api/rest/2.0/metadata/liveboard/data`,
-          {
-            method: "POST",
-            headers: {
-              Authorization:
-                "Bearer xxx",
-              Accept: "application/json",
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          }
-        )
-          .then((response) => response.json())
-          .then(console.log)
-          .catch(console.log);
-      });
-  };
-
-  return (
-    <LiveboardEmbed
-      ref={embedRef}
-      liveboardId={"ID"}
-      fullHeight={true}
-      onFilterChanged={handleFilterChanged}
-    />
-  );
-----
-
-See also, link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_getexportrequestforcurrentpinboard[HostEvent.getExportRequestForCurrentPinboard].
-
-
-=== Fetch Answer Data API
-
-To get data from a saved Answer object via `/api/rest/2.0/metadata/answer/data`, you need at least view access to the saved Answer.
-
-The API request body must include the name or GUID of the saved Answer.
-
-==== Example
-[source,cURL]
-----
-curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/answer/data' \
-  -H 'Authorization: Bearer {access-token}'\
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  "metadata_identifier": "f605dbc7-db19-450b-8613-307118f74c3c",
-}'
-----
-
-
-== Report APIs
-
-ThoughtSpot provides the following REST API v2 endpoints to fetch data:
-
-* xref:_liveboard_report_api[`POST /api/rest/2.0/report/liveboard`] +
+* xref:#_liveboard_report_api[`POST /api/rest/2.0/report/liveboard`] +
 Download a Liveboard and its visualizations in PDF, PNG, CSV, or XLSX file format.
 * xref:#_answer_report_api[`POST /api/rest/2.0/report/answer`] +
 Download data from a saved Answer in PDF, PNG, CSV, or XLSX file format.
 
-=== Liveboard Report API
+[NOTE]
+To retrieve data as JSON instead of downloading a file, see xref:data-apis-v2.adoc[Data APIs].
+
+== Liveboard Report API
 
 To download a Liveboard report via `/api/rest/2.0/report/liveboard` API, you need at least view access to the Liveboard specified in the API request.
 
@@ -237,7 +35,7 @@ To download a personalized view of the Liveboard, specify the view name in the `
 * If the granular Role-Based Access Control (RBAC) is enabled, the `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) privilege is required to export in the XLSX or CSV formats, and the `CAN_DOWNLOAD_VISUALS` (Can download visuals) privilege is required for PDF or PNG exports. In this case the `DATADOWNLOADING` privilege ceases to exist.
 ====
 
-==== File Formats
+=== File Formats
 
 The default `file_format` is *CSV*.
 
@@ -252,7 +50,7 @@ For *CSV* downloads,
 * It does not support any additional parameters to customize the page orientation and `include_cover_page`, `include_filter_page`, logo, footer text, and page numbers.
 * Charts are exported as tabular data. Downloaded reports may include columns not seen in the visualization if they were used as tokens in the underlying search query.
 
-===== Sample API payload for CSV downloads
+==== Sample API payload for CSV downloads
 
 [source,cURL]
 ----
@@ -278,7 +76,7 @@ For *XLSX* downloads,
 * Charts are exported as tabular data. Downloaded reports may include columns not seen in the visualization if they were used as tokens in the underlying search query.
 * New pivot tables generated in .xlsx workbooks using this API endpoint retain their complete visual formatting and structural integrity.
 
-===== Sample API payload for XLSX downloads
+==== Sample API payload for XLSX downloads
 
 [source,cURL]
 ----
@@ -305,7 +103,7 @@ When `page_size = CONTINUOUS`, the `include_filter_page` option works to show/hi
 * `zoom_level` offers various download size options to suit the viewer's screen dimensions, thereby enhancing legibility. This can be set only when `page_size = CONTINUOUS`. Valid values are integers in the range of 45 and 175.
 
 
-===== Sample API payload for PDF downloads
+==== Sample API payload for PDF downloads
 
 [source,cURL]
 ----
@@ -347,7 +145,7 @@ For *PNG* downloads, you can now define
 
 ====
 
-===== Sample API payload for PNG downloads
+==== Sample API payload for PNG downloads
 
 [source,cURL]
 ----
@@ -372,7 +170,7 @@ curl -X POST \
 }'
 ----
 
-==== Override filters
+=== Override filters
 
 If the Liveboard has filters applied, and you want to override the filters before downloading the Liveboard, you can specify the filters in the `override_filters` array.
 
@@ -425,12 +223,12 @@ curl -X POST \
 }'
 ----
 
-[#transient-lb-content]
-==== Liveboard data with unsaved changes
+[#transient-lb-content-report]
+=== Liveboard data with unsaved changes
 
 include::{path}/transient-lb-content.adoc[]
 
-===== Sample browser fetch request
+==== Sample browser fetch request
 
 [source,JavaScript]
 ----
@@ -454,7 +252,7 @@ include::{path}/transient-lb-content.adoc[]
 
 See also, link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_getexportrequestforcurrentpinboard[HostEvent.getExportRequestForCurrentPinboard].
 
-=== Answer Report API
+== Answer Report API
 
 To download Answer data via `/api/rest/2.0/report/answer` API, you need at least view access to the saved Answer.
 
@@ -468,7 +266,7 @@ The API supports exporting saved Answers, pinned Answers from a Liveboard, and S
 * If the granular Role-Based Access Control (RBAC) is enabled, the `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) privilege is required to export in the PDF, XLSX or CSV formats, and the `CAN_DOWNLOAD_VISUALS` (Can download visuals) privilege is required for PNG exports. In this case the `DATADOWNLOADING` privilege ceases to exist.
 ====
 
-==== Example
+=== Example
 
 [source,cURL]
 ----
@@ -525,12 +323,12 @@ Valid range: `80%` to `500%`.
 You can now export the PNG of any Answer in any aspect ratio and any scaling or zoom level. Just configure, scale, and export exactly what you need.
 
 [#exportSpotterData]
-==== Export data generated from Spotter APIs
+=== Export data generated from Spotter APIs
 To export results generated from Spotter APIs such as  `/api/rest/2.0/ai/answer/create`, `/api/rest/2.0/ai/agent/converse/sse`, and `/api/rest/2.0/ai/conversation/{conversation_identifier}/converse`, include the session ID and generation number in the `POST` request body.
 
 When downloading a Spotter-generated Answer, do not specify the metadata object ID, because you will be exporting the data generated from a conversation session with Spotter and not a saved Answer.
 
-===== Request example
+==== Request example
 
 [source,cURL]
 ----
@@ -549,12 +347,12 @@ curl -X POST \
 * `generation_number` indicates the Answer generation number.
 * `file_format`  specifies the format of the output. You can export the Spotter-generated data as PNG, CSV, XLSX, or PDF file. By default, the API exports this data in PNG file format.
 
-===== API Response
+==== API Response
 
 If the API request is successful, ThoughtSpot returns the data in the specified file format. You can download the file to use it later or import it into your application environment.
 
 ////
-===== Response codes
+==== Response codes
 [width="100%" cols="2,4"]
 [options='header']
 |===
@@ -567,124 +365,8 @@ If the API request is successful, ThoughtSpot returns the data in the specified 
 |===
 ////
 
-== Pagination settings for Data APIs
+== Pagination and runtime overrides
 
-When you make REST API calls to some v2 Data endpoints to query data, the API may return many rows of data in response. By default, the following parameters are set in API requests to the v2 Data API endpoints:
+The Report API endpoints support the same runtime overrides as the Data API endpoints. For more information, see xref:data-apis-v2.adoc#_runtime_overrides[Runtime overrides].
 
-[source,JSON]
-----
-{
-  "data_format": "COMPACT",
-  "record_offset": 0,
-  "record_size": 10
-}
-----
-
-[WARNING]
-====
-Do not set `record_size` to `-1`. On ThoughtSpot instances with a large number of objects or users, this can lead to slow responses, excessive logging, and out-of-memory failures. Specify an explicit `record_size` and iterate through pages programmatically.
-====
-
-The APIs return a maximum of 100000 rows of data at any given time. If you must retrieve a higher number of rows in an API call, contact ThoughtSpot Customer Support to increase the row size limit. However, if the record size and number of rows are high, the API may take a while to fetch the data, and the request may time out.
-
-== Runtime overrides
-The Data API endpoints support the following runtime overrides:
-
-* Runtime filters
-* Runtime sorting of columns
-* Runtime Parameters
-
-=== Runtime filters
-To add runtime filters, in the `runtime_filter` property, add the `col1`, `op1`, and `val1` parameters JSON key-value format:
-
-[source,JSON]
-----
-"runtime_filter": {
-    "col1": "type",
-    "op1": "EQ",
-    "val1": "roasted",
-}
-----
-
-To add additional filters, increment the number at the end of each parameter for each filter: for example, col2, op2, val2, and so on.
-
-[source,JSON]
-----
-"runtime_filter": {
-    "col1": "type",
-    "op1": "EQ",
-    "val1": "roasted",
-    "col2": "tea",
-    "op2": "EQ",
-    "val2": "barley"
-}
-----
-
-Some operators such as allow more than one value in the `val` parameter:
-
-[source,JSON]
-----
- "runtime_filter": {
-    "col1": "tea",
-    "op1": "CONTAINS",
-    "val1": [
-      "barley",
-      "mint"
-    ],
-    "col2": "type",
-    "op2": "CONTAINS",
-    "val2": [
-      "roasted",
-      "loose leaves"
-    ]
-}
-----
-
-For more information, see xref:runtime-filters.adoc#rtOperator[Supported runtime filter operators] and xref:runtime-filters.adoc#_rest_api_v2_0_endpoints[Apply runtime filters via REST APIs].
-
-=== Runtime parameters
-
-To add runtime Parameters, in the `runtime_param_override` property, add the `param1, and `paramVal1` parameters JSON key-value format. The Parameter value must be defined as per the data type. For example, `Date Param` and `Date List Param` Parameters, specify Epoch time as value.
-
-To apply Parameter overrides on Liveboards and Answers, ensure that the Parameters are configured in the Model used for generating Liveboard visualizations and Answer.
-
-[source,JSON]
-----
- "runtime_param_override": {
-    "param1": "Double List Param",
-    "paramVal1": 0.5
- }
-----
-
-To add additional Parameter overrides, increment the number at the end of each parameter: for example, paramVal2, and so on.
-
-[source,JSON]
-----
- "runtime_param_override": {
-    "param1": "Double List Param",
-    "paramVal1": 0.5,
-    "param2": "Date Param",
-    "paramVal2": 1696932000
-  }
-----
-
-For more information, see xref:runtime-parameters.adoc[Runtime Parameter overrides].
-
-=== Runtime sort
-
-To sort columns on a Liveboard or Answer, define runtime sort properties in `runtime_sort` as a key-value pair in JSON format. The `runtime_sort` object allows `sortCol1` and `asc1` properties. To sort more columns, increment the number at the end of the parameter for each key: for example, `sortCol2`, `asc2`, `sortCol3`, `asc3`, and so on.
-
-
-[source,JSON]
-----
- "runtime_sort": {
-    "sortCol1": "sales",
-    "asc1": true,
-    "sortCol2": "region",
-    "asc2": false
-  }
-----
-
-For more information, see xref:runtime-sort.adoc#_rest_api_v2_0[Runtime sorting of columns].
-
-
+For information about pagination, record size, and the maximum row limit that apply to the Data API endpoints, see xref:data-apis-v2.adoc#pagination[Pagination settings for Data APIs].
