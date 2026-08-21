@@ -150,6 +150,32 @@ export const customizeDocContent = () => {
     document.querySelectorAll('pre code').forEach((block) => {
         hljs.highlightBlock(block as HTMLElement);
     });
+
+    /*
+     * Expand/collapse for code blocks taller than the collapsed max-height.
+     * Avoids trapping mouse-wheel scroll inside a nested scrollbar: collapsed
+     * blocks clip + fade instead of scrolling internally; "Show more" reveals
+     * the full block (no scroll) so page scroll takes over normally.
+     */
+    document.querySelectorAll<HTMLElement>('.code-block-wrapper').forEach((wrapper) => {
+        if (wrapper.querySelector('.code-expand-btn')) return;
+
+        const pre = wrapper.querySelector('pre');
+        if (!pre) return;
+
+        if (pre.scrollHeight <= pre.clientHeight + 2) return;
+
+        wrapper.classList.add('has-overflow');
+
+        const expandBtn = document.createElement('button');
+        expandBtn.classList.add('code-expand-btn');
+        expandBtn.textContent = 'Show more';
+        expandBtn.addEventListener('click', () => {
+            const isExpanded = wrapper.classList.toggle('expanded');
+            expandBtn.textContent = isExpanded ? 'Show less' : 'Show more';
+        });
+        wrapper.appendChild(expandBtn);
+    });
 };
 
 const isInViewport = (el: HTMLElement) => {
