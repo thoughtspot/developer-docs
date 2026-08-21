@@ -58,17 +58,6 @@ export const fetchChild = (html: string) => {
     return topLevelItems.map((el) => buildJSON(el));
 };
 
-// Not being used anywhere
-const getParentHref = (current) => {
-    if (current.href) {
-        return current.href;
-    }
-    if (current?.children?.length > 1) {
-        return current.children[0]?.href;
-    }
-    return null;
-};
-
 /**
  * Reconstructs a page's pageid from an href found in nav content. Tutorials/
  * walkthroughs module pages use compound pageids ({subdirectory}__{finalSegment},
@@ -102,12 +91,16 @@ export const getBreadcrumsPath = (data: any, pageid?: string) => {
             return [{ name: current.name, href: null }];
         }
         if (current.children) {
-            const parentObj = [
-                { name: current.name, href: getParentHref(current) },
-            ];
             const childObj = getBreadcrumsPath(current.children, pageid);
             if (childObj.length) {
-                return [...parentObj, ...childObj];
+                // Group labels with no link of their own (e.g. an unlinked nav
+                // heading used purely to group tutorial steps) aren't a real
+                // page — skip them rather than falling back to a child's href,
+                // which would make the crumb redundantly link to that child.
+                if (current.href) {
+                    return [{ name: current.name, href: current.href }, ...childObj];
+                }
+                return childObj;
             }
         }
         if (previous.length) {

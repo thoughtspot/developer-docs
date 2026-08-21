@@ -184,10 +184,11 @@ const Document = (props: {
 
     const isHomePage = props.pageid === HOME_PAGE_ID;
     // The walkthroughs overview is a card-grid landing page with no real body
-    // text to copy, and the toolbar's float:right lands far from the (empty)
-    // breadcrumb above the wide card grid — just hide it there. tutorials-overview
-    // shows the copy button like any other tutorial content page.
-    const hideCopyPage = props.pageid === 'walkthroughs';
+    // text to copy and no meaningful parent to link back to — hide the copy
+    // button and the breadcrumb there. tutorials-overview shows both like any
+    // other tutorial content page.
+    const isWalkthroughsLandingPage = props.pageid === 'walkthroughs';
+    const hideCopyPage = isWalkthroughsLandingPage;
 
     return (
         <div
@@ -207,7 +208,7 @@ const Document = (props: {
                     Ask SpotterCode
                 </button>
             )}
-            {!isHomePage && (
+            {!isHomePage && !isWalkthroughsLandingPage && (
                 <Breadcrums
                     breadcrumsData={props.breadcrumsData}
                     pageid={props.pageid}

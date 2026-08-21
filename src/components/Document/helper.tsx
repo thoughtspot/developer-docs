@@ -161,6 +161,23 @@ export const customizeDocContent = () => {
     });
 
     /*
+     * Autoplaying <video> elements without `muted` get silently blocked or
+     * repeatedly stalled by the browser's autoplay policy in a real (non-
+     * automated) browser — each buffering/retry attempt can intercept
+     * trackpad scroll for a second or two. The video:: macro's options list
+     * doesn't forward "muted" through this Asciidoctor version, so set it
+     * directly on the element instead.
+     */
+    document.querySelectorAll<HTMLVideoElement>('video[autoplay]').forEach((video) => {
+        video.muted = true;
+        video.setAttribute('muted', '');
+        // Setting `muted` after the browser already evaluated (and likely
+        // blocked) the initial autoplay attempt doesn't retroactively start
+        // playback — re-trigger it explicitly.
+        video.play().catch(() => {});
+    });
+
+    /*
      * Expand/collapse for code blocks taller than the collapsed max-height.
      * Avoids trapping mouse-wheel scroll inside a nested scrollbar: collapsed
      * blocks clip + fade instead of scrolling internally; "Show more" reveals
