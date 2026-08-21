@@ -263,7 +263,6 @@ const SecondaryHeader = (props: {
                 <div className="secondary-header__mobile-version">
                     <Dropdown location={location} isMobile={false} />
                 </div>
-
             </div>
         </nav>
     );
