@@ -155,9 +155,15 @@ const SecondaryHeader = (props: {
             // Stay on this wrapper page and retarget the nested iframe instead of
             // navigating to the unversioned CATEGORY_LANDING page, which would drop
             // the user out of the pinned older version.
+            // Query-only (no pathname) so the browser resolves it relative to the
+            // current URL via pushState's native relative-URL resolution. Building
+            // the target from location.pathname here duplicated the site's /docs
+            // pathPrefix in production (404s), while working fine in local dev,
+            // which has no prefix — root cause in Gatsby's routing not fully
+            // isolated, but this sidesteps the pathname reconstruction entirely.
             const params = new URLSearchParams(location.search);
             params.set('pageid', landing.replace(/^\//, ''));
-            navigate(`${location.pathname}?${params.toString()}`);
+            navigate(`?${params.toString()}`);
             return;
         }
         navigate(landing);
