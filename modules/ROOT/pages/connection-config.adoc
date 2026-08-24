@@ -51,8 +51,13 @@ In your `POST` request body, include the following parameters:
 
 * `SAGE_INDEXING`
 * `ROW_COUNT_STATS`
-
 |=====
+#[NOTE]#
+====
+`SECURE_SAMPLING` and `SECURE_MATCH_VALUES` queries generated when columns are configured with *Secure suggestions*, are not routed by this configuration. These are on-demand queries issued during an active user's search session, and they always execute against the primary warehouse. For more information, see link:https://docs.thoughtspot.com/cloud/{{version}}/data-modeling-suggestion-settings[Suggestion settings].
+
+Secondary warehouse routing is not supported for parameterized connections. If the connection object itself is parameterized, the processes listed here are not routed to the secondary warehouse. Routing is supported when only the tables are parameterized.
+====
 
 === Search a connection configuration
 To create a connection configuration to an existing data connection object in ThoughtSpot, send a `POST` request to the `POST /api/rest/2.0/connection-configurations/search` API endpoint.
@@ -103,6 +108,35 @@ In your `POST` request body, include the following parameters:
 |`configuration_identifier` a|__String__. Required. Unique ID of the configuration to be deleted.
 |`connection_identifier` a|__String__. Required. Unique ID of the connection object for the configuration to be deleted.
 |=====
+
+== #Workload routing and secure suggestions#
+
+Connection configurations with the `PROCESSES` policy type route background system queries to a secondary warehouse. The table below summarizes which query types are eligible for secondary warehouse routing:
+
+[width="100%",cols="1,2,1",options="header"]
+|=====
+|Query tag in warehouse history|Description|Routable to secondary warehouse?
+
+|`SAGE_INDEXING`
+|Scheduled background queries that build the ThoughtSpot search index.
+|Yes, use `SAGE_INDEXING` in `policy_processes`.
+
+|`ROW_COUNT_STATS`
+|Periodic row count statistics queries.
+|Yes, use `ROW_COUNT_STATS` in `policy_processes`.
+
+|`SECURE_SAMPLING`
+|On-demand queries that fetch sample values for columns configured with *Secure suggestions*, issued at user search time.
+|No, always runs against the primary warehouse.
+
+|`SECURE_MATCH_VALUES`
+|On-demand queries that resolve Spotter suggestion matches for RLS-protected columns, issued at user search time.
+|No, always runs against the primary warehouse.
+|=====
+
+`SECURE_SAMPLING` and `SECURE_MATCH_VALUES` are not background jobs. They are issued on demand while a user is searching or asking a Spotter question, and they must return quickly to keep the search responsive. A secondary warehouse cannot guarantee that response time, because it is typically sized and scheduled for background workloads that run during a specific window of the day. For this reason, these query types are excluded from the `policy_processes` routing configuration and always run against the primary warehouse.
+
+If the volume of `SECURE_SAMPLING` queries is higher than expected, check your Model configuration. Columns that do not require RLS-compliant suggestions should be set to *Inherit table settings* or *Don't show suggestions* in the Suggestion settings column.
 
 == Additional Resources
 * xref:connections.adoc[Connections]
