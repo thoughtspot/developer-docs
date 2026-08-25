@@ -8,9 +8,18 @@
 
 To provide access to ThoughtSpot content or define privileges, you must add users and groups in ThoughtSpot. You can create user accounts and user groups in the ThoughtSpot UI or via REST API calls.
 
+== Required permissions
+
+// TODO(verify): this permission list was carried over from the REST API v1 user
+// documentation. Confirm it against the v2 endpoint privilege requirements.
+
+You must have administrator privileges to create, edit, and delete a user, assign users to groups, transfer objects from one user to another, and activate, deactivate, or log out a user.
+
+On a multi-tenant instance with the Orgs feature enabled, the cluster administrator can create a user and assign it to one or several Orgs. For more information about Orgs, see xref:orgs.adoc[Multi-tenancy with Orgs].
+
 == User creation and update
 
-You can create users and update user profiles using xref:rest-api-reference.adoc#_user_management[REST API v1] or xref:rest-api-v2-reference.adoc#_users[v2 endpoints].
+You can create users and update user profiles using the xref:rest-api-v2-reference.adoc#_users[REST API v2 `users` endpoints].
 
 While you can delete users, it is preferable to deactivate a user, which maintains the user's references within the system.
 
@@ -18,6 +27,33 @@ When configuring xref:configure-saml.adoc[SAML SSO] in ThoughtSpot UI, you can s
 
 By default, ThoughtSpot sends e-mail messages to a new user and enables onboarding workflows when they log in for the first time, even when you are embedding ThoughtSpot content. To alter this behavior at a system-wide level, you need to xref:customize-email-settings.adoc[Customize the onboarding settings].
 The user update API also allows setting onboarding experience values for an individual user. If you need to modify the default behavior beyond the available UI options, contact your ThoughtSpot team.
+
+=== User account attributes
+
+A user account carries the following attributes. Set them with `POST /api/rest/2.0/users/create` or `POST /api/rest/2.0/users/{user_identifier}/update`, and read them with `POST /api/rest/2.0/users/search`:
+
+* Identity: `name` (the unique username), `display_name`, `email`, and `password`.
+* Authentication: `account_type` records how the user authenticates. When you import users from an external server such as Active Directory or an IdP, ThoughtSpot assigns `account_type` automatically. For example, a user from an LDAP server is added as `LDAP_USER`. For IAMv2 users, the default is `OIDC_USER`.
+// TODO(verify): the full set of valid account_type values was carried over from
+// the REST API v1 usertype parameter. Only LOCAL_USER, SAML_USER, and OIDC_USER
+// are attested in v2 examples in this repo. Confirm LDAP_USER and REMOTE_USER
+// against the v2 OpenAPI spec.
+* Status: `account_status`, such as `ACTIVE` or `INACTIVE`. For IAMv2 users, the response can also include `SUSPENDED`. See xref:api-user-management.adoc#_user_migration_to_iamv2[User migration to IAMv2].
+* Sharing: `visibility` controls whether other users and groups can share objects with this user. A user set to `SHARABLE` appears in the sharing dialog.
+// TODO(verify): REST API v1 used DEFAULT and NON_SHARABLE for this attribute.
+// Only SHARABLE is attested in v2 examples in this repo. Confirm the full set of
+// v2 values against the OpenAPI spec.
+* Membership: `group_identifiers` and `org_identifiers`. A user's privileges are determined by the groups they belong to. For example, a user assigned to a group with the `ADMINISTRATION` privilege has admin privileges.
+* Content defaults: `home_liveboard_identifier` and `favorite_metadata`.
+
+For the filtering behavior and the exact values these attributes accept, see the following sections of xref:rest-api-v2-users-search.adoc[Search users]:
+
+* xref:rest-api-v2-users-search.adoc#_account_type_and_account_status[account_type and account_status]
+* xref:rest-api-v2-users-search.adoc#_visibility[visibility]
+* xref:rest-api-v2-users-search.adoc#_group_identifiers[group_identifiers]
+* xref:rest-api-v2-users-search.adoc#_org_identifiers[org_identifiers]
+
+For the complete request schema, see the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fcreate-user">users/create</a>+++ and +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user">users/{user_identifier}/update</a>+++ playground entries. For the full response structure, see xref:rest-api-v2-users-search.adoc[Search users].
 
 [NOTE]
 ====
@@ -74,28 +110,23 @@ The common user state transitions include:
 ==== APIs for user state transitions
 To check the status of a user account, use one of the following API endpoints:
 
-* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fsearch-user">POST /api/rest/2.0/users/search</a>+++  (REST API v2)
-* xref:user-api.adoc[GET /tspublic/v1/user/] (REST API v1)
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fsearch-user">POST /api/rest/2.0/users/search</a>+++
 
 To create a user in the `SUSPENDED` state, use one of the following API endpoints:
 
-* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fcreate-user">POST /api/rest/2.0/users/create</a>+++ (Rest API v2)
-* xref:user-api.adoc#create-user[POST /tspublic/v1/user] (Rest API v1)
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fcreate-user">POST /api/rest/2.0/users/create</a>+++
 
 To update user status from `ACTIVE` or `PENDING` to `SUSPENDED`, or reactivate a `SUSPENDED` user to the ACTIVE or PENDING state, use one of the following API endpoints:
 
-* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user"">POST /api/rest/2.0/users/{user_identifier}/update</a>+++ (Rest API v2)
-* xref:user-api.adoc#update-user[PUT /tspublic/v1/user/{userid}] (Rest API v1)
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user"">POST /api/rest/2.0/users/{user_identifier}/update</a>+++
 
 To deactivate an `ACTIVE` user, use one of these API endpoints:
 
-* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fdeactivate-user">POST /api/rest/2.0/users/deactivate</a>+++ (Rest API v2)
-* xref:user-api.adoc#deactivate-user[POST /tspublic/v1/user/inactivate] (Rest API v1)
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fdeactivate-user">POST /api/rest/2.0/users/deactivate</a>+++
 
 To activate an `INACTIVE` user account, use one of these API endpoints:
 
-* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Factivate-user">POST /api/rest/2.0/users/activate</a>+++ (Rest API v2)
-* xref:user-api.adoc#activate-user[POST /tspublic/v1/user/activate] (Rest API v1)
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Factivate-user">POST /api/rest/2.0/users/activate</a>+++
 ////
 
 
@@ -118,14 +149,12 @@ Administrators can manage the user account status for all users. For IAMv2 users
 
 To create a user:
 
-* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fcreate-user">POST /api/rest/2.0/users/create</a>+++ (Rest API v2)
-* xref:user-api.adoc#create-user[POST /tspublic/v1/user] (Rest API v1)
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fcreate-user">POST /api/rest/2.0/users/create</a>+++
 
 
 To update user details:
 
-* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user">POST /api/rest/2.0/users/{user_identifier}/update</a>+++ (Rest API v2)
-* xref:user-api.adoc#update-user[PUT /tspublic/v1/user/{userid}] (Rest API v1)
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user">POST /api/rest/2.0/users/{user_identifier}/update</a>+++
 
 [NOTE]
 ====
@@ -172,31 +201,76 @@ For more information, see the following pages:
 * link:https://docs.thoughtspot.com/cloud/latest/oidc-iamv2[Managing authentication with OIDC using IAMv2, window=_blank]
 * link:https://docs.thoughtspot.com/cloud/latest/okta-iam[IAMv2 documentation, window=_blank]
 
+== User preferences
 
+A user profile carries a set of preferences that you can read with `POST /api/rest/2.0/users/search` and set with `POST /api/rest/2.0/users/{user_identifier}/update`:
+
+* `notify_on_share` +
+__Boolean__. Whether the user receives an email notification when another user shares an Answer or Liveboard with them.
+
+* `show_onboarding_experience` +
+__Boolean__. Whether the user sees the guided onboarding walkthrough. ThoughtSpot provides an interactive walkthrough that leads new users through a set of actions to help them get started. Users can turn the onboarding experience off and access it again later when they need assistance with the ThoughtSpot UI.
+
+* `onboarding_experience_completed` +
+__Boolean__. Indicates whether the user has completed onboarding.
+
+* `preferred_locale` and `use_browser_language` +
+Set the language of the ThoughtSpot UI and the date, number, and currency formats for the user. For the supported locale IDs, the interaction between these two parameters, and the endpoints that accept them, see xref:locale-setting.adoc#_set_locale_via_rest_api[Set locale via REST API].
+
+// TODO(verify): REST API v1 documented that the user-preference endpoint could not
+// modify the profile picture, the account password, or the Answer experience
+// setting. Confirm whether the same limitations apply to the v2 update endpoint
+// before restoring that statement.
+
+== Account activation and deactivation
+
+* To deactivate an active user account, use +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fdeactivate-user">POST /api/rest/2.0/users/deactivate</a>+++. A deactivated user cannot log in to their ThoughtSpot instance.
+* To activate a deactivated account, use +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Factivate-user">POST /api/rest/2.0/users/activate</a>+++.
+* To remove a user from the system entirely, use `POST /api/rest/2.0/users/{user_identifier}/delete`.
+
+== Password management
+
+ThoughtSpot provides two distinct password operations:
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http/api-endpoints/users/change-user-password">POST /api/rest/2.0/users/change-password</a>+++ +
+Allows a user to change the password of their own account. The request requires the current password.
+
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http/api-endpoints/users/reset-user-password">POST /api/rest/2.0/users/reset-password</a>+++ +
+Allows an administrator to reset the password of a user account without knowing the current password.
+
+The `can_change_password` property in the `POST /api/rest/2.0/users/search` response indicates whether a given user is permitted to change their own password.
+
+After resetting a password, you may want to force the user to log in again with the new credentials. See xref:api-user-management.adoc#_user_sessions[User sessions].
+
+== User sessions
+
+To invalidate the current sessions of one or several users and force them to log in again, use +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fforce-logout-users">POST /api/rest/2.0/users/force-logout</a>+++.
+
+This is typically used after a password reset, or when revoking access to an instance.
 
 == User group creation and update
-Groups can be created via xref:rest-api-v2-reference.adoc#_groups[REST API v2] or xref:rest-api-reference.adoc#_groups_and_privileges[REST API v1] API endpoint.
+Groups can be created via the xref:rest-api-v2-reference.adoc#_groups[REST API v2 `groups` endpoints].
 
 The xref:api-user-management.adoc#group-privileges[Group privileges] are set directly on groups, either during group creation or via a group update API call.
 
 == User association to groups
-You can add users to specific groups when creating a user or group via REST API endpoints.
+You can add users to specific groups when creating a user or group via REST API endpoints. The association can be set from either side of the relationship:
 
-The REST API v1 xref:group-api.adoc#addMembers[group/addmemberships] endpoint allows adding multiple users to multiple groups in a single request.
+* From the user: `POST /api/rest/2.0/users/{user_identifier}/update` with the `group_identifiers` property, which takes an array of group names or GUIDs.
+* From the group: `POST /api/rest/2.0/groups/{group_identifier}/update` with the `user_identifiers` property, which takes an array of usernames or user GUIDs.
 
-To get a list of users assigned to a group, you can use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fsearch-user-groups">POST /api/rest/2.0/groups/search</a>+++ v2 endpoint or the xref:group-api.adoc#get-usersInGroup[/tspublic/v1/group/{groupid}/users] v1 endpoint.
+[IMPORTANT]
+====
+Both `group_identifiers` and `user_identifiers` are declarative: the array you send replaces the entire existing set of associations rather than adding to it.
 
-To remove a user from a group, use the update group REST v2 endpoint, or the following REST API v1 endpoints:
+* To add an association, send the current members along with the new one.
+* To remove an association, send the set you want to retain and omit the rest. Sending an empty array removes all associations.
+* To read the current associations before updating them, use `POST /api/rest/2.0/users/search` (the `user_groups` property) or `POST /api/rest/2.0/groups/search` (the `users` property).
+====
 
-* xref:group-api.adoc#delete-user-assoc[POST /tspublic/v1/group/{groupid}/user/{userid}] +
-removes a user from a specific group
-* xref:group-api.adoc#removeMembers[POST /tspublic/v1/group/removememberships] +
-removes a list of users from many groups at once.
+To get a list of users assigned to a group, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fsearch-user-groups">POST /api/rest/2.0/groups/search</a>+++ endpoint.
 
-== Access control (sharing)
-Access to objects is determined by content *shared* directly to the user or the groups they belong to. It is easier to manage and audit sharing through groups rather than object sharing at the individual user level.
-
-Users can share objects or modify sharing properties through the UI or via an API call to the `POST /api/rest/2.0/security/metadata/share` or xref:security-api.adoc#share-object[/tspublic/v1/security/share] endpoint.
+Groups can also belong to other groups. Use the `sub_group_identifiers` property to manage nested groups. A group inherits the privileges of its parent group.
 
 [#group-privileges]
 == Group privileges
@@ -211,7 +285,7 @@ include::{path}/group-privileges.adoc[]
 
 [NOTE]
 ====
-ThoughtSpot also has a default group called `All`. When you create new users in ThoughtSpot, they are automatically added to `All`. By default, the members of the `All` group do not have permission to download or upload data. To add these privileges, you can use the Group API endpoints.
+ThoughtSpot also has a default group called `All`. When you create new users in ThoughtSpot, they are automatically added to `All`. By default, the members of the `All` group do not have permission to download or upload data. To add these privileges, use `POST /api/rest/2.0/groups/{group_identifier}/update`.
 ====
 
 == Roles
@@ -229,3 +303,88 @@ Roles must be available before they can be assigned. Use the xref:roles-api.adoc
 ====
 
 For a complete list of available privileges and role categories, see xref:roles.adoc[Role-based access control].
+
+== Orgs and user assignment
+
+On instances with the Orgs feature enabled, each user belongs to one or several Orgs.
+
+* To set the Orgs for a single user, use `POST /api/rest/2.0/users/{user_identifier}/update` with the `org_identifiers` property, which takes an array of Org names or IDs.
+* To manage the membership of an Org, use `POST /api/rest/2.0/orgs/{org_identifier}/update`.
+
+If you do not specify `org_identifiers` when creating a user, ThoughtSpot assigns the user to the Org context from which the API request was sent.
+
+For more information, see xref:orgs.adoc[Multi-tenancy with Orgs].
+
+== Synchronize users and groups from an external directory
+
+To synchronize user accounts and user groups from an external database such as LDAP or Active Directory with ThoughtSpot, use +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fimport-users">POST /api/rest/2.0/users/import</a>+++ for users and `POST /api/rest/2.0/groups/import` for groups.
+
+// TODO(verify): the reconciliation behavior described below was carried over from
+// the REST API v1 user/sync endpoint. It is NOT confirmed for v2 users/import.
+// In particular, confirm whether v2 import deletes principals that are absent from
+// the supplied list, and what the request parameters are named, before relying on
+// this section. See the users/import playground entry for the authoritative schema.
+The request takes the set of principals that exist in the external database. ThoughtSpot reconciles its own users and groups against that set:
+
+* Principals present in the external list but not in ThoughtSpot are created.
+* Principals present in both are updated so that their attributes in ThoughtSpot match those in the external list. This includes group membership.
+* Principals present in ThoughtSpot but absent from the external list are deleted, unless the request specifies that deleted principals should be retained.
+
+[NOTE]
+====
+Because the import operation can delete users and groups, run it first in a mode that reports the evaluated differences without applying them, review the result, and then apply the changes.
+====
+
+== Transfer object ownership
+
+When a user leaves the organization or their account is removed, you may want to transfer the objects they own to another user. Administrators can programmatically change the author of one or several metadata objects using +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author">POST /api/rest/2.0/security/metadata/assign</a>+++.
+
+The endpoint assigns a new author to the specified objects, which transfers ownership from the current author to the target user.
+
+== Access control (sharing)
+Access to objects is determined by content *shared* directly to the user or the groups they belong to. It is easier to manage and audit sharing through groups rather than object sharing at the individual user level.
+
+Users can share objects or modify sharing properties through the UI or via an API call to the `POST /api/rest/2.0/security/metadata/share` endpoint.
+
+
+== REST API v2 endpoint reference
+
+The following REST API v2 endpoints cover the user, group, role, and Org management operations described on this page.
+
+[div tableContainer]
+--
+[width="100%" cols="2,3"]
+[options='header']
+|=====
+|Operation| API endpoint
+|Create a user|`POST /api/rest/2.0/users/create`
+|Update a user, including group and Org assignment, preferences, and email address|`POST /api/rest/2.0/users/{user_identifier}/update`
+|Get details of one or several users|`POST /api/rest/2.0/users/search`
+|Delete a user|`POST /api/rest/2.0/users/{user_identifier}/delete`
+|Activate a deactivated user account|`POST /api/rest/2.0/users/activate`
+|Deactivate a user account|`POST /api/rest/2.0/users/deactivate`
+|Change the password of your own account|`POST /api/rest/2.0/users/change-password`
+|Reset the password of a user account|`POST /api/rest/2.0/users/reset-password`
+|Log users out of their current sessions|`POST /api/rest/2.0/users/force-logout`
+|Import users from an external directory|`POST /api/rest/2.0/users/import`
+|Create a group|`POST /api/rest/2.0/groups/create`
+|Update a group, including its users, sub-groups, privileges, and roles|`POST /api/rest/2.0/groups/{group_identifier}/update`
+|Get details of one or several groups|`POST /api/rest/2.0/groups/search`
+|Delete a group|`POST /api/rest/2.0/groups/{group_identifier}/delete`
+|Import groups from an external directory|`POST /api/rest/2.0/groups/import`
+|Create a role|`POST /api/rest/2.0/roles/create`
+|Update a role|`POST /api/rest/2.0/roles/{role_identifier}/update`
+|Get details of one or several roles|`POST /api/rest/2.0/roles/search`
+|Delete a role|`POST /api/rest/2.0/roles/{role_identifier}/delete`
+|Create an Org|`POST /api/rest/2.0/orgs/create`
+|Update an Org, including its membership|`POST /api/rest/2.0/orgs/{org_identifier}/update`
+|Get details of one or several Orgs|`POST /api/rest/2.0/orgs/search`
+|Delete an Org|`POST /api/rest/2.0/orgs/{org_identifier}/delete`
+|Change the author of one or several metadata objects|`POST /api/rest/2.0/security/metadata/assign`
+|Share an object with users or groups|`POST /api/rest/2.0/security/metadata/share`
+|Fetch the permissions of users or groups|`POST /api/rest/2.0/security/principals/fetch-permissions`
+|Get details of the currently logged-in user|`GET /api/rest/2.0/auth/session/user`
+|=====
+--
+
+For the complete request and response schema of each endpoint, see xref:rest-api-v2-reference.adoc[REST API v2 Reference].
