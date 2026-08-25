@@ -169,8 +169,11 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
 
     // True when loaded inside a VersionIframe (outer shell sets ?_iframe=1).
     // Outer shell already renders SecondaryHeader, so suppress ours to avoid duplication.
+    // Default to hidden during SSR (window unset) since the query string is only
+    // knowable client-side — otherwise the static HTML always bakes the header in,
+    // causing a hydration mismatch that can leave a duplicate header on screen.
     const isIframeMode =
-        typeof window !== 'undefined' &&
+        typeof window === 'undefined' ||
         new URLSearchParams(location.search).get('_iframe') === '1';
 
     const isGQPlayGround =
