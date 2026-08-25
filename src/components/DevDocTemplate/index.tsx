@@ -549,6 +549,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                     backLink={backLink}
                     isPublisSiteOpen={isPublicSiteOpen}
                     params={params}
+                    isDarkMode={isDarkMode}
                 />
             );
 

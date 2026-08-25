@@ -1121,18 +1121,164 @@ a.anchor {
         background-position: -136px -68px;
     }
 }
-.header-banner {
-    min-height: 240px;
+
+#wrapper[data-theme='dark'],
+#docsModal[data-theme='dark'] {
+    .typedoc-Type_alias a,
+    .typedoc-Function a {
+        color: #71a1f4;
+    }
+    .typedoc-Type_alias :before,
+    .typedoc-Function :before {
+        background-image: none;
+        background-color: #71a1f4;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-image: url(../icons/icons.png);
+        mask-image: url(../icons/icons.png);
+    }
+    .typedoc-Type_alias :before {
+        -webkit-mask-position: 0px -170px;
+        mask-position: 0px -170px;
+    }
+    .typedoc-Function :before {
+        -webkit-mask-position: -136px -68px;
+        mask-position: -136px -68px;
+    }
+}
+// ── Radiance blob gradient — confined to the header banner only ────────────
+// `.radiance-bg` lives *inside* `.header-banner` (which is `position:
+// relative` and already scoped to the content column, next to the sidebar
+// — see the header-banner rule below) instead of being `position: fixed`
+// relative to the full viewport. A viewport-wide fixed layer bled behind
+// the sidebar, wasting part of the gradient and throwing off the visible
+// color balance. `position: absolute` here is sized relative to
+// `.header-banner`'s own box, so it only ever spans the visible content
+// lane.
+// `bottom: 0` (instead of a fixed/viewport height) makes this match
+// `.header-banner`'s own content-driven height exactly, so the gradient —
+// including its own `overflow: hidden` clipping of the oversized blobs —
+// ends exactly where the banner ends and never bleeds into the cards
+// section below, regardless of viewport height.
+.radiance-bg {
+    position: absolute;
+    inset: 0;
+    // z-index 0 (an explicit stacking context via position + z-index) keeps
+    // this behind the header-banner text/search bar, which are given their
+    // own explicit stacking priority below rather than relying on DOM order.
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
     background-color: var(--header-banner-base);
-    background-image: var(--header-banner-background);
-    background-size: 160% 160%;
-    background-position: 20% 10%;
-    animation: radiance-drift 24s ease-in-out infinite alternate;
+
+    // Blobs (below) are sized/positioned to fill most of the banner box,
+    // which spreads visible color across it. This overlay sits above the
+    // blobs (explicit z-index beats their z-index:auto) and fades from
+    // transparent — letting the blobs show through near the top — to the
+    // flat base color toward the bottom.
+    // A plain 2-stop linear fade (transparent -> solid) has a sharp change
+    // in slope right where it hits full opacity — even though the color
+    // matches the page background exactly, that slope discontinuity reads
+    // as a visible "seam" (a Mach-band effect) right at the banner/cards
+    // boundary. The extra `color-mix` stops below ease the taper in
+    // gradually (S-curve) instead of snapping from "still fading" to
+    // "fully flat", which removes that perceived hard edge.
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: linear-gradient(
+            to bottom,
+            transparent 0%,
+            transparent 40%,
+            color-mix(in srgb, var(--header-banner-base) 20%, transparent) 55%,
+            color-mix(in srgb, var(--header-banner-base) 45%, transparent) 68%,
+            color-mix(in srgb, var(--header-banner-base) 75%, transparent) 82%,
+            var(--header-banner-base) 96%,
+            var(--header-banner-base) 100%
+        );
+    }
+
+    .blob {
+        position: absolute;
+        border-radius: 50%;
+        // The radial-gradient's own falloff still reads as a bounded shape
+        // with a visible (if soft) edge — an actual blur is what turns it
+        // into ambient diffuse light with no perceptible boundary.
+        filter: blur(60px);
+    }
+
+    // height/top use `vh` (not `%`) so blob proportions stay the same
+    // regardless of how tall `.radiance-bg` itself is. With `%`, sizing
+    // against this now-short (header-banner-height) box made every blob so
+    // vertically compressed (nearly as tall as the whole clipped area) that
+    // there was no visible core/edge left to show drift against — the
+    // blur+clip just read as a flat wash, and the animation, while still
+    // running, was imperceptible.
+    // Light mode blobs
+    .blob-pink {
+        width: 72%;
+        height: 85vh;
+        left: -14%;
+        top: -18vh;
+        // Toned down from 0.44 — read as too vivid/rose against the reference.
+        background: radial-gradient(ellipse at center, rgba(255, 93, 142, 0.32) 0%, transparent 68%);
+        animation: drift-a 6s ease-in-out infinite alternate;
+    }
+
+    .blob-purple {
+        width: 55%;
+        height: 70vh;
+        left: 4%;
+        top: 35vh;
+        background: radial-gradient(ellipse at center, rgba(138, 93, 255, 0.46) 0%, transparent 66%);
+        animation: drift-b 7s ease-in-out infinite alternate;
+    }
+
+    .blob-blue {
+        width: 70%;
+        height: 80vh;
+        right: -14%;
+        top: -15vh;
+        background: radial-gradient(ellipse at center, rgba(39, 140, 255, 0.42) 0%, transparent 68%);
+        animation: drift-c 5s ease-in-out infinite alternate;
+    }
+
+    .blob-wash-pink {
+        width: 90%;
+        height: 100vh;
+        left: -5%;
+        top: 0;
+        background: radial-gradient(ellipse at 35% 50%, rgba(255, 170, 210, 0.09) 0%, transparent 70%);
+    }
+
+    .blob-wash-blue {
+        width: 90%;
+        height: 100vh;
+        right: -5%;
+        top: 0;
+        background: radial-gradient(ellipse at 65% 50%, rgba(160, 196, 255, 0.12) 0%, transparent 70%);
+    }
+
+    // Dark-only blobs — hidden in light mode
+    .blob-orange,
+    .blob-yellow,
+    .blob-purple-r,
+    .blob-teal {
+        display: none;
+    }
+}
+
+.header-banner {
+    position: relative;
+    min-height: 240px;
     border-bottom: none;
     padding: 30px 0 0 40px;
 
-
     .header-banner-text {
+        position: relative;
+        z-index: 1;
         display: flex;
         flex-direction: column;
         color: var(--primary-color);
@@ -1149,30 +1295,135 @@ a.anchor {
             letter-spacing: -0.064px;
         }
     }
+
+    #homePageSearchBar {
+        position: relative;
+        z-index: 1;
+    }
 }
 
-@keyframes radiance-drift {
-    0%   { background-position: 10% 0%; }
-    50%  { background-position: 65% 40%; }
-    100% { background-position: 20% 60%; }
+#wrapper[data-theme='dark'] .radiance-bg,
+#docsModal[data-theme='dark'] .radiance-bg {
+    // Light-only blobs — hidden in dark mode
+    .blob-pink,
+    .blob-purple {
+        display: none;
+    }
+
+    .blob-orange {
+        display: block;
+        width: 65%;
+        height: 80vh;
+        // Shifted in from the corner (-10%) toward center-left so the warm
+        // glow reads as centered on the left half, not hugging the edge.
+        left: -2%;
+        top: 8vh;
+        // Toned down slightly (0.28 -> 0.22) so it stays a subtle accent
+        // and doesn't compete with the purple emphasis at center.
+        background: radial-gradient(ellipse at center, rgba(255, 180, 90, 0.22) 0%, transparent 68%);
+        animation: drift-a 6s ease-in-out infinite alternate;
+    }
+
+    .blob-yellow {
+        display: block;
+        width: 48%;
+        height: 58vh;
+        left: 8%;
+        top: -8vh;
+        background: radial-gradient(ellipse at center, rgba(255, 232, 150, 0.08) 0%, transparent 65%);
+        animation: drift-d 8s ease-in-out infinite alternate;
+    }
+
+    // Same size as light — different position + animation delay
+    .blob-blue {
+        width: 55%;
+        height: 65vh;
+        // Pulled back in (right: -4% -> 6%) so its center sits closer to
+        // purple-r's — with two separate radial falloffs, centers too far
+        // apart leave a dim/desaturated "valley" between them instead of a
+        // smooth hand-off (that's what didn't match the reference). The
+        // wider falloff (62% -> 70%) also softens/extends its own tail so
+        // it carries color further into the middle.
+        right: 6%;
+        top: -10vh;
+        background: radial-gradient(ellipse at center, rgba(39, 140, 255, 0.34) 0%, transparent 70%);
+        animation-delay: -3s;
+    }
+
+    .blob-purple-r {
+        display: block;
+        // Widened further (62% -> 68%) and pulled toward true center
+        // (right: 14% -> 26%) so purple is the highlighted center-of-banner
+        // tone, with strengthened opacity (0.52 -> 0.58) to make it read as
+        // the focal glow while everything else stays subtle around it.
+        width: 68%;
+        height: 68vh;
+        // Pulled in a bit further (26% -> 18%) to close the gap toward blue
+        // — see blob-blue above.
+        right: 18%;
+        top: 6vh;
+        background: radial-gradient(ellipse at center, rgba(138, 93, 255, 0.58) 0%, transparent 72%);
+        animation: drift-b 7s ease-in-out infinite alternate;
+    }
+
+    .blob-teal {
+        display: block;
+        width: 40%;
+        height: 50vh;
+        right: 14%;
+        top: 8vh;
+        background: radial-gradient(ellipse at center, rgba(45, 220, 177, 0.18) 0%, transparent 65%);
+        animation: drift-d 9s ease-in-out infinite alternate;
+    }
+}
+
+// Mostly-horizontal drift: large vertical swings pushed blobs down into the
+// `::after` fade-to-flat zone for part of each cycle, dimming the glow right
+// when it should stay visible. Horizontal movement stays large enough to
+// read clearly as motion, without carrying the glow out of the visible band;
+// the smaller scale swing (vs. an earlier, more dramatic pass) keeps the
+// pulse subtle rather than a noticeable "breathing" effect.
+@keyframes drift-a {
+    from { transform: translate(0px, 0px) scale(1.00); }
+    to   { transform: translate(200px, -60px) scale(1.15); }
+}
+
+@keyframes drift-b {
+    from { transform: translate(0px, 0px) scale(1.00); }
+    to   { transform: translate(-160px, 70px) scale(1.18); }
+}
+
+@keyframes drift-c {
+    from { transform: translate(0px, 0px) scale(1.00); }
+    to   { transform: translate(-180px, -50px) scale(1.14); }
+}
+
+@keyframes drift-d {
+    from { transform: translate(0px, 0px) scale(1.00); }
+    to   { transform: translate(140px, 60px) scale(1.16); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .header-banner {
+    .radiance-bg .blob {
         animation: none;
     }
 }
 
-// In-product presentation only: override banner color to match product sidebar (#232F43).
-// Standalone light/dark banner gradient is preserved via var(--header-banner-background) above.
-.embedded-mode .header-banner {
-    background: #232F43;
-    animation: none;
-    border-bottom: none;
-    box-shadow: none;
+// In-product presentation only: override banner color to match product sidebar (#232F43),
+// and suppress the page-wide gradient entirely.
+.embedded-mode {
+    .radiance-bg {
+        display: none;
+    }
 
-    .header-banner-text {
-        color: #fff;
+    .header-banner {
+        background: #232F43;
+        border-bottom: none;
+        box-shadow: none;
+
+        .header-banner-text {
+            color: #fff;
+        }
     }
 }
 
@@ -1290,7 +1541,7 @@ a.anchor {
     .cl-label p {
         display: inline-block;
         border: 1px solid var(--rel-notes-pill-border);
-        background-color: var(--rel-notes-tag-bg-color);
+        background-color: var(--rd-comp-color-button-primary-on-color-hover);
         color: var(--rel-notes-tag-text);
         font-size: 14px;
         font-weight: 300;
