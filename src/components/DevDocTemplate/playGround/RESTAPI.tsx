@@ -23,7 +23,7 @@ const EXTERNAL_PLAYGROUND_EVENTS = {
 };
 
 const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
-    const { location, backLink, isPublisSiteOpen = false } = props;
+    const { location, backLink, isPublisSiteOpen = false, isDarkMode = false } = props;
 
     const isBrowser = () => typeof window !== 'undefined';
 
@@ -60,10 +60,23 @@ const RenderPlayGround: FC<RenderPlayGroundProps> = (props) => {
     };
     const baseUrl = isPublisSiteOpen ? DEFAULT_HOST : getParentURL();
 
-    const playgroundUrl =
+    const playgroundBaseUrl =
         clusterType === CLUSTER_TYPES.PROD
             ? playgroundUrlTemplate({ version: DOC_VERSION_PROD })
             : playgroundUrlTemplate({ version: DOC_VERSION_DEV });
+
+    // Same convention VersionIframe uses to propagate theme into a nested
+    // iframe: an `isDarkMode` query param. Standalone site: `isDarkMode`
+    // already reflects the user's toggle/OS preference. In-product help:
+    // `isDarkMode` already reflects the cluster's theme (DevDocTemplate
+    // forces it from the embedding product rather than letting the user
+    // toggle it) — so this needs no extra logic, just forwarding the same
+    // value versioned URLs already use.
+    const playgroundUrl = (() => {
+        const url = new URL(playgroundBaseUrl);
+        url.searchParams.set('isDarkMode', String(isDarkMode));
+        return url.toString();
+    })();
 
     useEffect(() => {
         async function fetchData() {
@@ -226,4 +239,5 @@ type RenderPlayGroundProps = {
     backLink: string;
     isPublisSiteOpen: boolean;
     params: Object;
+    isDarkMode?: boolean;
 };

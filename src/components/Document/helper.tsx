@@ -1,6 +1,7 @@
 import React from 'react';
 import hljs from 'highlight.js';
-import { FiCopy } from '@react-icons/all-files/fi/FiCopy';
+import { MdContentCopy } from '@react-icons/all-files/md/MdContentCopy';
+import { MdCheck } from '@react-icons/all-files/md/MdCheck';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import selectors from '../../constants/selectorsContant';
@@ -31,19 +32,28 @@ export const enableCopyToClipboard = (
             document.body.removeChild(ta);
         }
 
-        /* Tooltip appended inside the button so it floats via absolute positioning */
-        if (element.querySelector('.tooltip')) return;
-        const divElement = document.createElement('div');
-        divElement.classList.add('tooltip');
-        const spanElement = document.createElement('span');
-        spanElement.classList.add('tooltiptext');
-        spanElement.innerText = t('CODE_COPY_BTN_AFTER_CLICK_TEXT');
-        divElement.appendChild(spanElement);
-        element.appendChild(divElement);
+        /* Swap the icon for a checkmark and reverting after a delay. The
+           "Copied" text is no longer shown as an always-visible popup —
+           it's only surfaced via `aria-label`/`title`, which browsers only
+           display on hover. `.copyIcon` is the <svg> itself, so replace it
+           wholesale via outerHTML rather than innerHTML, which would nest a
+           new svg inside the existing one instead of swapping it. */
+        const iconEl = element.querySelector('.copyIcon');
+        if (iconEl) {
+            iconEl.outerHTML = getHTMLFromComponent(<MdCheck />, 'copyIcon');
+        }
+        element.classList.add('copied');
+        element.setAttribute('aria-label', t('CODE_COPY_BTN_AFTER_CLICK_TEXT'));
+        element.setAttribute('title', t('CODE_COPY_BTN_AFTER_CLICK_TEXT'));
+
         setTimeout(() => {
-            if (element.contains(divElement)) {
-                element.removeChild(divElement);
+            const icon = element.querySelector('.copyIcon');
+            if (icon) {
+                icon.outerHTML = getHTMLFromComponent(<MdContentCopy />, 'copyIcon');
             }
+            element.classList.remove('copied');
+            element.setAttribute('aria-label', t('CODE_COPY_BTN_HOVER_TEXT'));
+            element.setAttribute('title', t('CODE_COPY_BTN_HOVER_TEXT'));
         }, 1500);
     });
 };
@@ -99,7 +109,7 @@ export const customizeDocContent = () => {
         buttonElement.setAttribute('title', t('CODE_COPY_BTN_HOVER_TEXT'));
 
         const imageElement = document.createElement('span');
-        imageElement.innerHTML = getHTMLFromComponent(<FiCopy />, 'copyIcon');
+        imageElement.innerHTML = getHTMLFromComponent(<MdContentCopy />, 'copyIcon');
         buttonElement.appendChild(imageElement);
 
         enableCopyToClipboard(buttonElement, copySource);
@@ -140,7 +150,7 @@ export const customizeDocContent = () => {
 
                     enableCopyToClipboard(buttonElement, contentWrapper);
                     const imageElement = document.createElement('span');
-                    imageElement.innerHTML = getHTMLFromComponent(<FiCopy />, 'copyIcon');
+                    imageElement.innerHTML = getHTMLFromComponent(<MdContentCopy />, 'copyIcon');
                     buttonElement.appendChild(imageElement);
                     cellElement.appendChild(buttonElement);
                 });
