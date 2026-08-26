@@ -564,6 +564,10 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                 <div
                     className={`documentBody ${
                         isHomePage ? 'doc-home' : 'doc-wrapper-detail'
+                    }${
+                        params[TS_PAGE_ID_PARAM] === 'walkthroughs'
+                            ? ' doc-walkthroughs'
+                            : ''
                     }`}
                 >
                     <div className="introWrapper">
