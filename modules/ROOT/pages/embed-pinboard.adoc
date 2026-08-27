@@ -180,9 +180,9 @@ const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
 [#liveboard-gutter]
 === #Set Liveboard tile gutter#
 
-The `liveboardGutter` property lets you control the spacing (in pixels) between Liveboard tiles and groups from your embedding code, overriding the Liveboard's saved styling value.
+The `liveboardGutter` property lets you control the spacing between Liveboard tiles and groups, and the grid's outer layout padding, directly from your embed configuration. The value you set overrides the Liveboard's saved styling setting.
 
-Use this property when you need to enforce a consistent tile spacing across all embedded Liveboards, regardless of how individual Liveboards are styled in the ThoughtSpot application.
+Use this property when you need to enforce consistent tile spacing across embedded Liveboards, regardless of how individual Liveboards are styled in ThoughtSpot.
 
 [source,JavaScript]
 ----
@@ -201,14 +201,14 @@ liveboardEmbed.render();
 The following rules apply to the `liveboardGutter` value:
 
 * Accepts non-negative integers (0 or greater).
-* A value of `0` removes all gutter space between tiles.
-* Negative numbers, decimal values, and non-numeric strings are ignored, and the Liveboard falls back to its saved styling value.
+* A value of `0` removes all gutter space between tiles and the grid's outer layout padding.
+* Negative numbers, decimal values, and non-numeric strings are ignored. The Liveboard falls back to its saved styling value.
 
 [NOTE]
 ====
 `liveboardGutter` controls the spacing between tiles and groups, not the spacing within a group.
 
-The Liveboard header's horizontal margin is controlled separately by the `--ts-var-liveboard-header-horizontal-margin` CSS variable. To align the Liveboard header with the tile grid, set both `liveboardGutter` and `--ts-var-liveboard-header-horizontal-margin` to matching values. For more information, see xref:customize-css-styles.adoc#lb-header-margin[Liveboard header horizontal margin].
+The Liveboard header's horizontal margin is controlled separately by the `--ts-var-liveboard-header-horizontal-margin` CSS variable. To align the Liveboard header and tab/filter section with the tile grid, set both `liveboardGutter` and `--ts-var-liveboard-header-horizontal-margin` to matching values. For more information, see xref:customize-css-styles.adoc#lb-header-margin[Liveboard CSS variables].
 ====
 
 === Customize Liveboard tabs
@@ -454,13 +454,14 @@ To open the **Download** modal with the XLSX option selected when the `isLiveboa
 * `HostEvent.DownloadAsCsv` +
 To open the **Download** modal with the CSV option selected when `isLiveboardXLSXCSVDownloadEnabled` parameter is enabled in the embed view.
 
-[#12col-layout]
-=== #Lock Liveboard to 12-column layout#
+[#force-12col-layout]
+=== Force 12-column layout in embedded Liveboards
 
 By default, embedded Liveboards use a responsive layout that collapses from 12 columns to 2 columns at container widths of 1024px or less, and to a single column at 630px or less.
-In some embedding scenarios, such as fixed-width dashboards or data-dense layouts, you may want to prevent this collapse and keep the 12-column layout at all widths.
 
-To lock the Liveboard to the 12-column layout, set `isLiveboardAlwaysOn12ColLayout` to `true` in the `LiveboardViewConfig` object:
+Use the `force12ColLayout` property to prevent this collapse and keep the 12-column layout at all container widths.
+
+To force the 12-column layout, set `force12ColLayout` to `true` in the `LiveboardViewConfig` object:
 
 [source,JavaScript]
 ----
@@ -470,25 +471,18 @@ const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
         height: '100%',
     },
     liveboardId: '<%=liveboardGUID%>',
-    isLiveboardAlwaysOn12ColLayout: true,
+    force12ColLayout: true,
 });
 ----
 
-When `isLiveboardAlwaysOn12ColLayout` is `true`:
+When `force12ColLayout` is `true`:
 
 * The Liveboard always renders in the 12-column layout, regardless of the container width.
-* Tiles shrink proportionally as the container narrows. No horizontal scrollbar appears.
+* Tiles shrink proportionally as the container narrows.
 * The layout never collapses to 2-column or single-column.
 //* The `isMobileResponsiveLiveboardEnabled` property has no effect.
 
-[NOTE]
-====
-CSS variables `--ts-var-liveboard-dual-column-breakpoint` and `--ts-var-liveboard-single-column-breakpoint` control the pixel thresholds at which the responsive layout collapses.
-Use `isLiveboardAlwaysOn12ColLayout: true` when you want to prevent layout collapse entirely, rather than adjust the breakpoint thresholds.
-//For more information about CSS layout variables, see xref:mobile-embed-android.adoc[Embed ThoughtSpot in Android apps].
-====
-
-The `isLiveboardAlwaysOn12ColLayout` property is also supported on `AppEmbed` via `AppViewConfig`:
+The property is also supported on `AppEmbed` via `AppViewConfig`:
 
 [source,JavaScript]
 ----
@@ -497,9 +491,43 @@ const appEmbed = new AppEmbed(document.getElementById('ts-embed'), {
         width: '100%',
         height: '100%',
     },
-    isLiveboardAlwaysOn12ColLayout: true,
+    force12ColLayout: true,
 });
 ----
+
+==== Set a minimum width for horizontal scrolling
+
+When `force12ColLayout` is `true`, tiles shrink as the container narrows.
+To prevent tiles from compressing below a usable size, use the `--ts-var-liveboard-min-width` CSS variable to set a minimum container width.
+Below this threshold, a horizontal scrollbar appears instead of further tile compression.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        width: '100%',
+        height: '100%',
+    },
+    liveboardId: '<%=liveboardGUID%>',
+    force12ColLayout: true,
+    customizations: {
+        style: {
+            customCSS: {
+                variables: {
+                    '--ts-var-liveboard-min-width': '800px',
+                },
+            },
+        },
+    },
+});
+----
+
+[NOTE]
+====
+The CSS variables `--ts-var-liveboard-dual-column-breakpoint` and `--ts-var-liveboard-single-column-breakpoint` control the pixel thresholds at which the responsive layout collapses.
+Use `force12ColLayout: true` when you want to prevent layout collapse entirely, rather than adjust the breakpoint thresholds.
+For more information about the CSS layout variables available for Liveboard layout control, see xref:customize-css-styles.adoc#liveboard-layout-vars[Liveboard layout CSS variables].
+====
 
 === Liveboard grouping and styling
 [earlyAccess eaBackground]#Early Access#
