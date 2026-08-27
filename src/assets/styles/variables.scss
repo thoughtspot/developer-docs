@@ -36,7 +36,13 @@ $highlight-fadedgreen: #dfd;
 $highlight-yellow: #e18114;
 $highlight-cyan: #78d9ec;
 
-$header-zIndex: 10;
+// `header` is `position: absolute` + this z-index, which makes it its own
+// stacking context — so no descendant (e.g. the version/Resources dropdown
+// menus) can ever paint above content outside `header`, no matter how high
+// a z-index that descendant sets locally. Must stay above the SpotterCode
+// floating-assistant panel/chip (FloatingAssistant/index.scss, z-index up
+// to 1002) so header's dropdowns aren't trapped behind it.
+$header-zIndex: 1200;
 $header-logo-width: 273px;
 $header-link-margin: 45px;
 $font-weight-normal: 300;
@@ -147,7 +153,7 @@ $rem-base: 18;
 $body-font-size-desktop: 1.125em; /* 18px */
 $body-font-size-print: 0.9375em; /* 15px */
 $body-line-height: 1.15;
-$body-font-family: 'Roboto', sans-serif;
+$body-font-family: Optimo-Plain, Roboto, sans-serif;
 $body-font-weight-bold: 500;
 $monospace-font-family: 'Roboto Mono', monospace;
 $monospace-font-weight-bold: 500;
@@ -175,8 +181,106 @@ $tag-color-yellow: #ffbc00;
 $tag-color-white: var(--body-background-color);
 $tag-color-light: $lightgrey;
 
+// ---------------------------------------------------------------------------
+// radiant remap â a custom property whose value contains var() is resolved on
+// the element where it is DECLARED, not where it is used. If we alias
+//     --body-background-color: var(--rd-sys-color-background-base);
+// only on :root, dark mode would resolve against :root's (light) token and
+// silently stop working. So the SAME alias block must be emitted on every
+// element that carries data-theme. Hence one mixin, included twice.
+// ---------------------------------------------------------------------------
+
+@mixin ts-docs-radiant-aliases {
+    /* --- surfaces --- */
+    --body-background-color:      var(--rd-sys-color-background-base);
+    --table-header-bg:            #f6f8fa;
+    --copy-page-menu-bg:          #f6f8fa;
+    --left-nav-color:             var(--rd-sys-color-background-raised);
+    --panel-bg-color:             var(--rd-sys-color-background-on-base);
+    --block-background:           var(--rd-sys-color-background-on-base);
+    --admonition-background:      var(--rd-sys-color-background-on-base);
+    --code-text-bg:                var(--rd-sys-color-background-sunken);
+    --code-block-light:           var(--rd-sys-color-background-sunken);
+    --was-helpful-bg:              var(--rd-sys-color-background-sunken);
+    --back-button-background:     var(--rd-sys-color-background-secondary-action);
+    --copy-btn-bg:                 var(--rd-sys-color-background-secondary-action);
+    --copy-btn-hover:               var(--rd-sys-color-background-secondary-hover);
+    --announcement-block-color:   var(--rd-sys-color-background-secondary-action);
+
+    /* --- text / icons --- */
+    --primary-color:               var(--rd-sys-color-content-primary);
+    --sidebar-title:                var(--rd-sys-color-content-primary);
+    --side-nav-text:                var(--rd-sys-color-content-primary);
+    --back-button-color:           var(--rd-sys-color-content-primary);
+    --announcement-text-color:     var(--rd-sys-color-content-primary);
+    --breadcrums-font-color:        var(--rd-sys-color-content-secondary);
+    --icon-color:                   var(--rd-sys-color-content-secondary);
+    --var-docmap-nested-color:     var(--rd-sys-color-content-secondary);
+    --header-primary-color:        var(--rd-sys-color-content-inverse);
+
+    /* --- links / active states --- */
+    --link-text-color:             var(--rd-sys-color-content-brand);
+    --side-nav-active-text:        var(--rd-sys-color-content-brand);
+    --side-nav-active-bg:          var(--rd-sys-color-background-ghost-highlight);
+    --secondary-color:             var(--rd-sys-color-content-brand);
+    // Docmap (right-nav) hover/active text + border. Deliberately its own
+    // alias rather than reusing --var-note-color: that one maps to
+    // --rd-sys-color-content-information, whose dark-theme value in
+    // radiant-colors.css is a broken placeholder ("x", not a real color),
+    // so anything using it renders with no visible color in dark mode.
+    // --rd-sys-color-content-brand matches --link-text-color exactly and is
+    // valid in both themes.
+    --docmap-active-color:          var(--rd-sys-color-content-brand);
+
+    /* --- borders --- */
+    --border-color:                 var(--rd-sys-color-border-subtle);
+    --border-color-tr:              var(--rd-sys-color-border-subtle);
+    --was-helpful-border:           var(--rd-sys-color-border-subtle);
+    --docmap-border-color:          var(--rd-sys-color-border-bold);
+    --search-border-color:          var(--rd-sys-color-border-bold);
+    --sidebar-connector-color:      var(--rd-sys-color-border-bold);
+    --important-border-color:       var(--rd-sys-color-border-bold);
+    --border-color-home-search:     var(--rd-sys-color-border-bold-hover);
+    --scrollbar-color:               var(--rd-sys-color-border-bold-hover);
+    --docmap-scrollbar-color:        var(--rd-sys-color-content-brand);
+
+    /* --- admonitions / status --- */
+    --note-block-color:            var(--rd-sys-color-background-information);
+    --note-border-color:           var(--rd-sys-color-border-brand);
+    // --rd-sys-color-content-information is broken in dark mode (see
+    // --docmap-active-color note above: its dark value in radiant-colors.css
+    // is the placeholder "x", not a real color), which made the NOTE block's
+    // left border disappear in dark mode. --rd-sys-color-content-brand is
+    // byte-identical to it in light mode and valid in both themes.
+    --var-note-color:               var(--rd-sys-color-content-brand);
+    --var-important-color:          var(--rd-sys-color-content-failure);
+    --important-block-color:        var(--rd-sys-color-background-on-base);
+
+    /* --- release-notes pills --- */
+    --rel-notes-tag-bg-color:       var(--rd-comp-color-button-primary-on-color-hover);
+    --rel-notes-tag-text:           var(--rd-sys-color-content-information);
+    --rel-notes-pill-border:        var(--rd-sys-color-content-information);
+
+    /* --- elevation ---
+       $box-shadow-search-box is already byte-identical to radiant's
+       shadow-menu token, so these are a straight swap. */
+    --box-shadow:       0 0 4px rgba(25, 35, 49, 0.10), 0 2px 4px rgba(25, 35, 49, 0.04);
+    --box-shadow-hover: 0 0 4px rgba(25, 35, 49, 0.08), 0 12px 24px rgba(25, 35, 49, 0.12);
+}
+
+// Dark-mode elevation is NOT the same shadow at higher opacity â radiant uses a
+// separate ramp, so this one group does need a per-theme override.
+@mixin ts-docs-radiant-elevation-dark {
+    --box-shadow:       0 0 4px rgba(0, 0, 0, 0.24), 0 4px 8px rgba(0, 0, 0, 0.20);
+    --box-shadow-hover: 0 0 6px rgba(0, 0, 0, 0.16), 0 14px 28px rgba(0, 0, 0, 0.32);
+}
+
 :root {
-    /* Brand tokens */
+    @include ts-docs-radiant-aliases;
+
+    /* ---- NOT remapped: marketing/brand chrome. These are deliberate brand
+       colours, not product-surface colours â radiant has no token for them and
+       shouldn't. Left exactly as-is. ---- */
     --ts-black: #000000;
     --ts-grey: #f1f4f8;
     --ts-blue: #0568fa;
@@ -186,48 +290,21 @@ $tag-color-light: $lightgrey;
     --ts-purple: #dcadff;
     --ts-yellow: #fcde18;
 
-    --body-background-color: #fff;
-    --primary-color: #1d232f;
-    --header-primary-color: #fff;
     --header-color: #08062B;
     --header-border-color: #08072C;
     --header-link-color: rgba(255, 255, 255, 0.85);
     --nav-bar-color: #08062B;
-    --left-nav-color: #fff;
-    --header-banner-background: linear-gradient(180deg, #08062B, #122246, #122246);
-    --panel-bg-color: #f1f4f8;
     --secondary-header-bg: #08062B;
     --secondary-header-border: #323946;
     --secondary-header-text: #f1f4f8;
     --secondary-header-active: #0568fa;
-    --rel-notes-tag-bg-color: #dce5f9;
-    --rel-notes-tag-text: #0568fa;
-    --rel-notes-pill-border: #aac2f8;    
-    --breadcrums-font-color: #5f6368;
-    --docmap-border-color: #d9d9d9;
-    --border-color-home-search: #a5acb9;
-    --announcement-block-color: #e1e1e1;
-    --announcement-text-color: #1d232f;
-    --admonition-background: #f1f4f8;
+    --nav-accent-color: #A9E8FF;
+    --header-background-color: #012676;
+    --header-banner-base: #fff;
+    --left-nav-color: #f6f8fa;
     --code-block-color: #0d1117;
-    --code-block-light: #f6f8fa;
     --code-text-color: #e6edf3;
-    --code-text-bg: #f6f8fa;
-    --side-nav-text: #374151;
-    --sidebar-title: #393939;
-    --side-nav-active-bg: rgba(5, 104, 250, 0.08);
-    --side-nav-active-text: #0568fa;
     --text-color-code-lang: #fff;
-    --icon-color: #6b7280;
-    --back-button-color: #1d232f;
-    --back-button-background: #eaedf2;
-    --block-background: #f1f4f8;
-    --search-border-color: #cccdcd;
-    --border-color: #eaedf2;
-    --table-header-color: #fff;
-    --border-color-tr: #e5e7eb;
-    --scrollbar-color: #a5acb9;
-    --docmap-scrollbar-color: #0568fa;
     --color-jet-70: #d14;
     --highlight-purple: #9334e6;
     --highlight-green: #188038;
@@ -235,75 +312,46 @@ $tag-color-light: $lightgrey;
     --highlight-lightblue: #0086b3;
     --highlight-darkblue: #000080;
     --highlight-blue: #458;
-    --highlight-orange: ;
     --highlight-yellow: #e1b514;
+    --highlight-orange: $warning-color;
     --highlight-darkred: #900;
     --highlight-lilac: #d7aefb;
     --highlight-violet: #990073;
-    --secondary-color: #393939;
-    --link-text-color: #0568fa;
-    --header-background-color: #012676;
-    --var-note-color: #0568fa;
-    --note-block-color: #eef7ff;
-    --note-border-color: #7492d5;
-    --var-important-color: #e22b3d;
-    --important-border-color: #cccdcd;
-    --important-block-color: #f1f4f8;
-    --var-docmap-nested-color: #6b7280;
-    --box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    --box-shadow-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-        0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --sidebar-connector-color: #d1d5db;
-    --copy-btn-bg: #f3f4f6;
-    --copy-btn-hover: #e5e7eb;
-    --was-helpful-bg: #f9fafb;
-    --was-helpful-border: #e5e7eb;
 }
 
 #wrapper[data-theme='dark'],
 #docsModal[data-theme='dark'] {
+    // Same aliases, re-declared so they resolve against the DARK tokens.
+    @include ts-docs-radiant-aliases;
+    @include ts-docs-radiant-elevation-dark;
 
-    --body-background-color: #161b22;
-    --header-color: #0d1117;
-    --header-border-color: #cccdcd;
-    --header-link-color: rgba(255, 255, 255, 0.85);
-    --nav-bar-color: #0d1117;
-    --left-nav-color: #161b22;
-    --panel-bg-color: #0d1117;
-    --secondary-header-bg: #0d1117;
-    --secondary-header-border: #393939;
+    /* brand chrome â dark variants previously hardcoded here */
+    --header-color: #26282c;
+    --header-border-color: #34363C;
+    --nav-bar-color: #26282C;
+    --secondary-header-bg: #26282C;
+    --secondary-header-border: #34363C;
     --secondary-header-text: #c9d1d9;
     --secondary-header-active: #0086b3;
-    --primary-color: #cccdcd;
-    --header-primary-color: #cccdcd;
-    --header-banner-background: linear-gradient(180deg, #0d1117, #1B3E61);
-    --breadcrums-font-color: #8b949e;
-    --docmap-border-color: #30363d;
-    --rel-notes-tag-bg-color: #232F43;
-    --rel-notes-tag-text: #fff;
-    --rel-notes-pill-border: #74daff;
-    --announcement-block-color: #3c4356;
-    --announcement-text-color: #e6edf3;
-    --admonition-background: #161b22;
-    --code-block-color:#1e2430;
-    --code-block-light: #21262d;
-    --code-text-bg: #21262d;
+    --nav-accent-color: #71a1f4;
+    --header-banner-base: #1F2024;
+    --header-background-color: #26282C;
+
+    /* main content surface reads darker/blacker than the raised header/left-nav in the product */
+    --body-background-color: #1F2024;
+    --table-header-bg: #26282C;
+    --copy-page-menu-bg: #26282C;
+    --rel-notes-tag-bg-color: #A0C4FF;
+    --rel-notes-tag-text: #71a1f4;
+    --rel-notes-pill-border: #278CFF;
+    /* dark-mode-only admonition background — light mode keeps its existing
+       per-type values (--note-block-color, --important-block-color,
+       --admonition-background) unchanged */
+    --admonition-background-dark: #26282C;
+    /* code-syntax dark set â unchanged */
+    --code-block-color: #26282C;
     --code-text-color: #e6edf3;
-    --sidebar-title: #5f6368;
-    --side-nav-text: #c9d1d9;
-    --side-nav-active-bg: rgba(116, 218, 255, 0.12);
-    --side-nav-active-text: #74daff;
     --text-color-code-lang: #8b949e;
-    --icon-color: #8b949e;
-    --back-button-color: #e6edf3;
-    --table-header-color: #21262d;
-    --back-button-background: #21262d;
-    --block-background: #161b22;
-    --border-color: #30363d;
-    --search-border-color: #30363d;
-    --border-color-home-search: #a5acb9;
-    --border-color-tr: #21262d;
-    --scrollbar-color: #30363d;
     --color-jet-70: #ffa657;
     --highlight-purple: #d2a8ff;
     --highlight-green: #3fb950;
@@ -314,25 +362,6 @@ $tag-color-light: $lightgrey;
     --highlight-darkred: #ffa198;
     --highlight-lilac: #b083f0;
     --highlight-violet: #f8bbd0;
-    --secondary-color: #74daff;
-    --link-text-color: #74daff;
-    --header-background-color: #012676;
-    --var-note-color: #74daff;
-    --note-block-color: #1e2430;
-    --note-border-color: #74daff;
-    --var-important-color: #e22b3d;
-    --important-border-color: #30363d;
-    --important-block-color: #1e2430;
-    --var-docmap-nested-color: #8b949e;
-    --sidebar-connector-color: #30363d;
-    --copy-btn-bg: #21262d;
-    --copy-btn-hover: #30363d;
-    --was-helpful-bg: #161b22;
-    --was-helpful-border: #30363d;
-
-    --box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-    --box-shadow-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.4),
-        0 2px 4px -1px rgba(0, 0, 0, 0.3);
 
     .header-banner {
         box-shadow: none;
