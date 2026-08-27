@@ -9,19 +9,23 @@ import './index.scss';
 export type DocCategory =
     | 'all'
     | 'guides'
+    | 'walkthroughs'
     | 'embedding'
     | 'rest-api'
     | 'mcp-server'
     | 'spottercode'
+    | 'tutorials'
     | 'whats-new';
 
 export const CATEGORY_LABELS: Record<DocCategory, string> = {
     all: 'All docs',
     guides: 'Developer guides',
+    walkthroughs: 'Guided Walkthroughs',
     embedding: 'Embedding',
     'rest-api': 'REST APIs',
     'mcp-server': 'MCP server',
     spottercode: 'SpotterCode',
+    tutorials: 'Tutorials',
     'whats-new': "What's new",
 };
 
@@ -31,10 +35,12 @@ export const CATEGORY_LABELS: Record<DocCategory, string> = {
 export const CATEGORY_LANDING: Record<DocCategory, string> = {
     all: '/introduction',
     guides: '/introduction',
+    walkthroughs: '/tutorials/walkthroughs',
     embedding: '/getting-started',
     'rest-api': '/rest-apis',
     'mcp-server': '/mcp-integration',
     spottercode: '/SpotterCode',
+    tutorials: '/tutorials/tutorials-overview',
     'whats-new': '/whats-new',
 };
 
@@ -45,11 +51,13 @@ export const CATEGORY_LANDING: Record<DocCategory, string> = {
 export const CATEGORY_NAV_ID: Record<DocCategory, string> = {
     all: 'nav',
     guides: 'nav',
+    walkthroughs: 'nav-walkthroughs',
     embedding: 'nav-embedding',
     'rest-api': 'nav-rest-api',
     'mcp-server': 'nav-mcp-server',
     spottercode: 'nav-spottercode',
-    'whats-new': 'nav',
+    tutorials: 'nav-tutorials',
+    'whats-new': 'nav-release-notes',
 };
 
 /*
@@ -70,6 +78,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
         'webhooks-overview', 'webhooks-ui', 'webhooks-comm-channel', 'webhooks-lb-schedule',
         'webhooks-s3-integration', 'webhooks-gcs-storage', 'webhooks-lb-payload', 'webhooks-kpi',
     ],
+    walkthroughs: [],
     embedding: [
         'getting-started', 'tsembed', 'embed-liveboard', 'embed-a-viz',
         'embed-ai-search-analytics', 'embed-spotter', 'embed-spotter-agent',
@@ -114,6 +123,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
     spottercode: [
         'SpotterCode', 'integrate-SpotterCode', 'spottercode-prompting-guide',
     ],
+    tutorials: [],
     'whats-new': [
         'whats-new', 'fixed-issues', 'known-issues', 'deprecated-features',
         'embed-sdk-changelog', 'mobile-sdk-changelog',
@@ -142,6 +152,12 @@ const SecondaryHeader = (props: {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
+    // 'tutorials' and 'walkthroughs' intentionally excluded — reachable from links
+    // inside nav.adoc's own sidebar rather than a secondary-header tab, and the
+    // secondary header/left sidebar are hidden altogether on their card-grid overview
+    // pages (see DevDocTemplate). Their category config (label/landing/nav id/pageids)
+    // still exists above — it's what makes nav-tutorials.adoc/nav-walkthroughs.adoc
+    // resolve as the active sidebar once you're on one of their pages.
     const categories: DocCategory[] = [
         'guides', 'embedding', 'rest-api', 'mcp-server', 'spottercode', 'whats-new',
     ];
