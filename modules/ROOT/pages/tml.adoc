@@ -31,10 +31,14 @@ See the following pages for the detailed syntax of TML files for each object typ
 
 For TML modification tips and recommendations, see xref:modify-tml.adoc[TML modification].
 
+
+////
 [NOTE]
 ====
-Worksheets are deprecated in ThoughtSpot and replaced by Models from 10.12.0.cl onwards.
+Worksheets are deprecated in ThoughtSpot and replaced by Models.
 ====
+////
+
 
 == TML import and export via REST API
 
@@ -60,17 +64,6 @@ To import TML representation of the metadata objects into ThoughtSpot, use one o
 * xref:tml-api.adoc#import[POST /tspublic/v1/metadata/tml/import] (REST API v1)
 
 //While the v1 API accepts a string containing a JSON array of TML objects to upload, in YAML or JSON format, the v2 accepts it only in the JSON format.
-
-There are multiple kinds of imports possible:
-
-* `PARTIAL` imports all objects that validate successfully, and ignores objects that do not validate successfully.
-* `ALL_OR_NONE` imports the objects that validate successfully.
-* `VALIDATE_ONLY` validates the objects but does not import them.
-* `PARTIAL_OBJECT` (only applicable to REST API v2)
-imports objects that validate successfully and skips the objects that do not validate successfully. If the import fails for a visualization object in a Liveboard TML, the Liveboard will be imported without that visualization object. Similarly, if importing a relationship in a logical table fails, the table TML will be imported with warnings in the API response.
-
-You can also specify additional parameters to set the Org context and skip CDW validation checks for Table TMLs.
-
 [NOTE]
 ====
 If you import only a Model object, it may take some time for the Model to become available in the ThoughtSpot system. You may need to wait for a few seconds to create answers and Liveboards.
@@ -123,8 +116,9 @@ If the import is performed by an administrator account, all personalized views s
 
 Why this happens?::
 
-Personalized views are stored as user-owned objects linked to the Liveboard's GUID.
-When an admin imports a Liveboard TML that matches an existing GUID, the import operation overwrites the Liveboard, and the associated user views are not carried forward.
+Personalized views are stored as user-owned objects linked to the Liveboard’s GUID. When an admin imports a Liveboard TML that matches an existing GUID, the import operation overwrites the Liveboard, and the associated user views are not carried forward.
++
+This happens because personalized views are created and usually owned by end users in a different environment (likely a Prod instance). They are not included in Liveboard TML files exported from a development or staging environment, so the import has no record of them.
 
 Workarounds::
 . Import as a non-admin user -
@@ -146,6 +140,154 @@ Creates an import TML tasks and processes TMLs asynchronously
 * +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Ffetch-async-import-task-status">POST /api/rest/2.0/metadata/tml/async/status</a>+++ +
 Fetches status of import tasks
 
+=== Best practices for async TML import
+
+Use the following guidelines to configure and manage async TML import tasks effectively.
+
+==== Choose the right import policy
+
+[width="100%", cols="1,3,2,2"]
+[options='header']
+|====
+|Policy|Behavior|Recommended use case|Limits and risks
+
+|`ALL_OR_NONE`
+|All objects are validated and saved in a single database write.
+If any object fails, no objects are written.
+|Small, tightly coupled object sets requiring atomicity.
+|Limit to approximately 50 TML objects per task.
+Exceeding this risks OOM errors or database write failures.
+Liveboard size affects this limit; Liveboards averaging approximately 30 visualizations are a useful sizing baseline.
+
+|`VALIDATE_ONLY`
+|Objects are validated in memory.
+No changes are written to the database.
+|Pre-import validation before committing to a production import.
+|All changes accumulate in memory.
+Very large tasks risk OOM errors.
+
+|`PARTIAL`
+|Objects that pass validation are written.
+Failed objects are skipped without dropping subentities.
+If a subentity (such as a visualization) fails, the parent object (such as a Liveboard) also fails and is not written.
+|Large-scale migrations where some failures are expected.
+Resubmit failed objects as a new task after fixing errors.
+|Recommended policy for large imports.
+Objects are written incrementally, reducing memory pressure.
+
+|`PARTIAL_OBJECT`
+|Objects that pass validation are written.
+If a subentity (visualization, join, or RLS rule) fails, the parent object is written with a warning and the failed subentity is dropped.
+|Large-scale migrations where pipeline continuity matters more than completeness.
+|Recommended when a missing visualization or dropped join is acceptable in the target environment.
+|====
+
+[NOTE]
+====
+If you use custom scripts to batch imports with `ALL_OR_NONE`, the net result across batches is effectively the same as `PARTIAL` behavior—some batches succeed and some fail.
+Use the `PARTIAL` policy directly for large-volume imports rather than scripting `ALL_OR_NONE` batches.
+====
+
+[IMPORTANT]
+====
+Use `PARTIAL` or `PARTIAL_OBJECT` for large import operations.
+`ALL_OR_NONE` and `VALIDATE_ONLY` process all objects in memory or in a single database transaction, which can cause OOM errors on large tasks.
+====
+
+==== Size your import tasks
+
+* For `ALL_OR_NONE` and `VALIDATE_ONLY`, limit tasks to approximately 50 TML objects.
+There is no hard code limit, but larger tasks risk OOM errors or failed database writes.
+The safe upper bound depends on Liveboard complexity.
+Liveboards with an average of approximately 30 visualizations each provide a reasonable sizing baseline.
+
+* For `PARTIAL` and `PARTIAL_OBJECT`, there is no per-task object limit enforced by the API.
+These policies write objects incrementally and are appropriate for large migration workloads.
+
+* The API payload size limit is 500 MB per request (infrastructure limit).
+Contact ThoughtSpot Support if your use case requires a larger limit.
+
+
+==== Avoid parallel imports of the same object
+
+Never submit tasks that include the same object in more than one active task simultaneously.
+Concurrent writes to the same object cause a version conflict, and one of the tasks will fail.
+
+Design your import pipeline so that each object appears in at most one active import task at a time.
+Sequence tasks, do not parallelize them across the same objects.
+
+==== Monitor the task queue and status
+
+The async import queue supports a maximum of 100 concurrent tasks.
+Submitting more than 100 tasks at once causes the excess tasks to be rejected with a `FAILED` status immediately.
+
+Poll the `POST /api/rest/2.0/metadata/tml/async/status` endpoint to check task status.
+
+[width="100%", cols="1,4"]
+[options='header']
+|====
+|Status value|Description
+
+|`IN_QUEUE`
+|The task is waiting to be processed.
+The queue limit is 100 concurrent tasks.
+Tasks submitted beyond the limit are rejected immediately with status `FAILED`.
+
+|`IN_PROGRESS`
+|The task is being processed.
+
+|`COMPLETED`
+|The task processing is complete.
+`COMPLETED` does not mean every object imported successfully.
+Individual objects within the task have their own statuses.
+Inspect per-object status in the response to identify failures.
+
+|`FAILED`
+|The task failed.
+This could be due to multiple reasons such as - the queue was full at submission time, a policy-level failure occurred, or an unrecoverable error was encountered during processing.
+|====
+
+*Recommended polling intervals:*
+
+The status API enforces a rate limit of 100 requests per minute.
+Exceeding this limit returns an error.
+
+For practical use:
+
+* For small tasks, poll no more frequently than every 30 seconds.
+* For large tasks, a polling interval of 1 minute is recommended, as larger tasks take proportionally longer to complete.
+
+==== Use API parameters correctly
+
+The following parameters in `POST /api/rest/2.0/metadata/tml/async/import` require careful use:
+
+`create_new`::
+Set `create_new: true` only when you want to create objects with new GUIDs, not update existing objects.
+Setting this parameter on objects that already exist creates duplicates.
+Do not set this parameter unless you are certain that new objects should be created.
+
+`skip_diff_check`::
+Set `skip_diff_check: true` only when you want to force a re-import of a TML file that has not changed since the previous import.
+By default, ThoughtSpot identifies unchanged objects and skips them to reduce import time.
+Enable this parameter only when unchanged files must be explicitly reprocessed.
+
+`enable_large_metadata_validation`::
+Set to `true` if the database contains multiple thousands of tables.
+When enabled, ThoughtSpot validates schema one table at a time, which helps circumvent metadata fetching limitations of the Cloud Data Warehouse (CDW).
+Default: `false`.
+
+`enable_personalized_view_upsert`::
+Set to `true` to enable update and insert of personalized views in a Liveboard during TML import.
+When enabled, personalized views are preserved or created as part of the import operation instead of being discarded.
+Default: `false`.
+
+
+==== Schedule large imports during off-peak hours
+
+Large TML migrations can temporarily increase system resource usage.
+Schedule bulk async imports during off-peak hours to reduce the risk of impacting users who are actively using the cluster.
+
+
 === Schedule import tasks
 
 You can import TML objects asynchronously by scheduling TML import tasks via `POST` request to POST `/api/rest/2.0/metadata/tml/async/import` API endpoint. You can send the following parameters in the API request body:
@@ -162,24 +304,28 @@ __Optional__ |__Boolean__. Specify if import operation must be run for all Orgs 
 
 __Requires Org administration privileges to access TML objects across all Orgs.__| `false`
 
-|`import_policy`  a|__String__. Available from 10.5.0.cl. Policy to follow during import. The allowed values are:
+|`import_policy`  a|__String__. Policy to follow during import. The allowed values are:
 
-* `PARTIAL` +
-Imports objects that validate successfully. Skips the objects that do not validate successfully and their dependent objects if any.
-* `ALL_OR_NONE` +
-Imports all objects that validate successfully. If the import fails for one object, no objects will be imported.
-* `VALIDATE_ONLY` +
-Validates the objects but does not import them.
-* `PARTIAL_OBJECT` +
-Imports objects that validate successfully and skips the objects that do not validate successfully. If the import fails for a visualization object in a Liveboard TML, the Liveboard will be imported without that visualization object. Similarly, if importing a relationship in a logical table fails, the table TML will be imported with warnings in the API response.
+* `PARTIAL`
+//Imports objects that validate successfully. Skips the objects that do not validate successfully and their dependent objects if any.
+* `ALL_OR_NONE`
+//Imports all objects that validate successfully. If the import fails for one object, no objects will be imported.
+* `VALIDATE_ONLY`
+//Validates the objects but does not import them.
+* `PARTIAL_OBJECT`
+//Imports objects that validate successfully and skips the objects that do not validate successfully. If the import fails for a visualization object in a Liveboard TML, the Liveboard will be imported without that visualization object. Similarly, if importing a relationship in a logical table fails, the table TML will be imported with warnings in the API response.
 | `PARTIAL_OBJECT`
 
 |`skip_diff_check` +
 __Optional__
-|__Boolean__. When set to `true`, skips the diff check before processing TML objects for import. By default, ThoughtSpot compares each TML object against its last imported version and skips objects that have not changed, which reduces unnecessary reimports. Set to `true` to bypass this check and reimport all objects regardless of whether they have changed. |`false`
+|__Boolean__ |`false`
 |`enable_large_metadata_validation` +
 __Optional__
- |__Boolean__. Available from 10.5.0.cl. Enables validation for large metadata objects. Set to `true` if the database contains multiple thousands of tables. When enabled, it allows for schema validation of one table at a time and helps circumvent the metadata fetching limitations of the Cloud Data Warehouse (CDW).
+ |__Boolean__
+|`false`
+|`enable_personalized_view_upsert` +
+__Optional__
+|__Boolean__
 |`false`
 |====
 ////
@@ -277,8 +423,6 @@ response starting from offset position.
 The maximum limit for the `record_size` that user can pass in an API request is 50. If the `record_size` exceeds this threshold, the API returns a bad request error. To extend the `record_size` limit, contact ThoughtSpot Support.
 ====
 | `5`
-|`include_import_response`|__Boolean__. Specify whether to include the import response when fetching status for the import task.
-
 |====
 
 [IMPORTANT]

@@ -140,9 +140,14 @@ const SecondaryHeader = (props: {
     // In-product (embedded) presentation has no category tabs/AskDocs — render just the
     // mobile nav-toggle so the left sidebar stays reachable on narrow viewports.
     minimal?: boolean;
+    // True on an older-version wrapper page: its content is a nested iframe pointing at a
+    // separate frozen deployment, so a tab click must swap that iframe's page via the
+    // ?pageid= param instead of navigating this (unversioned) site to CATEGORY_LANDING.
+    isVersionedIframe?: boolean;
 }) => {
     const {
         activeCategory, onCategoryChange, location, leftNavOpen, setLeftNavOpen, minimal,
+        isVersionedIframe,
     } = props;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -161,9 +166,23 @@ const SecondaryHeader = (props: {
         onCategoryChange(cat);
         setMobileMenuOpen(false);
         const landing = CATEGORY_LANDING[cat];
-        if (landing) {
-            navigate(landing);
+        if (!landing) return;
+        if (isVersionedIframe) {
+            // Stay on this wrapper page and retarget the nested iframe instead of
+            // navigating to the unversioned CATEGORY_LANDING page, which would drop
+            // the user out of the pinned older version.
+            // Query-only (no pathname) so the browser resolves it relative to the
+            // current URL via pushState's native relative-URL resolution. Building
+            // the target from location.pathname here duplicated the site's /docs
+            // pathPrefix in production (404s), while working fine in local dev,
+            // which has no prefix — root cause in Gatsby's routing not fully
+            // isolated, but this sidesteps the pathname reconstruction entirely.
+            const params = new URLSearchParams(location.search);
+            params.set('pageid', landing.replace(/^\//, ''));
+            navigate(`?${params.toString()}`);
+            return;
         }
+        navigate(landing);
     };
 
     useEffect(() => {

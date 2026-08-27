@@ -178,8 +178,9 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             version.iframeUrl === props?.pageContext?.iframeUrl,
     );
 
-    // True when loaded inside a VersionIframe (outer shell sets ?_iframe=1).
-    // Outer shell already renders SecondaryHeader, so suppress ours to avoid duplication.
+    // True when loaded inside a VersionIframe's nested <iframe> (its src carries ?_iframe=1).
+    // This is body content only — the outer wrapper page owns the chrome (Header/SecondaryHeader),
+    // so the nested content must never render its own copy.
     const isIframeMode =
         typeof window !== 'undefined' &&
         new URLSearchParams(location.search).get('_iframe') === '1';
@@ -222,7 +223,10 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         return map;
     }, [processedNavMap]);
 
-    /* Detect active category from current page ID */
+    /* Detect active category from current page ID.
+     * Version-wrapper pages always build with curPageNode pinned to the default 'introduction'
+     * page (gatsby-node.js doesn't vary $pageId per version-wrapper page), so the real page
+     * being shown in the nested iframe is tracked via the ?pageid= query param instead. */
     useEffect(() => {
         const currentPageId = curPageNode.pageAttributes.pageid;
         // tutorials-overview is also linked from nav.adoc's own "Tutorials" section
@@ -243,7 +247,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             ([, pageIds]) => pageIds.includes(currentPageId),
         );
         if (found) setActiveCategory(found[0]);
-    }, [curPageNode.pageAttributes.pageid, pageIdToCategoryMap]);
+    }, [curPageNode.pageAttributes.pageid, pageIdToCategoryMap, isVersionedIframe, location.search]);
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -391,7 +395,19 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                     if (hash) {
                         url.hash = hash;
                     }
+                    // Deliberately bypasses navigate()/React state: this only syncs the address
+                    // bar for shareable links/back-button. Routing it through navigate() would
+                    // update the `location` prop and re-trigger VersionIframe's src memo, causing
+                    // the iframe to reload the page it just navigated to internally.
                     window.history.replaceState({}, '', url.toString());
+
+                    // Keep the outer tab bar's active-category highlight in sync with content
+                    // navigated to via in-page links inside the iframe (not just outer tab
+                    // clicks), without relying on the location update suppressed above.
+                    const found = (Object.entries(CATEGORY_PAGEIDS) as [DocCategory, string[]][]).find(
+                        ([, pageIds]) => pageIds.includes(e.data.params.pageid),
+                    );
+                    if (found) setActiveCategory(found[0]);
                 }
             }
         };
@@ -786,20 +802,25 @@ if (isVersionedIframe) {
                             : { height: '0px' }
                     }
                 ></div>
-                {!isIframeMode && !isVersionedIframe && (
+                {!isIframeMode && (
                     isPublicSiteOpen ? (
+                        // Standalone site: always show the full tab bar, including on an
+                        // older-version wrapper page — it's still top-level site chrome,
+                        // the version's actual content is just nested in the iframe below.
                         <SecondaryHeader
                             activeCategory={activeCategory}
                             onCategoryChange={setActiveCategory}
                             location={location}
                             leftNavOpen={leftNavOpen}
                             setLeftNavOpen={setLeftNavOpen}
+                            isVersionedIframe={isVersionedIframe}
                         />
-                    ) : !isMaxMobileResolution && (
+                    ) : !isVersionedIframe && !isMaxMobileResolution && (
                         // In-product presentation has no tabs — show just the nav
                         // toggle so the sidebar stays reachable on narrow viewports.
                         // Desktop-width embeds skip this entirely; the sidebar is
-                        // always visible there.
+                        // always visible there. Version-wrapper pages have no sidebar
+                        // to toggle (they render only the VersionIframe), so skip here too.
                         <SecondaryHeader
                             activeCategory={activeCategory}
                             onCategoryChange={setActiveCategory}
@@ -817,7 +838,14 @@ if (isVersionedIframe) {
                         isIframeMode
                             ? { height: '100lvh' }
                             : isVersionedIframe
-                                ? { height: 'calc(100lvh - 65px)' }
+                                ? {
+                                      // Public site now renders both Header (65px) and the full
+                                      // SecondaryHeader (44px) above this wrapper's iframe; the rare
+                                      // in-product deep-link case keeps its prior single-offset calc.
+                                      height: isPublicSiteOpen
+                                          ? 'calc(100lvh - 65px - 44px)'
+                                          : 'calc(100lvh - 65px)',
+                                  }
                                 : !isPublicSiteOpen
                                     ? (!isMaxMobileResolution
                                         ? { height: 'calc(100lvh - 48px)' }

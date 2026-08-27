@@ -10,7 +10,6 @@ This page explains how to embed a ThoughtSpot Liveboard in your web page, portal
 
 A ThoughtSpot Liveboard is an interactive dashboard that presents a collection of visualizations pinned by a user.
 
-
 == Import the LiveboardEmbed package
 
 Import the `LiveboardEmbed` SDK library to your application environment:
@@ -137,8 +136,48 @@ const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
 When `fullHeight` is set to `true`, the SDK ignores the `isLiveboardHeaderSticky:true` setting, and the Liveboard header is not sticky.
 ====
 
-=== Customize Liveboard tabs
+[#compact-header]
+=== Enable compact Liveboard header
+By default, embedded Liveboards display a full-height header bar that contains the Liveboard title, description, filter chips, tab navigation, and action menu. You can switch to a more space-efficient layout by enabling the compact header.
 
+The compact header reduces the vertical footprint of the header area, integrates tabs and filter chips into a single condensed row, and moves the *Edit* button into the header's overflow action menu.
+
+To enable the compact header, set `isLiveboardCompactHeaderEnabled` to `true` in the `LiveboardViewConfig` object. Note that the `isLiveboardCompactHeaderEnabled` attribute is set to `true` by default on all ThoughtSpot embedded instances using Visual Embed SDK v1.51.0 or later.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    //... other embed config properties
+    isLiveboardCompactHeaderEnabled: true,
+});
+----
+
+When `isLiveboardCompactHeaderEnabled` is `true`, the following UI changes apply compared to the standard header:
+
+[width="100%",cols="2,4",options="header"]
+|====
+|Area |Change
+|Header height |The header renders in a condensed, shorter height to maximize the visible content area.
+|Edit button |The *Edit* button is removed from the top-level header and is accessible from the header overflow (*...*) menu.
+|Filter chips |Filter chips are rendered inside the compact header's integrated filter row, replacing the separate floating filter panel.
+|Tabs |The tab bar is incorporated into the compact header row, rather than appearing as a separate element below the header.
+|Sticky scroll behavior |The scroll threshold at which the sticky header attaches to the top of the viewport is recalculated for the compact header's shorter height. This may affect the scroll position at which the header becomes sticky compared to the standard header.
+||
+|====
+
+==== Hiding the Liveboard title in compact header
+In the compact header, you can hide the Liveboard title by setting `showLiveboardTitle` to `false` in the `LiveboardViewConfig` object:
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    //... other embed config properties
+    isLiveboardCompactHeaderEnabled: true,
+    showLiveboardTitle: false,
+});
+----
+
+=== Customize Liveboard tabs
 By default, the first tab created on a Liveboard is set as the home tab. You can set any tab as an active tab using the `activeTabId` property in the Visual Embed SDK as shown in the example here:
 
 [source,JavaScript]
@@ -162,6 +201,34 @@ The `activeTabId` property is available only in the `LiveboardEmbed` package and
 `visibleVizs` and `visibleTabs` allow you to limit the experience for certain users on a Liveboard with many more elements.
 
 For example, a template Liveboard with many different key performance indicators (KPIs) could be reduced to a smaller set by giving a user an interface to select the particular visualizations to show, storing their selections, and using that saved set of visualization globally unique identifiers (GUIDs) as the array for `visibleVizs` on page load (there is an equivalent xref:embed-events.adoc[HostEvent] called `SetVisibleVizs` to make an update after the Liveboard has loaded).
+
+=== Customizing filter visibility
+To hide the entire header area, including filters and the Liveboard menu, set `hideLiveboardHeader` to `true`. You can then trigger filter interactions programmatically using host events.
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed', {
+  ... // other liveboard view config
+  hideLiveboardHeader:true,
+});
+----
+
+If the Liveboard has multiple tabs and the compact header is enabled, you can set `hideIrrelevantChipsInLiveboardTabs` to `true` to hide filters that are not relevant to the current tab in an embedded Liveboard. Note that `hideIrrelevantChipsInLiveboardTabs` is set to `true` by default on all ThoughtSpot embedded instances using Visual Embed SDK v1.51.0 or later.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    //... other embed config properties
+    isLiveboardCompactHeaderEnabled: true,
+    hideIrrelevantChipsInLiveboardTabs: true,
+});
+----
+
+When `hideIrrelevantChipsInLiveboardTabs` is `true`:
+
+* Filter chips backed by data sources that are *not used by any visualization on the active tab* are hidden automatically when the user switches tabs.
+* A *Show irrelevant filters* toggle button appears in the filter row when at least one chip is hidden, allowing users to temporarily reveal all chips.
+* When the user clicks *Show irrelevant filters*, a complementary *Hide irrelevant filters* button appears to restore the filtered view.
 
 [#noteTiles]
 === Add Note tiles
@@ -233,30 +300,6 @@ The SDK processes up to 49 runtime filters per embed. Any objects at index 50 or
 beyond are silently dropped without an error or warning. For more information, see
 xref:runtime-filters.adoc#_maximum_filter_count[Runtime filter limit].
 ====
-
-==== Customizing filter visibility
-To hide filters in an embedded Liveboard, you can use the following options:
-
-* Set `hideLiveboardHeader` to `true` to hide the entire header area, including filters and the Liveboard menu. You can then trigger filter interactions programmatically using host events.
-+
-[source,JavaScript]
-----
-const embed = new LiveboardEmbed('#embed', {
-  ... // other liveboard view config
-  hideLiveboardHeader:true,
-});
-----
-
-* If the Liveboard compact header is enabled, set `hideIrrelevantChipsInLiveboardTabs` to `true` to hide filters that are not relevant to the current tab in an embedded Liveboard.
-+
-[source,JavaScript]
-----
-const embed = new LiveboardEmbed('#embed', {
-  ... // other liveboard view config
-  isLiveboardCompactHeaderEnabled: true,
-  hideIrrelevantChipsInLiveboardTabs: true,
-});
-----
 
 ==== Updating filters
 Use the following host events in the Visual Embed SDK to update filters:
