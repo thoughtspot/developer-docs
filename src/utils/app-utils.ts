@@ -65,6 +65,19 @@ export const removeTrailingSlash = (url: string) => {
 };
 
 /**
+ * True for any tutorials-module page (/tutorials/... locally, /docs/tutorials/...
+ * in production) — path-segment check so it's robust to the {{navprefix}} prefix.
+ * Tutorials pages have their own pagination footer and no SpotterCode assistant
+ * (see FloatingAssistant), so SpotterCode-related affordances elsewhere (e.g. the
+ * "Ask SpotterCode" code-block CTA in Document/helper.tsx) should stay hidden there too.
+ * @param {string} pathname - location.pathname
+ * @returns {boolean} true if the path is under /tutorials/
+ */
+export const isTutorialsPath = (pathname: string) => {
+    return pathname.split('/').filter(Boolean).includes('tutorials');
+};
+
+/**
  * Used to check if the docs portal open as public site or inside embed iframe
  * @param {string} queryParamStr - query string from location.search
  * @returns {boolean} true, if it is opened as public site otherwise false
