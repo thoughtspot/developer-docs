@@ -85,17 +85,17 @@ const Header = (props: {
     ];
 
     const renderDropdownItems = (
-        items: { name: string; sub: string; link: string; icon: any }[],
+        items: { name: string; sub: string; link: string; icon: any; external?: boolean }[],
         onClose?: () => void,
     ) =>
         items.map((item) => {
             const Icon = item.icon;
+            const isExternal = item.external !== false;
             return (
                 <a
                     key={item.name}
                     href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     className="header-dropdown-item"
                     role="menuitem"
                     onClick={onClose}
@@ -107,9 +107,11 @@ const Header = (props: {
                         <span className="dropdown-item-name">{item.name}</span>
                         <span className="dropdown-item-sub">{item.sub}</span>
                     </span>
-                    <IconContext.Provider value={{ className: 'external-link-icon' }}>
-                        <FiExternalLink />
-                    </IconContext.Provider>
+                    {isExternal && (
+                        <IconContext.Provider value={{ className: 'external-link-icon' }}>
+                            <FiExternalLink />
+                        </IconContext.Provider>
+                    )}
                 </a>
             );
         });

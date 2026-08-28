@@ -58,15 +58,22 @@ export const fetchChild = (html: string) => {
     return topLevelItems.map((el) => buildJSON(el));
 };
 
-// Not being used anywhere
-const getParentHref = (current) => {
-    if (current.href) {
-        return current.href;
-    }
-    if (current?.children?.length > 1) {
-        return current.children[0]?.href;
-    }
-    return null;
+/**
+ * Reconstructs a page's pageid from an href found in nav content. Tutorials/
+ * walkthroughs module pages use compound pageids ({subdirectory}__{finalSegment},
+ * see getTutorialLinkFromEdge in gatsby-utils.js) while their nav links use the
+ * human-readable URL (/tutorials/{subdirectory}/{finalSegment}) — this bridges
+ * the two so matching works regardless of the {{navprefix}} substitution ('' on
+ * LOCAL, '/docs' otherwise), since only the trailing segments are inspected.
+ */
+export const getPageIdFromHref = (href?: string | null): string | null => {
+    if (!href) return null;
+    const segments = href.split('?')[0].split('/').filter(Boolean);
+    const lastSegment = segments.pop();
+    if (!lastSegment) return null;
+    const tutorialsIdx = segments.indexOf('tutorials');
+    const subdir = tutorialsIdx !== -1 ? segments[tutorialsIdx + 1] : undefined;
+    return subdir ? `${subdir}__${lastSegment}` : lastSegment;
 };
 
 export const getBreadcrumsPath = (data: any, pageid?: string) => {
@@ -77,18 +84,23 @@ export const getBreadcrumsPath = (data: any, pageid?: string) => {
     return data.reduce((previous, current) => {
         if (
             current.href === `?pageid=${pageid}` ||
-            current.href === `/${SITE_PREFIX}/${pageid}`
+            current.href === `/${SITE_PREFIX}/${pageid}` ||
+            getPageIdFromHref(current.href) === pageid
         ) {
             // To avoid having link for the same page we are setting href to null
             return [{ name: current.name, href: null }];
         }
         if (current.children) {
-            const parentObj = [
-                { name: current.name, href: getParentHref(current) },
-            ];
             const childObj = getBreadcrumsPath(current.children, pageid);
             if (childObj.length) {
-                return [...parentObj, ...childObj];
+                // Group labels with no link of their own (e.g. an unlinked nav
+                // heading used purely to group tutorial steps) aren't a real
+                // page — skip them rather than falling back to a child's href,
+                // which would make the crumb redundantly link to that child.
+                if (current.href) {
+                    return [{ name: current.name, href: current.href }, ...childObj];
+                }
+                return childObj;
             }
         }
         if (previous.length) {

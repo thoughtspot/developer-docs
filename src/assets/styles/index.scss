@@ -1,3 +1,4 @@
+@import './radiant-colors.css';
 @import './variables.scss';
 @import './padding.scss';
 @import './margin.scss';
@@ -655,7 +656,7 @@ button {
     border-left: 4px solid var(--var-note-color);
     td.content {
         border: 1px solid var(--note-border-color);
-        box-shadow: 0 1px 1px var(--note-border-color);
+        box-shadow: var(--box-shadow);
         border-radius: 5px !important;;
         background: var(--note-block-color);
 
@@ -666,11 +667,20 @@ button {
         padding-bottom: 10px;
     }
 }
+
+// Dark mode: all admonition types share one flat background, overriding
+// each type's light-mode background variable (--note-block-color,
+// --important-block-color, --admonition-background).
+#wrapper[data-theme='dark'] .admonitionblock td.content,
+#docsModal[data-theme='dark'] .admonitionblock td.content {
+    background: var(--admonition-background-dark);
+}
+
 .admonitionblock.important {
     border-left: 4px solid var(--var-important-color);
     td.content {
         border: 1px solid var(--important-border-color);
-        box-shadow: 0 1px 1px var(--important-border-color);
+        box-shadow: var(--box-shadow);
         border-radius: 5px !important;
         background: var(--important-block-color);
     }
@@ -683,9 +693,22 @@ button {
 .admonitionblock.warning {
     border-left: 5px solid $warning-color;
     td.content {
-        border: none !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
+        border: 1px solid $warning-color;
+        box-shadow: var(--box-shadow);
+        border-radius: 5px !important;
+    }
+    td.icon {
+        left: 20px !important;
+        top: 5px !important;
+    }
+}
+
+.admonitionblock.caution {
+    border-left: 5px solid $caution-color;
+    td.content {
+        border: 1px solid $caution-color;
+        box-shadow: var(--box-shadow);
+        border-radius: 5px !important;
     }
     td.icon {
         left: 20px !important;
@@ -698,7 +721,7 @@ button {
     td.content {
         border: 0 !important;
         border-radius: 0.5 !important;
-        box-shadow: none !important;
+        box-shadow: var(--box-shadow);
     }
     td.icon {
         left: 20px !important;
@@ -710,11 +733,24 @@ button {
 .videoContainer {
     border-radius: 10px;
     overflow-x: auto;
+    overflow-y: hidden;
     width: 100%;
     box-shadow: var(--box-shadow);
     border: 2px solid var(--border-color);
     margin: 10px;
     padding: 15px;
+
+    // The video:: macro only sets width="100%" on the <video> tag, with no
+    // height/aspect-ratio — the browser has nothing to reserve layout space
+    // with until the video's metadata loads async, so the page renders short
+    // and grows later, pushing everything below (incl. Prev/Next) further
+    // down mid-scroll. All tutorial demo videos are 16:9 screen recordings.
+    video {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16 / 9;
+    }
 }
 
 summary.title {
@@ -1125,17 +1161,142 @@ a.anchor {
         mask-position: -136px -68px;
     }
 }
+// ── Radiance blob gradient — confined to the header banner only ────────────
+// `.radiance-bg` lives *inside* `.header-banner` (which is `position:
+// relative` and already scoped to the content column, next to the sidebar
+// — see the header-banner rule below) instead of being `position: fixed`
+// relative to the full viewport. A viewport-wide fixed layer bled behind
+// the sidebar, wasting part of the gradient and throwing off the visible
+// color balance. `position: absolute` here is sized relative to
+// `.header-banner`'s own box, so it only ever spans the visible content
+// lane.
+// `bottom: 0` (instead of a fixed/viewport height) makes this match
+// `.header-banner`'s own content-driven height exactly, so the gradient —
+// including its own `overflow: hidden` clipping of the oversized blobs —
+// ends exactly where the banner ends and never bleeds into the cards
+// section below, regardless of viewport height.
+.radiance-bg {
+    position: absolute;
+    inset: 0;
+    // z-index 0 (an explicit stacking context via position + z-index) keeps
+    // this behind the header-banner text/search bar, which are given their
+    // own explicit stacking priority below rather than relying on DOM order.
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    background-color: var(--header-banner-base);
+
+    // Blobs (below) are sized/positioned to fill most of the banner box,
+    // which spreads visible color across it. This overlay sits above the
+    // blobs (explicit z-index beats their z-index:auto) and fades from
+    // transparent — letting the blobs show through near the top — to the
+    // flat base color toward the bottom.
+    // A plain 2-stop linear fade (transparent -> solid) has a sharp change
+    // in slope right where it hits full opacity — even though the color
+    // matches the page background exactly, that slope discontinuity reads
+    // as a visible "seam" (a Mach-band effect) right at the banner/cards
+    // boundary. The extra `color-mix` stops below ease the taper in
+    // gradually (S-curve) instead of snapping from "still fading" to
+    // "fully flat", which removes that perceived hard edge.
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: linear-gradient(
+            to bottom,
+            transparent 0%,
+            transparent 40%,
+            color-mix(in srgb, var(--header-banner-base) 20%, transparent) 55%,
+            color-mix(in srgb, var(--header-banner-base) 45%, transparent) 68%,
+            color-mix(in srgb, var(--header-banner-base) 75%, transparent) 82%,
+            var(--header-banner-base) 96%,
+            var(--header-banner-base) 100%
+        );
+    }
+
+    .blob {
+        position: absolute;
+        border-radius: 50%;
+        // The radial-gradient's own falloff still reads as a bounded shape
+        // with a visible (if soft) edge — an actual blur is what turns it
+        // into ambient diffuse light with no perceptible boundary.
+        filter: blur(60px);
+    }
+
+    // height/top use `vh` (not `%`) so blob proportions stay the same
+    // regardless of how tall `.radiance-bg` itself is. With `%`, sizing
+    // against this now-short (header-banner-height) box made every blob so
+    // vertically compressed (nearly as tall as the whole clipped area) that
+    // there was no visible core/edge left to show drift against — the
+    // blur+clip just read as a flat wash, and the animation, while still
+    // running, was imperceptible.
+    // Light mode blobs
+    .blob-pink {
+        width: 72%;
+        height: 85vh;
+        left: -14%;
+        top: -18vh;
+        // Toned down from 0.44 — read as too vivid/rose against the reference.
+        background: radial-gradient(ellipse at center, rgba(255, 93, 142, 0.32) 0%, transparent 68%);
+        animation: drift-a 6s ease-in-out infinite alternate;
+    }
+
+    .blob-purple {
+        width: 55%;
+        height: 70vh;
+        left: 4%;
+        top: 35vh;
+        background: radial-gradient(ellipse at center, rgba(138, 93, 255, 0.46) 0%, transparent 66%);
+        animation: drift-b 7s ease-in-out infinite alternate;
+    }
+
+    .blob-blue {
+        width: 70%;
+        height: 80vh;
+        right: -14%;
+        top: -15vh;
+        background: radial-gradient(ellipse at center, rgba(39, 140, 255, 0.42) 0%, transparent 68%);
+        animation: drift-c 5s ease-in-out infinite alternate;
+    }
+
+    .blob-wash-pink {
+        width: 90%;
+        height: 100vh;
+        left: -5%;
+        top: 0;
+        background: radial-gradient(ellipse at 35% 50%, rgba(255, 170, 210, 0.09) 0%, transparent 70%);
+    }
+
+    .blob-wash-blue {
+        width: 90%;
+        height: 100vh;
+        right: -5%;
+        top: 0;
+        background: radial-gradient(ellipse at 65% 50%, rgba(160, 196, 255, 0.12) 0%, transparent 70%);
+    }
+
+    // Dark-only blobs — hidden in light mode
+    .blob-orange,
+    .blob-yellow,
+    .blob-purple-r,
+    .blob-teal {
+        display: none;
+    }
+}
+
 .header-banner {
+    position: relative;
     min-height: 240px;
-    background: var(--header-banner-background);
-    box-shadow: 0 2px 2px #1B3E61;
+    border-bottom: none;
     padding: 30px 0 0 40px;
 
-
     .header-banner-text {
+        position: relative;
+        z-index: 1;
         display: flex;
         flex-direction: column;
-        color: #fff;
+        color: var(--primary-color);
         width: 60%;
         h1 {
             font-size: $font-size-large;
@@ -1149,13 +1310,313 @@ a.anchor {
             letter-spacing: -0.064px;
         }
     }
+
+    #homePageSearchBar {
+        position: relative;
+        z-index: 1;
+    }
 }
 
-// In-product presentation only: override banner color to match product sidebar (#232F43).
-// Standalone light/dark banner gradient is preserved via var(--header-banner-background) above.
-.embedded-mode .header-banner {
-    background: #232F43;
-    box-shadow: none;
+// Walkthroughs landing page — one wrapper around the hero text AND the card
+// grid, with the gradient wash as a position:absolute layer sized to that
+// whole wrapper instead of its own fixed-height box. A boxed hero (even a
+// generously tall one) still has a hard bottom edge where overflow:hidden
+// clips the blur/falloff mid-fade — visible as a seam or, with a taller box,
+// a softer rounded silhouette. Sizing the layer to the full page instead
+// means the blobs have all the room they need to fade out completely on
+// their own before any edge is reached, so nothing is left to clip.
+// It also means the gradient no longer reserves its own vertical space, so
+// the hero text and the card grid below sit at normal content spacing
+// instead of being pushed apart by an artificial min-height.
+.walkthroughs-page {
+    position: relative;
+    padding-top: 48px;
+    margin-top: 0;
+    
+    @media (max-width: $mobile-resolution-max) {
+        padding-top: 32px;
+    }
+
+    .radiance-bg {
+        position: absolute;
+        // Bleeds under this page's 60px/60px left-right content padding AND
+        // .doc-wrapper-detail's shared 20px top padding, so the wash
+        // reaches the header on all three edges instead of leaving a plain
+        // gap — matching the home page, which has no such padding to begin
+        // with. Bottom stays 0: the card grid below should keep its normal
+        // padding untouched.
+        inset: -20px -60px 0 -60px;
+
+        @media (max-width: $mobile-resolution-max) {
+            // .doc-wrapper-detail's padding (including its 20px top) drops
+            // to 0 at this breakpoint, so there's no padding left to bleed
+            // under — inset:0 here, not the desktop offsets above.
+            inset: 0;
+        }
+
+        // home's ::after mask (above) uses %-based stops, which are relative
+        // to its OWN box — since that box now spans the whole page, a %
+        // stop would stretch the fade-out proportionally with page length,
+        // tinting the cards. It also only masks down to its own 100% stop;
+        // giving it a shorter *height* instead (tried first) left the
+        // segment between that height and .radiance-bg's real (page-length)
+        // bottom completely unmasked, so the raw blobs showed through at
+        // full strength there with a hard cutoff at the very end — visible
+        // in a screenshot as full-strength color straight through the card
+        // row. Fixed px stops sidestep both: the fade still completes at a
+        // constant depth, and every pixel past 190px keeps resolving to the
+        // final (fully opaque, page-matching) stop, all the way to the
+        // page's actual bottom edge.
+        &::after {
+            background: linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 76px,
+                color-mix(in srgb, var(--header-banner-base) 20%, transparent) 104px,
+                color-mix(in srgb, var(--header-banner-base) 45%, transparent) 129px,
+                color-mix(in srgb, var(--header-banner-base) 75%, transparent) 156px,
+                var(--header-banner-base) 182px,
+                var(--header-banner-base) 100%
+            );
+        }
+
+        // pink/purple/blue are home's values (tuned for its taller banner —
+        // h1 + search bar — where their cores sit ~200px down). This page's
+        // hero is just a heading + one line of text, and the gap to the
+        // cards is intentionally kept tight, so the visible band above is
+        // only ~190px (the mask height above) — home's positions would put
+        // each blob's core below that band, in the now-flattened tail, so
+        // only their pale outer edges would show. Pulling all three up
+        // brings their cores (peak color) back inside the visible band —
+        // but that also means this page actually shows each blob's full-
+        // strength core, where home (by design) never does. Same alpha as
+        // home would read far more saturated here, so it's toned down to
+        // land at a similar visual intensity to home/the reference.
+        .blob-pink {
+            top: -31vh;
+            background: radial-gradient(ellipse at center, rgba(255, 93, 142, 0.16) 0%, transparent 68%);
+        }
+
+        .blob-blue {
+            top: -29vh;
+            background: radial-gradient(ellipse at center, rgba(39, 140, 255, 0.20) 0%, transparent 68%);
+        }
+
+        .blob-purple {
+            top: -24vh;
+            background: radial-gradient(ellipse at center, rgba(138, 93, 255, 0.22) 0%, transparent 66%);
+        }
+
+        .blob-wash-pink {
+            background: radial-gradient(ellipse at 35% 50%, rgba(255, 170, 210, 0.06) 0%, transparent 70%);
+        }
+
+        .blob-wash-blue {
+            background: radial-gradient(ellipse at 65% 50%, rgba(160, 196, 255, 0.08) 0%, transparent 70%);
+        }
+    }
+
+    // Guarantees the card grid paints above the gradient layer regardless
+    // of stacking order — harmless once the fade completes well above it,
+    // but avoids relying on that timing.
+    .document-body-wrapper {
+        position: relative;
+        z-index: 1;
+    }
+}
+
+// Total gap from the top of the page to the first card row is now just
+// this padding-bottom + .tutorial-cards-row's own margin-top (24px,
+// index.scss) — no more artificial min-height holding them apart, which is
+// what made the gap so large before.
+.walkthroughs-hero-text {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    color: var(--primary-color);
+    padding: 0 24px 20px;
+
+    h1 {
+        font-size: $font-size-large;
+        font-weight: 400;
+        margin: 0;
+    }
+
+    p {
+        margin: 12px 0 0;
+    }
+}
+
+#wrapper[data-theme='dark'] .radiance-bg,
+#docsModal[data-theme='dark'] .radiance-bg {
+    // Light-only blobs — hidden in dark mode
+    .blob-pink,
+    .blob-purple {
+        display: none;
+    }
+
+    .blob-orange {
+        display: block;
+        width: 65%;
+        height: 80vh;
+        // Shifted in from the corner (-10%) toward center-left so the warm
+        // glow reads as centered on the left half, not hugging the edge.
+        left: -2%;
+        top: 8vh;
+        // Toned down slightly (0.28 -> 0.22) so it stays a subtle accent
+        // and doesn't compete with the purple emphasis at center.
+        background: radial-gradient(ellipse at center, rgba(255, 180, 90, 0.22) 0%, transparent 68%);
+        animation: drift-a 6s ease-in-out infinite alternate;
+    }
+
+    .blob-yellow {
+        display: block;
+        width: 48%;
+        height: 58vh;
+        left: 8%;
+        top: -8vh;
+        background: radial-gradient(ellipse at center, rgba(255, 232, 150, 0.08) 0%, transparent 65%);
+        animation: drift-d 8s ease-in-out infinite alternate;
+    }
+
+    // Same size as light — different position + animation delay
+    .blob-blue {
+        width: 55%;
+        height: 65vh;
+        // Pulled back in (right: -4% -> 6%) so its center sits closer to
+        // purple-r's — with two separate radial falloffs, centers too far
+        // apart leave a dim/desaturated "valley" between them instead of a
+        // smooth hand-off (that's what didn't match the reference). The
+        // wider falloff (62% -> 70%) also softens/extends its own tail so
+        // it carries color further into the middle.
+        right: 6%;
+        top: -10vh;
+        background: radial-gradient(ellipse at center, rgba(39, 140, 255, 0.34) 0%, transparent 70%);
+        animation-delay: -3s;
+    }
+
+    .blob-purple-r {
+        display: block;
+        // Widened further (62% -> 68%) and pulled toward true center
+        // (right: 14% -> 26%) so purple is the highlighted center-of-banner
+        // tone, with strengthened opacity (0.52 -> 0.58) to make it read as
+        // the focal glow while everything else stays subtle around it.
+        width: 68%;
+        height: 68vh;
+        // Pulled in a bit further (26% -> 18%) to close the gap toward blue
+        // — see blob-blue above.
+        right: 18%;
+        top: 6vh;
+        background: radial-gradient(ellipse at center, rgba(138, 93, 255, 0.58) 0%, transparent 72%);
+        animation: drift-b 7s ease-in-out infinite alternate;
+    }
+
+    .blob-teal {
+        display: block;
+        width: 40%;
+        height: 50vh;
+        right: 14%;
+        top: 8vh;
+        background: radial-gradient(ellipse at center, rgba(45, 220, 177, 0.18) 0%, transparent 65%);
+        animation: drift-d 9s ease-in-out infinite alternate;
+    }
+}
+
+// Same fix as the light-mode blobs in .walkthroughs-page above, for dark
+// mode's distinct orange/yellow/purple-r/teal set — their positions above
+// are tuned for home's taller banner, putting every core below this page's
+// much shorter (~190px) visible band.
+#wrapper[data-theme='dark'] .walkthroughs-page .radiance-bg,
+#docsModal[data-theme='dark'] .walkthroughs-page .radiance-bg {
+    // Same reasoning as the light-mode alpha overrides above: home never
+    // shows these blobs' full-strength cores, this page does (that's the
+    // point of the repositioning), so the same alpha reads more saturated
+    // here than on home/the reference.
+    .blob-orange {
+        top: -29vh;
+        background: radial-gradient(ellipse at center, rgba(255, 180, 90, 0.11) 0%, transparent 68%);
+    }
+
+    .blob-yellow {
+        top: -18vh;
+        background: radial-gradient(ellipse at center, rgba(255, 232, 150, 0.05) 0%, transparent 65%);
+    }
+
+    .blob-blue {
+        top: -21vh;
+        background: radial-gradient(ellipse at center, rgba(39, 140, 255, 0.16) 0%, transparent 70%);
+    }
+
+    .blob-purple-r {
+        top: -23vh;
+        background: radial-gradient(ellipse at center, rgba(138, 93, 255, 0.24) 0%, transparent 72%);
+    }
+
+    .blob-teal {
+        top: -14vh;
+        background: radial-gradient(ellipse at center, rgba(45, 220, 177, 0.09) 0%, transparent 65%);
+    }
+}
+
+// Mostly-horizontal drift: large vertical swings pushed blobs down into the
+// `::after` fade-to-flat zone for part of each cycle, dimming the glow right
+// when it should stay visible. Horizontal movement stays large enough to
+// read clearly as motion, without carrying the glow out of the visible band;
+// the smaller scale swing (vs. an earlier, more dramatic pass) keeps the
+// pulse subtle rather than a noticeable "breathing" effect.
+@keyframes drift-a {
+    from { transform: translate(0px, 0px) scale(1.00); }
+    to   { transform: translate(200px, -60px) scale(1.15); }
+}
+
+@keyframes drift-b {
+    from { transform: translate(0px, 0px) scale(1.00); }
+    to   { transform: translate(-160px, 70px) scale(1.18); }
+}
+
+@keyframes drift-c {
+    from { transform: translate(0px, 0px) scale(1.00); }
+    to   { transform: translate(-180px, -50px) scale(1.14); }
+}
+
+@keyframes drift-d {
+    from { transform: translate(0px, 0px) scale(1.00); }
+    to   { transform: translate(140px, 60px) scale(1.16); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .radiance-bg .blob {
+        animation: none;
+    }
+}
+
+// In-product presentation only: override banner color to match product sidebar (#232F43),
+// and suppress the page-wide gradient entirely.
+.embedded-mode {
+    .radiance-bg {
+        display: none;
+    }
+
+    .header-banner {
+        background: #232F43;
+        border-bottom: none;
+        box-shadow: none;
+
+        .header-banner-text {
+            color: #fff;
+        }
+    }
+
+    .walkthroughs-page {
+        background: #232F43;
+
+        .walkthroughs-hero-text {
+            color: #fff;
+        }
+    }
 }
 
 // Fluid home page cards for both standalone and embedded presentations.
@@ -1172,6 +1633,140 @@ a.anchor {
     width: auto;
 }
 
+// Tutorials overview cards — same boxDiv look, but sized to fill the
+// grid column edge-to-edge (no width cap) so the three cards in a row
+// read as evenly sized tiles rather than centered fixed-width boxes.
+.tutorialCard {
+    flex: 1 1 280px;
+    width: 100%;
+    margin: 10px;
+    padding: 24px;
+
+    h5 {
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+    }
+
+    p {
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+    }
+}
+
+// Small uppercase label above the card title, e.g. "Tutorial".
+.tutorialCardLabel {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--breadcrums-font-color);
+    margin: 0 0 8px;
+}
+
+// "Start" call-to-action link at the bottom of the card.
+.tutorialCardCta {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+// Center the tutorial-card rows as a group and tighten the gap between cards —
+// .row/.col-md-4/.col-md-6 (grid.scss) add 15px of column padding on top of
+// .tutorialCard's own margin, which otherwise leaves ~50px between cards.
+.tutorial-cards-row {
+    justify-content: center;
+
+    // Breathing room between the intro paragraph and the first card row —
+    // only the first row needs it; the row-to-row gap is already handled by .pb-10.
+    &:first-of-type {
+        margin-top: 24px;
+    }
+
+    .col-md-4,
+    .col-md-6 {
+        padding: 0 8px;
+    }
+
+    // .row (grid.scss) pulls the row in by -15px on each side to offset a
+    // Bootstrap-style container gutter that doesn't exist on this page.
+    // Override it here via the compound selector (higher specificity than
+    // the plain .row rule, so it wins regardless of stylesheet order).
+    // The surrounding container padding is symmetric (.doc-wrapper-detail.
+    // doc-walkthroughs + .walkthroughs-body-wrapper), so both margins match.
+    &.row {
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
+
+// Prev/Next footer buttons on tutorial content pages — prev sits on the left,
+// next (or the final "Done") is pushed to the right via margin-left: auto so
+// it stays right-aligned even when prev is absent (first page of a tutorial).
+// (The SpotterCode floating assistant hides itself on tutorials pages — see
+// isTutorialsPath in FloatingAssistant/index.tsx — so no space needs reserving
+// here for it.)
+.tutorial-pagination {
+    display: flex;
+    align-items: center;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+
+    // `.documentWrapper a, .documentWrapper a:active { color: var(--link-text-color); }`
+    // (Document/index.scss) has specificity 0,1,1 — a single `&__btn` class (0,1,0)
+    // loses to it in the resting state, so the text color only ever showed correctly
+    // under `:hover` (0,2,0). Compounding with the `a` element + parent class here
+    // raises these to 0,2,1 / 0,3,1 so they always win.
+    a.tutorial-pagination__btn {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 18px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: $font-weight-bold;
+        color: var(--rd-comp-color-button-primary-default);
+        text-decoration: none;
+        background: var(--body-background-color);
+        box-shadow: var(--box-shadow);
+        transition: border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+
+        &:hover {
+            border-color: var(--rd-comp-color-button-primary-hover);
+            color: var(--rd-comp-color-button-primary-hover);
+            box-shadow: var(--box-shadow-hover);
+        }
+
+        &:active {
+            border-color: var(--rd-comp-color-button-primary-pressed);
+            color: var(--rd-comp-color-button-primary-pressed);
+        }
+    }
+
+    &__next {
+        margin-left: auto;
+    }
+
+    a.tutorial-pagination__done {
+        background: var(--rd-comp-color-button-primary-default);
+        border-color: var(--rd-comp-color-button-primary-default);
+        color: #fff;
+
+        &:hover {
+            background: var(--rd-comp-color-button-primary-hover);
+            border-color: var(--rd-comp-color-button-primary-hover);
+            color: #fff;
+        }
+
+        &:active {
+            background: var(--rd-comp-color-button-primary-pressed);
+            border-color: var(--rd-comp-color-button-primary-pressed);
+            color: #fff;
+        }
+    }
+}
+
 .cardHeading {
     font-size: $font-size-h2;
     color: var(--primary-color) #1d232f;
@@ -1184,6 +1779,20 @@ a.anchor {
 
 .document-body-wrapper {
     padding: 5px 30px 20px 30px;
+}
+
+// Walkthroughs landing page only — extra breathing room on both sides.
+// Scoped via the class added directly on this page's markup
+// (guided-walkthroughs.adoc), so it can't affect .document-body-wrapper on
+// any other page (e.g. home.adoc uses the same base class).
+.document-body-wrapper.walkthroughs-body-wrapper {
+    padding-left: 60px;
+    padding-right: 60px;
+    margin-top: 60px;
+    @media (max-width: $mobile-resolution-max) {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
 }
 .searchInputBanner {
     padding: 20px 0;
@@ -1226,6 +1835,7 @@ a.anchor {
     width: 100%;
     border-spacing: 0;
     border-collapse: collapse;
+    border: none;
 
 
     /* reset borders applied by the generic table rule */
@@ -1271,7 +1881,7 @@ a.anchor {
     .cl-label p {
         display: inline-block;
         border: 1px solid var(--rel-notes-pill-border);
-        background-color: var(--rel-notes-tag-bg-color);
+        background-color: var(--rd-comp-color-button-primary-on-color-hover);
         color: var(--rel-notes-tag-text);
         font-size: 14px;
         font-weight: 300;
