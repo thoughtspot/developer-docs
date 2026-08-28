@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import './index.scss';
 import { customizeDocContent, addScrollListener } from './helper';
 import Footer from '../Footer';
@@ -7,6 +7,7 @@ import LinkableHeader from '../LinkableHeader';
 import WasThisHelpful from '../WasThisHelpful';
 import CopyPageDropdown from '../CopyPageDropdown';
 import { HOME_PAGE_ID } from '../../configs/doc-configs';
+import { isTutorialsPath } from '../../utils/app-utils';
 import parse, { HTMLReactParserOptions, domToReact, attributesToProps } from 'html-react-parser';
 
 const Document = (props: {
@@ -16,8 +17,65 @@ const Document = (props: {
     isPublicSiteOpen: boolean;
     shouldShowRightNav: boolean;
     breadcrumsData: any;
+    showWalkthroughsCrumb?: boolean;
     markdownBody?: string;
 }) => {
+    const openAssistantWithQuote = (text: string) => {
+        window.dispatchEvent(new CustomEvent('spotter-code-ask', { detail: { quotedText: text } }));
+    };
+    const [selectionPos, setSelectionPos] = useState<{ top: number; left: number } | null>(null);
+    const selectionRef = useRef<string>('');
+
+    useEffect(() => {
+        let mouseDownX = 0;
+        let mouseDownY = 0;
+
+        const handleMouseUp = (e: MouseEvent) => {
+            // The SpotterCode assistant is hidden entirely on tutorials pages (see
+            // FloatingAssistant and Document/helper.tsx) — don't surface this CTA there either.
+            if (isTutorialsPath(window.location.pathname)) return;
+
+            const target = e.target as HTMLElement;
+            if (target.closest('.selection-cta-button')) return;
+            if (target.closest('.floating-assistant__panel, .floating-assistant__chip-ring')) return;
+
+            // If mouse didn't move (plain click, not a drag-select), don't re-show
+            const moved = Math.abs(e.clientX - mouseDownX) > 3 || Math.abs(e.clientY - mouseDownY) > 3;
+            if (!moved) return;
+
+            const selection = window.getSelection();
+            const text = selection?.toString().trim() || '';
+            if (!text) {
+                setSelectionPos(null);
+                return;
+            }
+            const range = selection!.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            selectionRef.current = text;
+            const HEADER_HEIGHT = 108; // main header (60) + secondary header (48)
+            const BUTTON_HEIGHT = 36;
+            const rawTop = rect.top - BUTTON_HEIGHT - 6;
+            setSelectionPos({
+                top: Math.max(HEADER_HEIGHT + 4, rawTop),
+                left: Math.max(8, e.clientX - 80),
+            });
+        };
+
+        const handleMouseDown = (e: MouseEvent) => {
+            mouseDownX = e.clientX;
+            mouseDownY = e.clientY;
+            if ((e.target as HTMLElement).closest('.selection-cta-button')) return;
+            setSelectionPos(null);
+        };
+
+        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('mousedown', handleMouseDown);
+        return () => {
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mousedown', handleMouseDown);
+        };
+    }, []);
+
     useEffect(() => {
         customizeDocContent();
     }, [props.docContent]);
@@ -125,19 +183,39 @@ const Document = (props: {
     };
 
     const isHomePage = props.pageid === HOME_PAGE_ID;
+    // The walkthroughs overview is a card-grid landing page with no real body
+    // text to copy and no meaningful parent to link back to — hide the copy
+    // button and the breadcrumb there. tutorials-overview shows both like any
+    // other tutorial content page.
+    const isWalkthroughsLandingPage = props.pageid === 'walkthroughs';
+    const hideCopyPage = isWalkthroughsLandingPage;
 
     return (
         <div
             className="documentWrapper"
             style={!props.shouldShowRightNav ? { width: '100%' } : undefined}
         >
-            {!isHomePage && (
+            {selectionPos && (
+                <button
+                    className="selection-cta-button"
+                    style={{ top: selectionPos.top, left: selectionPos.left }}
+                    onClick={() => {
+                        const selected = selectionRef.current;
+                        setSelectionPos(null);
+                        openAssistantWithQuote(selected);
+                    }}
+                >
+                    Ask SpotterCode
+                </button>
+            )}
+            {!isHomePage && !isWalkthroughsLandingPage && (
                 <Breadcrums
                     breadcrumsData={props.breadcrumsData}
                     pageid={props.pageid}
+                    showWalkthroughsCrumb={props.showWalkthroughsCrumb}
                 />
             )}
-            {!isHomePage && props.isPublicSiteOpen && (
+            {!isHomePage && !hideCopyPage && props.isPublicSiteOpen && (
                 <div className="document-toolbar">
                     <CopyPageDropdown pageTitle={props.docTitle} markdownBody={props.markdownBody} />
                 </div>

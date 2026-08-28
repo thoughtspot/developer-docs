@@ -12,7 +12,7 @@ import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { Analytics } from '@vercel/analytics/react';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
-import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
+import { passThroughHandler, fetchChild, getPageIdFromHref } from '../../utils/doc-utils';
 import Header from '../Header';
 import SecondaryHeader, { DocCategory, CATEGORY_PAGEIDS, CATEGORY_NAV_ID } from '../SecondaryHeader';
 import LeftSidebar from '../LeftSidebar';
@@ -106,8 +106,20 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     });
     const [isDarkMode, setDarkMode] = useState<boolean>(() => {
         if (typeof window === 'undefined') return false;
+        // URL param takes highest priority (set by embedding product to pass its theme).
+        const urlParams = new URLSearchParams(window.location.search);
+        const darkModeParam = urlParams.get('isDarkMode');
+        if (darkModeParam !== null) {
+            const isDark = darkModeParam === 'true';
+            localStorage.setItem('themeMode', isDark ? 'dark' : 'light');
+            return isDark;
+        }
         // In-product (embedded) presentation always uses light mode — product UI has no theme toggle.
-        if (!isPublicSite(location.search)) return false;
+        if (!isPublicSite(location.search)){
+            const explicitChoice = localStorage.getItem('themeMode');
+            if (explicitChoice) return explicitChoice === 'dark';
+            return false;
+        }
         /* themeMode is only written when the user explicitly clicks the toggle.
            If absent, follow OS preference fresh every load. */
         const explicitChoice = localStorage.getItem('themeMode');
@@ -166,11 +178,18 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             version.iframeUrl === props?.pageContext?.iframeUrl,
     );
 
-    // True when loaded inside a VersionIframe (outer shell sets ?_iframe=1).
-    // Outer shell already renders SecondaryHeader, so suppress ours to avoid duplication.
+    // True when loaded inside a VersionIframe's nested <iframe> (its src carries ?_iframe=1).
+    // This is body content only — the outer wrapper page owns the chrome (Header/SecondaryHeader),
+    // so the nested content must never render its own copy.
     const isIframeMode =
         typeof window !== 'undefined' &&
         new URLSearchParams(location.search).get('_iframe') === '1';
+
+    // The walkthroughs overview is a card-grid landing page (like home) — no
+    // in-page nav to browse, so skip the left sidebar entirely and let the
+    // cards use the full width. tutorials-overview is presented like any other
+    // tutorial content page (left nav + right TOC), same as its own lessons.
+    const hideLeftNav = curPageNode.pageAttributes.pageid === 'walkthroughs';
 
     const isGQPlayGround =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
@@ -183,26 +202,41 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
 
     /* Build pageId → category map by parsing hrefs from each category's nav HTML.
      * This means writers only need to update nav-*.adoc — no TypeScript changes needed.
-     * Excludes the merged in-product nav, which isn't a real tab/category. */
+     * Skips any merged nav key that isn't a real tab/category (e.g. the in-product nav,
+     * or a content-only nav file like nav-release-notes.adoc that a category points to
+     * via CATEGORY_NAV_ID rather than being a category itself) — otherwise `cat` ends up
+     * as a bogus DocCategory and CATEGORY_NAV_ID[activeCategory] later resolves to
+     * undefined, crashing on the `.startsWith` call in activeNavContent below. */
     const pageIdToCategoryMap = React.useMemo(() => {
         if (typeof window === 'undefined') return {};
+        const knownCategories = new Set(Object.keys(CATEGORY_NAV_ID));
         const map: Record<string, DocCategory> = {};
         Object.entries(processedNavMap).forEach(([cat, html]) => {
-            if (cat === IN_PRODUCT_NAV_KEY) return;
+            if (cat === IN_PRODUCT_NAV_KEY || !knownCategories.has(cat)) return;
             const doc = new DOMParser().parseFromString(html as string, 'text/html');
             doc.querySelectorAll('a[href]').forEach((a) => {
-                const href = a.getAttribute('href') || '';
-                // hrefs are like /docs/pageid or /pageid — extract the last segment
-                const pageId = href.split('?')[0].split('/').filter(Boolean).pop();
-                if (pageId) map[pageId] = cat as DocCategory;
+                const pageId = getPageIdFromHref(a.getAttribute('href'));
+                if (!pageId) return;
+                map[pageId] = cat as DocCategory;
             });
         });
         return map;
     }, [processedNavMap]);
 
-    /* Detect active category from current page ID */
+    /* Detect active category from current page ID.
+     * Version-wrapper pages always build with curPageNode pinned to the default 'introduction'
+     * page (gatsby-node.js doesn't vary $pageId per version-wrapper page), so the real page
+     * being shown in the nested iframe is tracked via the ?pageid= query param instead. */
     useEffect(() => {
         const currentPageId = curPageNode.pageAttributes.pageid;
+        // tutorials-overview is also linked from nav.adoc's own "Tutorials" section
+        // (so it has a real breadcrumb entry), which would otherwise dynamically
+        // claim it under 'guides' and show the wrong sidebar. Force it under
+        // 'tutorials' so it gets nav-tutorials.adoc's sidebar like its own lessons.
+        if (currentPageId === 'tutorials-overview') {
+            setActiveCategory('tutorials');
+            return;
+        }
         // First try the auto-derived map from nav files
         if (pageIdToCategoryMap[currentPageId]) {
             setActiveCategory(pageIdToCategoryMap[currentPageId]);
@@ -213,7 +247,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             ([, pageIds]) => pageIds.includes(currentPageId),
         );
         if (found) setActiveCategory(found[0]);
-    }, [curPageNode.pageAttributes.pageid, pageIdToCategoryMap]);
+    }, [curPageNode.pageAttributes.pageid, pageIdToCategoryMap, isVersionedIframe, location.search]);
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -235,6 +269,12 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         if (isBrowser()) {
             // In-product (embedded) presentation always uses light mode.
             if (!isPublicSiteOpen) {
+                const explicitChoice = localStorage.getItem('themeMode');
+                if (explicitChoice) {
+                    const isDark = explicitChoice === 'dark';
+                    setDarkMode(isDark);
+                    return;
+                }
                 setDarkMode(false);
                 setKey('dark');
                 return;
@@ -265,6 +305,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                 const newDarkMode = darkModeParam === 'true';
                 setDarkMode(newDarkMode);
                 localStorage.setItem('theme', newDarkMode ? 'dark' : 'light');
+                localStorage.setItem('themeMode', newDarkMode ? 'dark' : 'light');
             }
         }
     }, [location.search]);
@@ -354,7 +395,19 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                     if (hash) {
                         url.hash = hash;
                     }
+                    // Deliberately bypasses navigate()/React state: this only syncs the address
+                    // bar for shareable links/back-button. Routing it through navigate() would
+                    // update the `location` prop and re-trigger VersionIframe's src memo, causing
+                    // the iframe to reload the page it just navigated to internally.
                     window.history.replaceState({}, '', url.toString());
+
+                    // Keep the outer tab bar's active-category highlight in sync with content
+                    // navigated to via in-page links inside the iframe (not just outer tab
+                    // clicks), without relying on the location update suppressed above.
+                    const found = (Object.entries(CATEGORY_PAGEIDS) as [DocCategory, string[]][]).find(
+                        ([, pageIds]) => pageIds.includes(e.data.params.pageid),
+                    );
+                    if (found) setActiveCategory(found[0]);
                 }
             }
         };
@@ -428,24 +481,28 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         });
     }
 
-    const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
+    // The walkthroughs overview is a card-grid landing page like home — it has
+    // no in-page headings worth a right-nav TOC, and the extra 260px it reserves
+    // squashes the cards. tutorials-overview gets the normal right nav, same as
+    // any other tutorial content page.
+    const shouldShowRightNav =
+        params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID &&
+        params[TS_PAGE_ID_PARAM] !== 'walkthroughs';
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
             overlay: {
                 background: 'rgba(50,57,70, 0.9)',
-                zIndex: 10,
+                zIndex: 1100,
             },
             content: {
                 top: '50px',
-                left: 'auro',
-                right: 'auto',
+                left: 0,
+                right: 0,
                 bottom: 'auto',
-                width: isMaxMobileResolution ? '40%' : '100%',
+                width: isMaxMobileResolution ? '40%' : 'calc(100% - 32px)',
                 margin: 'auto',
-                transform: `translate(${
-                    isMaxMobileResolution ? '80%' : '0'
-                }, 70px)`,
+                transform: 'translate(0, 70px)',
                 border: 'none',
                 height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',
@@ -458,6 +515,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                 isOpen={showSearch}
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
+                portalClassName="DocsSearchModalPortal"
             >
                 <div
                     id="docsModal"
@@ -491,26 +549,29 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
     const renderDocTemplate = () => (
         <>
             {renderSearch()}
-            <div className="leftNavContainer">
-                <LeftSidebar
-                    backLink={getParentBackButtonLink()}
-                    navTitle={navTitle}
-                    navContent={activeNavContent}
-                    docWidth={width}
-                    location={location}
-                    setLeftNavOpen={setLeftNavOpen}
-                    leftNavOpen={leftNavOpen}
-                    isPublicSiteOpen={isPublicSiteOpen}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={setDarkMode}
-                    isDarkMode={isDarkMode}
-                    curPageid={curPageNode.pageAttributes.pageid}
-                    searchClickHandler={() => {
-                        setShowSearch(true);
-                        if (!isMaxMobileResolution) setLeftNavOpen(false);
-                    }}
-                />
-            </div>
+            {!hideLeftNav && (
+                <div className="leftNavContainer">
+                    <LeftSidebar
+                        backLink={getParentBackButtonLink()}
+                        navTitle={navTitle}
+                        navContent={activeNavContent}
+                        docWidth={width}
+                        location={location}
+                        setLeftNavOpen={setLeftNavOpen}
+                        leftNavOpen={leftNavOpen}
+                        isPublicSiteOpen={isPublicSiteOpen}
+                        isMaxMobileResolution={isMaxMobileResolution}
+                        setDarkMode={setDarkMode}
+                        isDarkMode={isDarkMode}
+                        curPageid={curPageNode.pageAttributes.pageid}
+                        isTutorialsNav={activeCategory === 'tutorials' || activeCategory === 'walkthroughs'}
+                        searchClickHandler={() => {
+                            setShowSearch(true);
+                            if (!isMaxMobileResolution) setLeftNavOpen(false);
+                        }}
+                    />
+                </div>
+            )}
             {isAskDocsPage ? (
                 <div className="documentBody">
                     <AskDocs />
@@ -519,6 +580,10 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                 <div
                     className={`documentBody ${
                         isHomePage ? 'doc-home' : 'doc-wrapper-detail'
+                    }${
+                        params[TS_PAGE_ID_PARAM] === 'walkthroughs'
+                            ? ' doc-walkthroughs'
+                            : ''
                     }`}
                 >
                     <div className="introWrapper">
@@ -529,6 +594,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                                 docTitle={docTitle}
                                 docContent={docContent}
                                 breadcrumsData={breadcrumsData}
+                                showWalkthroughsCrumb={activeCategory === 'walkthroughs'}
                                 isPublicSiteOpen={isPublicSiteOpen}
                                 markdownBody={curPageNode.fields?.markdownBody}
                             />
@@ -559,6 +625,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                     backLink={backLink}
                     isPublisSiteOpen={isPublicSiteOpen}
                     params={params}
+                    isDarkMode={isDarkMode}
                 />
             );
 
@@ -735,20 +802,25 @@ if (isVersionedIframe) {
                             : { height: '0px' }
                     }
                 ></div>
-                {!isIframeMode && !isVersionedIframe && (
+                {!isIframeMode && (
                     isPublicSiteOpen ? (
+                        // Standalone site: always show the full tab bar, including on an
+                        // older-version wrapper page — it's still top-level site chrome,
+                        // the version's actual content is just nested in the iframe below.
                         <SecondaryHeader
                             activeCategory={activeCategory}
                             onCategoryChange={setActiveCategory}
                             location={location}
                             leftNavOpen={leftNavOpen}
                             setLeftNavOpen={setLeftNavOpen}
+                            isVersionedIframe={isVersionedIframe}
                         />
-                    ) : !isMaxMobileResolution && (
+                    ) : !isVersionedIframe && !isMaxMobileResolution && (
                         // In-product presentation has no tabs — show just the nav
                         // toggle so the sidebar stays reachable on narrow viewports.
                         // Desktop-width embeds skip this entirely; the sidebar is
-                        // always visible there.
+                        // always visible there. Version-wrapper pages have no sidebar
+                        // to toggle (they render only the VersionIframe), so skip here too.
                         <SecondaryHeader
                             activeCategory={activeCategory}
                             onCategoryChange={setActiveCategory}
@@ -766,7 +838,14 @@ if (isVersionedIframe) {
                         isIframeMode
                             ? { height: '100lvh' }
                             : isVersionedIframe
-                                ? { height: 'calc(100lvh - 65px)' }
+                                ? {
+                                      // Public site now renders both Header (65px) and the full
+                                      // SecondaryHeader (44px) above this wrapper's iframe; the rare
+                                      // in-product deep-link case keeps its prior single-offset calc.
+                                      height: isPublicSiteOpen
+                                          ? 'calc(100lvh - 65px - 44px)'
+                                          : 'calc(100lvh - 65px)',
+                                  }
                                 : !isPublicSiteOpen
                                     ? (!isMaxMobileResolution
                                         ? { height: 'calc(100lvh - 48px)' }
