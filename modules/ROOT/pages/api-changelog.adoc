@@ -15,30 +15,8 @@ This page documents the changes introduced in each release of the Visual Embed S
 |[tag greenBackground]#NEW FEATURE# a|
 
 [discrete]
-===== Browser history management in full application embedding
-To override the browser history behavior for embedding application users and prevent users from getting trapped in back-button loops inside the embedded iframe environment, you can now set `overrideHistoryState` in the Visual Embed SDK.
-
-
-////
-[source,JavaScript]
-----
-import { AppEmbed, init, AuthType } from '@thoughtspot/visual-embed-sdk';
-
-init({
-  thoughtSpotHost: 'https://<hostname>.thoughtspot.cloud',
-  authType: AuthType.TrustedAuthToken,
-  getAuthToken: () => fetch('/ts-token').then(r => r.json()).then(d => d.token),
-});
-
-const embed = new AppEmbed('#embed-container', {
-  frameParams: { width: '100%', height: '100%' },
-  overrideHistoryState: true, // <1>
-});
-
-embed.render();
-----
-<1> When set to `true`, ThoughtSpot replaces rather than pushes browser history entries during internal navigation.
-////
+===== Browser history management in embedded application
+To override the browser history behavior for embedding application users, you can now set `overrideHistoryState` in the Visual Embed SDK. Use this setting in your embed when the in-app navigation between objects pushes multiple entries onto the host application's browser history stack. When set to `true`, this feature prevents users from getting trapped in back-button loops inside the embedded iframe.
 
 |[tag greenBackground]#NEW FEATURE# a|
 
@@ -48,7 +26,224 @@ The `HomeLeftNavItem.Collections` enum value is now available in the Visual Embe
 
 For more information, see xref:full-app-customize.adoc[Customize full application embedding].
 
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== Starter prompt configuration for Spotter embed
+The SDK introduces starter prompt configuration properties for the embedded Spotter interface. The `StarterPromptsConfig` interface allows you to set or disable specific elements such as quick search, deep analysis, and data literacy pills on the Spotter page.  \
+
+The `starterPrompts` object allows you to enable
+
+Customizes the labels and questions of the Spotter starter prompts. Individual pills are hidden or shown with hiddenActions / visibleActions using Action.QuickSearchPill, Action.DeepAnalysisPill and Action.DataLiteracyPill.
+
+
+For more information, see xref:customize-spotter-embed.adoc#_spotter_starter_prompts[Spotter quick starter prompts].
+
+
+
+
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== Spotter starter-prompt pill actions
+The SDK introduces the following `Action` IDs to control the visibility of starter prompt pills in the Spotter chat interface.  Spotter chat starter-prompt pills. You can use these action IDs to show or hide specific starter-prompt categories in the embedded Spotter interface.
+
+
+The Basic Search starter prompt pill.
+
+Starter prompt pills are the row of category buttons shown above the Spotter chat input before a conversation starts. They give a new user ready-made questions to click instead of typing one from scratch, and disappear once the conversation begins. There are three, one per action below.
+
+Clicking this pill opens a card of suggested simple questions; picking one submits it to Spotter right away. Visible by default, and hidden along with the other pills when the surface itself is off
+
+* `Action.QuickSearchPill` — Controls the *Basic Search* starter-prompt pill shown above the Spotter chat input.
+* `Action.DeepAnalysisPill` — Controls the *Deep Analysis* starter-prompt pill.
+* `Action.DataLiteracyPill` — Controls the *Data Literacy* starter-prompt pill. This pill submits a fixed prompt describing the connected data source.
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed('#ts-embed', {
+  // Hide the Deep Analysis pill
+  disabledActions: [Action.DeepAnalysisPill],
+  // Alternatively, hide all three:
+  // disabledActions: [Action.QuickSearchPill, Action.DeepAnalysisPill, Action.DataLiteracyPill],
+});
+
+spotterEmbed.render();
+----
+
+These action IDs can be passed in `disabledActions`, `hiddenActions`, or `visibleActions` on any embed type where Spotter is available (`SpotterEmbed`, `AppEmbed`, `LiveboardEmbed`).
+
+For more information, see xref:embed-actions.adoc[Show or hide actions] and xref:customize-spotter-embed.adoc#_spotter_starter_prompts[Spotter quick starter prompts].
+
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== Pre-render configuration object
+
+The SDK introduces the `PreRenderConfig` interface, which bundles pre-rendering settings into a single object:
+
+* `preRenderId` — Unique identifier for the pre-rendered embed instance.
+* `preRenderContainer` — DOM element or selector for the pre-render container.
+* `doNotTrackPreRenderSize` — When `true`, disables automatic size tracking of the pre-render container.
+* `zIndex` — Z-index for the pre-rendered iframe.
+
+Use the new `preRenderConfig` property on `BaseViewConfig` instead of the individual top-level properties.
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed-container', {
+  liveboardId: '<liveboard-guid>',
+  preRenderConfig: {
+    preRenderId: 'my-pre-render',
+    preRenderContainer: document.getElementById('pre-render-div'),
+    doNotTrackPreRenderSize: false,
+    zIndex: 100,
+  },
+});
+----
+
+[IMPORTANT]
+====
+The following top-level properties are now [.version-badge.deprecated]#Deprecated# in favor of `preRenderConfig`:
+
+* `preRenderId`
+* `preRenderContainer`
+* `doNotTrackPreRenderSize`
+
+The deprecated properties continue to work but will be removed in a future release. Migrate to `preRenderConfig` when updating your integration.
+====
+
+For more information, see xref:prerender.adoc[Pre-rendering ThoughtSpot embed components].
+
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== Exported host-event contract types
+
+// SOURCE: SCAL-325540
+
+The SDK now publicly exports host-event contract types that were previously internal-only. This allows TypeScript consumers to strongly type `embed.trigger(HostEvent.X, payload)` calls without importing internal modules.
+
+Newly exported types include:
+
+* `UIPassthroughContractBase`, `UIPassthroughRequest`, `UIPassthroughResponse`, `UIPassthroughArrayResponse`
+* `HostEventRequest`, `HostEventResponse`
+* `TriggerPayload`, `TriggerResponse`
+* `LiveboardTab`, `LiveboardGroup`
+* `Applicability`, `ApplicabilityLevel`
+* `FilterUpdate`, `LiveboardFilter`, `LiveboardParameter`
+* `SpotterAnalystConfig`
+* `StarterPromptsConfig`, `StarterPromptCategory`, `StarterPreviewDataCategory`, `StarterPromptQuestion`
+
+[source,TypeScript]
+----
+import {
+  HostEvent,
+  HostEventRequest,
+  TriggerResponse,
+  LiveboardFilter,
+} from '@thoughtspot/visual-embed-sdk';
+
+// Strongly typed trigger call
+const response: TriggerResponse = await embed.trigger(
+  HostEvent.UpdateRuntimeFilters,
+  { filters: myFilters } as HostEventRequest,
+);
+----
+
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== CSS variable for unsaved filter indicator
+
+A new CSS variable `--ts-var-unsaved-filter-indicator-color` is available to customize the color of the "unsaved changes" indicator dot shown on filter and parameter chips.
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed-container', {
+  liveboardId: '<liveboard-guid>',
+  customizations: {
+    style: {
+      customCSS: {
+        variables: {
+          '--ts-var-unsaved-filter-indicator-color': '#FF6B35',
+        },
+      },
+    },
+  },
+});
+----
+
+For more information, see xref:css-customization.adoc[CSS customization framework].
+
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== Liveboard Schedules page in full application embedding
+
+The `Page.LiveboardSchedules` enum value (`'liveboard-schedules'`) is now available for full application embedding. Use this value to navigate users directly to the Liveboard schedules list page.
+
+[source,JavaScript]
+----
+import { AppEmbed, Page } from '@thoughtspot/visual-embed-sdk';
+
+const embed = new AppEmbed('#embed-container', {
+  pageId: Page.LiveboardSchedules,
+});
+
+embed.render();
+----
+
+|[tag greenBackground]#NEW FEATURE# a|
+
+[discrete]
+===== Insight tile CSS variables
+
+New CSS variables are available to customize the Liveboard insight tile appearance:
+
+* `--ts-var-liveboard-insight-tile-background` — Background color of the insight tile.
+* `--ts-var-liveboard-insight-tile-icon-color` — Color of the insight tile icon.
+* `--ts-var-liveboard-insight-tile-success-color` — Color used for positive/success indicators.
+* `--ts-var-liveboard-insight-tile-failure-color` — Color used for negative/failure indicators.
+
+// SOURCE: SCAL-325451
+
+For more information, see xref:css-customization.adoc[CSS customization framework].
+
+|[tag greenBackground]#MODIFIED# a|
+
+[discrete]
+===== Lazy loading defaults changed for full-height embeds
+
+// SOURCE: SCAL-333385
+
+When `fullHeight` is set to `true` on `AppEmbed` or `LiveboardEmbed`, the following lazy loading parameters now **default to enabled** (previously they defaulted to disabled):
+
+* `lazyLoadingForFullHeight` — defaults to `true`
+* `enableScrollableContainerLazyLoading` — defaults to `true`
+* `lazyLoadingMargin` — defaults to `'500px 0px'`
+
+This improves initial load performance for large Liveboards. If your integration relies on all visualizations loading immediately when `fullHeight` is enabled, you must now explicitly set these parameters to `false`.
+
+[source,JavaScript]
+----
+// To restore previous behavior (all visualizations load immediately):
+const embed = new LiveboardEmbed('#embed-container', {
+  liveboardId: '<liveboard-guid>',
+  fullHeight: true,
+  lazyLoadingForFullHeight: false,
+  enableScrollableContainerLazyLoading: false,
+});
+----
+
+For more information, see xref:lazy-loading-fullheight.adoc[Lazy loading of Liveboard visualizations].
+
 |====
+
+
+
+
+
 
 
 == Version 1.51.x, August 2026
