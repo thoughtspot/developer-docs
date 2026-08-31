@@ -126,18 +126,56 @@ Connection configurations with the `PROCESSES` policy type route background syst
 |Yes, use `ROW_COUNT_STATS` in `policy_processes`.
 
 |`SECURE_SAMPLING`
-|On-demand queries that fetch sample values for columns configured with *Secure suggestions*, issued at user search time.
+|On-demand queries that fetch sample values for model columns configured with *Secure suggestions*, issued at user search time. These queries run regardless of the model column's Index type setting — sample values always flow to Spotter.
 |No, always runs against the primary warehouse.
 
 |`SECURE_MATCH_VALUES`
-|On-demand queries that resolve Spotter suggestion matches for RLS-protected columns, issued at user search time.
+|On-demand queries that resolve Spotter suggestion matches for model columns whose source table has an RLS rule applied, issued at user search time. Requires the model column's Index type to be set to *Default*.
 |No, always runs against the primary warehouse.
 |=====
 
+[NOTE]
+====
+`SECURE_SAMPLING` and `SECURE_MATCH_VALUES` are not interchangeable:
+
+* `SECURE_SAMPLING` fetches sample values for Spotter and runs regardless of the model column's Index type setting. Sample values always flow to Spotter.
+* `SECURE_MATCH_VALUES` resolves exact suggestion matches for model columns where the source table has an RLS rule. It requires the model column's Index type to be set to *Default*. This requirement does not apply to `SECURE_SAMPLING`.
+====
+
 `SECURE_SAMPLING` and `SECURE_MATCH_VALUES` are not background jobs. They are issued on demand while a user is searching or asking a Spotter question, and they must return quickly to keep the search responsive. A secondary warehouse cannot guarantee that response time, because it is typically sized and scheduled for background workloads that run during a specific window of the day. For this reason, these query types are excluded from the `policy_processes` routing configuration and always run against the primary warehouse.
 
-If the volume of `SECURE_SAMPLING` queries is higher than expected, check your Model configuration. Columns that do not require RLS-compliant suggestions should be set to *Inherit table settings* or *Don't show suggestions* in the Suggestion settings column.
+=== When to use Secure suggestions
+
+A model column requires *Secure suggestions* when **all** of the following are true:
+
+* The source table has an RLS rule applied to it, *or* the model column is sourced from a table joined to a table with an RLS rule.
+* The model column is indexed for type-ahead or Spotter value suggestions.
+* The column values must be filtered per user. A user must not see suggestion values from rows they are not permitted to query.
+
+If none of these conditions apply, enabling *Secure suggestions* on a model column adds `SECURE_SAMPLING` query load without any security benefit.
+
+.Example: When a JOIN makes Secure suggestions necessary
+[%collapsible]
+====
+Consider a model built from two Snowflake tables:
+
+* `ORDERS` — contains order details. An RLS rule restricts each user to their own region's orders.
+* `PRODUCTS` — a global lookup table of product names. No RLS rule is applied to `PRODUCTS`.
+
+The model joins `ORDERS` to `PRODUCTS`.
+
+*Scenario 1 — Secure suggestions needed:*
+A model column sourcing `PRODUCTS.product_name` is indexed for Spotter suggestions. Even though `PRODUCTS` itself has no RLS rule, the rows visible through the join are already scoped by the `ORDERS` RLS rule. Without *Secure suggestions*, Spotter could surface product names from orders the user cannot see. In this case, enable *Secure suggestions* on this model column.
+
+*Scenario 2 — Secure suggestions not needed:*
+A model column sourcing `PRODUCTS.product_category` is a global classification (for example, "Electronics", "Clothing"). Every user sees the same categories regardless of their RLS context. Enabling *Secure suggestions* here generates unnecessary `SECURE_SAMPLING` queries. Set this model column's Suggestion type to *Inherit table settings* or *Don't show suggestions* instead.
+
+NOTE: *Inherit table settings* inherits the suggestion security setting from the source table and applies it everywhere — not just in type-ahead or Knowledge cards.
+====
+
+If the volume of `SECURE_SAMPLING` queries is higher than expected, audit each model column configured with *Secure suggestions*. If the source table has no RLS rule and is not joined to a table with an RLS rule, set the model column's Suggestion type to *Inherit table settings* or *Don't show suggestions* to eliminate the unnecessary `SECURE_SAMPLING` load.
 
 == Additional Resources
 * xref:connections.adoc[Connections]
 * xref:rest-api-v2-reference.adoc[REST APIs v2]
+* link:https://docs.thoughtspot.com/cloud/{{version}}/data-modeling-suggestion-settings[Suggestion settings] (ThoughtSpot product documentation)
