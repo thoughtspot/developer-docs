@@ -1,0 +1,106 @@
+= Embed the Liveboard view
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Embed the Liveboard view
+:page-pageid: spottercode-embed__embed-liveboard-view
+:page-description: Prompt SpotterCode to generate the React code for embedding a ThoughtSpot Liveboard.
+
+With `init()` in place, the first goal is to render a host's listing-performance Liveboard inside the SpotStay portal. Write a specific prompt rather than a vague one:
+
+[source,text]
+----
+"I want to embed a ThoughtSpot Liveboard showing listing performance in my React app.
+Use the available tools to get this information and generate the embed code."
+----
+
+[div videoContainer]
+--
+video::./images/mktng-tutorials/lb-embed-prompt.mp4[width=100%,options="autoplay,loop"]
+--
+
+What SpotterCode needs to complete the task:
+
+* The ThoughtSpot host URL (already set in `init()`)
+* The Liveboard GUID (retrieved from the Developer Playground)
+* Confirmation of the authentication type you're already using
+
+[source,javascript]
+----
+import { LiveboardEmbed, useEmbedRef } from '@thoughtspot/visual-embed-sdk/react';
+
+const HostDashboard = () => {
+    const embedRef = useEmbedRef();
+
+    return (
+        <LiveboardEmbed
+            ref={embedRef}
+            liveboardId="<your-spotstay-listing-liveboard-guid>"
+        />
+    );
+};
+
+export default HostDashboard;
+----
+
+[#make-it-host-specific]
+== Make it host-specific
+
+A shared Liveboard shows every listing on the platform. You need each host to see only their own. Prompt for a runtime filter scoped to the logged-in host:
+
+[source,text]
+----
+"Show a code example for embedding a Liveboard with a runtime filter where host_id equals
+the logged-in user's ID, using the Visual Embed SDK for React."
+----
+
+[source,javascript]
+----
+import {
+    LiveboardEmbed,
+    useEmbedRef,
+    HostEvent,
+    RuntimeFilterOp,
+} from '@thoughtspot/visual-embed-sdk/react';
+
+const HostDashboard = ({ hostId }) => {
+    const embedRef = useEmbedRef();
+
+    const onLiveboardRendered = () => {
+        embedRef.current.trigger(HostEvent.UpdateRuntimeFilters, [
+            {
+                columnName: 'host_id',
+                operator: RuntimeFilterOp.EQ,
+                values: [hostId],
+            },
+        ]);
+    };
+
+    return (
+        <LiveboardEmbed
+            ref={embedRef}
+            liveboardId="spotstay-listing-performance-lb"
+            onLiveboardRendered={onLiveboardRendered}
+        />
+    );
+};
+
+export default HostDashboard;
+----
+
+[NOTE]
+====
+Your prompt has to carry business context ("the logged-in user's ID") that isn't in any documentation. SpotterCode generates the mechanism; you supply the SpotStay-specific meaning.
+====
+
+[div videoContainer]
+--
+video::./images/mktng-tutorials/analytics.mp4[width=100%,options="autoplay,loop"]
+--
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/spottercode-embed/set-up-spottercode">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/spottercode-embed/embed-spotter">Next &rarr;</a>
+</div>
+++++

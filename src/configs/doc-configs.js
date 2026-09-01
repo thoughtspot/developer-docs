@@ -22,8 +22,8 @@ module.exports = {
         //   'https://developers.thoughtspot.com/docs/26.3.0.cl?pageid=whats-new'
         // - GA: ' /docs/whats-new'
         //linkHref: '/docs/whats-new',
-        linkHref: '/docs/26.8.0.cl?pageid=whats-new',
-        linkText: 'Version 26.8.0.cl',
+        linkHref: '/docs/26.9.0.cl?pageid=whats-new',
+        linkText: 'Version 26.9.0.cl',
         openInNewTab: true,
     },
     TYPE_DOC_PREFIX: 'typedoc',
@@ -48,10 +48,10 @@ module.exports = {
     },
     VERSION_DROPDOWN: [
 	    {
-            label: '26.8.0.cl',
-            link: '26.8.0.cl',
+            label: '26.9.0.cl',
+            link: ' ',
             subLabel: 'Cloud (Latest)',
-            iframeUrl: 'https://developer-docs-26-8-0-cl.vercel.app/docs/',
+            iframeUrl: 'https://developer-docs-26-9-0-cl.vercel.app/docs/',
         },
     ],
     CUSTOM_PAGE_ID: {
@@ -117,7 +117,7 @@ module.exports = {
                 'rest-api-v2', 'rest-apiv2-reference', 'restV2-playground',
                 'rest-apiv2-getstarted', 'api-authv2', 'rest-apiv2-js',
                 'rest-apiv2-search', 'rest-apiv2-users-search', 'rest-apiv2-groups-search',
-                'rest-apiv2-metadata-search', 'fetch-data-and-report-apis',
+                'rest-apiv2-metadata-search', 'fetch-data-and-report-apis', 'report-apis',
                 'rest-api-sdk', 'rest-api-sdk-typescript', 'rest-api-sdk-java',
                 'rest-api-getstarted', 'api-auth-session', 'catalog-and-audit',
                 'rest-api-pagination', 'runtime-sort', 'v1v2-comparison',
@@ -125,7 +125,7 @@ module.exports = {
                 'session-api', 'user-api', 'group-api', 'role-api', 'security-api',
                 'admin-api', 'database-api', 'orgs-api', 'search-data-api', 'materialization-api',
                 'liveboard-data-api', 'liveboard-export-api', 'push-data', 'logs-api',
-                'audit-logs', 'tml', 'collections', 'connections',
+                'audit-logs', 'tml', 'tml-import', 'tml-export', 'collections', 'connections',
                 'connection-config', 'connections-api', 'api-user-management', 'rbac',
                 'webhooks-rest-api', 'rest-v2-changelog', 'rest-v1-changelog',
             ],

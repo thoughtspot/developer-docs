@@ -9,19 +9,23 @@ import './index.scss';
 export type DocCategory =
     | 'all'
     | 'guides'
+    | 'walkthroughs'
     | 'embedding'
     | 'rest-api'
     | 'mcp-server'
     | 'spottercode'
+    | 'tutorials'
     | 'whats-new';
 
 export const CATEGORY_LABELS: Record<DocCategory, string> = {
     all: 'All docs',
     guides: 'Developer guides',
+    walkthroughs: 'Guided Walkthroughs',
     embedding: 'Embedding',
     'rest-api': 'REST APIs',
     'mcp-server': 'MCP server',
     spottercode: 'SpotterCode',
+    tutorials: 'Tutorials',
     'whats-new': "What's new",
 };
 
@@ -31,10 +35,12 @@ export const CATEGORY_LABELS: Record<DocCategory, string> = {
 export const CATEGORY_LANDING: Record<DocCategory, string> = {
     all: '/introduction',
     guides: '/introduction',
+    walkthroughs: '/tutorials/walkthroughs',
     embedding: '/getting-started',
     'rest-api': '/rest-apis',
     'mcp-server': '/mcp-integration',
     spottercode: '/SpotterCode',
+    tutorials: '/tutorials/tutorials-overview',
     'whats-new': '/whats-new',
 };
 
@@ -45,11 +51,13 @@ export const CATEGORY_LANDING: Record<DocCategory, string> = {
 export const CATEGORY_NAV_ID: Record<DocCategory, string> = {
     all: 'nav',
     guides: 'nav',
+    walkthroughs: 'nav-walkthroughs',
     embedding: 'nav-embedding',
     'rest-api': 'nav-rest-api',
     'mcp-server': 'nav-mcp-server',
     spottercode: 'nav-spottercode',
-    'whats-new': 'nav',
+    tutorials: 'nav-tutorials',
+    'whats-new': 'nav-release-notes',
 };
 
 /*
@@ -70,6 +78,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
         'webhooks-overview', 'webhooks-ui', 'webhooks-comm-channel', 'webhooks-lb-schedule',
         'webhooks-s3-integration', 'webhooks-gcs-storage', 'webhooks-lb-payload', 'webhooks-kpi',
     ],
+    walkthroughs: [],
     embedding: [
         'getting-started', 'tsembed', 'embed-liveboard', 'embed-a-viz',
         'embed-ai-search-analytics', 'embed-spotter', 'embed-spotter-agent',
@@ -99,10 +108,11 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
     ],
     'rest-api': [
         'rest-apis', 'api-user-management', 'rbac', 'spotter-api', 'audit-logs', 'tml',
+        'tml-import', 'tml-export',
         'collections', 'connections', 'connection-config',
         'rest-apiv2-getstarted', 'api-authv2', 'rest-apiv2-js', 'rest-apiv2-search',
         'rest-apiv2-users-search', 'rest-apiv2-groups-search', 'rest-apiv2-metadata-search',
-        'fetch-data-and-report-apis', 'rest-api-sdk', 'rest-api-sdk-typescript', 'rest-api-sdk-java',
+        'fetch-data-and-report-apis', 'report-apis', 'rest-api-sdk', 'rest-api-sdk-typescript', 'rest-api-sdk-java',
         'rest-api-getstarted', 'api-auth-session', 'catalog-and-audit', 'rest-api-pagination',
         'runtime-sort', 'v1v2-comparison', 'graphql-guide',
         'webhooks-rest-api', 'rest-v2-changelog', 'rest-v1-changelog',
@@ -114,6 +124,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
     spottercode: [
         'SpotterCode', 'integrate-SpotterCode', 'spottercode-prompting-guide',
     ],
+    tutorials: [],
     'whats-new': [
         'whats-new', 'fixed-issues', 'known-issues', 'deprecated-features',
         'embed-sdk-changelog', 'mobile-sdk-changelog',
@@ -130,13 +141,24 @@ const SecondaryHeader = (props: {
     // In-product (embedded) presentation has no category tabs/AskDocs — render just the
     // mobile nav-toggle so the left sidebar stays reachable on narrow viewports.
     minimal?: boolean;
+    // True on an older-version wrapper page: its content is a nested iframe pointing at a
+    // separate frozen deployment, so a tab click must swap that iframe's page via the
+    // ?pageid= param instead of navigating this (unversioned) site to CATEGORY_LANDING.
+    isVersionedIframe?: boolean;
 }) => {
     const {
         activeCategory, onCategoryChange, location, leftNavOpen, setLeftNavOpen, minimal,
+        isVersionedIframe,
     } = props;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
+    // 'tutorials' and 'walkthroughs' intentionally excluded — reachable from links
+    // inside nav.adoc's own sidebar rather than a secondary-header tab, and the
+    // secondary header/left sidebar are hidden altogether on their card-grid overview
+    // pages (see DevDocTemplate). Their category config (label/landing/nav id/pageids)
+    // still exists above — it's what makes nav-tutorials.adoc/nav-walkthroughs.adoc
+    // resolve as the active sidebar once you're on one of their pages.
     const categories: DocCategory[] = [
         'guides', 'embedding', 'rest-api', 'mcp-server', 'spottercode', 'whats-new',
     ];
@@ -145,9 +167,23 @@ const SecondaryHeader = (props: {
         onCategoryChange(cat);
         setMobileMenuOpen(false);
         const landing = CATEGORY_LANDING[cat];
-        if (landing) {
-            navigate(landing);
+        if (!landing) return;
+        if (isVersionedIframe) {
+            // Stay on this wrapper page and retarget the nested iframe instead of
+            // navigating to the unversioned CATEGORY_LANDING page, which would drop
+            // the user out of the pinned older version.
+            // Query-only (no pathname) so the browser resolves it relative to the
+            // current URL via pushState's native relative-URL resolution. Building
+            // the target from location.pathname here duplicated the site's /docs
+            // pathPrefix in production (404s), while working fine in local dev,
+            // which has no prefix — root cause in Gatsby's routing not fully
+            // isolated, but this sidesteps the pathname reconstruction entirely.
+            const params = new URLSearchParams(location.search);
+            params.set('pageid', landing.replace(/^\//, ''));
+            navigate(`?${params.toString()}`);
+            return;
         }
+        navigate(landing);
     };
 
     useEffect(() => {
@@ -241,12 +277,6 @@ const SecondaryHeader = (props: {
                                     {CATEGORY_LABELS[cat]}
                                 </button>
                             ))}
-                            <button
-                                className="secondary-header__mobile-item"
-                                onClick={() => { navigate('/ask-docs'); setMobileMenuOpen(false); }}
-                            >
-                                AskDocs
-                            </button>
                         </div>
                     )}
                 </div>
@@ -256,14 +286,6 @@ const SecondaryHeader = (props: {
                 <div className="secondary-header__mobile-version">
                     <Dropdown location={location} isMobile={false} />
                 </div>
-
-                {/* Desktop only: AskDocs link */}
-                <button
-                    className="secondary-header__askdocs"
-                    onClick={() => navigate('/ask-docs')}
-                >
-                    AskDocs <span className="secondary-header__beta">Beta</span>
-                </button>
             </div>
         </nav>
     );

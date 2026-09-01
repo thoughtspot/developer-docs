@@ -1,0 +1,145 @@
+= Step 1: Set up the project
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Step 1: Set up the project
+:page-pageid: embed-data-driven-app__step-01
+:page-description: Allowlist your portal domain, get the cluster hostname, choose an auth type, and scaffold the project files.
+
+Before you write a single line of embed code, four things need to be settled: the portal's domain needs to be allowlisted, you need the actual cluster hostname, you need to know which auth type you're building against, and you need the project files scaffolded.
+Skipping them is the fastest way to spend an afternoon debugging a CORS error and blaming the code.
+
+== 1. Allowlist the portal domain
+
+In the ThoughtSpot UI, an admin or developer-privileged user goes to *Develop* > *Customizations* > *Security Settings* and adds your portal's domain (for example, `+https://spotstay.com+`) to the CSP and CORS allowlists.
+Without this, the browser blocks the embed regardless of how correct the code is.
+
+This is a one-time, admin-side setup step: not something the SDK or any tooling generates for you.
+Do this first, so you aren't debugging a CORS error later and assuming it's your code.
+
+== 2. Get the cluster hostname
+
+Your ThoughtSpot instance lives at a specific hostname.
+For a Cloud instance, it looks like `spotstay.thoughtspot.cloud`.
+It's visible in the browser URL bar whenever you're logged into the ThoughtSpot UI, and it's also listed under *Develop* > *REST API Playground*, which shows the fully qualified host any API call needs to target.
+This is the value that goes into `thoughtSpotHost`. If you get it wrong, every embed on the page renders blank.
+
+== 3. Choose an auth type
+
+The tutorial-friendly option is `AuthType.None`.
+It prompts for a ThoughtSpot login at runtime and is fine for local development.
+It is not what ships to hosts in production.
+
+The production-recommended pattern is Trusted Authentication: your own backend exchanges credentials for a token server-side, and hosts are signed in to the embed silently. No ThoughtSpot login screen, no separate ThoughtSpot license per user.
+Setting this up means standing up a small token-issuing endpoint on your side. It's a separate build from the embed code itself, and worth planning for before this goes past a demo.
+
+See xref:embed-authentication.adoc[Authentication] for the full option set, `AuthType.None`, `AuthType.Basic`, `AuthType.TrustedAuthToken`, `AuthType.TrustedAuthTokenCookieless`, and SSO-based flows, and which fits your setup.
+
+== 4. Create the project structure
+
+With the domain allowed, the hostname in hand, and an auth type picked, create a small project folder.
+This matches the structure in the SpotStay example repo on GitHub:
+
+[source]
+----
+spotstay-embed/
+├── index.html   # Page shell + wrapper app navigation
+├── app.js       # All embedding code (SpotterEmbed, LiveboardEmbed, custom actions)
+└── styles.css   # Host app styling
+----
+
+Install the SDK:
+
+[source,shell]
+----
+npm install @thoughtspot/visual-embed-sdk
+----
+
+In `app.js`, import the components you'll use:
+
+[source,javascript]
+----
+import {
+  SpotterEmbed,
+  LiveboardEmbed,
+  AuthType,
+  init,
+  EmbedEvent,
+  HostEvent,
+} from '@thoughtspot/visual-embed-sdk';
+----
+
+[NOTE]
+====
+For a throwaway prototype, the CDN import works just as well: swap the package import for a `<script type="module" src="app.js">` pointed at the jsDelivr build.
+Use npm if this is going into a real app.
+====
+
+`index.html` owns the page chrome, nav bar, container `div`, and nothing else.
+ThoughtSpot doesn't need to know anything about the rest of the portal:
+
+[source,html]
+----
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SpotStay Portal</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <nav class="app-nav">
+    <span class="brand">SpotStay</span>
+    <button data-view="liveboard" class="nav-btn active">Dashboard</button>
+    <button data-view="spotter" class="nav-btn">Ask a question</button>
+  </nav>
+
+  <main>
+    <div id="ts-embed"></div>
+    <div id="detail-panel" class="hidden"></div>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
+----
+
+`app.js` initializes the SDK once, near the top of the file.
+Always call `init()` before calling `render()` on any embed component:
+
+[source,javascript]
+----
+const tsURL = 'https://spotstay.thoughtspot.cloud';
+
+init({
+  thoughtSpotHost: tsURL,
+  authType: AuthType.None, // <1>
+});
+----
+<1> `AuthType.None` is fine while you're iterating locally: you get a one-time login popup and the session holds until it expires.
+Before this touches production, swap in a token-based `AuthType` such as `AuthType.TrustedAuthTokenCookieless`, so hosts are authenticated silently through your own backend, not a ThoughtSpot login popup.
+
+Then add tab-switching logic so the nav bar swaps embeds:
+
+[source,javascript]
+----
+const container = document.getElementById('ts-embed');
+
+document.querySelectorAll('.nav-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    container.innerHTML = '';
+    btn.dataset.view === 'spotter' ? renderSpotter() : renderLiveboard();
+  });
+});
+
+renderLiveboard(); // default view on load
+----
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/embed-data-driven-app/step-00">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/embed-data-driven-app/step-02">Next &rarr;</a>
+</div>
+++++
