@@ -172,6 +172,51 @@ Starting from Visual Embed SDK 1.52.0, the top-level pre-render properties are d
 This approach is the fastest way to load the embed, but it is also the most resource-intensive.
 The SDK makes calls to the ThoughtSpot API to fetch the Liveboard data and metadata, which might be unwanted if the end user never views the embed.
 
+
+== Mount the pre-rendered embed in a specific container
+By default, the SDK attaches pre-rendered iframes as child components of the document body. The `containerSelector` property in `preRenderConfig` tells the SDK which element on your page to mount the pre-rendered embed inside instead.
+
+This is useful when the browser window itself does not scroll, but an inner container does. Mounting the pre-rendered embed inside the scrolling container ensures the embed positions and sizes itself correctly within your application's layout.
+
+For example, if the window does not scroll, `#app-scroll` does, and the embed element sits inside it:
+
+[source,HTML]
+----
+<div id="app-scroll">
+  <div id="tsEmbed"></div>
+</div>
+----
+
+Set `containerSelector` to the scrolling container:
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#tsEmbed', {
+  liveboardId: '<liveboard-guid>',
+  preRenderConfig: {
+    id: 'my-liveboard',
+    containerSelector: '#app-scroll',
+  },
+});
+
+// Warm the Liveboard up front, for example on your landing page.
+await embed.preRender();
+
+// Reveal it when the user navigates to the page that shows it.
+embed.showPreRender();
+----
+
+In React, set `containerSelector` on the `PreRendered*` component — the component that creates the pre-render:
+
+[source,JSX]
+----
+<PreRenderedLiveboardEmbed
+  liveboardId="<liveboard-guid>"
+  preRenderConfig={{ id: 'my-liveboard', containerSelector: '#app-scroll' }}
+/>
+----
+
+
 === Pre-render without the Liveboard ID
 In this approach, you load the common assets and common API calls early, but you defer the Liveboard-specific data/API calls until needed.
 
@@ -340,10 +385,36 @@ prefetch("https://<hostname>:<port>", [
 | On Demand | ❌ | ✅ No | ✅ No | ✅ | ✅ (on revisit), ❌ (first visit) | Best balance of performance and efficiency
 |=====
 
+== Keep the pre-render configuration in sync with the actual embed
+When you pre-render a Liveboard with `PreRenderedLiveboardEmbed`, pass the same configuration you intend to use on the real `LiveboardEmbed`, including the `liveboardId` and any flags that change the Liveboard's layout or behavior, such as `isLiveboardCompactHeaderEnabled` or `isLiveboardMasterpiecesEnabled`.
+
+These settings alter the rendered UI and the API calls ThoughtSpot makes to build the Liveboard. If a flag is set on `LiveboardEmbed` but was missing from the pre-rendered instance, the pre-rendered app cannot be reused as-is: it has to reload and re-fetch the Liveboard, which cancels the benefit of pre-rendering and reintroduces exactly the delay you were trying to avoid.
+
+As a best practice, pre-render with the exact configuration you intend to display, the same liveboardId, settings, and runtime overrides. When the pre-rendered configuration matches, the SDK reuses the existing instance directly, resulting in a near-instant load.
+
+[source,JSX]
+----
+// Pre-render early (hidden), with the full config
+<PreRenderedLiveboardEmbed
+  preRenderConfig={{ id: 'lb-preview' }}
+  liveboardId="<liveboard-guid>"
+  isLiveboardCompactHeaderEnabled={true}
+  isLiveboardMasterpiecesEnabled={true}
+/>
+
+// Later, show it — identical configuration settings, so the pre-rendered instance is reused
+<LiveboardEmbed
+  preRenderConfig={{ id: 'lb-preview' }}
+  liveboardId="<liveboard-guid>"
+  isLiveboardCompactHeaderEnabled={true}
+  isLiveboardMasterpiecesEnabled={true}
+/>
+----
+
 === Advanced troubleshooting
 
 * If the pre-rendered component does not appear, check that the container is visible and the coordinates are set.
-* The iframes are saved as child components to the body, and not in the given target element.
+* The iframes are saved as child components to the body, and not in the given target element. To mount the pre-rendered iframe inside a specific element instead, use `preRenderConfig.containerSelector`. For more information, see <<Mount the pre-rendered embed in a specific container>>.
 
 == Additional resources
 
