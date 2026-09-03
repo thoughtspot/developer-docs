@@ -625,7 +625,7 @@ const FloatingAssistant: React.FC = () => {
                                                         </>
                                                     ) : (
                                                         i === messages.map((m, idx) => m.role === 'user' ? idx : -1).filter(x => x >= 0).pop() && !isLoading && (
-                                                            <button className="floating-assistant__edit-action-btn" onClick={() => startEdit(i, msg.content, msg.quotedText)} aria-label="Edit message">
+                                                            <button className="floating-assistant__edit-action-btn floating-assistant__edit-action-btn--edit" onClick={() => startEdit(i, msg.content, msg.quotedText)} aria-label="Edit message">
                                                                 <Icon id={IconID.PENCIL} size={IconSize.SMALL} color={IconColor.GRAY} />
                                                             </button>
                                                         )
