@@ -11,7 +11,7 @@ ThoughtSpot provides the following REST API v2 endpoints to download or export d
 * xref:#_liveboard_report_api[`POST /api/rest/2.0/report/liveboard`] +
 Download a Liveboard and its visualizations in PDF, PNG, CSV, or XLSX file format.
 * xref:#_answer_report_api[`POST /api/rest/2.0/report/answer`] +
-Download data from a saved Answer in PDF, PNG, CSV, or XLSX file format.
+Download data from a saved Answer, a pinned Answer on a Liveboard, or a Spotter-generated Answer in PDF, PNG, CSV, or XLSX file format.
 
 [NOTE]
 To retrieve data as JSON instead of downloading a file, see xref:data-apis-v2.adoc[Data APIs].
@@ -28,7 +28,7 @@ To download a personalized view of the Liveboard, specify the view name in the `
 
 [IMPORTANT]
 ====
-* The downloadable file returned in API response file is extensionless. You need to rename the downloaded file by typing in the relevant extension.
+* The downloadable file returned in the Liveboard API response is extensionless. You need to rename the downloaded file by adding the relevant extension. Answer exports are named automatically; see xref:#_answer_report_api[Answer Report API].
 * If the Liveboard includes Note tiles, ensure that you do not pass the GUID of Note tiles as `visualization_identifiers` in the API request. Attempting to do so will lead to an error, and the API will return 400 error code in response.
 * Attempting to override existing filter values with runtime filters while exporting a Liveboard will result in an error.
 * If Role-Based Access Control (RBAC) is enabled, `DATADOWNLOADING` (Can download Data) privilege is required for Liveboard exports.
@@ -254,19 +254,111 @@ See also, link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_ge
 
 == Answer Report API
 
-To download Answer data via `/api/rest/2.0/report/answer` API, you need at least view access to the saved Answer.
+To download Answer data via `/api/rest/2.0/report/answer` API, you need at least view access to the Answer being exported.
 
-In the request body, specify the GUID or name of the Answer object as `metadata_identifier`.
+The API supports exporting:
 
-The API supports exporting saved Answers, pinned Answers from a Liveboard, and Spotter-generated Answers. You can download Answer data in `CSV`, `XLSX`, `PNG`, and `PDF` format. The default `file_format` is `CSV`.
+* Saved Answers
+* Pinned Answers on a Liveboard
+* Spotter-generated Answers
+
+You can download Answer data in `CSV`, `XLSX`, `PNG`, and `PDF` format. The default `file_format` is `CSV`.
 
 [IMPORTANT]
 ====
-* If Role-Based Access Control (RBAC) is enabled, `DATADOWNLOADING` (Can download Data) privilege is required for Answer exports.
-* If the granular Role-Based Access Control (RBAC) is enabled, the `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) privilege is required to export in the PDF, XLSX or CSV formats, and the `CAN_DOWNLOAD_VISUALS` (Can download visuals) privilege is required for PNG exports. In this case the `DATADOWNLOADING` privilege ceases to exist.
+* If Role-Based Access Control (RBAC) is enabled, the `DATADOWNLOADING` (Can download Data) privilege is required for Answer exports.
+* If the granular Role-Based Access Control (RBAC) is enabled, the `CAN_DOWNLOAD_DETAILED_DATA` (Can download detailed data) privilege is required to export in the PDF, XLSX, or CSV formats, and the `CAN_DOWNLOAD_VISUALS` (Can download visuals) privilege is required for PNG exports. In this case the `DATADOWNLOADING` privilege ceases to exist.
 ====
 
-=== Example
+=== Usage guidelines
+
+Use the `type` and `metadata_identifier` parameters together to specify the Answer to export.
+The `type` parameter distinguishes between a saved Answer and a pinned Answer on a Liveboard.
+If `type` is not specified, the API defaults to `SAVED`.
+
+
+[cols="1,2,1,3"]
+|===
+|`type` |`metadata_identifier` |Result |Notes
+
+|`SAVED` (default)
+|GUID or name of the *saved Answer*
+|_Success_. Downloads the saved Answer
+|Omitting `type` produces the same result as setting `type: SAVED`.
+
+|`PINNED`
+|Container ID
+|_Success_. Downloads with Liveboard context +
+Liveboard-level filters, Runtime Filters, and Column Security Rules (CSR) are automatically applied to the export.
+|Use container ID as `metadata_identifier`.
+
+|`PINNED`
+|GUID of a *saved Answer* (not a Liveboard)
+|_Fails_
+|Passing an Answer GUID instead of the containing Liveboard GUID when `type` is `PINNED` results in an error.
+
+|`SAVED`
+|GUID of a *Liveboard*
+|_Fails_
+|Liveboard GUIDs are not valid `metadata_identifier` values when `type` is `SAVED` or omitted.
+|===
+
+To export a specific Personalized View of a Liveboard, include the `personalised_view_identifier` parameter with the GUID of that view.
+
+[NOTE]
+====
+* Exported files are automatically named after the Answer title, with the file extension appended based on the selected format.
+* HTML rendering is not supported for PDF exports of Answers with tables.
+====
+
+=== Find the metadata identifier
+
+For *saved Answers* (`type: SAVED`):
+Send a request to `/api/rest/2.0/metadata/search` with `type: ANSWER` to retrieve the Answer GUID.
+
+For *pinned Answers* (`type: PINNED`):
+Use the GUID of the *Liveboard* that contains the pinned Answer as the `metadata_identifier`.
+To find the Liveboard GUID:
+
+. In the ThoughtSpot application, open the Liveboard.
+. Copy the GUID from the address bar.
++
+----
+https://<your-thoughtspot-instance>/#/pinboard/<liveboard-guid>
+----
+
+Alternatively, send a request to `/api/rest/2.0/metadata/search` with `type: LIVEBOARD`.
+
+=== PNG export options
+
+The `png_options` support the following properties:
+
+
+[cols="1,1,3"]
+|===
+|Property |Type |Description
+
+|`x_resolution`
+|Number
+|Width of the exported PNG in pixels. +
+Valid range: `600px` to `3840px`. +
+Default: `2254px`. This is honored only when neither `x_resolution` nor `y_resolution` is passed. If either value is passed, retaining the default 1.414:1 aspect ratio is prioritized.
+
+|`y_resolution`
+|Number
+|Height of the exported PNG in pixels. +
+Valid range: `600px` to `3840px`. +
+Default: `1588px`. This is honored only when neither `x_resolution` nor `y_resolution` is passed. If either value is passed, retaining the default 1.414:1 aspect ratio is prioritized.
+
+|`scaling`
+|Integer
+|Display scale percentage for objects rendered in the image. Adjusts the relative size of visual elements without cropping the image. +
+Valid range: `80%` to `500%`.
+|===
+
+=== Examples
+
+==== Export a saved Answer (default)
 
 [source,cURL]
 ----
@@ -280,47 +372,44 @@ curl -X POST \
 }'
 ----
 
-[NOTE]
-====
-* Exported files are automatically named after the Answer title, with the file extension appended based on the selected format.
-* HTML rendering is not supported for PDF exports of Answers with tables.
-====
+Omitting `type` is equivalent to setting `"type": "SAVED"`.
 
+==== Export a pinned Answer from a Liveboard
 
-Contact ThoughtSpot support to enable these enhanced settings for this API endpoint on your ThoughtSpot instance:
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "416052fd-ad22-4d48-be0a-e43b53109957",
+  "type": "PINNED",
+  "file_format": "CSV"
+}'
+----
 
-* `personalised_view_identifier` [earlyAccess eaBackground]#Early Access# +
-Optional parameter to specify the GUID of the personalised view of the `PINNED` Answer object that you want to download.
-* `type` [earlyAccess eaBackground]#Early Access# +
-Used to distinguish between a saved answer and a pinned answer on a Liveboard. Setting this parameter to `PINNED` allows the API to
-accept the guid of a pinned Answer directly as the `metadata_identifier`. When
-exporting an Answer, all Liveboard-level filters, Runtime Filters, and Column
-Security Rules (CSR) are automatically applied to the export output.
+In this case, `metadata_identifier` is the GUID of the Liveboard that contains the pinned Answer.
+Liveboard-level filters, Runtime Filters, and Column Security Rules are automatically applied to the export.
 
-The `png_options` [earlyAccess eaBackground]#Early Access# support the following properties:
+==== Export a PNG with custom dimensions and scaling
 
-[cols="1,1,3"]
-|===
-|Property |Type |Description
-
-|`x_resolution`
-|Number
-|Width of the exported PNG in pixels. +
-Valid range: `600px` to `3840px`.
-
-|`y_resolution`
-|Number
-|Height of the exported PNG in pixels. +
-Valid range: `600px` to `3840px`.
-
-|`scaling`
-|Integer
-|Display scale percentage for objects rendered in the image. Adjusts the relative
-size of visual elements without cropping the image. +
-Valid range: `80%` to `500%`.
-|===
-
-You can now export the PNG of any Answer in any aspect ratio and any scaling or zoom level. Just configure, scale, and export exactly what you need.
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/report/answer' \
+  -H 'Authorization: Bearer {access-token}'\
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "metadata_identifier": "9bd202f5-d431-44bf-9a07-b4f7be372125",
+  "file_format": "PNG",
+  "png_options": {
+    "x_resolution": 1920,
+    "y_resolution": 1080,
+    "scaling": 120
+  }
+}'
+----
 
 [#exportSpotterData]
 === Export data generated from Spotter APIs

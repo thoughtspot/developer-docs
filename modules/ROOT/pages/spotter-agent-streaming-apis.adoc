@@ -1,0 +1,664 @@
+= Spotter agent streaming API
+:toc: true
+:toclevels: 3
+
+:page-title: Spotter agent streaming APIs
+:page-pageid: spotter-agent-streaming-apis
+:page-description: Use the Spotter agent streaming REST API to receive real-time Server-Sent Events (SSE) responses for conversational queries sent to the Spotter agent.
+
+ThoughtSpot's Spotter agent streaming API lets you send natural language queries to an existing conversation session and receive the response as a real-time Server-Sent Events (SSE) stream, instead of waiting for the complete response.
+
+For information about creating a conversation session and sending queries to it, see xref:spotter-agent-conversation-apis.adoc[Spotter agent conversation APIs].
+
+== Send a query to agent and get streaming responses
+
+To send queries to an ongoing conversation session with Spotter agent and receive streaming responses, use the `/api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream` API endpoint. This API endpoint uses the SSE protocol to deliver data incrementally in real time, rather than waiting for the entire response to be generated before sending it to the client.
+
+The `/api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream` API can be used as an integrated tool for real-time streaming of conversational interactions between agents and the ThoughtSpot backend.
+
+=== Request parameters
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Parameter| Description
+|`conversation_identifier` |__String__. Specify the conversation ID received from the xref:spotter-agent-conversation-apis.adoc#_create_a_conversation_session_with_spotter_agent[POST /api/rest/2.0/ai/agent/conversation/create] API call.
+|`messages`|_Array of strings_. Include at least one natural language query. For example, `Sales data for Jackets`, `Top performing products in the west coast`.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "conversation_identifier": "h2I_pTGaRQof",
+  "messages": [
+    "Net sales of Jackets"
+  ]
+}'
+----
+
+=== API response
+
+If the API request is successful, the response includes a stream of events, each containing a partial or complete message from the AI agent, rather than a single JSON object.
+
+Each event is a simple text-based message in a specific format, `data: <your_data>\n\n`; `<your_data>\n\n` means that each message sent from the server to the client is prefixed with the `data:` keyword, followed by the actual payload (`<your_data>`), and ends with two newline characters (`\n\n`).
+
+The API uses this format so that the clients can reconstruct the AI-generated response as it streams in, chunk by chunk, and show the responses in real-time. In agentic workflows, the receiving client or agent listens to the SSE stream, parses each event, and assembles the full response for its users.
+
+==== Example response
+If the request is valid, the API returns SSE streams. Each line has the form `data: [{"type": "...", ...}]`, a JSON array of event objects.
+
+[source,JSON]
+----
+data: [{"type":"ack","node_id":"aGxzcFVrtom8"}]
+
+data: [{"type":"conv_title","title":"Sales 2025 vs 2024","conv_id":"-XIi04l5rrof"}]
+
+data: [{"type":"notification","group_id":"cDEsAQbSnd3J","metadata":{"type":"thinking","tool_title":"Analyzing Sales Performance: 2025 vs 2024"},"code":"TOOL_CALL_NOTIFICATION"}]
+
+data: [{"id":"mNAdvy-NK2l6","type":"text-chunk","group_id":"cDEsAQbSnd3J","metadata":{"format":"markdown","type":"thinking"},"content":"\n\nI need to compare sales performance between 2025 and 2024."}]
+
+data: [{"type":"notification","group_id":"m1MTvttEUa7o","code":"nls_start"}]
+
+data: [{"id":"hxWMDP-pgR3B","type":"answer","group_id":"m1MTvttEUa7o","metadata":{"sage_query":"[sales] [date] = '2025' vs [date] = '2024'","session_id":"431adcf9-1328-4d8c-81a1-0faa7fa37ba6","title":"Compare sales for 2025 vs 2024"},"title":"Compare sales for 2025 vs 2024"}]
+
+data: [{"type":"notification","code":"FINAL_RESPONSE_NOTIFICATION"}]
+----
+For the complete response in one payload, use the xref:spotter-agent-conversation-apis.adoc#_send_queries_to_a_conversation_session[`/send` endpoint] instead.
+
+////
+[source,]
+----
+data: [{"type": "ack", "node_id": "BRxCtJ-aGt8l"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": "I"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " understand"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " you're"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " interested"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " in"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " net"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " of"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " Jackets"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " I'll"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " retrieve"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " relevant"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " data"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": " you"}]
+
+data: [{"id": "OJ0zMh4PVa-y", "type": "text-chunk", "group_id": "czoDDhNwwU7z", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"type": "notification", "group_id": "o8dQ9SAWdtrL", "metadata": {"title": "Net sales of Jackets"}, "code": "nls_start"}]
+
+data: [{"type": "notification", "group_id": "o8dQ9SAWdtrL", "code": "QH", "message": "Fetching Worksheet Data"}]
+
+data: [{"type": "notification", "group_id": "o8dQ9SAWdtrL", "code": "TML_GEN", "message": "Translating your query with the Reasoning Engine"}]
+
+data: [{"type": "notification", "group_id": "o8dQ9SAWdtrL", "code": "ANSWER_GEN", "message": "Verifying results with the Trust Layer"}]
+
+data: [{"id": "r24X7D99SROD", "type": "answer", "group_id": "o8dQ9SAWdtrL", "metadata": {"sage_query": "[sales] [item type] = [item type].'jackets'", "session_id": "b321b404-cbf1-4905-9b0c-b93ad4eedf89", "gen_no": 1, "transaction_id": "6874259d-13b1-478c-83cb-b3ed52628850", "generation_number": 1, "warning_details": null, "ambiguous_phrases": null, "query_intent": null, "assumptions": "You want to see the total sales amount for jackets item type.", "tml_phrases": ["[sales]", "[item type] = [item type].'jackets'"], "cached": false, "sub_queries": null, "title": "Net sales of Jackets", "worksheet_id": "cd252e5c-b552-49a8-821d-3eadaa049cca"}, "title": "Net sales of Jackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "The"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " net"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " Jackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " have"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " been"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " visual"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "ized"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " you"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "."}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " This"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " analysis"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " specifically"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " filtered"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " item"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " type"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "jackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "\""}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " and"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " calculated"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " total"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " amount"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " associated"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " with"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " those"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " products"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ".\n\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "**"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "Summary"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " &"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " Insights"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ":"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "**\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "-"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " The"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " visualization"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " shows"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " total"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " net"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " all"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " jacket"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " transactions"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " in"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " your"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " apparel"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " dataset"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ".\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "-"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " The"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " calculation"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " uses"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " only"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " amounts"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " where"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " item"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " type"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " is"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " \""}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "J"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "ackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ".\"\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "-"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " This"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " information"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " is"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " useful"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " for"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " understanding"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " the"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " revenue"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " contribution"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " of"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " jackets"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " within"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " your"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " product"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " mix"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ".\n\n"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "If"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " you'd"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " like"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " to"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " see"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " a"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " breakdown"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " by"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " region"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " state"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " time"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " period"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " or"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " compare"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " jacket"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " sales"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " to"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " other"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " product"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " types"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": ","}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " please"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " let"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " me"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": " know"}]
+
+data: [{"id": "BgY16KR8nVL1", "type": "text-chunk", "group_id": "_ARJXDKbFhHF", "metadata": {"format": "markdown"}, "content": "!"}]
+----
+////
+
+==== SSE event types
+The SSE event types streamed in the API response include:
+
+* `ack` +
+Confirms receipt of the request. For example, the type in the first message `data: [{"type": "ack", "node_id": "BRxCtJ-aGt8l"}]`, which indicates that the server has received the client's request and is acknowledging it.
+* `conv_title` +
+A conversation title (`title`, `conv_id`).
+* `notification` +
+Progress or status update (`group_id`, `metadata`, `code`). For example, `TOOL_CALL_NOTIFICATION`, `nls_start`, `FINAL_RESPONSE_NOTIFICATION`.
+* `type` +
+Type can be `thinking`, `text`.
+* `text` +
+Complete text block in markdown format.
+* `text-chunk` +
+Text fragments in incremental streaming, often in markdown (`id`, `group_id`, `metadata` with `format`)
+* `content` +
+The actual text content sent incrementally. For example, `"I"`, `"understand"`, `"you're"`, `"interested"`, `"in"`, `"the"`, `"net"`, `"sales"`, and so on.
+* `text` +
+Full text block with same structure as text-chunk.
+* `answer` +
+Structured answer with metadata (`id`, `group_id`, `metadata` with `sage_query`, `session_id`, `title` and more)
+* `error` +
+In case of failures.
+* `*-interrupt` +
+If the generation was stopped mid-stream.
+* `group_id` +
+Groups related chunks together.
+
+For more information and examples, see xref:spotter-agent-streaming-apis.adoc#_sse_event_payload_reference[SSE event payload reference].
+
+=== Thinking versus output events
+Spotter responses have two phases:
+
+* A *thinking phase*, where the AI reasons through the query and calls internal tools, followed by an *output phase* containing the final response delivered to the user. +
+
+Events in the thinking phase carry `"metadata": { "type": "thinking" }`. All other events are final output.
+
+Every event includes a `group_id`. Events sharing the same `group_id` belong together. During the thinking phase, each tool call gets its own `group_id`. A `FINAL_RESPONSE_NOTIFICATION` notification marks the boundary between the thinking and output phases.
+
+[listing]
+----
+THINKING PHASE
+───────────────────────────────────────────────────────────
+ack
+
+┌─ group_id: g1 ── Tool Call 1 ("Searching data") ─────────┐
+│  notification  (thinking, TOOL_CALL_NOTIFICATION)        │
+│  text-chunk    (thinking)                                │
+│  answer        (thinking)                                │
+└──────────────────────────────────────────────────────────┘
+
+┌─ group_id: g2 ── Tool Call 2 ("Running code") ───────────┐
+│  notification  (thinking, TOOL_CALL_NOTIFICATION)        │
+│  text-chunk    (thinking)                                │
+│  text-chunk    (thinking)                                │
+└──────────────────────────────────────────────────────────┘
+
+notification (FINAL_RESPONSE_NOTIFICATION)  ←── boundary
+────────────────────────────────────────────────────────────
+
+OUTPUT PHASE
+────────────────────────────────────────────────────────────
+┌─ group_id: g3 ────────────────────────────────────────────┐
+│  text      "Here are the results:"                        │
+│  answer    (final visualization)                          │
+└───────────────────────────────────────────────────────────┘
+[stream closes]
+----
+
+==== Notification codes reference
+
+[width="100%" cols="2,4"]
+[options='header']
+|=====
+|Code| When it appears
+|`QH`|Query handling started
+|`TML_GEN` / `TML_GEN_RETRY`|Generating or retrying TML
+|`ANSWER_GEN`|Generating an answer
+|`IDENTIFYING_ATTRIBUTES`|Identifying data attributes
+|`PERFORMING_CHANGE_ANALYSIS`|Running change analysis
+|`PERFORMING_FORECASTING_ANALYSIS`|Running forecasting
+|`SUMMARIZING_RESULTS`|Summarizing results
+|`TOOL_CALL_NOTIFICATION`|Tool invocation (during thinking phase)
+|`FINAL_RESPONSE_NOTIFICATION`|Marks the transition from thinking to output
+|`search_datasets_start` / `search_datasets_end`|Data source discovery in progress or complete
+|`approval_required`|An external tool requires user permission before proceeding
+|=====
+
+=== SSE event payload reference
+
+==== ack
+
+[source,JSON]
+----
+data: {
+  "type": "ack",
+  "group_id": "a1b2c3",
+  "id": "evt-001",
+  "node_id": "resp-node-abc"
+}
+----
+
+==== notification (thinking — tool call)
+
+[source,JSON]
+----
+data: {
+  "type": "notification",
+  "group_id": "g1",
+  "id": "evt-002",
+  "code": "TOOL_CALL_NOTIFICATION",
+  "message": "Searching for relevant data",
+  "metadata": {
+    "type": "thinking",
+    "tool_title": "Searching sales data",
+    "tool_code": "RUNNING_CODE_EXECUTION",
+    "tool_name": "code_interpreter"
+  }
+}
+----
+
+==== notification (thinking - external tool with MCP integration)
+
+[source,JSON]
+----
+data: {
+  "type": "notification",
+  "group_id": "g2",
+  "id": "evt-003",
+  "code": "TOOL_CALL_NOTIFICATION",
+  "message": "Querying Salesforce",
+  "metadata": {
+    "type": "thinking",
+    "tool_title": "Salesforce: Get Opportunities",
+    "tool_name": "get_opportunities",
+    "integration_id": "int-sf-123",
+    "integration_name": "Salesforce"
+  }
+}
+----
+
+==== notification (approval required)
+Sent when an external MCP tool requires explicit user permission before proceeding. Your application should prompt the user to approve or deny the action before continuing.
+
+[source,JSON]
+----
+data: {
+  "type": "notification",
+  "group_id": "g2",
+  "id": "evt-005",
+  "code": "approval_required",
+  "metadata": {
+    "request_id": "perm-req-789",
+    "integration_id": "int-sf-123",
+    "integration_name": "Salesforce",
+    "tool_name": "get_opportunities",
+    "annotated_title": "Access Salesforce Opportunities"
+  }
+}
+----
+
+==== notification (FINAL_RESPONSE_NOTIFICATION)
+
+[source,JSON]
+----
+data: {
+  "type": "notification",
+  "group_id": "g1",
+  "id": "evt-004",
+  "code": "FINAL_RESPONSE_NOTIFICATION",
+  "message": ""
+}
+----
+
+==== text
+
+[source,JSON]
+----
+data: {
+  "type": "text",
+  "group_id": "g3",
+  "id": "evt-007",
+  "content": "Here is the total revenue breakdown by region for Q4 2025:\n\n- **North America:** $4.2M\n- **EMEA:** $2.8M\n- **APAC:** $1.5M"
+}
+----
+
+==== text-chunk
+Multiple chunks sharing the same `id` should be appended together to reconstruct the full text item.
+
+[source,JSON]
+----
+data: { "type": "text-chunk", "group_id": "g3", "id": "evt-009", "content": "Based on the analysis, " }
+data: { "type": "text-chunk", "group_id": "g3", "id": "evt-009", "content": "revenue grew 12% quarter-over-quarter." }
+----
+
+==== answer
+When an `answer` event is received, the `session_id` and `gen_no` fields are returned. You can export the visualization data using the Export Answer Report API to process the results. This allows users to download the answer as a PDF, PNG, CSV, or XLSX file.
+
+[source,JSON]
+----
+data: {
+  "type": "answer",
+  "group_id": "g3",
+  "id": "evt-010",
+  "title": "Revenue by Region Q4 2025",
+  "metadata": {
+    "session_id": "sess-abc-123",
+    "gen_no": 1,
+    "transaction_id": "txn-456",
+    "worksheet_id": "ws-def-789",
+    "cached": false,
+    "is_hidden": false
+  }
+}
+----
+
+==== search_datasets
+Emitted as a start/end pair during Auto mode data source discovery.
+
+
+[source,JSON]
+----
+data: { "type": "search_datasets", "group_id": "g0", "id": "evt-012", "code": "search_datasets_start", "metadata": {} }
+
+data: {
+  "type": "search_datasets",
+  "group_id": "g0",
+  "id": "evt-013",
+  "code": "search_datasets_end",
+  "metadata": {
+    "data_sources": [
+      { "worksheet_id": "ws-1", "worksheet_name": "Sales Data", "confidence": "high", "reasoning": "Contains revenue columns" },
+      { "worksheet_id": "ws-2", "worksheet_name": "Marketing Data", "confidence": "low", "reasoning": "No revenue columns" }
+    ],
+    "auto_selected": { "worksheet_id": "ws-1", "worksheet_name": "Sales Data", "confidence": "high", "reasoning": "Best match" }
+  }
+}
+----
+==== file
+
+[source,JSON]
+----
+data: {
+  "type": "file",
+  "group_id": "g3",
+  "id": "evt-014",
+  "files": [
+    { "ts_file_id": "file-abc-001", "display_name": "quarterly_report.csv", "file_type": "csv", "created_at": "2025-11-15T10:30:00Z" },
+    { "ts_file_id": "file-abc-002", "display_name": "chart.png", "file_type": "png", "created_at": "2025-11-15T10:30:01Z" }
+  ],
+  "metadata": { "conv_id": "conv-123" }
+}
+----
+==== conv_title
+
+[source,JSON]
+----
+data: {
+  "type": "conv_title",
+  "group_id": "g0",
+  "id": "evt-015",
+  "title": "Revenue Analysis Q4 2025",
+  "conv_id": "conv-123"
+}
+----
+
+==== error
+
+[source,JSON]
+----
+data: {
+  "type": "error",
+  "group_id": "g3",
+  "id": "evt-016",
+  "code": "RATE_LIMIT_EXCEEDED",
+  "message": "Too many requests",
+  "display_message": "You've exceeded the rate limit. Please try again in a few minutes."
+}
+----
+==== agent-interrupt
+
+[source,JSON]
+----
+Sent when generation is stopped mid-stream.
+data: {
+  "type": "notification",
+  "group_id": "g3",
+  "id": "evt-017",
+  "code": "agent-interrupt",
+  "message": "Generation stopped"
+}
+----
+
+== Additional resources
+
+* See also xref:spotter-agent-apis.adoc[Spotter Agent APIs]
+* xref:spotter-agent-conversation-apis.adoc[Spotter agent conversation APIs]
+* xref:spotter-agent-process-results-apis.adoc[Process Spotter agent conversation results]
+* xref:spotter-agent-sharing-apis.adoc[Spotter agent conversation sharing APIs]
