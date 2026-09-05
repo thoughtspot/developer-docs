@@ -1,0 +1,365 @@
+= Spotter agent conversation sharing APIs
+:toc: true
+:toclevels: 2
+
+:page-title: Spotter agent conversation sharing APIs
+:page-pageid: spotter-agent-sharing-apis
+:page-description: Use the Spotter agent conversation sharing REST API v2.0 endpoints to share saved Spotter agent conversations with other users or groups.
+
+You can share a Spotter conversation with other users and groups and manage shared content programmatically using REST API endpoints.
+
+== Supported endpoints
+
+[width="100%" cols="1"]
+|=====
+a| `POST /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/share` +
+xref:spotter-agent-sharing-apis.adoc#_share_a_conversation[Shares a saved Spotter conversation, grants or revokes access to a shared conversation] for one or more principals. +
+__Available on ThoughtSpot Cloud instances from 26.9.0.cl onwards.__
+
+a| `GET /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-shared-content` +
+xref:spotter-agent-sharing-apis.adoc#_get_shared_content[Returns the read-only view of the shared conversation], including messages and associated answers. +
+__Available on ThoughtSpot Cloud instances from 26.9.0.cl onwards.__
+
+a| `GET /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-share-info` +
+xref:spotter-agent-sharing-apis.adoc#_get_share_information[Returns sharing state and metadata], and the list of principals that can access the shared content. +
+__Available on ThoughtSpot Cloud instances from 26.9.0.cl onwards.__
+|=====
+
+For information about creating, saving, and managing saved conversation, see  xref:spotter-agent-conversation-apis.adoc[Spotter agent conversation APIs] and xref:spotter-agent-conversation-mgmt-apis.adoc[APIs for managing saved conversations].
+
+== Required privileges
+
+* To use these APIs, you need the `CAN_USE_SPOTTER` (*Can use Spotter*) privilege.
+* To share a conversation or view the sharing status, you must be the owner of the conversation. Only the user who created the conversation can manage its share access.
+* To retrieve shared content, you must be the conversation owner or a principal (user or group) that has been granted access.
+
+[NOTE]
+====
+The shared view is a read-only snapshot of the conversation at the time of sharing. Recipients cannot send messages or modify the conversation.
+====
+
+[#_share_a_conversation]
+== Share a conversation
+To share a conversation with other ThoughtSpot users and groups, refresh shared content, or revoke access, send a `POST` request to the `/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/share` endpoint. When principals are added, ThoughtSpot creates a read-only shared view of the conversation from its current state.
+
+The conversation to share is identified by the `conversation_identifier` URL path parameter. In your API request, you must include the GUID of the saved Spotter conversation as a path parameter and add the attributes to grant or revoke access in the request body.
+
+[NOTE]
+====
+Do not include the same principal identifiers in both `grant` and `revoke` arrays in the same request.
+====
+
+=== Request parameters
+
+[width="100%" cols="2,4"]
+[options="header"]
+|=====
+| Parameter | Description
+| `grant` |__Array of strings__. Array of principals to grant access to the conversation specified in the request. Specify `principal_identifier` and `principal_type`. Specify the principal type, name or GUID of the intended recipients. All recipients are granted a `READ_ONLY` access.
+| `revoke` |__Array of strings__. Principals to revoke access from. Specify `principal_identifier` and `principal_type`. Specify the principal type, name or GUID of the recipients to revoke access from.
+| `refresh_shared_content` |__Boolean__. When set to `true`, ThoughtSpot regenerates the shared view from the latest conversation state, even if a shared view already exists. When `false`, reuses the existing shared view. Default is `false`.
+//| `notify_on_share` |__Boolean__. When set to `true`, ThoughtSpot sends an in-app notification to the recipients of the shared content. Default is `true`. Available from 26.10.0.cl.
+|=====
+
+=== Request examples
+
+Grant access to a conversation::
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/share' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "refresh_shared_content": false,
+  "grant": [
+    { "principal_identifier": "user-001", "principal_type": "USER" },
+    { "principal_identifier": "group-001", "principal_type": "USER_GROUP" }
+  ],
+  "revoke": []
+}
+----
+
+Revoke access granted to a shared conversation::
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/share' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "refresh_shared_content": false,
+  "grant": [],
+  "revoke": [
+    { "principal_identifier": "user-001", "principal_type": "USER" },
+    { "principal_identifier": "group-001", "principal_type": "USER_GROUP" }
+  ]
+}
+----
+
+Refresh shared content::
+To regenerate the shared snapshot for existing recipients without changing access, set `refresh_shared_content` to `true` with empty `grant` and `revoke` arrays.
++
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/share' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "refresh_shared_content": true,
+  "grant": [],
+  "revoke": []
+}
+----
+
+Refresh shared content and update access details::
+To update access and refresh the snapshot in a single call, combine `refresh_shared_content: true` with the recipient details in the `grant` or `revoke` array.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/share' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "refresh_shared_content": true,
+  "grant": [
+    { "principal_identifier": "user-002", "principal_type": "USER" },
+    { "principal_identifier": "group-002", "principal_type": "USER_GROUP" }
+  ]
+}
+----
+
+=== API response
+If the request is successful, ThoughtSpot returns a 204 response code.
+
+[#_get_shared_content]
+== Get shared conversation content
+To retrieve the full read-only view of a shared conversation, including ordered messages and data source metadata, send a `GET` request to the `/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-shared-content` endpoint. This endpoint is accessible to the conversation owner and any principal that has been granted access.
+
+Use this endpoint to render a shared conversation in a UI or to retrieve its content for post-processing.
+
+=== Request parameters
+
+[width="100%"]
+[options='header']
+|=====
+|Parameter|Type|Description
+|`conversation_identifier`|String|The unique ID of the source conversation.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X GET \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-shared-content' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json'
+----
+
+=== API response
+If the request is successful, the API returns the shared conversation content with the following fields:
+
+[source,JSON]
+----
+{
+  "conversation_id": "conv-abc-123",
+  "shared_conversation_id": "snap-xyz-456",
+  "conversation_title": "Sales by Region Q1",
+  "creator_user_id": "5d3e6cc7-2f4a-4b0e-9a1c-8f2b6d4e7a10",
+  "data_sources": [{ "id": "ds-001", "name": "Retail Sales" }],
+  "analyst_ids": ["spot-7f2a"],
+  "messages": [
+    {
+      "message_id": "node-u-01",
+      "timestamp_in_millis": 1744000000000,
+      "user_prompt": {
+        "message": {
+          "message_id": "msg-u-01",
+          "content": "Show me revenue by region."
+        },
+        "attachments": []
+      },
+      "response_items": [
+        {
+          "type": "tool_call",
+          "tool_call_id": "toolu-01",
+          "tool_name": "search_datasets",
+          "step_title": "Searching datasets",
+          "arguments": { "query": "revenue by region" },
+          "timestamp_in_millis": 1744000001000,
+          "is_thinking": false
+        },
+        {
+          "type": "answer",
+          "answer_id": "ans-01",
+          "tool_call_id": "toolu-02",
+          "tool_name": "fetch_and_visualize",
+          "step_title": "Visualizing",
+          "timestamp_in_millis": 1744000004000,
+          "is_thinking": false
+        },
+        {
+          "type": "text",
+          "content": "Revenue is highest in APAC.",
+          "content_type": "TEXT_MARKDOWN",
+          "timestamp_in_millis": 1744000005000,
+          "is_thinking": false,
+          "step_title": null,
+          "file_reference": null
+        }
+      ]
+    }
+  ],
+  "code_execution_files": [
+    {
+      "file_id": "revenue_by_region.csv",
+      "display_name": "revenue_by_region.csv",
+      "file_type": "csv",
+      "created_time_in_millis": 1744027200000,
+      "expired": false
+    }
+  ]
+}
+----
+
+==== Response fields
+
+[width="100%"]
+[options='header']
+|=====
+|Field|Description
+|`conversation_id`|__String__. Conversation ID sent in the request parameter.
+|`shared_conversation_id`|__String__. Id of the shared snapshot. This is not the same as `conversation_id`. Pass this value as the `conversation_identifier` parameter in `loadAnswer` calls. This value changes each time the snapshot is refreshed via the share endpoint with `refresh_shared_content: true`.
+|`conversation_title`|__String__. Display title of the conversation. `null` if no title was set.
+|`creator_user_id`|__String__. Id of the user who created and shared the conversation. This is the original creator, not the  caller retrieving the shared content.
+|`data_sources`|__Array of strings__. Array of data sources used by the conversation. Each entry includes the `id` and display `name` of the data source.
+|`analyst_ids`|__Array of strings__. Array of the identifiers of the AI analysts the conversation ran against. An analyst is a purpose-built agent configured over a set of data sources, with its own instructions and access rules. An empty array is returned if  the conversation is not associated with any analyst.
+|`messages`|__Array of conversation messages__. Ordered conversation messages, from oldest to newest. The structure is the same as returned by the get conversation endpoint. An empty array is returned when the conversation has no messages.
+a|`code_execution_files`|__Array of code execution files__. Sanitized metadata for files generated by the code execution tool. Each entry in the `code_execution_files` array contains the following attributes:
+
+* `file_id`. __String__. Unique identifier of the file.
+* `display_name`. __String__. Name of the file.
+* `file_type`. __String__. File type, such as `csv`, `pdf`, or `png`.
+* `created_time_in_millis`. __Long__. Milliseconds since Unix epoch when the file was created.
+* `expired`.__Boolean__. When `true`, the underlying file is no longer retrievable from code execution storage. Disable download and preview options in your UI for expired files.
+
+If there are no code execution steps, an empty array is returned.
+|=====
+
+=== Load answer payloads from a shared view
+The full answer payload is not embedded in messages. Each `answer` response item in `messages[].response_items` contains an `answer_id` field. To retrieve the full answer payload, call `loadAnswer` with:
+
+* `conversation_identifier`: the `shared_conversation_id` value from this response.
+* `answer_id`: the `answer_id` from the `answer` response item.
+
+[IMPORTANT]
+====
+`shared_conversation_id` is not the same as `conversation_id`. It identifies the shared snapshot, which is a separate internal object from the source conversation. Always use the `shared_conversation_id` value as the `conversation_identifier` parameter when calling `loadAnswer` to hydrate answers from a shared view. Because this value changes each time the snapshot is refreshed, re-fetch the shared content to get the current value before calling `loadAnswer`.
+====
+
+
+[#_get_share_information]
+== Get share information
+To view the current share state of a conversation you own, send a `GET` request to the `/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-share-info` endpoint. The response shows whether the shared view reflects the latest conversation content and lists the principals that currently have access.
+
+Use this endpoint to render a share management UI, audit who has access to a conversation, or determine whether the shared view needs to be refreshed before sending a link.
+
+=== Request parameters
+
+[width="100%"]
+[options='header']
+|=====
+|Parameter|Description
+|`conversation_identifier`|__String__. The unique ID of the conversation, as returned when creating a conversation or listing conversations.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X GET \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-share-info' \
+  -H 'Authorization: Bearer {access-token}' \
+  -H 'Accept: application/json'
+----
+
+=== API response
+
+The following example shows the response for a conversation that is shared and current:
+
+[source,JSON]
+----
+{
+  "conversation_id": "conv-abc-123",
+  "is_shared_content_outdated": false,
+  "principals": [
+    {
+      "id": "user-001",
+      "type": "USER",
+      "display_name": "Alice Example",
+      "name": "alice.example",
+      "permission": "READ_ONLY"
+    },
+    {
+      "id": "group-001",
+      "type": "USER_GROUP",
+      "display_name": "Sales Team",
+      "name": "sales-team",
+      "permission": "READ_ONLY"
+    }
+  ]
+}
+----
+
+The following example shows the response for a conversation that has never been shared:
+
+[source,JSON]
+----
+{
+  "conversation_id": "conv-abc-123",
+  "is_shared_content_outdated": null,
+  "principals": []
+}
+----
+
+When `is_shared_content_outdated` is `true`, call the share endpoint with `refresh_shared_content: true` to update the shared view with the latest conversation content.
+
+
+==== Response fields
+
+[width="100%"]
+[options='header']
+|=====
+|Field|Description
+|`conversation_id`|__String__. Echoes the request parameter.
+|`is_shared_content_outdated` a|__Boolean__.
+
+* `true`, if the shared view was generated before the last edit to the conversation and does not reflect the latest content
+* `false` when the shared view is current.
+* `null` when the conversation has never been shared.
+|`principals`|__Array of strings__. List of principals with access. Empty when no access has been granted. The conversation owner is never included. Each entry in the `principals` array contains the following attributes:
+
+* `id`. __String__. Unique identifier of the user or group.
+* `type`. __String__. `USER` for individual users, `USER_GROUP` for groups.
+* `display_name`. __String__. Display name as shown in the ThoughtSpot UI.
+* `name`. __String__. Internal name of the user or group.
+* `permission`. __String__. Access level. Always `READ_ONLY` for shared conversations.
+
+|=====
+
+== Additional resources
+
+* xref:spotter-agent-apis.adoc[Spotter Agent APIs]
+* xref:spotter-agent-conversation-apis.adoc[Spotter agent conversation APIs]
+* xref:spotter-agent-conversation-mgmt-apis.adoc[APIs for managing saved conversations]
+* xref:customize-spotter-sharing.adoc#_spotter_conversation_sharing[Spotter conversation sharing in embedded views]
+

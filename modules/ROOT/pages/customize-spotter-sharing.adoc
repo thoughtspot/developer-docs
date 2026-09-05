@@ -1,0 +1,192 @@
+= Customize conversation sharing experience
+:toc: true
+:toclevels: 2
+
+:page-title: Customizing Spotter conversation sharing
+:page-pageid: customize-spotter-sharing
+:page-description: You can customize the Spotter conversation sharing experience using the customization options available in the Visual Embed SDK.
+
+Users can share their Spotter conversations with other users and groups from the embedded Spotter interface.
+
+[#_spotter_conversation_sharing]
+== Spotter conversation sharing experience
+Conversation sharing is turned off by default in embedded Spotter interface. To enable it, set `enableShareConversation` to `true` in the `spotterShareConversationConfig` object. This setting enables the *Share* action in the Spotter response page and the chat history panel in the sidebar, which allows a user to share a conversation with other users and groups in their application. The recipients can access a shared conversation only in a read-only view.
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed('#ts-embed', {
+  // Enable conversation sharing
+  spotterShareConversationConfig: {
+    enableShareConversation: true,
+  },
+  // ...other embed view configuration options
+});
+----
+
+== Customizing share modal and sharing settings
+To customize the conversation sharing experience, use the following options in
+the `SpotterShareConversationConfig` interface as needed:
+
+[width="100%", cols="5,7"]
+[options='header']
+|=====
+|Property |Description
+|`enableShareConversation` |Enables conversation sharing in the embedded interface. Default is `false`.
+|`spotterShareLabel` |Label of the *Share* button in the conversation header and the *Share* menu item in the sidebar. Default text is `Share`.
+|`spotterShareModalTitle` | Title of the share modal.
+|`spotterShareConfirmLabel` |Label of the confirm button in the share modal. Default label is `Share`.
+|`spotterShareCancelLabel` |Label of the cancel button in the share modal. Default label is `Cancel`.
+|`spotterShareAddUsersLabel` |Label of the recipient picker in the share modal.
+|`spotterShareEmptyTitle` |Title text shown when the recipient picker is empty.
+|`spotterShareEmptySubtitle` |Subtitle text shown when the recipient picker is empty.
+|`spotterShareIncludeNewMessagesLabel` |Label of the checkbox that includes messages added since the last shared version.
+|`spotterShareUpToCurrentLabel` |Footer note shown in the share modal when the shared snapshot is current.
+|`spotterShareStaleInfoLabel` |Banner text shown in the share modal when the shared snapshot is stale.
+|`spotterSharedConversationBannerMessage` |Data-access banner text shown in the read-only shared view.
+|`spotterSharedConversationExitLabel` |Label of the *Exit* button in the read-only shared view. Default label is `Exit`.
+||
+|=====
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed('#ts-embed', {
+  // Enable conversation sharing
+  spotterShareConversationConfig: {
+    enableShareConversation: true,
+    spotterShareAddUsersLabel: "Add recipients",
+    spotterShareIncludeNewMessagesLabel: "Include new messages",
+  },
+  // ...other embed view configuration options
+});
+----
+
+== Customizing conversation sharing link
+When a user shares a conversation from an embedded Spotter interface, the share link sent to recipients must open within your embedding application context and not direct recipients to the conversation page in the ThoughtSpot instance.
+
+To customize the URL for your application context, configure the conversation share link setting and then pass the conversation ID to your embed.
+
+=== Configure the conversation share link setting
+To customize the conversation share link format:
+
+. Go to **Develop** > **Link settings** page in your ThoughtSpot application.
+. Specify the conversation share link URL so that the links are generated in a URL format that is customized for your application's domain URL, with a placeholder for the shared conversation's ID.
++
+`\https://{your-app-domain}/{path}/{conversation-id}?{ts-query-params}`
+
++
+For example:
+`\https://myapp.example.com/analytics/shared/{conversation-id}?{ts-query-params}`
+
+If the conversation sharing link format is defined, ThoughtSpot replaces the `{conversation-id}` with the ID of the shared conversation and generates the link in the specified URL format, so the recipient is directed to the shared conversation page within their application context.
+
+For more information about customizing links in embedded deployments, see xref:customize-links.adoc[Customize links].
+
+=== Pass the conversation ID to your embed
+When the user shares a conversation, add the necessary code in your application to read the conversation ID from the page URL and pass it to `SpotterEmbed` in the `sharedConversationId` property.
+
+[source,JavaScript]
+----
+const convId = new URLSearchParams(window.location.search).get('conversation-id');
+const embed = new SpotterEmbed('#tsEmbed', {
+   //... other embed view config
+   spotterShareConversationConfig: {
+    enableShareConversation: true,
+   },
+   sharedConversationId: convId,
+})
+----
+
+When the `sharedConversationId` property is configured, the embed opens the shared conversation directly in the read-only view, for all recipients within your application.
+
+== Customizing the visibility of sharing UI elements
+Use the following `Action` enum members in `hiddenActions` or `disabledActions` to control individual sharing UI elements:
+
+* `Action.SpotterShareConversationButtonHeader` for **Share** button in the Spotter conversation header.
+* `Action.SpotterShareConversationMenuItemSidebar` for **Share** menu action in the chat  history panel in the sidebar.
+* `Action.SpotterShareIncludeNewMessagesCheckbox` for the `include new messages since last shared version` checkbox in the share modal.
+* `SpotterSharedConversationBannerDismissButton` for the dismiss button of the data access banner displayed in the shared conversation view.
+* `Action.SpotterShareUpToCurrentInfo` for the share modal footer note, "Chat will be shared up to the current moment…."
+* `Action.SpotterSharedConversationBanner` for the data access banner shown when a recipient opens a shared conversation.
+* `Action.SpotterShareStaleInfoBannerDismissButton` for the banner that shows the message,  "This data may have changed since the last time you had a chat."
+* `Action.SpotterSharedConversationExitButton` for *Exit* button in the read-only view of the shared conversation.
+
++
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed('#ts-embed', {
+  worksheetId: '<datasource-guid>',
+  spotterShareConversationConfig: {
+    enableShareConversation: true,
+  },
+  // Allow sharing from the header only; hide the sidebar entry point
+  hiddenActions: [Action.SpotterShareConversationMenuItemSidebar,Action.SpotterShareUpToCurrentInfo],
+});
+----
+
+For a complete list action IDs, see xref:Action.adoc[Action reference].
+
+== Customizing app interactions
+
+Use the following event IDs to enable interaction between the host and the embedded application:
+
+HostEvents::
+* `HostEvent.ShareSpotterConversation` +
+Opens the Spotter share conversation modal for the given conversation ID.
+* `HostEvent.ExitSpotterSharedConversation` +
+Exits the read-only view of the shared conversation.
+* `HostEvent.CloseSpotterShareConversation` +
+Closes the Spotter share conversation modal.
+
++
+[source,JavaScript]
+----
+spotterEmbed.trigger(HostEvent.ShareSpotterConversation, {
+  conversationId: '<conversation-id>',
+});
+----
+
++
+For a complete list of event IDs, see xref:HostEvent.adoc[HostEvent reference].
+
+EmbedEvents::
+
+* `EmbedEvent.SpotterConversationShared` +
+Emitted when a Spotter conversation is shared with the intended recipients.
+* `EmbedEvent.SpotterConversationShareRevoked` +
+Emitted when access to a shared Spotter conversation is revoked.
+* `EmbedEvent.SpotterSharedConversationViewed` +
+Emitted when a recipient opens a shared Spotter conversation.
+* `EmbedEvent.SpotterShareConversationButtonHeaderClicked` +
+Emitted when the Share button in the conversation header is clicked.
+* `EmbedEvent.SpotterShareConversationMenuItemSidebarClicked` +
+Emitted when the Share action in the menu displayed for a chat in the chat history sidebar.
+* `SpotterShareIncludeNewMessagesCheckboxToggled` +
+Emitted when the user toggles the "include new messages since last shared version" checkbox in the share modal.
+* `EmbedEvent.SpotterShareModalCancelButtonClicked` +
+Emitted when the Cancel button in the share conversation modal is clicked.
+* `EmbedEvent.SpotterShareStaleInfoBannerDismissed`+
+Emitted when the user dismisses the banner that shows the text, "This data may have changed since the last time you had a chat."
+* `EmbedEvent.SpotterSharedConversationExitButtonClicked` +
+Emitted when a user exits the shared conversation read-only view.
+
++
+[source,JavaScript]
+----
+spotterEmbed.on(EmbedEvent.SpotterConversationShared, (payload) => {
+  console.log('Shared:', payload.shareId, payload.recipientsAdded);
+});
+
+spotterEmbed.on(EmbedEvent.SpotterConversationShareRevoked, (payload) => {
+  if (payload.fullyRevoked) {
+    console.log('All recipients removed');
+  }
+});
+----
+
+For a complete list of event IDs, see xref:EmbedEvent.adoc[EmbedEvent reference].
+
+== Additional resources
+* xref:customize-spotter-embed.adoc[Customizing the Spotter embed view]
+* xref:customize-spotter-chat-experience.adoc[Customizing the Spotter chat experience]
+* xref:customize-spotter-sidebar.adoc[Customizing the Spotter sidebar panel]
+* xref:customize-spotter-analysts.adoc[Customizing Spotter Analysts in the embedded view]
