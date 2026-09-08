@@ -47,6 +47,13 @@ const FloatingAssistant: React.FC = () => {
     const [isTutorialsPage, setIsTutorialsPage] = useState(
         () => typeof window !== 'undefined' && isTutorialsPath(window.location.pathname),
     );
+    // The 404 page has no fixed pathname to match against (it renders for
+    // whatever bogus URL the user hit), so detect it via its own DOM marker
+    // instead — checked after each route change once Gatsby has committed
+    // the new page's DOM.
+    const [isNotFoundPage, setIsNotFoundPage] = useState(
+        () => typeof document !== 'undefined' && !!document.getElementById('page-404'),
+    );
     const {
         isOpen,
         setIsOpen,
@@ -318,6 +325,14 @@ const FloatingAssistant: React.FC = () => {
     useEffect(() => {
         const handler = (e: CustomEvent<{ location: Location }>) => {
             setIsTutorialsPage(isTutorialsPath(e.detail.location.pathname));
+        };
+        window.addEventListener('gatsby-route-update', handler as EventListener);
+        return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
+    }, []);
+
+    useEffect(() => {
+        const handler = () => {
+            setIsNotFoundPage(!!document.getElementById('page-404'));
         };
         window.addEventListener('gatsby-route-update', handler as EventListener);
         return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
