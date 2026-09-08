@@ -112,7 +112,7 @@ module.exports = {
             label: 'Embedding',
             pageIds: [
                 'getting-started', 'VisualEmbedSdk',
-                'embed-spotter', 'embed-spotter-agent', 'embed-ai-search-analytics', 'embed-nls',
+                'embed-spotter', 'embed-spotter-agent', 'embed-ai-search-analytics',
                 'search-embed', 'embed-searchbar', 'embed-a-viz', 'embed-liveboard',
                 'full-embed', 'full-app-customize', 'react-app-embed', 'embed-without-sdk',
                 'mobile-embed', 'embed-ts-mobile-react-native', 'embed-ts-flutter',
