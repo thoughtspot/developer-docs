@@ -331,11 +331,16 @@ const FloatingAssistant: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const handler = () => {
-            setIsNotFoundPage(!!document.getElementById('page-404'));
-        };
-        window.addEventListener('gatsby-route-update', handler as EventListener);
-        return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
+        // This widget mounts via async dynamic imports (see gatsby-browser.js),
+        // racing against Gatsby's own render of the page — on a direct load of
+        // a 404 URL there's no gatsby-route-update event to correct a wrong
+        // initial read, so watch the DOM directly instead, same as the
+        // theme-sync effect above.
+        const check = () => setIsNotFoundPage(!!document.getElementById('page-404'));
+        check();
+        const observer = new MutationObserver(check);
+        observer.observe(document.body, { childList: true, subtree: true });
+        return () => observer.disconnect();
     }, []);
 
     useEffect(() => {
@@ -488,6 +493,7 @@ const FloatingAssistant: React.FC = () => {
 
     if (pageId === CUSTOM_PAGE_ID.API_PLAYGROUND) return null;
     if (isTutorialsPage) return null;
+    if (isNotFoundPage) return null;
 
     return (
         <>
