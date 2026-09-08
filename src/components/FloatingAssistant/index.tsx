@@ -12,6 +12,9 @@ import { Message } from './types';
 import { renderMarkdown, formatTimestamp, formatDuration, getPageId, stripMarkdown } from './helpers';
 import { fetchSuggestedQuestions, streamAgentResponse, sendFeedback } from './api';
 
+// Matches 404_PAGE_TITLE in src/intl/en.json.
+const NOT_FOUND_TITLE = 'Not found';
+
 const SparkleIcon = () => (
     <Icon id={IconID.AI_SPARKLE_SELECTED} size={IconSize.XLARGE} color={IconColor.BLUE} />
 );
@@ -48,11 +51,16 @@ const FloatingAssistant: React.FC = () => {
         () => typeof window !== 'undefined' && isTutorialsPath(window.location.pathname),
     );
     // The 404 page has no fixed pathname to match against (it renders for
-    // whatever bogus URL the user hit), so detect it via its own DOM marker
-    // instead — checked after each route change once Gatsby has committed
-    // the new page's DOM.
+    // whatever bogus URL the user hit), so detect it via document.title
+    // instead. NOTE: a DOM marker (id) doesn't work here — in production,
+    // Gatsby prefetches/pre-mounts the 404 page's component into the live
+    // DOM in the background (for instant fallback on broken links) even
+    // while a completely different, valid page is showing, so
+    // getElementById('page-404') can be true on any page. document.title
+    // isn't affected by that background mount, only by the page actually
+    // being rendered.
     const [isNotFoundPage, setIsNotFoundPage] = useState(
-        () => typeof document !== 'undefined' && !!document.getElementById('page-404'),
+        () => typeof document !== 'undefined' && document.title === NOT_FOUND_TITLE,
     );
     const {
         isOpen,
@@ -331,16 +339,9 @@ const FloatingAssistant: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        // This widget mounts via async dynamic imports (see gatsby-browser.js),
-        // racing against Gatsby's own render of the page — on a direct load of
-        // a 404 URL there's no gatsby-route-update event to correct a wrong
-        // initial read, so watch the DOM directly instead, same as the
-        // theme-sync effect above.
-        const check = () => setIsNotFoundPage(!!document.getElementById('page-404'));
-        check();
-        const observer = new MutationObserver(check);
-        observer.observe(document.body, { childList: true, subtree: true });
-        return () => observer.disconnect();
+        const handler = () => setIsNotFoundPage(document.title === NOT_FOUND_TITLE);
+        window.addEventListener('gatsby-route-update', handler as EventListener);
+        return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
     }, []);
 
     useEffect(() => {
