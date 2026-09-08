@@ -1,0 +1,166 @@
+= Customize the Spotter sidebar panel
+:toc: true
+:toclevels: 2
+
+:page-title: Customizing the Spotter sidebar panel
+:page-pageid: customize-spotter-sidebar
+:page-description: You can customize the sidebar panel in the Spotter embed, including the chat history panel, using the customization options available in the Visual Embed SDK.
+
+You can customize the Spotter sidebar panel and its contents using configuration properties available in the xref:SpotterSidebarViewConfig.adoc[SpotterSidebarViewConfig] interface.
+
+== Sidebar elements in the embedded view
+The sidebar panel in the Spotter interface includes the following elements:
+
+[width="100%", cols="5,7,7"]
+[options='header']
+|====
+|Feature |Description |Availability
+
+|Chat history sidebar +
+|Allows users to access past chats from a sidebar and start a new conversation session. The chat history panel is disabled by default in the embedded view.
+|
+[tag greenBackground tick]#✓# Spotter 3 +
+[tag greenBackground tick]#✓# Spotter 2 +
+[tag greenBackground tick]#✓# Spotter Classic
+
+|Spotter Analysts +
+|Allows users to view the Spotter Analysts in the sidebar panel and open the Analysts dashboard. This feature is available by default in the embedded view.
+For more information, see xref:customize-spotter-analysts.adoc[Customizing Spotter Analysts in the embedded view].
+
+|
+[tag greenBackground tick]#✓# Spotter 3 +
+[tag greenBackground tick]#✓# Spotter 2 +
+[tag greenBackground tick]#✓# Spotter Classic
+
+|Spotter best practices +
+|Provides users with guidance and best practices for using Spotter effectively.
+
+|
+[tag greenBackground tick]#✓# Spotter 3 +
+[tag greenBackground tick]#✓# Spotter 2 +
+[tag greenBackground tick]#✓# Spotter Classic
+|====
+
+== Chat history panel
+To allow your users to access the chat history from their previous sessions, you can enable the *Chat history* in the sidebar by setting the `enablePastConversationsSidebar` parameter to `true` in the `spotterSidebarConfig` object. You can also customize the default state and the labels as shown in this example:
+
+[source,JavaScript]
+----
+const embed = new SpotterEmbed('#tsEmbed', {
+    // ...other embed view configuration options
+    // Configuration for the Spotter sidebar UI
+    spotterSidebarConfig: {
+        enablePastConversationsSidebar: true, // Enable the chat history sidebar
+        spotterSidebarDefaultExpanded: true, // Expand the sidebar by default
+        spotterSidebarTitle: 'Chat History', // Custom sidebar header text
+        spotterNewChatButtonTitle: 'New Conversation', // Custom label for the New chat button
+        spotterChatRenameLabel: 'Rename session', // Custom label for the Rename action
+        spotterChatDeleteLabel: 'Delete session', // Custom label for the Delete action
+        spotterConversationsBatchSize: 20, // Conversations fetched per batch (default: 30)
+    },
+})
+----
+
+[NOTE]
+====
+The standalone `enablePastConversationsSidebar` property on `SpotterEmbedViewConfig` is deprecated from Visual Embed SDK v1.47.0. Use the `enablePastConversationsSidebar` property within the `spotterSidebarConfig` object instead. When both properties are defined, the value in `spotterSidebarConfig` takes precedence.
+====
+
+=== Customizing sidebar menu actions
+Use the following `Action` enum members in `hiddenActions` or `disabledActions` to control the visibility of individual chat history panel elements:
+
+* `Action.SpotterSidebarHeader` for the sidebar header, which includes the title and the expand/collapse toggle. Hide-only.
+* `Action.SpotterSidebarToggle` for the expand/collapse toggle button on the sidebar.
+* `Action.SpotterNewChat` for the *New Chat* button.
+* `Action.SpotterPastChatBanner` for the past-conversation alert banner. Hide-only.
+* `Action.SpotterChatMenu` for the three-dot edit menu displayed for each conversation in the list.
+* `Action.SpotterChatRename` for the *Rename* option in the conversation edit menu.
+* `Action.SpotterChatDelete` for the *Delete* option in the conversation edit menu.
+
++
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed('#ts-embed', {
+  worksheetId: '<datasource-guid>',
+  spotterSidebarConfig: {
+    enablePastConversationsSidebar: true,
+  },
+  // Hide the Rename option and the past-conversation banner
+  hiddenActions: [Action.SpotterChatRename, Action.SpotterPastChatBanner],
+});
+----
+
+For a complete list of action IDs, see xref:Action.adoc[Action reference].
+
+=== Customizing app interactions
+Use the following event IDs to enable interaction between the host application and the chat history panel:
+
+HostEvents::
+* `HostEvent.StartNewSpotterConversation` +
+Starts a new Spotter conversation programmatically.
+
++
+[source,JavaScript]
+----
+spotterEmbed.trigger(HostEvent.StartNewSpotterConversation);
+----
+
++
+For a complete list of event IDs, see xref:HostEvent.adoc[HostEvent reference]. For the host event that opens the share modal from the chat history panel, see xref:customize-spotter-sharing.adoc#_customizing_app_interactions[Customizing app interactions].
+
+EmbedEvents::
+
+* `EmbedEvent.SpotterConversationRenamed` +
+Emitted when a user renames a conversation from the chat history panel. The event payload includes the `convId`, `oldTitle`, and `newTitle`.
+* `EmbedEvent.SpotterConversationDeleted` +
+Emitted when a user deletes a conversation from the chat history panel. The event payload includes the `convId` and `title`.
+* `EmbedEvent.SpotterConversationSelected` +
+Emitted when a user selects a conversation from the chat history panel. The event payload includes the `convId`, `title`, and `worksheetId`.
+
++
+[source,JavaScript]
+----
+spotterEmbed.on(EmbedEvent.SpotterConversationRenamed, (payload) => {
+  console.log('Renamed:', payload.convId, payload.oldTitle, '->', payload.newTitle);
+});
+
+spotterEmbed.on(EmbedEvent.SpotterConversationDeleted, (payload) => {
+  console.log('Deleted:', payload.convId, payload.title);
+});
+
+spotterEmbed.on(EmbedEvent.SpotterConversationSelected, (payload) => {
+  console.log('Selected:', payload.convId, payload.title, payload.worksheetId);
+});
+----
+
+For a complete list of event IDs, see xref:EmbedEvent.adoc[EmbedEvent reference].
+
+== Customizing other settings in the sidebar panel
+The other settings in the sidebar panel include a link to Best practices guide and the sidebar footer.
+
+To customize these options or to control their visibility in the sidebar, use the following options:
+
+* `spotterDocumentationUrl` +
+Allows customizing the documentation link.
+* `Action.SpotterSidebarFooter` +
+Action ID to show or hide the sidebar footer that contains the documentation link.
+* `Action.SpotterDocs` +
+Action ID to show or hide the documentation or best practices link in the sidebar footer.
+
+[source,JavaScript]
+----
+const embed = new SpotterEmbed('#tsEmbed', {
+    // ...other embed view configuration options
+    // Configuration for the Spotter sidebar UI
+    spotterSidebarConfig: {
+        enablePastConversationsSidebar: true, // Enable the chat history sidebar
+        spotterDocumentationUrl: 'https://your-help-center-url', // Custom best practices link
+    },
+})
+----
+
+== Additional resources
+* xref:customize-spotter-embed.adoc[Customizing the Spotter embed view]
+* xref:customize-spotter-chat-experience.adoc[Customizing the Spotter chat experience]
+* xref:customize-spotter-sharing.adoc[Customizing Spotter conversation sharing]
+* xref:customize-spotter-analysts.adoc[Customizing Spotter Analysts in the embedded view]
