@@ -1,0 +1,129 @@
+= JIT provisioning best practices
+:toc: true
+:toclevels: 2
+
+:page-title: Best practices for Just-in-time provisioning
+:page-pageid: jit-provisioning-best-practices
+:page-description: Recommendations and best practices for implementing Just-in-time user provisioning in ThoughtSpot embedded and SSO deployments
+
+This page provides recommendations for implementing xref:just-in-time-provisioning.adoc[Just-in-time (JIT) provisioning] in production deployments. It is intended for solutions engineers, embed developers, and platform administrators designing SSO-driven user lifecycle management in ThoughtSpot.
+
+== Overview
+JIT provisioning refers to creating or updating a user's authentication and authorization state *at the moment they sign in*, rather than pre-provisioning ahead of time. Conceptually, every JIT flow answers four questions in the following order:
+
+. Does the user exist in ThoughtSpot?
+.. If the user does not exist, create the user.
+. Is the user in this Org?
+.. If not in the Org, add the user to the Org.
+. Update the user's current provisioning within the Org (ThoughtSpot Group membership).
+.. If a group passed in the request does not exist, the group is created in the respective Org.
+. Update any Row Level Security (RLS) or Attribute-Based Access Control (ABAC) variable values for the user via token request (token authentication only). Variable values are set at the user level.
+
+== Choose the right JIT path
+
+ThoughtSpot supports two JIT provisioning paths with significantly different capabilities. Decide which path your deployment uses before designing your provisioning logic:
+
+[cols="2,3,4", options="header"]
+|=====
+|Path|Mechanism|Capability
+
+|Trusted authentication (token request)
+|Token request service and REST API v2
+|Full control: user creation, Org assignment, group creation and updates, privileges, and RLS variables.
+
+|IdP assertion (SAML or OIDC)
+|IdP claims at login
+|Limited: creates a user and adds them to existing groups in existing Orgs. Group mapping requires a ThoughtSpot Support ticket.
+|=====
+
+If your deployment requires dynamic entitlements, per-tenant Org routing, or ABAC variables, use trusted authentication. IdP-assertion JIT is best suited for simple auto creation on first login scenarios.
+
+For user and group creation and assignment, the explicit `/users` and `/groups` REST APIs can also be used and provide full control over every property. For JIT provisioning, however, token-based provisioning is the recommended approach.
+
+== Secure the token request service
+All REST API-based JIT operations should live inside your xref:trusted-auth-token-request-service.adoc[token request service], the backend component in the trusted authentication pattern that exchanges your `secret_key` for user tokens.
+
+* *Isolate credentials* +
+The token request service requires two secrets:
+** the `secret_key` for token requests +
+** a service account with administrator privileges for the provisioning REST API calls.
++
+Keep both server-side only. Do not expose them to the browser or embed code.
+* *Scope the service account minimally* +
+The account needs only the privileges to create and update users and groups in the target Orgs. Audit what the account actually requires instead of defaulting to full administrator access everywhere.
+* *Complete provisioning before requesting the token* +
+Unless you use `auto_create: true`, the user must exist in ThoughtSpot, in the Org the token is requested for, before a login token can be issued.
+
+== Pre-create groups and roles
+Groups drive content sharing, group-based RLS, roles, and column-level security, so your JIT group logic is effectively your entitlement engine.
+
+* Pre-create groups with the correct privileges, roles, and sharing before JIT go-live, and design your JIT logic to only assign membership, never to create groups implicitly.
+* Roles must exist before they can be referenced in `/groups/create` or `/groups/{group_identifier}/update` calls. Pre-create your role catalog; do not attempt role creation inline in the login path.
+* Sharing content requires the group or user to already exist. Follow "create, assign, and share" sequence.
+* Treat group names as stable, code-reviewed identifiers. They can double as data entitlements in RLS rules.
+
+== Validate group names
+
+* Group lists must use `group_name`, not `display_name`.
+* A non-matching group name silently creates a new, empty group with no privileges, roles, or access. A typo therefore fails silently: the user lands in an empty group and loses expected access.
+* Validate group names against a known-good list before passing them in token or update requests, and monitor for unexpected group creation.
+
+== Row-level security and ABAC considerations
+
+* If an RLS rule uses `ts_groups`, group names must exactly match values in the corresponding data warehouse column. The group name literally is the data entitlement, so a misspelled JIT-created group both grants no ThoughtSpot access and breaks RLS matching.
+* For attribute-based access control (ABAC), pass variable values through the custom token request (`/auth/token/custom`), which supports multiple values per variable. This works only with token authentication. For more information, see xref:abac_rls-variables.adoc[ABAC via RLS with variables].
+* For complex or bulk variable updates outside the login path, use the variable values update REST API.
+* Token request latency can increase with the number and complexity of RLS rules.
+
+== Multi-Org provisioning
+
+* You can only set a user's groups in the Org matching the authentication token used for the request.
+* If you create a user from the Primary Org, any `group_identifiers` in that request apply only within the Primary Org, even if the user is added to multiple Orgs in the same request.
+* Multi-Org group assignment therefore requires per-Org update calls with per-Org tokens.
+
+== Plan for deprovisioning
+
+JIT provisioning creates and updates users. It does not remove them.
+Define a deprovisioning process. Pair JIT with SCIM or periodic REST API reconciliation to deactivate or remove users who no longer require access.
+
+== Decision guide
+
+[cols="3,4", options="header"]
+|=====
+|Scenario|Recommended approach
+
+|Embedded analytics, per-tenant Orgs, dynamic entitlements
+|Trusted authentication with explicit `/users` and `/groups` REST APIs in the token request service
+
+|Embedded analytics, simple setup, entitlements fully known at login
+|Trusted authentication with `auto_create: true` on `/auth/token/full`, accepting the full group replace on each login
+
+|Entitlements set once at first login only
+|`/auth/token/custom` with `auto_create: true`, plus periodic reconciliation
+
+|Row-level security driven by user attributes
+|`/auth/token/custom` with ABAC variables
+
+|Direct SSO login (non-embedded) with auto-created users
+|SAML or OIDC JIT with attribute mapping; ThoughtSpot Support ticket required for group mapping
+|=====
+
+== Operational checklist
+
+Before enabling JIT provisioning in production, verify the following:
+
+* The token request service holds the `secret_key` and administrator service account credentials server-side only.
+* Groups and roles are pre-created with the correct privileges before JIT go-live.
+* Group names are validated against an allowlist before any token or update call, because typos silently create empty groups.
+* The token endpoint is chosen deliberately: `/auth/token/full` performs a full group replace on each login, while `/auth/token/custom` assigns groups at creation time only.
+* Multi-Org deployments account for per-Org group assignment via per-Org tokens.
+* SAML or OIDC group mapping Support tickets are raised early in the project timeline.
+* RLS `ts_groups` names are verified to exactly match warehouse column values.
+* A deprovisioning process is defined. Pair JIT with System for Cross-domain Identity Management (SCIM) or periodic API reconciliation.
+
+== Related information
+
+* xref:just-in-time-provisioning.adoc[Just-in-time provisioning]
+* xref:trusted-auth-token-request-service.adoc[Token request service]
+* xref:abac_rls-variables.adoc[ABAC via RLS with variables]
+* xref:api-user-management.adoc[User management via REST API]
