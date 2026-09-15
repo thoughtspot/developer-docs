@@ -1,0 +1,300 @@
+= Embed Spotter Analyst
+:toc: true
+:toclevels: 2
+
+:page-title: Embed Spotter Analyst
+:page-pageid: embed-spotter-analyst
+:page-description: Embed a single, pinned Spotter Analyst in your application using the Visual Embed SDK
+
+// SOURCE: SCAL-317811, SDK-1.53.0-changelog.md, Spotter embed developer cheatsheet
+
+ThoughtSpot Spotter Analysts are governed AI agents configured with specific data sources, instructions, and starter prompts. Using the Visual Embed SDK, you can embed a single, pinned Analyst in your application. This locks the embed to one governed experience and prevents users from switching to other Analysts or to the default Spotter.
+
+== Version requirements
+
+[cols="1,2"]
+|===
+| Component | Minimum version
+
+| Visual Embed SDK | 1.51.2
+| ThoughtSpot cluster | 26.10.0.cl
+|===
+
+[NOTE]
+====
+Some controls described in this page are available on earlier cluster versions (26.3 through 26.9). The `spotterAnalystConfig.analystId` property itself requires cluster version 26.10.0.cl. Use 26.10.0.cl as the minimum version requirement when setting up the single-Analyst embed configuration.
+====
+
+== How it works
+
+Use `spotterAnalystConfig.analystId` in `SpotterEmbed` to pin the embed to one Analyst. By default, with no additional configuration, the Analyst panel and a switcher rail remain visible and users can navigate to other Analysts. To create a fully locked experience, you must also hide the switcher actions.
+
+== Minimal configuration
+
+The following example embeds one Analyst with the chat history sidebar disabled and the switcher hidden:
+
+[source,javascript]
+----
+// In server-side rendered frameworks (Next.js, Nuxt, SvelteKit),
+// import the SDK dynamically to avoid window reference errors.
+const { init, SpotterEmbed, AuthType } =
+  await import('@thoughtspot/visual-embed-sdk');
+
+init({
+  thoughtSpotHost: 'https://{cluster}',
+  authType: AuthType.None, // uses the browser's existing session
+});
+
+new SpotterEmbed(container, {
+  frameParams: { width: '100%', height: '100%' },
+  worksheetId: '{model-guid}',
+
+  // Pin to one Analyst.
+  spotterAnalystConfig: { analystId: '{analyst-guid}' },
+
+  // Disable the chat history sidebar.
+  spotterSidebarConfig: { enablePastConversationsSidebar: false },
+
+  // Hide the switcher so users cannot navigate to a different Analyst.
+  hiddenActions: [
+    'spotterAnalystSidebar',
+    'spotterDefaultAnalyst',
+    'spotterAnalystList',
+  ],
+
+  hideSourceSelection: true,
+  disableSourceSelection: true,
+}).render();
+----
+
+== Configuration reference
+
+=== `spotterAnalystConfig`
+
+Type: `SpotterAnalystConfig`. Available from SDK 1.53.0 and ThoughtSpot Cloud 26.10.0.cl.
+
+Available on `SpotterEmbedViewConfig`. Pins the embed to a single Analyst.
+
+[cols="1,1,1,3"]
+|===
+| Property | Type | Cluster version | Description
+
+| `analystId`
+| string
+| 26.10.0.cl
+| GUID of the Analyst to display. Obtain this value from the xref:spotter-analyst-api.adoc[Spotter Analyst API] or from the ThoughtSpot UI.
+|===
+
+=== `spotterSidebarConfig`
+
+Type: `SpotterSidebarViewConfig`.
+
+[cols="1,1,1,3"]
+|===
+| Property | Type | Cluster version | Description
+
+| `enablePastConversationsSidebar`
+| boolean
+| 26.4.0.cl
+| Shows or hides the chat history sidebar. Set this property explicitly. Leaving it unset applies the cluster default, which may be `true`.
+
+| `spotterChatPinConfig`
+| `SpotterChatPinConfig`
+| 26.10.0.cl
+| Enables pinning and unpinning conversations in the sidebar. See xref:embed-spotter-analyst.adoc#pinning-conversations[Pinning conversations].
+|===
+
+=== `worksheetId` and `dataSources`
+
+[cols="1,1,3"]
+|===
+| Property | Cluster version | Description
+
+| `worksheetId`
+| All
+| GUID of the single model Spotter queries. Include this property alongside `spotterAnalystConfig`. Omitting it can prevent host-triggered questions from executing.
+
+| `dataSources`
+| 26.9.0.cl
+| Array of model GUIDs when the Analyst spans multiple models. If both `dataSources` and `worksheetId` are set, `dataSources` takes precedence.
+|===
+
+=== Locking the embed with `hiddenActions`
+
+Pinning an Analyst without hiding the switcher only changes the default selection. Users can still navigate to a different Analyst. Use the following three action IDs together to prevent this:
+
+[cols="1,1,1"]
+|===
+| Action ID | What it hides | Cluster version
+
+| `spotterAnalystSidebar`
+| The Analyst selection panel
+| 26.8.0.cl
+
+| `spotterDefaultAnalyst`
+| The default Spotter row
+| 26.10.0.cl
+
+| `spotterAnalystList`
+| The Show all Analysts row
+| 26.10.0.cl
+|===
+
+[NOTE]
+====
+An action ID not recognized by the cluster is silently dropped and does not cause an error. You can include all three action IDs even when targeting a cluster that does not yet support one of them.
+====
+
+If a narrow sidebar rail (expand toggle, New chat icon, or footer gear icon) remains visible after hiding these three actions, add the following shell-level action IDs. These are supported from cluster version 26.3.0.cl:
+
+[source,javascript]
+----
+hiddenActions: [
+  'spotterAnalystSidebar',
+  'spotterDefaultAnalyst',
+  'spotterAnalystList',
+  'spotterSidebarOpen',
+  'spotterSidebarClose',
+  'spotterNewConversation',
+  'spotterSidebarSettings',
+],
+----
+
+=== Starter prompts
+
+Use `starterPrompts` in `SpotterChatViewConfig` to customize the starter prompt pills displayed above the chat input.
+
+[cols="1,1,1,3"]
+|===
+| Property | Type | Cluster version | Description
+
+| `starterPrompts`
+| `StarterPromptsConfig`
+| 26.10.0.cl
+| Top-level configuration object for Spotter starter prompts. Contains keys: `enable`, `quick`, `research`, `previewData`, and `liveboard`.
+
+| `openSpotterOnLiveboardByDefault`
+| boolean
+| 26.10.0.cl
+| Opens the Spotter chat panel automatically when a Liveboard loads. Default: `true`. Supported in `LiveboardEmbed` and `AppEmbed`.
+|===
+
+To show or hide individual starter prompt pills, use the `Action` enum:
+
+[cols="1,3"]
+|===
+| Action | Description
+
+| `Action.QuickSearchPill`
+| The Basic Search starter-prompt pill. Opens a card of suggested questions that submit on click.
+
+| `Action.DeepAnalysisPill`
+| The Deep Analysis pill. Fills the chat input with a suggested question without auto-submitting.
+
+| `Action.DataLiteracyPill`
+| The Data Literacy pill. Submits a backend-generated prompt describing the data source. Only its label is customizable.
+|===
+
+[source,javascript]
+----
+hiddenActions: [
+  Action.QuickSearchPill,
+  Action.DeepAnalysisPill,
+  Action.DataLiteracyPill,
+],
+----
+
+[NOTE]
+====
+Setting `hideSampleQuestions: true` hides both the generic sample questions and the Analyst's own starter prompts, as they share the same block. This is generally not the intended behavior when embedding a governed Analyst.
+====
+
+=== Pre-filling the chat input
+
+Use `searchOptions.searchQuery` to pre-fill the prompt. This does not submit the question. To submit it, also fire `HostEvent.SpotterSearch` with `executeSearch: true`.
+
+[source,javascript]
+----
+new SpotterEmbed(container, {
+  searchOptions: {
+    searchQuery: 'What was total revenue last quarter?',
+  },
+  // ...
+}).render();
+----
+
+[#pinning-conversations]
+== Pinning conversations
+
+`SpotterChatPinConfig` lets users pin Spotter conversations so they appear at the top of the sidebar for quick access. Pinning is disabled by default in embedded deployments and must be explicitly enabled.
+
+[cols="1,1,1,3"]
+|===
+| Property | Type | Default | Description
+
+| `enabled`
+| boolean
+| `false`
+| Enables the pin and unpin actions in the conversation edit menu. Set to `true` to allow users to pin conversations.
+
+| `pinLabel`
+| string
+| System default
+| Custom label for the pin action in the conversation edit menu.
+
+| `unpinLabel`
+| string
+| System default
+| Custom label for the unpin action in the conversation edit menu.
+|===
+
+[source,javascript]
+----
+new SpotterEmbed(container, {
+  spotterSidebarConfig: {
+    enablePastConversationsSidebar: true,
+    spotterChatPinConfig: {
+      enabled: true,
+      pinLabel: 'Save to top',
+      unpinLabel: 'Remove from top',
+    },
+  },
+  // ...
+}).render();
+----
+
+To listen for pin and unpin events, or to trigger pin state programmatically from the host application, see xref:event-embedEvents.adoc#pin-events[Spotter pin and unpin events] and xref:events-hostEvents.adoc#spotter-pin-host-events[Spotter conversation pin and unpin].
+
+== New actions in SDK 1.53.0
+
+The following `Action` enum members are new in SDK 1.53.0 and are relevant to Analyst embed:
+
+[cols="1,3"]
+|===
+| Action | Description
+
+| `Action.SpotterChatPin`
+| Controls visibility and disabled state of the pin and unpin action in the Spotter conversation edit menu.
+
+| `Action.SpotterAnalystList`
+| Controls visibility and disabled state of the Show all Analysts row in the Analyst interface.
+
+| `Action.SpotterDefaultAnalyst`
+| Controls visibility and disabled state of the default Spotter analyst entry in the Analyst interface.
+
+| `Action.SpotterOnLiveboard`
+| The Spotter button in the Liveboard header.
+
+| `Action.AllLiveboardFilters`
+| Shows, hides, or disables all filter surfaces on a Liveboard: filter chips, parameter chips, and cross-filter chips at the Liveboard, tab, and group levels. Parameter and cross-filter chips support hide only and cannot be disabled.
+
+| `Action.EditInputTable`
+| Edits an input table used by an Answer directly from the Liveboard.
+|===
+
+== Related resources
+
+* xref:spotter-analyst-api.adoc[Spotter Analyst API]
+* xref:event-embedEvents.adoc[Embed events reference]
+* xref:events-hostEvents.adoc[Host events reference]
+* xref:customize-spotter-embed.adoc[Customize Spotter embed]
