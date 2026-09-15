@@ -1,0 +1,366 @@
+= Feature Management API
+:toc: true
+:toclevels: 2
+
+:page-title: Feature Management API
+:page-pageid: feature-management-api
+:page-description: Search feature configurations, assign features to Orgs, and set feature values using the REST API
+
+// SOURCE: SCAL-319281; search-feature.md, update-feature-assignment.md, updated-feature-value.md
+
+The Feature Management API lets cluster and Org admins retrieve feature configurations, assign features to Orgs, and set feature values programmatically. These endpoints replicate the feature management capabilities available in the Admin Portal 2.0 UI.
+
+All endpoints are under `/api/rest/2.0/configurations/features/` and are available from ThoughtSpot Cloud 26.10.0.cl.
+
+== Prerequisites
+
+* Feature Management must be enabled on your ThoughtSpot instance.
+* All requests require a Bearer token.
+* If link:https://developers.thoughtspot.com/docs/rbac[Role-Based Access Control (RBAC)] is enabled on your instance, the `ADMINISTRATION` privilege is required for all write operations.
+* Privilege requirements vary by operation. See each endpoint section for details.
+
+== Key concepts
+
+=== Feature scope
+
+Feature configurations exist at two levels:
+
+Cluster scope:: The cluster-level default, visible to cluster admins. Returns `assigned_orgs` and `is_org_aware` for each feature.
+Org scope:: A per-Org value override, visible to Org admins. Returns `element_type`, `element_config`, and `element_value` for each feature.
+
+=== Feature identifiers
+
+Each feature can be referenced by its:
+
+* `feature_name`: a human-readable name, such as `index_columns`.
+* `feature_id`: the underlying system identifier, such as `orion.embraceConfig.doIndexing`.
+
+Both forms are accepted in requests to any endpoint that takes a `feature_identifier`.
+
+=== Feature categories
+
+Features are grouped into availability categories:
+
+* `GENERAL_ACCESS`: generally available features. This is the default.
+* `EARLY_ACCESS`: features in early access.
+
+== Search features
+
+`POST /api/rest/2.0/configurations/features/search`
+
+Returns feature configurations available on the ThoughtSpot instance, grouped by feature group.
+
+=== Privileges required
+
+`ADMINISTRATION` or `ORG_ADMINISTRATION`.
+
+=== Request parameters
+
+[cols="1,1,1,3"]
+|===
+| Parameter | Type | Required | Description
+
+| `scope`
+| string
+| Required
+| Administrative view: `CLUSTER` returns the cluster-admin view, including `assigned_orgs` per feature. `ORG` returns the Org-admin view, including `element_value` per feature.
+
+| `org_identifier`
+| integer
+| Conditional
+| Numeric ID of the Org. Required when `scope` is `ORG`. Omitting it returns a `400` error. Ignored when `scope` is `CLUSTER`.
+
+| `category`
+| string
+| Optional
+| Feature availability category: `GENERAL_ACCESS` (default) or `EARLY_ACCESS`.
+|===
+
+=== Response fields by scope
+
+The response fields populated depend on the requested `scope`.
+
+*Cluster view (`scope=CLUSTER`)*: each feature includes `feature_id`, `feature_name`, `assigned_orgs`, `is_org_aware`, and (for non-Org-aware features) `feature_value`.
+
+*Org view (`scope=ORG`)*: each feature includes `feature_id`, `feature_name`, `element_type`, `element_config`, and `element_value`.
+
+=== Example: cluster view
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "scope": "CLUSTER",
+  "category": "GENERAL_ACCESS"
+}'
+----
+
+=== Example: Org view
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "scope": "ORG",
+  "org_identifier": 1,
+  "category": "GENERAL_ACCESS"
+}'
+----
+
+=== Example response (cluster view)
+
+[source,json]
+----
+[
+  {
+    "feature_group": "search",
+    "docs_url": null,
+    "features": [
+      {
+        "feature_id": "orion.embraceConfig.doIndexing",
+        "feature_name": "index_columns",
+        "assigned_orgs": [
+          {
+            "org_id": 0,
+            "org_name": "Primary"
+          }
+        ],
+        "is_org_aware": true,
+        "feature_value": null,
+        "docs_url": null
+      }
+    ]
+  }
+]
+----
+
+=== Error responses
+
+[cols="1,3"]
+|===
+| HTTP status code | Description
+
+| 400 | Invalid request parameters, or `org_identifier` is missing when `scope` is `ORG`.
+| 401 | Bearer token is missing, expired, or invalid.
+| 403 | Insufficient privileges.
+| 404 | Feature Management is not enabled on this instance.
+| 500 | Unexpected server error.
+|===
+
+== Update feature assignments
+
+`POST /api/rest/2.0/configurations/features/assignments/update`
+
+Updates the Org assignments for a feature. Available to cluster admins only. Org-scoped admins cannot call this endpoint.
+
+=== Privileges required
+
+`ADMINISTRATION` in the cluster-admin (All-Org or default-Org) context.
+
+=== Request parameters
+
+[cols="1,1,1,3"]
+|===
+| Parameter | Type | Required | Description
+
+| `feature_identifier`
+| string
+| Required
+| Feature name (`feature_name`) or feature ID (`feature_id`) of the feature to update.
+
+| `org_identifiers`
+| array
+| Required
+| Numeric IDs of the Orgs to assign. Send an empty array with `operation` set to `REPLACE` to remove all Org assignments for this feature.
+
+| `operation`
+| string
+| Optional
+| Type of assignment update: `ADD` assigns the given Orgs in addition to existing assignments, `REMOVE` unassigns the given Orgs, or `REPLACE` sets the assignment to exactly the given Orgs. Defaults to `REPLACE`.
+|===
+
+=== Response
+
+Returns `200 OK` and a `FeatureAssignmentResponse` object with `feature_id`, `feature_name`, and the updated `assigned_orgs` list.
+
+=== Example: add Org assignments
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/assignments/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "feature_identifier": "index_columns",
+  "org_identifiers": [1, 2],
+  "operation": "ADD"
+}'
+----
+
+=== Example: remove all Org assignments
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/assignments/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "feature_identifier": "index_columns",
+  "org_identifiers": [],
+  "operation": "REPLACE"
+}'
+----
+
+=== Example response
+
+[source,json]
+----
+{
+  "feature_id": "orion.embraceConfig.doIndexing",
+  "feature_name": "index_columns",
+  "assigned_orgs": [
+    { "org_id": 1, "org_name": "Acme" },
+    { "org_id": 2, "org_name": "Beta" }
+  ]
+}
+----
+
+=== Error responses
+
+[cols="1,3"]
+|===
+| HTTP status code | Description
+
+| 400 | Invalid request parameters.
+| 401 | Bearer token is missing, expired, or invalid.
+| 403 | Insufficient privileges. Org-scoped admins cannot call this endpoint.
+| 404 | Feature not found, or Feature Management is not enabled on this instance.
+| 500 | Unexpected server error.
+|===
+
+== Update feature value
+
+`POST /api/rest/2.0/configurations/features/values/update`
+
+Sets the value of a feature at the cluster or Org scope.
+
+[WARNING]
+====
+Setting `reset_org_overrides` to `true` at `CLUSTER` scope removes all per-Org value overrides cluster-wide. All Orgs then inherit the new cluster-level value. This operation cannot be undone via the API.
+====
+
+=== Privileges required
+
+`ADMINISTRATION`.
+
+=== Request parameters
+
+[cols="1,1,1,3"]
+|===
+| Parameter | Type | Required | Description
+
+| `scope`
+| string
+| Required
+| Scope at which to set the value: `CLUSTER` or `ORG`.
+
+| `org_identifier`
+| integer
+| Conditional
+| Numeric ID of the Org for which to set the value. Required when `scope` is `ORG`. Ignored when `scope` is `CLUSTER`.
+
+| `feature_identifier`
+| string
+| Required
+| Feature name (`feature_name`) or feature ID (`feature_id`) of the feature to update.
+
+| `feature_value`
+| string
+| Required
+| New value to assign to the feature.
+
+| `reset_org_overrides`
+| boolean
+| Conditional
+| Applicable only when `scope` is `CLUSTER`. When `true`, removes all existing per-Org value overrides so that every Org inherits the new cluster-level value. Required when `scope` is `CLUSTER` for Org-aware features. Passing this parameter at `ORG` scope returns a `400` error.
+|===
+
+=== Response
+
+Returns `200 OK` and a `FeatureValueResponse` object with `feature_id`, `feature_name`, and the updated `feature_value`.
+
+=== Example: set an Org-level override
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/values/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "scope": "ORG",
+  "org_identifier": 1,
+  "feature_identifier": "index_columns",
+  "feature_value": "true"
+}'
+----
+
+=== Example: set cluster value and reset all Org overrides
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/values/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "scope": "CLUSTER",
+  "feature_identifier": "index_columns",
+  "feature_value": "true",
+  "reset_org_overrides": true
+}'
+----
+
+=== Example response
+
+[source,json]
+----
+{
+  "feature_id": "orion.embraceConfig.doIndexing",
+  "feature_name": "index_columns",
+  "feature_value": "true"
+}
+----
+
+=== Error responses
+
+[cols="1,3"]
+|===
+| HTTP status code | Description
+
+| 400 | Invalid request, or `reset_org_overrides` was passed with `scope: ORG`.
+| 401 | Bearer token is missing, expired, or invalid.
+| 403 | Insufficient privileges, or the Org is not assigned to this feature.
+| 404 | Feature not found, or Feature Management is not enabled on this instance.
+| 500 | Unexpected server error.
+|===
+
+== Related resources
+
+* xref:rest-api-v2-reference.adoc[REST API v2 reference]
+* xref:orgs-api.adoc[Orgs API]
+* xref:privileges-and-roles.adoc[Privileges and roles]
