@@ -194,7 +194,7 @@ const Document = (props: {
     // text to copy and no meaningful parent to link back to — hide the copy
     // button and the breadcrumb there. tutorials-overview shows both like any
     // other tutorial content page.
-    const isWalkthroughsLandingPage = props.pageid === 'walkthroughs';
+    const isWalkthroughsLandingPage = props.pageid === 'quickstarts';
     const hideCopyPage = isWalkthroughsLandingPage;
 
     return (
