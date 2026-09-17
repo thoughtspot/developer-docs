@@ -189,7 +189,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
     // in-page nav to browse, so skip the left sidebar entirely and let the
     // cards use the full width. tutorials-overview is presented like any other
     // tutorial content page (left nav + right TOC), same as its own lessons.
-    const hideLeftNav = curPageNode.pageAttributes.pageid === 'walkthroughs';
+    const hideLeftNav = curPageNode.pageAttributes.pageid === 'quickstarts';
 
     const isGQPlayGround =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
@@ -487,7 +487,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
     // any other tutorial content page.
     const shouldShowRightNav =
         params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID &&
-        params[TS_PAGE_ID_PARAM] !== 'walkthroughs';
+        params[TS_PAGE_ID_PARAM] !== 'quickstarts';
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
@@ -581,7 +581,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                     className={`documentBody ${
                         isHomePage ? 'doc-home' : 'doc-wrapper-detail'
                     }${
-                        params[TS_PAGE_ID_PARAM] === 'walkthroughs'
+                        params[TS_PAGE_ID_PARAM] === 'quickstarts'
                             ? ' doc-walkthroughs'
                             : ''
                     }`}

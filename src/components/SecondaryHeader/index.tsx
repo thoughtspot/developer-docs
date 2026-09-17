@@ -20,7 +20,7 @@ export type DocCategory =
 export const CATEGORY_LABELS: Record<DocCategory, string> = {
     all: 'All docs',
     guides: 'Developer guides',
-    walkthroughs: 'Guided Walkthroughs',
+    walkthroughs: 'Quickstarts',
     embedding: 'Embedding',
     'rest-api': 'REST APIs',
     'mcp-server': 'MCP server',
@@ -35,7 +35,7 @@ export const CATEGORY_LABELS: Record<DocCategory, string> = {
 export const CATEGORY_LANDING: Record<DocCategory, string> = {
     all: '/introduction',
     guides: '/introduction',
-    walkthroughs: '/tutorials/walkthroughs',
+    walkthroughs: '/tutorials/quickstarts',
     embedding: '/getting-started',
     'rest-api': '/rest-apis',
     'mcp-server': '/mcp-integration',
