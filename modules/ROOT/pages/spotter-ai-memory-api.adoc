@@ -80,7 +80,7 @@ The API returns a response object with the following details:
 * `content` +
 The serialized memory payload in YAML format. The exported file includes an array of memories, including rules and recipes added to Spotter memory, and data model GUID and object ID if present.
 * `type` +
-Indicates if the memory type is `RULE` or `RECIPE`. If the type is `RULE`, the response shows the rule definition. If the type is `RECIPE`, the contents of the recipe such as task, steps, TML tokens are included in the response.
+Indicates the memory type: `RULE`, `RECIPE`, or `ALWAYS_APPLY_RULES`. If the type is `RULE`, the response includes the rule definition. If the type is `RECIPE`, the response includes the `user_query` and `recipe` fields.
 * `datamodel_sources` +
 GUID and object ID of the data model object.
 
@@ -215,6 +215,11 @@ You can edit it locally and import it into your environment using the import mem
 }
 ----
 
+[IMPORTANT]
+====
+The export API response shows `content.recipe` as a structured JSON object for readability. In the actual YAML document returned inside the `content` field, `recipe` is always a scalar string — never a nested YAML mapping. The scalar format varies depending on which AI model generated the memory entry. Treat `recipe` values as opaque: copy them verbatim from an export and do not modify or reconstruct them manually. See <<update-memory-file,Updating the memory file content>> for details.
+====
+
 [#update-memory-file]
 == Updating the memory file content
 The export memory API endpoint returns a YAML payload with a single top-level `memories` key holding a list of memory items. It includes the following object properties:
@@ -229,7 +234,14 @@ You can modify this file, add target data models, and submit it back through the
 
 [IMPORTANT]
 ====
-When editing a memory record, do not manually add new entries, especially under ALWAYS_APPLY_RULES. You can modify the values or remove the existing entries. If you must add new entries, use the UI workflow to ensure the memory entries are created in the correct format.
+When editing a memory record, do not manually add new entries, especially under `ALWAYS_APPLY_RULES`. You can modify the values or remove the existing entries. If you must add new entries, use the UI workflow to ensure the memory entries are created in the correct format.
+
+For `RECIPE` items, `content.recipe` is always a scalar string — not a nested YAML mapping. The server rejects any import where `recipe` is expressed as indented YAML keys. The format of the `recipe` string depends on which AI model generated the memory entry:
+
+* *Task/steps format*: The server stores `recipe` as a compact, escaped JSON string in a YAML double-quoted scalar.
+* *NLSv2 format*: The server stores `recipe` as a multi-line structured text string using a YAML literal-block scalar (`|-`), with two numbered sections each containing an embedded JSON object.
+
+Do not construct or modify `recipe` values manually. Always copy `recipe` content verbatim from an export. To adjust Spotter memory behavior, edit the `RULE` and `ALWAYS_APPLY_RULES` entries — these are plain text and designed for human editing.
 ====
 
 [source,yaml]
@@ -264,16 +276,7 @@ memories:
 - type: RECIPE
   content:
     user_query: "Weekly sales for June"
-    recipe:
-      task: "Show total sales by week for the month of June"
-      steps:
-      - instruction: "Query sales by weekly date filtered to June month"
-        analytical_mappings:
-          tml_tokens:
-          - "[sales]"
-          - "[date].weekly"
-          - "[date] = 'june'"
-          formulas: []
+    recipe: "{\"task\": \"Show total sales by week for the month of June\", \"steps\": [{\"instruction\": \"Query sales by weekly date filtered to June month\", \"analytical_mappings\": {\"tml_tokens\": [\"[sales]\", \"[date].weekly\", \"[date] = 'june'\"], \"formulas\": []}}]}"
   datamodel_sources:
   - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
     obj_id: RetailSales-3bc18302
@@ -282,11 +285,19 @@ memories:
 - type: RECIPE
   content:
     user_query: "What is the total sales by date?"
-    recipe:
-      brief_summary: "Visualizes total sales revenue over time on a daily basis."
-      nl_query: "What is the total sales by date?"
-      lossy_tml_tokens: "[date] [sales]"
-      lossy_formulas: []
+    recipe: |-
+      1. Brief Answer Summary
+      {
+      "brief_summary": "Visualizes total sales revenue over time on a daily basis.",
+      "nl_query": "What is the total sales by date?",
+      "display_tml_tokens": ""
+      }
+
+      2. Call NLSV2_Tool with these arguments
+      {
+          "lossy_tml_tokens": "[date] [sales]",
+          "lossy_formulas": []
+      }
   datamodel_sources:
   - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
     obj_id: RetailSales-3bc18302
@@ -303,6 +314,8 @@ memories:
   tags: []
 ----
 
+The example shows one RECIPE entry in each format. The first RECIPE entry uses the task/steps format, where `recipe` is a compact JSON string in a YAML double-quoted scalar with escaped inner quotes. The second RECIPE entry uses the NLSv2 format, where `recipe` is a multi-line structured text string using a YAML literal-block scalar (`|-`) with two numbered sections. Both formats are valid — the format is determined by the AI model at the time the memory entry is created. Copy `recipe` values from your own export rather than constructing them from scratch.
+
 A file can contain multiple `RULE` and multiple `RECIPE` items for a data model, but at most one `ALWAYS_APPLY_RULES` item per data model.
 
 === Memory item fields
@@ -312,7 +325,7 @@ A file can contain multiple `RULE` and multiple `RECIPE` items for a data model,
 | `type` | Type can be `RULE`, `RECIPE`, or `ALWAYS_APPLY_RULES`. +
 
 * `RULE`. A single semantic rule. The content for this type must include `rule_definition` and the data model IDs.
-* `RECIPE`. A serialized string that includes responses to the natural-language query.
+* `RECIPE`. A query pattern entry. The `content` block must include `user_query` (a plain text string) and `recipe` (an opaque scalar string generated by the AI). The `recipe` value is never a nested YAML mapping. Its internal format depends on the AI model that generated the entry — do not construct or modify `recipe` values manually.
 * `ALWAYS_APPLY_RULES`. Mandatory rules that must always apply when generating queries for the data model. The content must include a `rules` list.
 | `content` | Type-specific content block.
 | `datamodel_sources` a| The data models the memory attaches to. Each item must list at least one source. Each entry identifies a data model via:
@@ -342,7 +355,7 @@ Note the following limits for the import file and its content:
 | Total memory items | 10,000
 | `rule_definition` length | 1,000 characters
 | `user_query` length | 1,000 characters
-| `recipe` length | 2,000 characters
+| `recipe` length (scalar string) | 2,000 characters
 | `rules` combined length (`ALWAYS_APPLY_RULES`) | 2,000 characters +
 The `rules` limit in `ALWAYS_APPLY_RULES` applies to the combined length across all entries in the list, not per entry.
 | Tags per item | 10
@@ -531,6 +544,8 @@ If the validation fails, the API returns `200` with a terminal `status` of `VALI
 * *VALIDATION_FAILED*: Indicates schema or semantic validation failure. Inspect `validation_failures` and fix the items. Each entry in `validation_failures` carries one of the following error types:
 
 ** `SCHEMA`: Indicates that YAML structure is invalid or malformed.
++
+A common cause of a `SCHEMA` error on `content.recipe` is expressing the `recipe` field as indented YAML keys (a mapping node) instead of a scalar string. Ensure `recipe` is a scalar value copied verbatim from an export.
 ** `VALIDATION`: Indicates that a required field is missing, exceeds the limit, or an incorrect GUID.
 ** `CHAR_LIMIT`: Indicates that a content field exceeds the character limit.
 ** `UNRESOLVED_SOURCE`: A referenced data model GUID could not be resolved on the target. Check that all GUIDs in the memory file correspond to data models that exist on the target environment.
