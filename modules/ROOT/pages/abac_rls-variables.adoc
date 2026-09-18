@@ -18,6 +18,10 @@ RLS rules have a defined set of system variables such as `ts_username` or `ts_gr
 
 Formula variables are custom variables defined within ThoughtSpot that enable dynamic and context-aware logic in RLS rules. They are assigned at the user level during session creation for the ABAC pattern, although they can be set at Org and data model levels as well.
 
+=== Supported operators
+
+RLS rules that use the `ts_var()` function support only equal to (`=`) and not equal to (`!=`) operators. Internally, `=` translates to `IN (...)` and `!=` translates to `NOT IN (...)` in the generated SQL, because `ts_var()` returns a list of values. Comparison operators such as `>` (greater than), `<` (less than), `>=` (greater than or equal to), and `\<=` (less than or equal to) are not supported and do not resolve in RLS rules.
+
 ////
 In embedded analytics scenarios, where each user may require different data access, administrators can assign security attributes and rules on a per-user basis. For these use cases, administrators can implement a JWT-based ABAC model combined with RLS to enforce data security using dynamic attributes derived from formula variables.
 
@@ -26,10 +30,12 @@ In the ABAC via RLS with variables method, administrators add formula variables 
 
 === Implementation steps
 
+////
 [NOTE]
 ====
 Formula variables are available on ThoughtSpot starting from 10.15.0.cl. If this feature is not enabled on your instance, contact ThoughtSpot Support.
 ====
+////
 
 The ABAC implementation with formula variables and RLS rules includes the following steps:
 
@@ -84,6 +90,7 @@ The variable update API (`/api/rest/2.0/template/variables/{identifier}/update`)
 
 Variable values are set either by xref:abac_rls-variables.adoc#_create_an_abac_token_request_with_variable_attributes[generating a token] using the `/api/rest/2.0/auth/token/custom` API endpoint or via the Update Variable Values REST API.
 
+
 == Add or update RLS rules with variable references
 RLS rules are defined on Table objects:
 
@@ -93,7 +100,7 @@ RLS rules are defined on Table objects:
 
 [NOTE]
 ====
-Variable values are set through the token request. The RLS rule specifies how the values will be used in the generated RLS `WHERE` clauses in the SQL.
+* Variable values are set through the token request. The RLS rule specifies how the values will be used in the generated RLS `WHERE` clauses in the SQL.
 ====
 
 === RLS rule examples
@@ -138,17 +145,25 @@ In this example, users can access data if they are in the "data developers" grou
 
 ==== Variables with numeric and date data types
 
-The following rule enforces a numeric threshold and restricts access to rows where the Revenue value is less than or equal to the value provided by the `revenue_cap_var` variable.
+The following rule restricts access to rows where the `country` column matches one of the values provided by the `country_var` variable, for a `VARCHAR` column.
 
 ----
-Revenue <= to_double(ts_var(revenue_cap_var))
+country = ts_var(country_var)
 ----
 
-The following rule restricts access to rows where the `date_column` is within the range defined by the `start_date_var` and `end_date_var` variables. Only rows with dates greater than or equal to the start date and less than or equal to the end date specified for these variables will be visible for the user.
+The following rule restricts access to rows where the `Revenue` column matches one of the values provided by `revenue_cap_var`. Use the `to_double()` cast function to ensure the string values from the token are compared correctly against a numeric column.
 
 ----
-(date_column >= ts_var(start_date_var)) AND (date_column <= ts_var(end_date_var))
+Revenue = to_double(ts_var(revenue_cap_var))
 ----
+
+The following rule restricts access to rows where the `date_column` matches one of the values provided by the `date_var` variable, for a `DATE` column.
+
+----
+date_column = ts_var(date_var)
+----
+
+Range comparisons, such as filtering for dates before or after a value provided by a variable, are not supported because RLS rules with `ts_var()` only support the `=` and `!=` operators.
 
 == Create an ABAC token request with variable attributes
 
@@ -158,7 +173,7 @@ You can also use the `/api/rest/2.0/template/variables/{identifier}/update-value
 
 The variable attributes defined in the token request take effect only if they are referenced in an RLS rule. If the variables are not used in any formula or RLS rule, they have no impact on data access. Before generating the request with variable attributes, ensure that the xref:abac_rls-variables.adoc#_add_or_update_rls_rules_with_variable_references[variables are added to the RLS rules] for the table.
 
-In the token request, include the following properties along with the `username`, xref:trusted-auth-secret-key.adoc[`secret_key`]:
+In the token request, include the following properties along with the `username` and xref:trusted-auth-secret-key.adoc[`secret_key`]:
 
 * `variable_values`
 * `persist_option`
@@ -297,23 +312,17 @@ You can simplify user provisioning and programmatically manage user creation and
 To restrict the scope of variable attributes and rules to a specific Org context and object, define `org_identifier` and `objects`.
 
 ==== Apply to specific objects
-To apply variable entitlements to a specific object, specify the object IDs in the `objects` array as shown in this example:
+To apply variable entitlements to a specific object, specify the object ID in the `objects` array as shown in this example. The API supports only the `LOGICAL_TABLE` object type:
 
 [source,JSON]
 ----
 "objects": [
-   {
-     "type": "{OBJECT_TYPE}",
-     "identifier": "{id or name of the object}"
-   },
    {
      "type": "LOGICAL_TABLE",
      "identifier": "9b751df2-d344-4850-9756-18535797378c"
    }
 ]
 ----
-
-The API supports only the `LOGICAL_TABLE` object type.
 
 If the object ID is not specified in the API request, the variable values will be applied to all formulas and rules that use those variables, across all objects in the Org for that user.
 
