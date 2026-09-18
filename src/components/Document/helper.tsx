@@ -2,6 +2,7 @@ import React from 'react';
 import hljs from 'highlight.js';
 import { MdContentCopy } from '@react-icons/all-files/md/MdContentCopy';
 import { MdCheck } from '@react-icons/all-files/md/MdCheck';
+import { MdFilterList } from '@react-icons/all-files/md/MdFilterList';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import { isTutorialsPath } from '../../utils/app-utils';
@@ -212,6 +213,117 @@ export const customizeDocContent = () => {
         });
         wrapper.appendChild(expandBtn);
     });
+
+    /*
+     * Release-notes tables ([.release-notes-table] role in AsciiDoc):
+     *  - Category filter, exposed as a dropdown menu hanging off the
+     *    "Feature category" column header (vertical list of values, not a
+     *    horizontal pill bar) — built from the distinct values in the last
+     *    column.
+     *  - Per-row "Show more" for Description cells taller than ~3 lines,
+     *    mirroring the code-block expand/collapse above (clip + fade rather
+     *    than an inner scrollbar).
+     * Guard against double-processing on re-render.
+     */
+    document
+        .querySelectorAll<HTMLTableElement>(
+            '.release-notes-table table, table.release-notes-table',
+        )
+        .forEach((table) => {
+            if (table.dataset.releaseNotesInit) return;
+            table.dataset.releaseNotesInit = 'true';
+
+            const rows = Array.from(table.querySelectorAll<HTMLElement>('tbody tr'));
+
+            const categories = Array.from(
+                new Set(
+                    rows
+                        .map((row) => row.querySelector('td:last-child')?.textContent?.trim() || '')
+                        .filter(Boolean),
+                ),
+            ).sort();
+
+            const categoryHeader = table.querySelector<HTMLElement>('thead th:last-child');
+
+            if (categories.length > 1 && categoryHeader) {
+                categoryHeader.classList.add('release-notes-filter-head');
+
+                const trigger = document.createElement('button');
+                trigger.type = 'button';
+                trigger.classList.add('release-notes-filter-trigger');
+                trigger.setAttribute('aria-label', 'Filter by feature category');
+                trigger.innerHTML = getHTMLFromComponent(<MdFilterList />, 'release-notes-filter-icon');
+                categoryHeader.appendChild(trigger);
+
+                const dropdown = document.createElement('div');
+                dropdown.classList.add('release-notes-filter-dropdown');
+                categoryHeader.appendChild(dropdown);
+
+                const closeDropdown = () => dropdown.classList.remove('open');
+
+                trigger.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    dropdown.classList.toggle('open');
+                });
+                document.addEventListener('click', (e) => {
+                    if (!categoryHeader.contains(e.target as Node)) closeDropdown();
+                });
+
+                const setActiveOption = (option: HTMLButtonElement, label: string) => {
+                    dropdown
+                        .querySelectorAll('.release-notes-filter-option')
+                        .forEach((o) => o.classList.remove('active'));
+                    option.classList.add('active');
+                    trigger.classList.toggle('active', label !== 'All');
+                };
+
+                const makeOption = (label: string, category: string | null) => {
+                    const option = document.createElement('button');
+                    option.type = 'button';
+                    option.classList.add('release-notes-filter-option');
+                    option.textContent = label;
+                    option.addEventListener('click', () => {
+                        setActiveOption(option, label);
+                        closeDropdown();
+                        rows.forEach((row) => {
+                            const rowCategory =
+                                row.querySelector('td:last-child')?.textContent?.trim() || '';
+                            row.style.display =
+                                category === null || rowCategory === category ? '' : 'none';
+                        });
+                    });
+                    return option;
+                };
+
+                const allOption = makeOption('All', null);
+                allOption.classList.add('active');
+                dropdown.appendChild(allOption);
+                categories.forEach((category) => dropdown.appendChild(makeOption(category, category)));
+            }
+
+            rows.forEach((row) => {
+                const cell = row.querySelector<HTMLElement>('td:first-child');
+                if (!cell || cell.classList.contains('release-notes-desc-processed')) return;
+                cell.classList.add('release-notes-desc-processed');
+
+                const inner = cell.querySelector<HTMLElement>(':scope > .content') || cell;
+                inner.classList.add('release-notes-desc');
+
+                if (inner.scrollHeight <= inner.clientHeight + 2) return;
+
+                cell.classList.add('has-overflow');
+
+                const expandBtn = document.createElement('button');
+                expandBtn.type = 'button';
+                expandBtn.classList.add('release-notes-more-btn');
+                expandBtn.textContent = 'Show more';
+                expandBtn.addEventListener('click', () => {
+                    const isExpanded = cell.classList.toggle('expanded');
+                    expandBtn.textContent = isExpanded ? 'Show less' : 'Show more';
+                });
+                cell.appendChild(expandBtn);
+            });
+        });
 };
 
 const isInViewport = (el: HTMLElement) => {
