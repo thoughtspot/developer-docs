@@ -1,7 +1,6 @@
 = Feature Management
 :toc: true
 :toclevels: 2
-
 :page-title: Feature Management API
 :page-pageid: feature-management
 :page-description: Search feature configurations, assign features to Orgs, and set feature values using the REST API
@@ -9,7 +8,6 @@
 The Feature Management API lets cluster and Org admins retrieve feature configurations, assign features to Orgs, and set feature values programmatically. These endpoints replicate the feature management capabilities available in the link:https://docs.thoughtspot.com/cloud/latest/admin-portal-2#_feature_management[new Admin portal UI, window=_blank].
 
 All endpoints are under `/api/rest/2.0/configurations/features/` and are available from ThoughtSpot Cloud 26.10.0.cl.
-
 
 == Before you begin
 
@@ -48,7 +46,7 @@ Features are grouped into availability categories:
 
 == Search features
 
-The `POST /api/rest/2.0/configurations/features/search` API endpoint returns the feature configurations available on the ThoughtSpot instance. Requires the `ADMINISTRATION` or `ORG_ADMINISTRATION` privilege. The `ORG_ADMINISTRATION` privilege applies only to Org admins.
+The `POST /api/rest/2.0/configurations/features/search` API endpoint returns the feature configurations available on the ThoughtSpot instance. Requires the `ADMINISTRATION` or `ORG_ADMINISTRATION` privilege. Org admins with the `ORG_ADMINISTRATION` privilege can call this endpoint only with `scope` set to `ORG`.
 
 A successful request returns `200 OK` and an array of feature groups. Each group contains a `feature_group` name and a `features` array. The fields returned for each feature depend on the `scope` of the request. For more information, see <<_feature_scope,Feature scope>>.
 
@@ -61,12 +59,12 @@ A successful request returns `200 OK` and an array of feature groups. Each group
 | `scope`
 | string
 | Required
-| `CLUSTER` returns the cluster-admin view, including `assigned_orgs` per feature. `ORG` returns the Org-admin view, including `element_value` per feature.
+| `CLUSTER` returns the cluster-admin view, including `assigned_orgs` per feature, and requires the `ADMINISTRATION` privilege. `ORG` returns the Org-admin view, including `element_value` per feature.
 
 | `org_identifier`
 | integer
 | Conditional
-| Numeric ID of the Org. Required when `scope` is `ORG`. Omitting it returns a `400` error. Ignored when `scope` is `CLUSTER`.
+| Numeric ID of the Org to scope the search to. Required when `scope` is `ORG`; ignored when `scope` is `CLUSTER`.
 
 | `category`
 | string
@@ -89,7 +87,7 @@ curl -X POST \
 }'
 ----
 
-==== API response
+=== API response: cluster view
 
 [source,json]
 ----
@@ -132,7 +130,7 @@ curl -X POST \
 }'
 ----
 
-==== API response
+=== API response: Org view
 
 [source,json]
 ----
@@ -178,7 +176,7 @@ curl -X POST \
 
 == Update feature assignments
 
-The `POST /api/rest/2.0/configurations/features/assignments/update` API endpoint updates the Org assignments for a feature. Available to cluster admins only. Org-scoped admins cannot call this endpoint. Requires the `ADMINISTRATION` privilege.
+The `POST /api/rest/2.0/configurations/features/assignments/update` API endpoint updates the Org assignments for a feature. Available to cluster admins only. Org admins cannot call this endpoint. Requires the `ADMINISTRATION` privilege.
 
 A successful request returns `200 OK` and a `FeatureAssignmentResponse` object with `feature_id`, `feature_name`, and the updated `assigned_orgs` list.
 
@@ -194,7 +192,7 @@ A successful request returns `200 OK` and a `FeatureAssignmentResponse` object w
 | Feature name (`feature_name`) or feature ID (`feature_id`) of the feature to update.
 
 | `org_identifiers`
-| array
+| array of integers
 | Required
 | Numeric IDs of the Orgs to assign. Send an empty array with `operation` set to `REPLACE` to remove all Org assignments for this feature.
 
@@ -225,6 +223,20 @@ curl -X POST \
 }'
 ----
 
+=== API response: add Org assignments
+
+[source,json]
+----
+{
+  "feature_id": "feature.search.columnIndexing",
+  "feature_name": "index_columns",
+  "assigned_orgs": [
+    { "org_id": 1, "org_name": "Acme" },
+    { "org_id": 2, "org_name": "Beta" }
+  ]
+}
+----
+
 === Example request: remove all Org assignments
 
 [source,bash]
@@ -241,20 +253,6 @@ curl -X POST \
 }'
 ----
 
-==== API response
-
-[source,json]
-----
-{
-  "feature_id": "feature.search.columnIndexing",
-  "feature_name": "index_columns",
-  "assigned_orgs": [
-    { "org_id": 1, "org_name": "Acme" },
-    { "org_id": 2, "org_name": "Beta" }
-  ]
-}
-----
-
 == Update feature value
 
 The `POST /api/rest/2.0/configurations/features/values/update` API endpoint sets the value of a feature at the cluster or Org scope. Requires the `ADMINISTRATION` or `ORG_ADMINISTRATION` privilege. The `ORG_ADMINISTRATION` privilege applies only to Org admins.
@@ -263,7 +261,7 @@ A successful request returns `200 OK` and a `FeatureValueResponse` object with `
 
 [WARNING]
 ====
-Setting `reset_org_overrides` to `true` at `CLUSTER` scope removes all per-Org value overrides cluster-wide. All Orgs then inherit the new cluster-level value. This operation cannot be undone via the API.
+Setting `reset_org_overrides` to `true` at `CLUSTER` scope removes all per-Org value overrides for this feature. All Orgs then inherit the new cluster-level value. This operation cannot be undone through the API.
 ====
 
 === Request parameters
@@ -295,7 +293,7 @@ Setting `reset_org_overrides` to `true` at `CLUSTER` scope removes all per-Org v
 | `reset_org_overrides`
 | boolean
 | Conditional
-| Applicable only when `scope` is `CLUSTER`. When `true`, removes all existing per-Org value overrides so that every Org inherits the new cluster-level value. Required when `scope` is `CLUSTER` for Org-aware features. Passing this parameter at `ORG` scope returns a `400` error.
+| Applicable only when `scope` is `CLUSTER`. When `true`, any existing per-Org value overrides for this feature are also removed so that all Orgs inherit the new cluster-level value. When `false`, existing per-Org value overrides are retained. Required when `scope` is `CLUSTER` for an Org-aware feature. Must be omitted when `scope` is `ORG`; passing it at `ORG` scope returns a `400` error.
 |===
 
 === Example request: set an Org-level override
@@ -332,7 +330,7 @@ curl -X POST \
 }'
 ----
 
-==== API response
+=== API response: set cluster value and reset all Org overrides
 
 [source,json]
 ----
