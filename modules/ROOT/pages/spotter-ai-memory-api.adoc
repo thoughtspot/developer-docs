@@ -75,14 +75,13 @@ curl -X POST \
 ----
 
 === Example response
-The API returns a response object with the following details:
+The API returns a response object with the following field:
 
 * `content` +
-The serialized memory payload in YAML format. The exported file includes an array of memories, including rules and recipes added to Spotter memory, and data model GUID and object ID if present.
-* `type` +
-Indicates if the memory type is `RULE` or `RECIPE`. If the type is `RULE`, the response shows the rule definition. If the type is `RECIPE`, the contents of the recipe such as task, steps, TML tokens are included in the response.
-* `datamodel_sources` +
-GUID and object ID of the data model object.
+The serialized memory payload in YAML format, returned as a string. The exported YAML includes an array of memories, where each item has:
+
+** `type`: `RULE`, `RECIPE`, or `ALWAYS_APPLY_RULES`. If the type is `RULE`, the item includes the rule definition. If the type is `RECIPE`, the item includes the `user_query` and `recipe` fields. If the type is `ALWAYS_APPLY_RULES`, the item includes a `rules` field, an array of strings; the combined length of all entries in `rules` cannot exceed 2,000 characters.
+** `datamodel_sources`: GUID and object ID of the data model object.
 
 You can edit it locally and import it into your environment using the import memory API endpoint.
 
@@ -140,24 +139,7 @@ You can edit it locally and import it into your environment using the import mem
             "type":"RECIPE",
             "content":{
                "user_query":"Weekly sales for June",
-               "recipe":{
-                  "task":"Show total sales by week for the month of June",
-                  "steps":[
-                     {
-                        "instruction":"Query sales by weekly date filtered to June month",
-                        "analytical_mappings":{
-                           "tml_tokens":[
-                              "[sales]",
-                              "[date].weekly",
-                              "[date] = 'june'"
-                           ],
-                           "formulas":[
-
-                           ]
-                        }
-                     }
-                  ]
-               }
+               "recipe":"{\"task\": \"Show total sales by week for the month of June\", \"steps\": [{\"instruction\": \"Query sales by weekly date filtered to June month\", \"analytical_mappings\": {\"tml_tokens\": [\"[sales]\", \"[date].weekly\", \"[date] = 'june'\"], \"formulas\": []}}]}"
             },
             "datamodel_sources":[
                {
@@ -173,14 +155,7 @@ You can edit it locally and import it into your environment using the import mem
             "type":"RECIPE",
             "content":{
                "user_query":"What is the total sales by date?",
-               "recipe":{
-                  "brief_summary":"Visualizes total sales revenue over time on a daily basis.",
-                  "nl_query":"What is the total sales by date?",
-                  "lossy_tml_tokens":"[date] [sales]",
-                  "lossy_formulas":[
-
-                  ]
-               }
+               "recipe":"{\"task\": \"Show total sales trended by date\", \"steps\": [{\"instruction\": \"Query total sales grouped by date\", \"analytical_mappings\": {\"tml_tokens\": [\"[sales]\", \"[date]\"], \"formulas\": []}}]}"
             },
             "datamodel_sources":[
                {
@@ -215,21 +190,35 @@ You can edit it locally and import it into your environment using the import mem
 }
 ----
 
+[IMPORTANT]
+====
+For readability, this example shows the response's `content` field expanded as a JSON object. The actual API response returns `content` as a single string containing the YAML document shown in <<update-memory-file,Updating the memory file content>>.
+
+Within that YAML, `recipe` is always a scalar string, never a nested YAML mapping, regardless of which AI model generated the memory entry. Treat `recipe` values as opaque: copy them verbatim from an export and do not modify or reconstruct them manually.
+====
+
 [#update-memory-file]
 == Updating the memory file content
-The export memory API endpoint returns a YAML payload with a single top-level `memories` key holding a list of memory items. It includes the following object properties:
+The exported YAML payload has a single top-level `memories` key holding a list of memory items. Each item includes:
 
 * `type` +
-A typed `content` block, indicating `RULE` or `RECIPE`.
+One of `RULE`, `RECIPE`, or `ALWAYS_APPLY_RULES`.
+* `content` +
+A type-specific content block.
 * `datamodel_sources` list +
 GUID and object ID of the data models.
 * `tags` __Optional__.
 
-You can modify this file, add target data models, and submit it back through the import memory API endpoint.
+Follow these guidelines and best practices before importing the memory file into ThoughtSpot:
 
-[IMPORTANT]
+* Specify the target data model in the `datamodel_sources` list. Each entry must include a `guid`, an `obj_id`, or both. If both are present, the server uses `obj_id` and ignores `guid`; if only `obj_id` is present, the server resolves it to a GUID in ThoughtSpot.
+* To adjust Spotter memory behavior, edit the `RULE` and `ALWAYS_APPLY_RULES` entries instead; these are plain text and designed for human editing.
+* Do not manually add new entries, especially under `ALWAYS_APPLY_RULES`. To add new entries, use the UI workflow instead.
+* `content.recipe` is a scalar string, not a nested YAML mapping.
+
+[WARNING]
 ====
-When editing a memory record, do not manually add new entries, especially under ALWAYS_APPLY_RULES. You can modify the values or remove the existing entries. If you must add new entries, use the UI workflow to ensure the memory entries are created in the correct format.
+ThoughtSpot does not recommend manually modifying memory entries or recipes after export. Changing their structure can create inconsistencies or conflicts with the original Spotter-generated content and result in validation errors during import. Always copy `recipe` content verbatim from an export, and preserve its JSON blob structure before importing.
 ====
 
 [source,yaml]
@@ -264,16 +253,7 @@ memories:
 - type: RECIPE
   content:
     user_query: "Weekly sales for June"
-    recipe:
-      task: "Show total sales by week for the month of June"
-      steps:
-      - instruction: "Query sales by weekly date filtered to June month"
-        analytical_mappings:
-          tml_tokens:
-          - "[sales]"
-          - "[date].weekly"
-          - "[date] = 'june'"
-          formulas: []
+    recipe: "{\"task\": \"Show total sales by week for the month of June\", \"steps\": [{\"instruction\": \"Query sales by weekly date filtered to June month\", \"analytical_mappings\": {\"tml_tokens\": [\"[sales]\", \"[date].weekly\", \"[date] = 'june'\"], \"formulas\": []}}]}"
   datamodel_sources:
   - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
     obj_id: RetailSales-3bc18302
@@ -282,11 +262,7 @@ memories:
 - type: RECIPE
   content:
     user_query: "What is the total sales by date?"
-    recipe:
-      brief_summary: "Visualizes total sales revenue over time on a daily basis."
-      nl_query: "What is the total sales by date?"
-      lossy_tml_tokens: "[date] [sales]"
-      lossy_formulas: []
+    recipe: "{\"task\": \"Show total sales trended by date\", \"steps\": [{\"instruction\": \"Query total sales grouped by date\", \"analytical_mappings\": {\"tml_tokens\": [\"[sales]\", \"[date]\"], \"formulas\": []}}]}"
   datamodel_sources:
   - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506
     obj_id: RetailSales-3bc18302
@@ -303,7 +279,9 @@ memories:
   tags: []
 ----
 
-A file can contain multiple `RULE` and multiple `RECIPE` items for a data model, but at most one `ALWAYS_APPLY_RULES` item per data model.
+Both RECIPE entries show `recipe` as a compact JSON string in a YAML double-quoted scalar with escaped inner quotes. Copy `recipe` values from your own export rather than constructing them from scratch.
+
+A file can contain multiple `RULE` and multiple `RECIPE` items for a data model, but at most one `ALWAYS_APPLY_RULES` item per data model; see <<cross-item-rules,cross-item rules>>.
 
 === Memory item fields
 [cols="2,4", options="header"]
@@ -312,7 +290,7 @@ A file can contain multiple `RULE` and multiple `RECIPE` items for a data model,
 | `type` | Type can be `RULE`, `RECIPE`, or `ALWAYS_APPLY_RULES`. +
 
 * `RULE`. A single semantic rule. The content for this type must include `rule_definition` and the data model IDs.
-* `RECIPE`. A serialized string that includes responses to the natural-language query.
+* `RECIPE`. A query pattern entry. The `content` block must include `user_query` (a plain text string) and `recipe` (an opaque scalar string generated by the AI). The `recipe` value is never a nested YAML mapping. Its internal format depends on the AI model that generated the entry. Do not construct or modify `recipe` values manually.
 * `ALWAYS_APPLY_RULES`. Mandatory rules that must always apply when generating queries for the data model. The content must include a `rules` list.
 | `content` | Type-specific content block.
 | `datamodel_sources` a| The data models the memory attaches to. Each item must list at least one source. Each entry identifies a data model via:
@@ -342,7 +320,7 @@ Note the following limits for the import file and its content:
 | Total memory items | 10,000
 | `rule_definition` length | 1,000 characters
 | `user_query` length | 1,000 characters
-| `recipe` length | 2,000 characters
+| `recipe` length (scalar string) | 2,000 characters
 | `rules` combined length (`ALWAYS_APPLY_RULES`) | 2,000 characters +
 The `rules` limit in `ALWAYS_APPLY_RULES` applies to the combined length across all entries in the list, not per entry.
 | Tags per item | 10
@@ -384,7 +362,7 @@ Pass the following parameters in the API request body.
 |===
 | Parameter | Description
 | `content`
-|__String__. The full contents of the Spotter memory payload YAML file passed as a string. The content structure is the same as the payload received from the export memory API endpoint. The memory payload will be imported to the data models specified in the `datamodel_sources` property of the content string. For more information about the contents and structure of the import file, see xref:spotter-ai-memory-api.adoc#update-memory-file[Updating the memory file content].
+|__String__. The full contents of the Spotter memory payload YAML file passed as a string. The content structure is the same as the payload received from the export memory API endpoint. The memory payload will be imported to the data models specified in the `datamodel_sources` property of the content string. For more information about the contents and structure of the import file, see <<update-memory-file,Updating the memory file content>>.
 
 | `dry_run`
 a|__Boolean__. Controls whether the import runs as a preview or executes for real. +
@@ -410,7 +388,7 @@ curl -X POST \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
-  "content": "{   \"content\": \"memories:\\n- type: RULE\\n  content:\\n    rule_definition:   Revenue is defined as Sales Monthly.\\n  datamodel_sources:\\n  - guid:   62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n    obj_id:   RetailSales-3bc18302\\n  tags: []\\n- type: RULE\\n  content:\\n   rule_definition: \\\"Hot products: top 20 products by sales.\\\"\\n   datamodel_sources:\\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n   obj_id: RetailSales-3bc18302\\n  tags: []\\n- type: RULE\\n  content:\\n      rule_definition: \\\"Sales operations are organized into three geographic   regions: east, midwest, and west.\\\"\\n  datamodel_sources:\\n  - guid:   62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n    obj_id:   RetailSales-3bc18302\\n  tags:\\n  - GLOBAL\\n- type: RECIPE\\n   content:\\n    user_query: Weekly sales for June\\n    recipe: \\\"{\\\\\\\"task\\\\\\\":   \\\\\\\"Show total sales by week for the month of June\\\\\\\", \\\\\\\"steps\\\\\\\":   [{\\\\\\\"instruction\\\\\\\": \\\\\\\"Query sales by weekly date filtered to June   month\\\\\\\", \\\\\\\"analytical_mappings\\\\\\\": {\\\\\\\"tml_tokens\\\\\\\": [\\\\\\\"[sales]\\\\\\\",    \\\\\\\"[date].weekly\\\\\\\", \\\\\\\"[date] = '\''june'\''\\\\\\\"], \\\\\\\"formulas\\\\\\\": []}}]}\\\"\\n     datamodel_sources:\\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n   obj_id: RetailSales-3bc18302\\n  tags: []\\n- type: RECIPE\\n   content:\\n    user_query: Compare this quarter'\''s sales with previous quarter   by region\\n    recipe: \\\"{\\\\\\\"task\\\\\\\": \\\\\\\"Compare total sales by region for   this quarter versus previous quarter\\\\\\\", \\\\\\\"steps\\\\\\\":   [{\\\\\\\"instruction\\\\\\\": \\\\\\\"Query total sales by region for this quarter   compared to previous quarter\\\\\\\", \\\\\\\"analytical_mappings\\\\\\\":   {\\\\\\\"tml_tokens\\\\\\\": [\\\\\\\"sales\\\\\\\", \\\\\\\"date = '\''this quarter'\''\\\\\\\", \\\\\\\"date =    '\''last quarter'\''\\\\\\\", \\\\\\\"region\\\\\\\"], \\\\\\\"formulas\\\\\\\": []}}]}\\\"\\n   datamodel_sources:\\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n   obj_id: RetailSales-3bc18302\\n  tags: []\\n- type: RECIPE\\n   content:\\n    user_query: What is the total sales by date?\\n    recipe: |-\\n       1. Brief Answer Summary\\n      {\\n      \\\"brief_summary\\\": \\\"Visualizes   total sales revenue over time on a daily basis.\\\",\\n      \\\"nl_query\\\": \\\"What    is the total sales by date?\\\",\\n      \\\"display_tml_tokens\\\": \\\"\\\"\\n   }\\n\\n      2. Call NLSV2_Tool with these arguments\\n      {\\n   \\\"lossy_tml_tokens\\\": \\\"[date] [sales]\\\",\\n          \\\"lossy_formulas\\\": []\\n        }\\n  datamodel_sources:\\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n       obj_id: RetailSales-3bc18302\\n  tags: []\\n- type:   ALWAYS_APPLY_RULES\\n  content:\\n    rules:\\n    - \\\"When asking for '\''top'\''   results without specifying a number, default to top 20\\\"\\n    - \\\"Use sales   column as primary metric; if sales data unavailable, fall back to quantity   purchased column\\\"\\n  datamodel_sources:\\n  - guid:   62f3e9b5-4fcc-4352-b8ad-fdddc2287506\\n    obj_id:   RetailSales-3bc18302\\n  tags: []\\n\"   }",
+  "content": "memories:\n- type: RULE\n  content:\n    rule_definition: \"Revenue is defined as Sales Monthly.\"\n  datamodel_sources:\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\n    obj_id: RetailSales-3bc18302\n  tags: []\n\n- type: RULE\n  content:\n    rule_definition: \"Hot products: top 20 products by sales.\"\n  datamodel_sources:\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\n    obj_id: RetailSales-3bc18302\n  tags:\n  - GLOBAL\n\n- type: RULE\n  content:\n    rule_definition: \"Sales operations are organized into three geographic regions: east, midwest, and west.\"\n  datamodel_sources:\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\n    obj_id: RetailSales-3bc18302\n  tags:\n  - GLOBAL\n\n- type: RECIPE\n  content:\n    user_query: \"Weekly sales for June\"\n    recipe: \"{\\\"task\\\": \\\"Show total sales by week for the month of June\\\", \\\"steps\\\": [{\\\"instruction\\\": \\\"Query sales by weekly date filtered to June month\\\", \\\"analytical_mappings\\\": {\\\"tml_tokens\\\": [\\\"[sales]\\\", \\\"[date].weekly\\\", \\\"[date] = '\''june'\''\\\"], \\\"formulas\\\": []}}]}\"\n  datamodel_sources:\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\n    obj_id: RetailSales-3bc18302\n  tags: []\n\n- type: RECIPE\n  content:\n    user_query: \"What is the total sales by date?\"\n    recipe: \"{\\\"task\\\": \\\"Show total sales trended by date\\\", \\\"steps\\\": [{\\\"instruction\\\": \\\"Query total sales grouped by date\\\", \\\"analytical_mappings\\\": {\\\"tml_tokens\\\": [\\\"[sales]\\\", \\\"[date]\\\"], \\\"formulas\\\": []}}]}\"\n  datamodel_sources:\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\n    obj_id: RetailSales-3bc18302\n  tags: []\n\n- type: ALWAYS_APPLY_RULES\n  content:\n    rules:\n    - \"When asking for '\''top'\'' results without specifying a number, default to top 20\"\n    - \"Use sales column as primary metric; if sales data unavailable, fall back to quantity purchased column\"\n  datamodel_sources:\n  - guid: 62f3e9b5-4fcc-4352-b8ad-fdddc2287506\n    obj_id: RetailSales-3bc18302\n  tags: []\n",
   "dry_run": true
 }'
 ----
@@ -491,7 +469,7 @@ a| Per data model and memory type result entries. Null when the import failed be
 a| Per-item validation failure entries.
 
 * `line_number`: Best-effort line number of the offending item in the YAML file. May be null when the line cannot be determined.
-* `reason`: Machine-readable category for the failure. For more information, see xref:spotter-ai-memory-api.adoc#validation-error-reference[Validation errors].
+* `reason`: Machine-readable category for the failure. For more information, see <<validation-error-reference,Validation error reference>>.
 * `field_name`: Dotted path to the offending field within the item. For example, `content.rule_definition`. Absent when the failure is at the item level rather than the field level.
 * `message`: Human-readable description of the failure.
 
@@ -514,11 +492,11 @@ a| Server-generated identifier for this import operation. Include this value in 
 |===
 
 === Validations reference
-The payload is fully validated before anything is written irrespective of the `dry_run` parameter setting. If any item fails validation, the entire import is rejected, with the failure details returned in the response.
+The payload is fully validated before anything is written irrespective of the `dry_run` parameter setting. If any item fails validation, the entire import is rejected, with the failure details returned in the response. See the <<structure-rules,structural rules>> and <<cross-item-rules,cross-item rules>> for the full requirements.
 
 To avoid validation errors:
 
-* Ensure that the memory file and its content do not exceed the xref:spotter-ai-memory-api.adoc#memory-file-limits[limits]. A data model referenced by more than one `ALWAYS_APPLY_RULES` item is rejected. Ensure that you combine them into a single item's `rules` list.
+* Ensure that the memory file and its content do not exceed the <<memory-file-limits,limits>>. A data model referenced by more than one `ALWAYS_APPLY_RULES` item is rejected. Ensure that you combine them into a single item's `rules` list.
 * The content string does not include any unknown keys at the top level, within an item, or under `content`.
 * Ensure that the `type` for each item is set to the three supported values (`RULE`, `RECIPE`, and `ALWAYS_APPLY_RULES`), and the `content` string for each memory entry matches that type's shape and all required fields are defined.
 * Ensure that there are no non-string or empty `tags`. Certain tags reserved for internal use are stripped automatically before the item is stored.
@@ -532,6 +510,8 @@ If the validation fails, the API returns `200` with a terminal `status` of `VALI
 
 ** `SCHEMA`: Indicates that YAML structure is invalid or malformed.
 ** `VALIDATION`: Indicates that a required field is missing, exceeds the limit, or an incorrect GUID.
++
+A common cause of a `VALIDATION` error on `content.recipe` is expressing the `recipe` field as indented YAML keys (a mapping node) instead of a scalar string: a wrong-typed value in a required field is treated as missing. Ensure `recipe` is a scalar value copied verbatim from an export.
 ** `CHAR_LIMIT`: Indicates that a content field exceeds the character limit.
 ** `UNRESOLVED_SOURCE`: A referenced data model GUID could not be resolved on the target. Check that all GUIDs in the memory file correspond to data models that exist on the target environment.
 ** `ACCESS_DENIED`: The user making the API request does not have edit access on a referenced data model.
