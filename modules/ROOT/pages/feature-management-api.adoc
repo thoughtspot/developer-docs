@@ -1,25 +1,24 @@
-= Feature Management API
+= Feature Management
 :toc: true
 :toclevels: 2
 
 :page-title: Feature Management API
-:page-pageid: feature-management-api
+:page-pageid: feature-management
 :page-description: Search feature configurations, assign features to Orgs, and set feature values using the REST API
 
 // SOURCE: SCAL-319281; search-feature.md, update-feature-assignment.md, updated-feature-value.md
 
-The Feature Management API lets cluster and Org admins retrieve feature configurations, assign features to Orgs, and set feature values programmatically. These endpoints replicate the feature management capabilities available in the Admin Portal 2.0 UI.
+The Feature Management API lets cluster and Org admins retrieve feature configurations, assign features to Orgs, and set feature values programmatically. These endpoints replicate the feature management capabilities available in the https://docs.thoughtspot.com/cloud/26.9.0.cl/admin-portal-2#_feature_management[link:https://docs.thoughtspot.com/cloud/latest/admin-portal-2#_feature_management][new Admin portal UI].
 
 All endpoints are under `/api/rest/2.0/configurations/features/` and are available from ThoughtSpot Cloud 26.10.0.cl.
 
-== Prerequisites
 
-* Feature Management must be enabled on your ThoughtSpot instance.
-* All requests require a Bearer token.
-* If link:https://developers.thoughtspot.com/docs/rbac[Role-Based Access Control (RBAC)] is enabled on your instance, the `ADMINISTRATION` privilege is required for all write operations.
-* Privilege requirements vary by operation. See each endpoint section for details.
+== Before you begin
 
-== Key concepts
+=== Required privileges
+
+If link:https://developers.thoughtspot.com/docs/rbac[Role-Based Access Control (RBAC)] is enabled on your instance, the `ADMINISTRATION` or `ORG_ADMINISTRATION` privilege is required for all write operations.
+See each endpoint section for privilege details.
 
 === Feature scope
 
@@ -46,13 +45,7 @@ Features are grouped into availability categories:
 
 == Search features
 
-`POST /api/rest/2.0/configurations/features/search`
-
-Returns feature configurations available on the ThoughtSpot instance, grouped by feature group.
-
-=== Privileges required
-
-`ADMINISTRATION` or `ORG_ADMINISTRATION`.
+The `POST /api/rest/2.0/configurations/features/search` API endpoint returns feature configurations available on the ThoughtSpot instance.
 
 === Request parameters
 
@@ -63,7 +56,7 @@ Returns feature configurations available on the ThoughtSpot instance, grouped by
 | `scope`
 | string
 | Required
-| Administrative view: `CLUSTER` returns the cluster-admin view, including `assigned_orgs` per feature. `ORG` returns the Org-admin view, including `element_value` per feature.
+| `CLUSTER` returns the cluster-admin view, including `assigned_orgs` per feature. `ORG` returns the Org-admin view, including `element_value` per feature.
 
 | `org_identifier`
 | integer
@@ -75,16 +68,7 @@ Returns feature configurations available on the ThoughtSpot instance, grouped by
 | Optional
 | Feature availability category: `GENERAL_ACCESS` (default) or `EARLY_ACCESS`.
 |===
-
-=== Response fields by scope
-
-The response fields populated depend on the requested `scope`.
-
-*Cluster view (`scope=CLUSTER`)*: each feature includes `feature_id`, `feature_name`, `assigned_orgs`, `is_org_aware`, and (for non-Org-aware features) `feature_value`.
-
-*Org view (`scope=ORG`)*: each feature includes `feature_id`, `feature_name`, `element_type`, `element_config`, and `element_value`.
-
-=== Example: cluster view
+=== Example request: cluster view
 
 [source,bash]
 ----
@@ -98,24 +82,7 @@ curl -X POST \
   "category": "GENERAL_ACCESS"
 }'
 ----
-
-=== Example: Org view
-
-[source,bash]
-----
-curl -X POST \
-  --url 'https://{cluster}/api/rest/2.0/configurations/features/search' \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {token}' \
-  --data-raw '{
-  "scope": "ORG",
-  "org_identifier": 1,
-  "category": "GENERAL_ACCESS"
-}'
-----
-
-=== Example response (cluster view)
+=== API response: cluster view
 
 [source,json]
 ----
@@ -142,18 +109,27 @@ curl -X POST \
 ]
 ----
 
-=== Error responses
+=== Example request: Org view
 
-[cols="1,3"]
-|===
-| HTTP status code | Description
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "scope": "ORG",
+  "org_identifier": 1,
+  "category": "GENERAL_ACCESS"
+}'
+----
+=== API response: Org view
 
-| 400 | Invalid request parameters, or `org_identifier` is missing when `scope` is `ORG`.
-| 401 | Bearer token is missing, expired, or invalid.
-| 403 | Insufficient privileges.
-| 404 | Feature Management is not enabled on this instance.
-| 500 | Unexpected server error.
-|===
+[source,json]
+----
+[{"feature_group":"downloadsAndSchedules","docs_url":null,"features":[{"feature_id":"orion.exportConfig.legalDisclaimerText","feature_name":"downloaded_file_instructions","assigned_orgs":null,"is_org_aware":null,"feature_value":null,"element_type":"input","element_config":{"type":"textarea"},"element_value":"new ","docs_url":null}]},{"feature_group":"sage_feature","docs_url":null,"features":[{"feature_id":"orion.enableConvAssist","feature_name":"spotter_on_liveboard","assigned_orgs":null,"is_org_aware":null,"feature_value":null,"element_type":"toggle","element_config":null,"element_value":"true","docs_url":null},{"feature_id":"orion.enableKaiosAgent","feature_name":"spotterviz_on_liveboard","assigned_orgs":null,"is_org_aware":null,"feature_value":null,"element_type":"toggle","element_config":null,"element_value":"false","docs_url":null}]},{"feature_group":"appSettingsGeneralSettings","docs_url":null,"features":[{"feature_id":"orion.exportConfig.legalDisclaimerText","feature_name":"downloaded_file_instructions","assigned_orgs":null,"is_org_aware":null,"feature_value":null,"element_type":"input","element_config":{"type":"textarea"},"element_value":"new ","docs_url":null}]}]
+----
 
 == Update feature assignments
 
