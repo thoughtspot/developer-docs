@@ -80,7 +80,7 @@ The API returns a response object with the following field:
 * `content` +
 The serialized memory payload in YAML format, returned as a string. The exported YAML includes an array of memories, where each item has:
 
-** `type`: `RULE`, `RECIPE`, or `ALWAYS_APPLY_RULES`. If the type is `RULE`, the item includes the rule definition. If the type is `RECIPE`, the item includes the `user_query` and `recipe` fields.
+** `type`: `RULE`, `RECIPE`, or `ALWAYS_APPLY_RULES`. If the type is `RULE`, the item includes the rule definition. If the type is `RECIPE`, the item includes the `user_query` and `recipe` fields. If the type is `ALWAYS_APPLY_RULES`, the item includes a `rules` field, an array of strings; the combined length of all entries in `rules` cannot exceed 2,000 characters.
 ** `datamodel_sources`: GUID and object ID of the data model object.
 
 You can edit it locally and import it into your environment using the import memory API endpoint.
@@ -199,7 +199,7 @@ Within that YAML, `recipe` is always a scalar string, never a nested YAML mappin
 
 [#update-memory-file]
 == Updating the memory file content
-The export memory API endpoint returns a YAML payload with a single top-level `memories` key holding a list of memory items. Each item includes the following object properties:
+The exported YAML payload has a single top-level `memories` key holding a list of memory items. Each item includes:
 
 * `type` +
 One of `RULE`, `RECIPE`, or `ALWAYS_APPLY_RULES`.
@@ -209,15 +209,16 @@ A type-specific content block.
 GUID and object ID of the data models.
 * `tags` __Optional__.
 
-You can modify this file, add target data models, and submit it back through the import memory API endpoint.
+Follow these guidelines and best practices before importing the memory file into ThoughtSpot:
 
-[IMPORTANT]
+* Specify the target data model in the `datamodel_sources` list. Each entry must include a `guid`, an `obj_id`, or both. If both are present, the server uses `obj_id` and ignores `guid`; if only `obj_id` is present, the server resolves it to a GUID in ThoughtSpot.
+* To adjust Spotter memory behavior, edit the `RULE` and `ALWAYS_APPLY_RULES` entries instead; these are plain text and designed for human editing.
+* Do not manually add new entries, especially under `ALWAYS_APPLY_RULES`. To add new entries, use the UI workflow instead.
+* `content.recipe` is a scalar string, not a nested YAML mapping.
+
+[WARNING]
 ====
-When editing a memory record, do not manually add new entries, especially under `ALWAYS_APPLY_RULES`. You can modify the values or remove the existing entries. If you must add new entries, use the UI workflow to ensure the memory entries are created in the correct format.
-
-For `RECIPE` items, `content.recipe` is always a scalar string, not a nested YAML mapping. The server rejects any import where `recipe` is expressed as indented YAML keys.
-
-Do not construct or modify `recipe` values manually. Always copy `recipe` content verbatim from an export. To adjust Spotter memory behavior, edit the `RULE` and `ALWAYS_APPLY_RULES` entries instead; these are plain text and designed for human editing.
+ThoughtSpot does not recommend manually modifying memory entries or recipes after export. Changing their structure can create inconsistencies or conflicts with the original Spotter-generated content and result in validation errors during import. Always copy `recipe` content verbatim from an export, and preserve its JSON blob structure before importing.
 ====
 
 [source,yaml]
@@ -280,7 +281,7 @@ memories:
 
 Both RECIPE entries show `recipe` as a compact JSON string in a YAML double-quoted scalar with escaped inner quotes. Copy `recipe` values from your own export rather than constructing them from scratch.
 
-A file can contain multiple `RULE` and multiple `RECIPE` items for a data model, but at most one `ALWAYS_APPLY_RULES` item per data model.
+A file can contain multiple `RULE` and multiple `RECIPE` items for a data model, but at most one `ALWAYS_APPLY_RULES` item per data model; see <<cross-item-rules,cross-item rules>>.
 
 === Memory item fields
 [cols="2,4", options="header"]
