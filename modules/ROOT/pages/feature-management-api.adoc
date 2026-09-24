@@ -1,0 +1,349 @@
+= Feature Management
+:toc: true
+:toclevels: 2
+:page-title: Feature Management API
+:page-pageid: feature-management
+:page-description: Search feature configurations, assign features to Orgs, and set feature values using the REST API
+
+The Feature Management API lets cluster and Org admins retrieve feature configurations, assign features to Orgs, and set feature values programmatically. These endpoints replicate the feature management capabilities available in the link:https://docs.thoughtspot.com/cloud/latest/admin-portal-2#_feature_management[new Admin portal UI, window=_blank].
+
+All endpoints are under `/api/rest/2.0/configurations/features/` and are available from ThoughtSpot Cloud 26.10.0.cl.
+
+== Before you begin
+
+=== Required privileges
+
+All Feature Management API endpoints require the `ADMINISTRATION` or `ORG_ADMINISTRATION` privilege. The `ORG_ADMINISTRATION` privilege applies only to Org admins.
+If xref:roles.adoc[Role-Based Access Control (RBAC)] is enabled on your instance, these privileges are granted through roles.
+
+=== Prerequisites
+
+* Feature Management must be enabled on your ThoughtSpot instance. If it is not enabled, the API returns a `404` error.
+* To set a feature value at `ORG` scope, the Org must be assigned to that feature. Otherwise, the API returns a `403` error. To assign Orgs to a feature, see <<_update_feature_assignments,Update feature assignments>>.
+
+=== Feature scope
+
+Feature configurations exist at two levels:
+
+Cluster scope:: The cluster-level default, visible to cluster admins. Returns `assigned_orgs` and `is_org_aware` for each feature.
+Org scope:: A per-Org value override, visible to Org admins. Returns `element_type`, `element_config`, and `element_value` for each feature.
+
+=== Feature identifiers
+
+Each feature can be referenced by its:
+
+* `feature_name`: a human-readable name, such as `index_columns`.
+* `feature_id`: the underlying system identifier, such as `feature.search.columnIndexing`.
+
+Both forms are accepted in requests to any endpoint that takes a `feature_identifier`.
+
+=== Feature categories
+
+Features are grouped into availability categories:
+
+* `GENERAL_ACCESS`: generally available features. This is the default.
+* `EARLY_ACCESS`: features in early access.
+
+== Search features
+
+The `POST /api/rest/2.0/configurations/features/search` API endpoint returns the feature configurations available on the ThoughtSpot instance. Requires the `ADMINISTRATION` or `ORG_ADMINISTRATION` privilege. Org admins with the `ORG_ADMINISTRATION` privilege can call this endpoint only with `scope` set to `ORG`.
+
+A successful request returns `200 OK` and an array of feature groups. Each group contains a `feature_group` name and a `features` array. The fields returned for each feature depend on the `scope` of the request. For more information, see <<_feature_scope,Feature scope>>.
+
+=== Request parameters
+
+[cols="1,1,1,3"]
+|===
+| Parameter | Type | Required | Description
+
+| `scope`
+| string
+| Required
+| `CLUSTER` returns the cluster-admin view, including `assigned_orgs` per feature, and requires the `ADMINISTRATION` privilege. `ORG` returns the Org-admin view, including `element_value` per feature.
+
+| `org_identifier`
+| integer
+| Conditional
+| Numeric ID of the Org to scope the search to. Required when `scope` is `ORG`; ignored when `scope` is `CLUSTER`.
+
+| `category`
+| string
+| Optional
+| Feature availability category: `GENERAL_ACCESS` (default) or `EARLY_ACCESS`.
+|===
+
+=== Example request: cluster view
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "scope": "CLUSTER",
+  "category": "GENERAL_ACCESS"
+}'
+----
+
+=== API response: cluster view
+
+[source,json]
+----
+[
+  {
+    "feature_group": "search",
+    "docs_url": null,
+    "features": [
+      {
+        "feature_id": "feature.search.columnIndexing",
+        "feature_name": "index_columns",
+        "assigned_orgs": [
+          {
+            "org_id": 0,
+            "org_name": "Primary"
+          }
+        ],
+        "is_org_aware": true,
+        "feature_value": null,
+        "docs_url": null
+      }
+    ]
+  }
+]
+----
+
+=== Example request: Org view
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "scope": "ORG",
+  "org_identifier": 1,
+  "category": "GENERAL_ACCESS"
+}'
+----
+
+=== API response: Org view
+
+[source,json]
+----
+[
+  {
+    "feature_group": "spotter",
+    "docs_url": null,
+    "features": [
+      {
+        "feature_id": "feature.spotter.liveboardAssist",
+        "feature_name": "spotter_on_liveboard",
+        "assigned_orgs": null,
+        "is_org_aware": null,
+        "feature_value": null,
+        "element_type": "toggle",
+        "element_config": null,
+        "element_value": "true",
+        "docs_url": null
+      }
+    ]
+  },
+  {
+    "feature_group": "downloads",
+    "docs_url": null,
+    "features": [
+      {
+        "feature_id": "feature.export.fileInstructions",
+        "feature_name": "downloaded_file_instructions",
+        "assigned_orgs": null,
+        "is_org_aware": null,
+        "feature_value": null,
+        "element_type": "input",
+        "element_config": {
+          "type": "textarea"
+        },
+        "element_value": "Internal use only",
+        "docs_url": null
+      }
+    ]
+  }
+]
+----
+
+== Update feature assignments
+
+The `POST /api/rest/2.0/configurations/features/assignments/update` API endpoint updates the Org assignments for a feature. Available to cluster admins only. Org admins cannot call this endpoint. Requires the `ADMINISTRATION` privilege.
+
+A successful request returns `200 OK` and a `FeatureAssignmentResponse` object with `feature_id`, `feature_name`, and the updated `assigned_orgs` list.
+
+=== Request parameters
+
+[cols="1,1,1,3"]
+|===
+| Parameter | Type | Required | Description
+
+| `feature_identifier`
+| string
+| Required
+| Feature name (`feature_name`) or feature ID (`feature_id`) of the feature to update.
+
+| `org_identifiers`
+| array of integers
+| Required
+| Numeric IDs of the Orgs to assign. Send an empty array with `operation` set to `REPLACE` to remove all Org assignments for this feature.
+
+| `operation`
+| string
+| Optional
+| Type of assignment update: `ADD` assigns the given Orgs in addition to existing assignments, `REMOVE` unassigns the given Orgs, or `REPLACE` sets the assignment to exactly the given Orgs. Defaults to `REPLACE`.
+|===
+
+[CAUTION]
+====
+If you omit `operation`, the API uses `REPLACE`. Any Orgs currently assigned to the feature that are not in `org_identifiers` are unassigned. To add Orgs without affecting existing assignments, set `operation` to `ADD`.
+====
+
+=== Example request: add Org assignments
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/assignments/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "feature_identifier": "index_columns",
+  "org_identifiers": [1, 2],
+  "operation": "ADD"
+}'
+----
+
+=== API response: add Org assignments
+
+[source,json]
+----
+{
+  "feature_id": "feature.search.columnIndexing",
+  "feature_name": "index_columns",
+  "assigned_orgs": [
+    { "org_id": 1, "org_name": "Acme" },
+    { "org_id": 2, "org_name": "Beta" }
+  ]
+}
+----
+
+=== Example request: remove all Org assignments
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/assignments/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "feature_identifier": "index_columns",
+  "org_identifiers": [],
+  "operation": "REPLACE"
+}'
+----
+
+== Update feature value
+
+The `POST /api/rest/2.0/configurations/features/values/update` API endpoint sets the value of a feature at the cluster or Org scope. Requires the `ADMINISTRATION` or `ORG_ADMINISTRATION` privilege. The `ORG_ADMINISTRATION` privilege applies only to Org admins.
+
+A successful request returns `200 OK` and a `FeatureValueResponse` object with `feature_id`, `feature_name`, and the updated `feature_value`.
+
+[WARNING]
+====
+Setting `reset_org_overrides` to `true` at `CLUSTER` scope removes all per-Org value overrides for this feature. All Orgs then inherit the new cluster-level value. This operation cannot be undone through the API.
+====
+
+=== Request parameters
+
+[cols="1,1,1,3"]
+|===
+| Parameter | Type | Required | Description
+
+| `scope`
+| string
+| Required
+| Scope at which to set the value: `CLUSTER` or `ORG`.
+
+| `org_identifier`
+| integer
+| Conditional
+| Numeric ID of the Org for which to set the value. Required when `scope` is `ORG`. Ignored when `scope` is `CLUSTER`.
+
+| `feature_identifier`
+| string
+| Required
+| Feature name (`feature_name`) or feature ID (`feature_id`) of the feature to update.
+
+| `feature_value`
+| string
+| Required
+| New value to assign to the feature, as a string. For toggle features, use `"true"` or `"false"`.
+
+| `reset_org_overrides`
+| boolean
+| Conditional
+| Applicable only when `scope` is `CLUSTER`. When `true`, any existing per-Org value overrides for this feature are also removed so that all Orgs inherit the new cluster-level value. When `false`, existing per-Org value overrides are retained. Required when `scope` is `CLUSTER` for an Org-aware feature. Must be omitted when `scope` is `ORG`; passing it at `ORG` scope returns a `400` error.
+|===
+
+=== Example request: set an Org-level override
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/values/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "scope": "ORG",
+  "org_identifier": 1,
+  "feature_identifier": "index_columns",
+  "feature_value": "true"
+}'
+----
+
+=== Example request: set cluster value and reset all Org overrides
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/configurations/features/values/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "scope": "CLUSTER",
+  "feature_identifier": "index_columns",
+  "feature_value": "true",
+  "reset_org_overrides": true
+}'
+----
+
+=== API response: set cluster value and reset all Org overrides
+
+[source,json]
+----
+{
+  "feature_id": "feature.search.columnIndexing",
+  "feature_name": "index_columns",
+  "feature_value": "true"
+}
+----
+
+== Related resources
+
+* xref:rest-api-v2-reference.adoc[REST API v2 reference]
+* xref:org-manage-api.adoc[Org administration]
+* xref:privileges-and-roles.adoc[Privileges and roles]
+* xref:roles.adoc[Role-based access control]

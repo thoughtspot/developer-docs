@@ -264,6 +264,23 @@ When `hideIrrelevantChipsInLiveboardTabs` is `true`:
 * A *Show irrelevant filters* toggle button appears in the filter row when at least one chip is hidden, allowing users to temporarily reveal all chips.
 * When the user clicks *Show irrelevant filters*, a complementary *Hide irrelevant filters* button appears to restore the filtered view.
 
+[#masked-filter-chips]
+==== #Masked filter chips#
+#If a Liveboard includes filters on columns that a user cannot access because of column-level security, the filter values are masked for that user. Use the `showMaskedFilterChip` property to control whether these masked filter chips are visible:#
+
+* #`true`: the filter chips for inaccessible columns are displayed as masked.#
+* #`false`: the filter chips for inaccessible columns are hidden.#
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    //... other embed config properties
+    showMaskedFilterChip: true,
+});
+----
+
+#The `showMaskedFilterChip` property is also available in full application embedding. For more information, see xref:data-security.adoc#csr-liveboards[Column security rules on Liveboards].#
+
 [#noteTiles]
 === Add Note tiles
 You can add a link:https://docs.thoughtspot.com/cloud/latest/liveboard-notes[Liveboard Note tile, window=_blank] with custom text, images, and links on an embedded Liveboard.
@@ -383,6 +400,56 @@ ThoughtSpot administrator, with a default and maximum of 1,000 runtime filters. 
 limit are silently dropped without an error or warning. For more information, see
 xref:runtime-filters.adoc#_maximum_filter_count[Runtime filter limit].
 ====
+
+[#contextual-liveboard-filtering]
+==== #Contextual filtering in Liveboards# [earlyAccess eaBackground]#Early Access#
+Starting with ThoughtSpot Cloud 26.10.0.cl release, Liveboard filters and parameters can be scoped at three levels:
+
+* *Liveboard*: applies to all visualizations on the Liveboard.
+* *Tab*: applies only to visualizations on a specific tab.
+* *Group*: applies only to visualizations in a specific group on a tab.
+
+With contextual filtering, you can add the same filter at more than one of these levels on a Liveboard. For example, a Liveboard can have a `Region` filter at the Liveboard level and another independent `Region` filter on a specific tab or group.
+
+[NOTE]
+====
+Contextual filtering in Liveboards is an Early Access feature and is disabled by default on ThoughtSpot instances. To enable this feature on your instance, set `isScopedLiveboardFilteringEnabled` to `true`.
+====
+
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    //... other embed config properties
+    liveboardId: "d7a5a08e-a1f7-4850-aeb7-0764692855b8",
+    isScopedLiveboardFilteringEnabled: true,
+});
+----
+
+The `isScopedLiveboardFilteringEnabled` property is also available in `AppViewConfig` for full application embedding.
+
+To get the groups on a Liveboard, use `HostEvent.GetGroups`. To scope a filter or parameter update to a specific tab or group, pass the `applicability` attribute with `HostEvent.UpdateFilters` or `HostEvent.UpdateParameters`:
+
+[source,javascript]
+----
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filters: [
+        {
+            column: 'Region',
+            oper: 'IN',
+            values: ['West'],
+            applicability: {
+                level: 'GROUP',
+                targetId: '{group-id}',
+            },
+        },
+    ],
+});
+----
+
+To listen for filter and parameter changes, use `EmbedEvent.FilterChanged` and `EmbedEvent.ParameterChanged`. Starting with SDK 1.53.0, both events include an optional `applicability` field in their response payload that indicates the scope of the change.
+
+For more information, see xref:events-hostEvents.adoc#liveboard-group-events[Liveboard group and parameter events] and xref:events-hostEvents.adoc#applicability-host-events[Scoped filter and parameter host events].
 
 ==== Updating filters
 Use the following host events in the Visual Embed SDK to update filters:

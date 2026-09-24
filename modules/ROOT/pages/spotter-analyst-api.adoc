@@ -1,0 +1,389 @@
+= Spotter Analyst API
+:toc: true
+:toclevels: 2
+
+:page-title: Spotter Analyst API
+:page-pageid: spotter-analyst-api
+:page-description: Create, search, update, and delete Spotter Analysts using the REST API
+
+// SOURCE: SCAL-317811; create-analyst.md, search-analyst.md, update-analyst.md, delete-analyst.md
+
+ThoughtSpot Spotter Analysts are governed AI agents, each configured with a name, description, one or more data sources, and optional instructions, MCP connectors, and starter prompts. Users converse with an Analyst directly in the Spotter interface.
+
+The Spotter Analyst REST API lets you create, search, update, and delete Analysts programmatically.
+All endpoints are under `/api/rest/2.0/ai/agent/analysts/` and are available from ThoughtSpot Cloud 26.10.0.cl.
+
+== Prerequisites
+
+* Spotter must be enabled on your ThoughtSpot instance. Contact ThoughtSpot Support to enable it.
+* All requests require a Bearer token. Use a token scoped to the Org in which the Analyst exists or should be created.
+* Privilege requirements vary by operation. See each endpoint section for details.
+
+== Analyst object
+
+Each Analyst has the following fields:
+
+[cols="1,1,3"]
+|===
+| Field | Type | Description
+
+| `id`
+| string
+| Server-assigned unique identifier.
+
+| `name`
+| string
+| Display name of the Analyst.
+
+| `description`
+| string
+| Description of the Analyst. Maximum 200 characters.
+
+| `instructions`
+| string
+| Optional natural-language behavior guidelines for the agent.
+
+| `sources`
+| array
+| Data sources the Analyst can query. Each source includes an `id`, `type`, and display `name`. Supported types: `MODEL`, `ANSWER`, `LIVEBOARD`, `CONVERSATION`.
+
+| `mcp_connectors`
+| array
+| Linked MCP connectors. Each connector includes `id`, `name`, and `icon_url`.
+
+| `starter_prompts`
+| array
+| Up to 4 suggested prompts shown on the Analyst landing page. Each entry includes `label`, `text`, `order`, and `is_ai_generated`.
+
+| `icon_id`
+| string
+| Analyst icon identifier. Analysts created via the API use the default icon until one is set in the UI.
+
+| `updated_time_in_millis`
+| integer
+| Epoch timestamp in milliseconds of the last update.
+
+| `last_accessed_time_in_millis`
+| integer
+| Epoch timestamp in milliseconds of the last access.
+
+| `created_by`
+| object
+| User who created the Analyst. Includes `id`, `name`, and `display_name`.
+
+| `updated_by`
+| object
+| User who last updated the Analyst. Includes `id`, `name`, and `display_name`.
+|===
+
+== Create Analyst
+
+`POST /api/rest/2.0/ai/agent/analysts/create`
+
+Creates a Spotter Analyst. Analysts created via the API use the default icon until one is set in the ThoughtSpot UI.
+
+=== Privileges required
+
+At least one of the following: `ADMINISTRATION`, `CAN_MANAGE_SPOTTER`, or `CAN_USE_SPOTTER`. The caller must also have view access to every data source listed in `sources`.
+
+=== Request parameters
+
+[cols="1,1,1,3"]
+|===
+| Parameter | Type | Required | Description
+
+| `name`
+| string
+| Required
+| Display name of the Analyst.
+
+| `description`
+| string
+| Required
+| Description of the Analyst. Maximum 200 characters.
+
+| `sources`
+| array
+| Required
+| At least one data source. Each entry requires an `identifier` and a `type` (`MODEL`, `ANSWER`, `LIVEBOARD`, or `CONVERSATION`). The `name` field is optional. The caller must have view access to every referenced source.
+
+| `instructions`
+| string
+| Optional
+| Natural-language instructions that guide the agent's behavior. Instructions that conflict with system guardrails are rejected with a `409` error.
+
+| `mcp_connector_identifiers`
+| array
+| Optional
+| Identifiers of MCP connectors to link to the Analyst.
+
+| `starter_prompts`
+| array
+| Optional
+| Up to 4 plain-text prompts, each between 10 and 250 characters. Display order follows list position.
+|===
+
+=== Response
+
+Returns `200 OK` and the created `Analyst` object, including the server-assigned `id`.
+
+=== Example
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/ai/agent/analysts/create' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "name": "Revenue Analyst",
+  "description": "Answers revenue questions using the Sales data model.",
+  "sources": [
+    {
+      "identifier": "{model-guid}",
+      "type": "MODEL"
+    }
+  ],
+  "instructions": "Focus on year-over-year comparisons. Do not surface raw transaction data.",
+  "starter_prompts": [
+    "What was total revenue last quarter?",
+    "Compare revenue by region for the past 12 months."
+  ]
+}'
+----
+
+=== Error responses
+
+[cols="1,3"]
+|===
+| HTTP status code | Description
+
+| 400 | Malformed request.
+| 401 | Bearer token is missing, expired, or invalid.
+| 403 | Insufficient privileges, or the caller does not have view access to a referenced data source.
+| 409 | The `instructions` value conflicts with system guardrails.
+| 422 | Validation failure: a required field is missing, `sources` is empty, the starter prompt count exceeds 4, or a field-length limit is violated.
+| 429 | Rate limit exceeded.
+| 500 | Unexpected server error.
+|===
+
+== Search Analysts
+
+`POST /api/rest/2.0/ai/agent/analysts/search`
+
+Returns Analysts visible to the caller. This endpoint operates in two modes:
+
+Fetch mode:: Provide `analyst_identifier` to retrieve a single Analyst. All other filters are ignored and `total_size` is `1`.
+List mode:: Omit `analyst_identifier` to get a paginated list of Analysts, ordered by most recently accessed.
+
+=== Privileges required
+
+At least one of the following: `ADMINISTRATION`, `CAN_MANAGE_SPOTTER`, or `CAN_USE_SPOTTER`.
+
+=== Request parameters
+
+[cols="1,1,1,3"]
+|===
+| Parameter | Type | Required | Description
+
+| `analyst_identifier`
+| string
+| Optional
+| When provided, returns exactly this Analyst. All other filters are ignored.
+
+| `record_size`
+| integer
+| Optional
+| Number of records per page. Default: `50`. Range: 1 to 500.
+
+| `record_offset`
+| integer
+| Optional
+| Zero-based index of the first record. Default: `0`. Maximum: `10000`.
+
+| `query`
+| string
+| Optional
+| Case-insensitive substring match on Analyst name.
+
+| `type`
+| string
+| Optional
+| Ownership filter. Accepted values: `ALL` (default, returns Analysts created by or shared with the caller), `CREATED_BY_ME`, or `SHARED_TO_ME`.
+|===
+
+=== Response
+
+Returns `200 OK` and an `AnalystSearchResponse` object with:
+
+* `analysts`: the current page of matching `Analyst` objects.
+* `total_size`: total count of matching Analysts before pagination.
+
+=== Example: list all Analysts
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/ai/agent/analysts/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "record_size": 50,
+  "record_offset": 0,
+  "type": "ALL"
+}'
+----
+
+=== Example: fetch a single Analyst
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/ai/agent/analysts/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "analyst_identifier": "{analyst-guid}"
+}'
+----
+
+=== Error responses
+
+[cols="1,3"]
+|===
+| HTTP status code | Description
+
+| 403 | Missing privileges, or (fetch mode) the caller does not have access to the requested Analyst.
+| 404 | (Fetch mode) No Analyst with the given identifier exists in the caller's Org.
+| 422 | `record_size` or `record_offset` is out of the permitted range.
+|===
+
+== Update Analyst
+
+`POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/update`
+
+Updates a Spotter Analyst. The update is a full replace: the Analyst is rewritten from the request body. Any optional field omitted from the request is cleared. Include all fields you want to retain.
+
+When new sources are added, they are automatically shared with users the Analyst was previously shared with. Those users retain access to a working Analyst.
+
+=== Privileges required
+
+The caller must be the owner of the Analyst, or hold `ADMINISTRATION` or `CAN_MANAGE_SPOTTER` privileges. Users the Analyst is shared with can use it but cannot edit it.
+
+=== Path parameter
+
+`analyst_identifier`: unique ID of the Analyst to update, as returned by the Create Analyst or Search Analysts endpoint.
+
+=== Request parameters
+
+The request body uses the same shape as Create Analyst: `name`, `description`, `sources`, `instructions`, `mcp_connector_identifiers`, and `starter_prompts`.
+
+=== Response
+
+Returns `200 OK` and the updated `Analyst` object, including the refreshed `updated_time_in_millis` and `updated_by` fields.
+
+=== Example
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/ai/agent/analysts/{analyst_identifier}/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "name": "Revenue Analyst v2",
+  "description": "Updated to include APAC data model.",
+  "sources": [
+    {
+      "identifier": "{model-guid}",
+      "type": "MODEL"
+    },
+    {
+      "identifier": "{apac-model-guid}",
+      "type": "MODEL"
+    }
+  ],
+  "starter_prompts": [
+    "What was total revenue last quarter?",
+    "Compare revenue by region for the past 12 months.",
+    "Show top 10 products by APAC revenue."
+  ]
+}'
+----
+
+[NOTE]
+====
+The update is a full replace. Omitting `instructions`, `mcp_connector_identifiers`, or `starter_prompts` clears those fields on the Analyst. Include every field you want to keep.
+====
+
+=== Error responses
+
+[cols="1,3"]
+|===
+| HTTP status code | Description
+
+| 400 | Malformed `analyst_identifier`.
+| 401 | Bearer token is missing, expired, or invalid.
+| 403 | The caller is not the Analyst owner and does not hold admin or Spotter-management privileges.
+| 404 | No Analyst with the given identifier exists in the caller's Org.
+| 409 | The `instructions` value conflicts with system guardrails.
+| 422 | Validation failure: a required field is missing, `sources` is empty, the starter prompt count exceeds 4, or a field-length limit is violated.
+| 429 | Rate limit exceeded.
+| 500 | Unexpected server error.
+|===
+
+== Delete Analyst
+
+`POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/delete`
+
+Permanently deletes a Spotter Analyst. This operation is irreversible. Deleted Analysts cannot be recovered.
+
+=== Privileges required
+
+The caller must be the owner of the Analyst, or hold `ADMINISTRATION` or `CAN_MANAGE_SPOTTER` privileges. Users the Analyst is shared with cannot delete it.
+
+=== Path parameter
+
+`analyst_identifier`: unique ID of the Analyst to delete, as returned by the Create Analyst or Search Analysts endpoint.
+
+=== Request body
+
+None.
+
+=== Response
+
+Returns `200 OK` and an `AnalystDeleteResponse` object containing the `id` of the deleted Analyst.
+
+=== Example
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/ai/agent/analysts/{analyst_identifier}/delete' \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer {token}'
+----
+
+=== Error responses
+
+[cols="1,3"]
+|===
+| HTTP status code | Description
+
+| 400 | Malformed `analyst_identifier`.
+| 401 | Bearer token is missing, expired, or invalid.
+| 403 | The caller is not the Analyst owner and does not hold admin or Spotter-management privileges.
+| 404 | No Analyst with the given identifier exists in the caller's Org.
+| 429 | Rate limit exceeded.
+| 500 | Unexpected server error.
+|===
+
+== Related resources
+
+* xref:embed-spotter-analyst.adoc[Embed Spotter Analyst]
+* xref:rest-api-v2-reference.adoc[REST API v2 reference]
+* xref:privileges-and-roles.adoc[Privileges and roles]

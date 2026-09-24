@@ -36,7 +36,7 @@ xref:runtime-filters.adoc#_maximum_filter_count[Runtime filter limit] for more i
 ====
 
 4. link:https://docs.thoughtspot.com/cloud/latest/liveboard-filters[Liveboard filters, window=_blank] +
-Liveboard filters apply to all visualizations on the Liveboard and are visible as UI components at the top of a Liveboard page. When a filter is clicked, a modal with filter options appropriate for the data type is displayed. +
+Liveboard filters are visible as UI components at the top of a Liveboard page. #By default, a Liveboard filter applies to all visualizations on the Liveboard. Starting with ThoughtSpot Cloud 26.10.0.cl, a filter can also be scoped to a specific tab or group. For more information, see <<scoped-filter-updates,Scoped filter and parameter updates>>.# When a filter is clicked, a modal with filter options appropriate for the data type is displayed. +
 Liveboard users can add or modify filters as needed. If you are embedding a Liveboard that includes preset filters, you can programmatically update, reset, or remove filters using `HostEvent.UpdateFilters`.
 
 5. link:https://docs.thoughtspot.com/cloud/latest/liveboard-filters-cross[Liveboard cross filters, window=_blank] +
@@ -222,6 +222,37 @@ liveboardEmbed.trigger(HostEvent.UpdateFilters, {
    });
 ----
 
+[#scoped-filter-updates]
+=== #Scoped filter and parameter updates#
+#Starting with ThoughtSpot Cloud 26.10.0.cl release, Liveboard filters and parameters can be scoped at three levels:#
+
+* #*Liveboard*: applies to all visualizations on the Liveboard.#
+* #*Tab*: applies only to visualizations on a specific tab.#
+* #*Group*: applies only to visualizations in a specific group on a tab.#
+
+#To enable group-level scoping in an embedded Liveboard, set `isScopedLiveboardFilteringEnabled` to `true` in the embed configuration. For more information, see xref:embed-pinboard.adoc#scoped-liveboard-filtering[Scoped Liveboard filtering].#
+
+#To scope an update to a tab or group, pass the `applicability` attribute with `HostEvent.UpdateFilters` or `HostEvent.UpdateParameters`. Set `level` to `TAB` or `GROUP`, and set `targetId` to the ID of the tab or group. To get the group IDs on a Liveboard, use `HostEvent.GetGroups`.#
+
+[source,JavaScript]
+----
+const groups = await liveboardEmbed.trigger(HostEvent.GetGroups);
+
+liveboardEmbed.trigger(HostEvent.UpdateFilters, {
+    filter: {
+        column: "Region",
+        oper: "IN",
+        values: ["West"],
+        applicability: {
+            level: "GROUP",
+            targetId: groups.orderedGroupIds[0],
+        },
+    },
+});
+----
+
+#For more information, see xref:events-hostEvents.adoc#applicability-host-events[Scoped filter and parameter host events].#
+
 === GetFilters and GetParameters events
 If you want to build your own filter UI within the embedding app, you can find out details of the Liveboard and runtime filters that are defined using `HostEvent.GetFilters`.
 
@@ -237,6 +268,8 @@ Each filter object in the `HostEvent.GetFilters` response includes two additiona
 
 * `applicable_viz`: indicates whether the filter applies to `ALL` visualizations or only `SPECIFIC` ones (with a `viz_ids` array).
 * `linking`: indicates whether the filter is linked to other filters, and which columns it is linked to (`is_linked`, `linked_columns`).
+
+#Starting with Visual Embed SDK 1.53.0, the filter objects returned by `HostEvent.GetFilters` and the parameter objects returned by `HostEvent.GetParameters` also include an optional `applicability` field that indicates whether the filter or parameter is scoped to the Liveboard, a tab, or a group.#
 
 For more information, see xref:events-hostEvents.adoc#_hostevent_getfilters[HostEvent.GetFilters] and xref:HostEvent.adoc#_getfilters[HostEvent reference documentation].
 
@@ -260,6 +293,8 @@ liveboardEmbed.trigger(HostEvent.GetParameters).then((parameter) => {
 You can also listen for the user's interactions with the filters using the link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent#_filterchanged[EmbedEvent.FilterChanged].
 
 There is an equivalent EmbedEvent for Parameters called link:https://developers.thoughtspot.com/docs/Enumeration_EmbedEvent#_parameterchanged[EmbedEvent.ParameterChanged].
+
+#Starting with Visual Embed SDK 1.53.0, the `EmbedEvent.FilterChanged` and `EmbedEvent.ParameterChanged` payloads include an optional `applicability` object that describes the scope of the changed filter or parameter. For more information, see xref:event-embedEvents.adoc#applicability-scope[Scoped filter and parameter events].#
 
 === UpdateCrossFilter event
 You can programmatically trigger an action to update a cross filter using link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_updatecrossfilter[HostEvent.UpdateCrossFilter]:
