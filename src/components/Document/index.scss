@@ -228,82 +228,145 @@
     }
 
     /* ── Release-notes tables ([.release-notes-table] role) ───────────── */
-    /* Category filter — a dropdown hanging off the "Feature category"
-       header cell (vertical list of values), not a horizontal pill bar. */
-    .release-notes-filter-head {
+    /* Page-level filter bar — sits once above every dated release section
+       and filters matching rows across ALL release-notes tables on the
+       page at once (Breaking changes toggle, Product, Feature category).
+       The same bar (and CSS) is reused by the badge-style pages further
+       down, just with different fields (Feature category, Type).
+
+       Sits in normal flow until helper.tsx (mountFilterBar) adds
+       `.is-pinned` once the user has scrolled it up to the header — at
+       that point it becomes fixed, confined to the main content column
+       (helper.tsx measures the bar's own rect while still in normal flow
+       for that width/left, since it already reflects the padding that
+       keeps real content clear of the sidebar overlay — .documentView's
+       own box does not). Plain position: sticky was tried first but
+       produced an unexplained gap above the bar and a real overlap with
+       the content right after it on this page; see the comment above
+       mountFilterBar for details. Solid background + a bottom border (no
+       border-radius, no surrounding box) so it reads as part of the
+       header stack rather than a floating card once pinned. */
+    .release-notes-filterbar {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        justify-content: flex-start;
-        gap: 4px;
+        gap: 10px;
+        margin: 0 0 24px;
+        padding: 10px 16px;
+        background: var(--table-header-bg);
+        border-bottom: 1px solid var(--border-color);
+
+        &.is-pinned {
+            position: fixed;
+            top: calc(#{$header-height} + 48px);
+            margin: 0;
+            z-index: 20;
+        }
     }
 
-    .release-notes-filter-trigger {
+    .release-notes-filterbar-spacer {
+        height: 0;
+    }
+
+    /* Stripe-changelog-style pills: rounded, bordered chips rather than
+       plain labelled dropdowns — same treatment for a <select>-based field
+       and the Breaking-changes checkbox toggle below. */
+    .release-notes-filterbar-field,
+    .release-notes-filterbar-toggle {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        width: 22px;
-        height: 22px;
-        padding: 0;
-        background: transparent;
-        border: none;
-        border-radius: 4px;
-        color: var(--secondary-color);
-        cursor: pointer;
-
-        svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        &:hover {
-            background: var(--copy-btn-bg);
-        }
-
-        &.active {
-            color: var(--link-text-color);
-        }
-    }
-
-    .release-notes-filter-dropdown {
-        display: none;
-        flex-direction: column;
-        position: absolute;
-        top: 100%;
-        right: 0;
-        z-index: 5;
-        min-width: 170px;
-        margin-top: 4px;
-        padding: 4px;
-        background: var(--panel-bg-color);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        box-shadow: var(--box-shadow-hover);
-
-        &.open {
-            display: flex;
-        }
-    }
-
-    .release-notes-filter-option {
-        display: block;
-        width: 100%;
-        padding: 6px 10px;
-        font-size: 12.5px;
+        gap: 6px;
+        padding: 6px 14px;
+        font-size: 13px;
         font-weight: 500;
-        text-align: left;
         color: var(--primary-color);
-        background: transparent;
-        border: none;
-        border-radius: 5px;
+        background: var(--copy-btn-bg);
+        border: 1px solid var(--rd-sys-color-border-bold);
+        border-radius: 999px;
         cursor: pointer;
+        transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 
         &:hover {
-            background: var(--copy-btn-bg);
+            border-color: var(--link-text-color);
+        }
+    }
+
+    .release-notes-filterbar-field {
+        span:first-child {
+            color: var(--secondary-color);
         }
 
-        &.active {
-            color: var(--link-text-color);
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            border: none;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            font-weight: 600;
+            color: var(--primary-color);
+            cursor: pointer;
+
+            &:focus-visible {
+                outline: none;
+            }
+        }
+
+        .release-notes-filterbar-chevron {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            margin-left: 1px;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid var(--secondary-color);
+        }
+    }
+
+    .release-notes-filterbar-toggle {
+        input[type='checkbox'] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            display: inline-grid;
+            place-content: center;
+            border: 1.5px solid var(--rd-sys-color-border-bold);
+            border-radius: 4px;
+            cursor: pointer;
+
+            &::before {
+                content: '';
+                width: 8px;
+                height: 8px;
+                border-radius: 2px;
+                background: var(--link-text-color);
+                transform: scale(0);
+                transition: transform 0.1s ease;
+            }
+
+            &:checked::before {
+                transform: scale(1);
+            }
+        }
+
+        // Filled/active pill state once checked, same idea as Stripe's
+        // filter chips highlighting once a value is applied.
+        &:has(input:checked) {
+            background: var(--link-text-color);
+            border-color: var(--link-text-color);
+            color: #fff;
+
+            input[type='checkbox'] {
+                border-color: #fff;
+
+                &::before {
+                    background: #fff;
+                }
+            }
         }
     }
 
@@ -323,18 +386,51 @@
         }
     }
 
+    /* Product / Feature category columns are authored as normal table
+       columns (that's what the page-level filter bar in helper.tsx reads
+       its values from), but readers never see them as columns — they're
+       internal filter metadata, not a printed label. Hide everything but
+       the Description column; the <col> hide keeps the table from
+       reserving layout width for the columns nobody sees. */
+    .release-notes-table table col:not(:first-child),
+    table.release-notes-table col:not(:first-child) {
+        display: none;
+    }
+
+    .release-notes-table table th:not(:first-child),
+    .release-notes-table table td:not(:first-child),
+    table.release-notes-table th:not(:first-child),
+    table.release-notes-table td:not(:first-child) {
+        display: none;
+    }
+
+    .release-notes-table table th:first-child,
+    .release-notes-table table td:first-child,
+    table.release-notes-table th:first-child,
+    table.release-notes-table td:first-child {
+        border-right: none;
+    }
+
     .release-notes-table table td:first-child,
     table.release-notes-table td:first-child {
         position: relative;
 
         .release-notes-desc {
-            max-height: 4.8em;
+            max-height: 1.6em;
             overflow: hidden;
+            position: relative;
         }
 
-        &.has-overflow:not(.expanded) .release-notes-desc {
-            mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
-            -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+        &.has-overflow:not(.expanded) .release-notes-desc::after {
+            content: '';
+            position: absolute;
+            top: 1.6em;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            pointer-events: none;
         }
 
         &.expanded .release-notes-desc {
@@ -354,6 +450,16 @@
             border: 1px solid var(--rd-sys-color-border-bold);
             border-radius: 999px;
             cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+        }
+
+        &.has-overflow:hover .release-notes-more-btn,
+        &.has-overflow:focus-within .release-notes-more-btn,
+        &.has-overflow.expanded .release-notes-more-btn {
+            opacity: 1;
+            pointer-events: auto;
         }
     }
 

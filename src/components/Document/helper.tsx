@@ -2,7 +2,6 @@ import React from 'react';
 import hljs from 'highlight.js';
 import { MdContentCopy } from '@react-icons/all-files/md/MdContentCopy';
 import { MdCheck } from '@react-icons/all-files/md/MdCheck';
-import { MdFilterList } from '@react-icons/all-files/md/MdFilterList';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import { isTutorialsPath } from '../../utils/app-utils';
@@ -60,7 +59,188 @@ export const enableCopyToClipboard = (
     });
 };
 
+/* Document/index.tsx wraps every h2/h3/h4 in <LinkableHeader>, which
+ * appends a literal 🔗 anchor-link icon inside the heading (see
+ * LinkableHeader/index.tsx) — reading a heading's `.textContent` directly
+ * drags that emoji along with it. Used below both to build "Feature
+ * category" filter values and to detect the "Breaking Changes" section by
+ * heading text; strip it first so neither one is comparing/displaying
+ * "Spotter🔗" or failing to match "breaking changes🔗" !== "breaking changes". */
+const getHeadingText = (heading: Element | null | undefined) => {
+    if (!heading) return '';
+    const clone = heading.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('.link-element').forEach((el) => el.remove());
+    return clone.textContent?.trim() || '';
+};
+
+/* Shared by both release-notes filter bars below: a labelled <select> with
+ * a leading "All" option, styled via .release-notes-filterbar-field. */
+const makeFilterSelect = (label: string, options: string[]) => {
+    const field = document.createElement('label');
+    field.classList.add('release-notes-filterbar-field');
+
+    const span = document.createElement('span');
+    span.textContent = label;
+
+    const select = document.createElement('select');
+    const allOption = document.createElement('option');
+    allOption.value = '';
+    allOption.textContent = 'All';
+    select.appendChild(allOption);
+    options.forEach((value) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+    });
+
+    const chevron = document.createElement('span');
+    chevron.classList.add('release-notes-filterbar-chevron');
+    chevron.setAttribute('aria-hidden', 'true');
+
+    field.appendChild(span);
+    field.appendChild(select);
+    field.appendChild(chevron);
+    return { field, select };
+};
+
+// Header (60px) + secondary nav (48px) — same offset the site's own
+// SecondaryHeader docks under; see $header-height in variables.scss.
+const FILTERBAR_PIN_TOP = 108;
+
+// customizeDocContent() reruns on every page navigation in this SPA and
+// rebuilds the filter bar from scratch — without this, each run's
+// scroll/resize listeners would pile up on `window` forever, each one
+// still holding a closure over its (by-then-detached) filterBar/spacer
+// from a page the user already left.
+let teardownFilterBarListeners: (() => void) | null = null;
+
+/* This app shell doesn't scroll the window/body at all (`body` is
+ * `overflow-y: hidden`) — the actual scrolling happens inside a nested
+ * container (.documentWrapperContainer as of this writing). `window.scroll`
+ * / `window.scrollY` are always 0 here; walk up from a known descendant to
+ * find whichever ancestor is genuinely scrollable, rather than hardcoding
+ * that class name. */
+const findScrollParent = (el: HTMLElement): HTMLElement => {
+    let node = el.parentElement;
+    while (node && node !== document.body) {
+        const style = getComputedStyle(node);
+        if (
+            (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+            node.scrollHeight > node.clientHeight
+        ) {
+            return node;
+        }
+        node = node.parentElement;
+    }
+    return document.scrollingElement as HTMLElement;
+};
+
+/* Mounts a release-notes filter bar right after the page's own <h1>. It
+ * starts in normal flow (no position override) and only becomes
+ * `position: fixed` — via the `.is-pinned` class in index.scss — once the
+ * user has scrolled it up to the header, at which point it docks there
+ * like Stripe's changelog filter bar. Three things this deliberately avoids:
+ *
+ * - Listening on `window`/`document` for scroll: see findScrollParent above
+ *   — on this site that never fires, since the window itself never
+ *   scrolls. The real scroll container has to be found dynamically and
+ *   listened to instead.
+ * - `position: sticky` here produces a large, unexplained gap above the
+ *   bar and a real layout overlap with the content right after it (tested
+ *   directly: switching to `static` removes both) — almost certainly the
+ *   same root cause as the point above: sticky's offset is computed
+ *   against the nearest scrolling ancestor, not the viewport, and that
+ *   ancestor's own box doesn't start at viewport (0,0). Toggling
+ *   `position: fixed` via a scroll listener sidesteps that entirely, and
+ *   `fixed` is genuinely viewport-relative regardless of which ancestor
+ *   scrolls, so its left/width don't need to be recomputed as the user
+ *   scrolls — only on resize.
+ * - `.documentView`'s own bounding box spans the full viewport width
+ *   regardless of the visible sidebar (the sidebar is a `position: fixed`
+ *   overlay painted on top of it, not a flex sibling that narrows it —
+ *   only .documentView's children get padded to visually clear it), so it
+ *   can't be used to compute the pinned bar's left/width. The bar's own
+ *   rect, read while still in normal flow, is correct instead — it's a
+ *   real rendered child, so it already reflects that padding, same as any
+ *   paragraph.
+ *
+ * A spacer sits right after the bar and only gets a height once pinned,
+ * so pinning doesn't yank the content below it upward. */
+const mountFilterBar = (filterBar: HTMLElement, documentView: HTMLElement) => {
+    const docTitle = documentView.querySelector(':scope > h1');
+    const parent = docTitle?.parentNode ?? documentView;
+    const anchor = docTitle ? docTitle.nextSibling : documentView.firstChild;
+
+    parent.insertBefore(filterBar, anchor);
+
+    const spacer = document.createElement('div');
+    spacer.classList.add('release-notes-filterbar-spacer');
+    parent.insertBefore(spacer, filterBar.nextSibling);
+
+    const scrollParent = findScrollParent(documentView);
+
+    let pinnedLeft = 0;
+    let pinnedWidth = 0;
+    let pinnedHeight = 0;
+    let pinThresholdScrollTop = 0;
+
+    // Left/width/threshold can only be measured correctly while the bar is
+    // in normal flow — briefly drop `.is-pinned` if needed to remeasure.
+    const measure = () => {
+        const wasPinned = filterBar.classList.contains('is-pinned');
+        if (wasPinned) filterBar.classList.remove('is-pinned');
+
+        const rect = filterBar.getBoundingClientRect();
+        pinnedLeft = rect.left;
+        pinnedWidth = rect.width;
+        pinnedHeight = rect.height;
+        pinThresholdScrollTop = scrollParent.scrollTop + rect.top - FILTERBAR_PIN_TOP;
+
+        if (wasPinned) filterBar.classList.add('is-pinned');
+    };
+
+    const update = () => {
+        const shouldPin = scrollParent.scrollTop >= pinThresholdScrollTop;
+        const isPinned = filterBar.classList.contains('is-pinned');
+
+        if (shouldPin && !isPinned) {
+            filterBar.style.left = `${pinnedLeft}px`;
+            filterBar.style.width = `${pinnedWidth}px`;
+            filterBar.classList.add('is-pinned');
+            spacer.style.height = `${pinnedHeight}px`;
+        } else if (!shouldPin && isPinned) {
+            filterBar.classList.remove('is-pinned');
+            spacer.style.height = '0px';
+        }
+    };
+
+    const onResize = () => {
+        measure();
+        update();
+    };
+
+    measure();
+    update();
+    scrollParent.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', onResize);
+
+    teardownFilterBarListeners = () => {
+        scrollParent.removeEventListener('scroll', update);
+        window.removeEventListener('resize', onResize);
+    };
+};
+
 export const customizeDocContent = () => {
+    /* Tear down the previous page's filter bar listeners (see
+     * teardownFilterBarListeners above) before removing its DOM, and
+     * defensively clear any leftover filter bar (e.g. React 18
+     * double-invoking this effect in dev) — rebuilt fresh below if the
+     * current page needs one. */
+    teardownFilterBarListeners?.();
+    teardownFilterBarListeners = null;
+    document.querySelectorAll('.release-notes-filterbar').forEach((el) => el.remove());
+
     /*
      * Restructure code blocks to have a permanent header bar:
      *   lang label (left)  ·  Ask SpotterCode + copy button (right)
@@ -216,114 +396,225 @@ export const customizeDocContent = () => {
 
     /*
      * Release-notes tables ([.release-notes-table] role in AsciiDoc):
-     *  - Category filter, exposed as a dropdown menu hanging off the
-     *    "Feature category" column header (vertical list of values, not a
-     *    horizontal pill bar) — built from the distinct values in the last
-     *    column.
-     *  - Per-row "Show more" for Description cells taller than ~3 lines,
-     *    mirroring the code-block expand/collapse above (clip + fade rather
-     *    than an inner scrollbar).
+     *  - A single page-level filter bar (Breaking changes toggle, Product,
+     *    Feature category) sits above every dated release section and
+     *    filters matching rows across ALL tables on the page at once — not
+     *    a per-table dropdown. A date (h2/.sect1) or subsection (h3/.sect2)
+     *    collapses out of view entirely once nothing inside it matches.
+     *  - Per-row "Show more" for Description cells taller than one line:
+     *    the overflow is clipped and blurred (not faded), and the button
+     *    itself only appears on hover/focus of the cell rather than sitting
+     *    visible below the text at all times.
      * Guard against double-processing on re-render.
      */
-    document
-        .querySelectorAll<HTMLTableElement>(
+    const releaseNotesTables = Array.from(
+        document.querySelectorAll<HTMLTableElement>(
             '.release-notes-table table, table.release-notes-table',
-        )
-        .forEach((table) => {
-            if (table.dataset.releaseNotesInit) return;
-            table.dataset.releaseNotesInit = 'true';
+        ),
+    );
 
-            const rows = Array.from(table.querySelectorAll<HTMLElement>('tbody tr'));
+    if (releaseNotesTables.length) {
+        const documentView = document.querySelector<HTMLElement>('.documentView');
 
-            const categories = Array.from(
-                new Set(
-                    rows
-                        .map((row) => row.querySelector('td:last-child')?.textContent?.trim() || '')
-                        .filter(Boolean),
-                ),
-            ).sort();
+        // Fixed, org-wide product taxonomy — unlike Feature category (below),
+        // this isn't derived from what's on the page, so it stays stable
+        // even on a page that only happens to mention one or two products.
+        const PRODUCTS = ['ThoughtSpot Cloud', 'ThoughtSpot Embedded', 'Analyst Studio', 'APIs and SDK'];
 
-            const categoryHeader = table.querySelector<HTMLElement>('thead th:last-child');
+        const categories = Array.from(
+            new Set(
+                releaseNotesTables
+                    .flatMap((table) => Array.from(table.querySelectorAll<HTMLElement>('tbody tr')))
+                    .map((row) => row.querySelector('td:last-child')?.textContent?.trim() || '')
+                    .filter(Boolean),
+            ),
+        ).sort();
 
-            if (categories.length > 1 && categoryHeader) {
-                categoryHeader.classList.add('release-notes-filter-head');
+        if (documentView) {
+            const filterBar = document.createElement('div');
+            filterBar.classList.add('release-notes-filterbar');
 
-                const trigger = document.createElement('button');
-                trigger.type = 'button';
-                trigger.classList.add('release-notes-filter-trigger');
-                trigger.setAttribute('aria-label', 'Filter by feature category');
-                trigger.innerHTML = getHTMLFromComponent(<MdFilterList />, 'release-notes-filter-icon');
-                categoryHeader.appendChild(trigger);
+            const breakingField = document.createElement('label');
+            breakingField.classList.add('release-notes-filterbar-toggle');
+            const breakingCheckbox = document.createElement('input');
+            breakingCheckbox.type = 'checkbox';
+            const breakingLabel = document.createElement('span');
+            breakingLabel.textContent = 'Breaking changes only';
+            breakingField.appendChild(breakingCheckbox);
+            breakingField.appendChild(breakingLabel);
 
-                const dropdown = document.createElement('div');
-                dropdown.classList.add('release-notes-filter-dropdown');
-                categoryHeader.appendChild(dropdown);
+            const { field: productField, select: productSelect } = makeFilterSelect('Product', PRODUCTS);
+            const { field: categoryField, select: categorySelect } = makeFilterSelect('Category', categories);
 
-                const closeDropdown = () => dropdown.classList.remove('open');
+            filterBar.appendChild(breakingField);
+            filterBar.appendChild(productField);
+            filterBar.appendChild(categoryField);
 
-                trigger.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    dropdown.classList.toggle('open');
-                });
-                document.addEventListener('click', (e) => {
-                    if (!categoryHeader.contains(e.target as Node)) closeDropdown();
-                });
+            mountFilterBar(filterBar, documentView);
 
-                const setActiveOption = (option: HTMLButtonElement, label: string) => {
-                    dropdown
-                        .querySelectorAll('.release-notes-filter-option')
-                        .forEach((o) => o.classList.remove('active'));
-                    option.classList.add('active');
-                    trigger.classList.toggle('active', label !== 'All');
-                };
+            const applyFilters = () => {
+                const product = productSelect.value;
+                const category = categorySelect.value;
+                const breakingOnly = breakingCheckbox.checked;
 
-                const makeOption = (label: string, category: string | null) => {
-                    const option = document.createElement('button');
-                    option.type = 'button';
-                    option.classList.add('release-notes-filter-option');
-                    option.textContent = label;
-                    option.addEventListener('click', () => {
-                        setActiveOption(option, label);
-                        closeDropdown();
-                        rows.forEach((row) => {
-                            const rowCategory =
-                                row.querySelector('td:last-child')?.textContent?.trim() || '';
-                            row.style.display =
-                                category === null || rowCategory === category ? '' : 'none';
-                        });
+                releaseNotesTables.forEach((table) => {
+                    const rows = Array.from(table.querySelectorAll<HTMLElement>('tbody tr'));
+                    let anyRowVisible = false;
+
+                    rows.forEach((row) => {
+                        const rowProduct = row.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
+                        const rowCategory = row.querySelector('td:last-child')?.textContent?.trim() || '';
+                        const matches =
+                            (!product || rowProduct === product) &&
+                            (!category || rowCategory === category);
+                        row.style.display = matches ? '' : 'none';
+                        if (matches) anyRowVisible = true;
                     });
-                    return option;
-                };
 
-                const allOption = makeOption('All', null);
-                allOption.classList.add('active');
-                dropdown.appendChild(allOption);
-                categories.forEach((category) => dropdown.appendChild(makeOption(category, category)));
-            }
-
-            rows.forEach((row) => {
-                const cell = row.querySelector<HTMLElement>('td:first-child');
-                if (!cell || cell.classList.contains('release-notes-desc-processed')) return;
-                cell.classList.add('release-notes-desc-processed');
-
-                const inner = cell.querySelector<HTMLElement>(':scope > .content') || cell;
-                inner.classList.add('release-notes-desc');
-
-                if (inner.scrollHeight <= inner.clientHeight + 2) return;
-
-                cell.classList.add('has-overflow');
-
-                const expandBtn = document.createElement('button');
-                expandBtn.type = 'button';
-                expandBtn.classList.add('release-notes-more-btn');
-                expandBtn.textContent = 'Show more';
-                expandBtn.addEventListener('click', () => {
-                    const isExpanded = cell.classList.toggle('expanded');
-                    expandBtn.textContent = isExpanded ? 'Show less' : 'Show more';
+                    const sect2 = table.closest<HTMLElement>('.sect2');
+                    if (sect2) sect2.dataset.hasVisibleRows = anyRowVisible ? 'true' : 'false';
                 });
-                cell.appendChild(expandBtn);
+
+                document.querySelectorAll<HTMLElement>('.sect2').forEach((sect2) => {
+                    const heading = getHeadingText(sect2.querySelector('h3')).toLowerCase();
+                    const isBreakingSection = heading === 'breaking changes';
+
+                    let visible = true;
+                    if (breakingOnly && !isBreakingSection) visible = false;
+                    if (sect2.dataset.hasVisibleRows === 'false') visible = false;
+
+                    sect2.style.display = visible ? '' : 'none';
+                });
+
+                document.querySelectorAll<HTMLElement>('.sect1').forEach((sect1) => {
+                    const sect2s = Array.from(sect1.querySelectorAll<HTMLElement>('.sect2'));
+                    const anySect2Visible = sect2s.some((s) => s.style.display !== 'none');
+                    sect1.style.display = sect2s.length && !anySect2Visible ? 'none' : '';
+                });
+            };
+
+            productSelect.addEventListener('change', applyFilters);
+            categorySelect.addEventListener('change', applyFilters);
+            breakingCheckbox.addEventListener('change', applyFilters);
+        }
+    }
+
+    releaseNotesTables.forEach((table) => {
+        if (table.dataset.releaseNotesInit) return;
+        table.dataset.releaseNotesInit = 'true';
+
+        const rows = Array.from(table.querySelectorAll<HTMLElement>('tbody tr'));
+
+        rows.forEach((row) => {
+            const cell = row.querySelector<HTMLElement>('td:first-child');
+            if (!cell || cell.classList.contains('release-notes-desc-processed')) return;
+            cell.classList.add('release-notes-desc-processed');
+
+            const inner = cell.querySelector<HTMLElement>(':scope > .content') || cell;
+            inner.classList.add('release-notes-desc');
+
+            if (inner.scrollHeight <= inner.clientHeight + 2) return;
+
+            cell.classList.add('has-overflow');
+
+            const expandBtn = document.createElement('button');
+            expandBtn.type = 'button';
+            expandBtn.classList.add('release-notes-more-btn');
+            expandBtn.textContent = 'Show more';
+            expandBtn.addEventListener('click', () => {
+                const isExpanded = cell.classList.toggle('expanded');
+                expandBtn.textContent = isExpanded ? 'Show less' : 'Show more';
             });
+            cell.appendChild(expandBtn);
         });
+    });
+
+    /*
+     * Badge-style weekly release-notes pages — the original production
+     * format: a colored Fix/Enhancement/New feature badge plus a
+     * description, one small table per entry, grouped under a date (h2)
+     * and an optional feature-category heading (h3). This is NOT the
+     * [.release-notes-table] role above, so it needs its own detection:
+     * an entry is anything containing one of the known badge classes.
+     * Feature category comes from the nearest enclosing h3 (.sect2), or
+     * "General" for entries that sit directly under the date heading.
+     * A page-level filter bar (Feature category + Type) is built the same
+     * way as the one above, and both bars are sticky (see index.scss) so
+     * they stay in view while a long page like this one scrolls.
+     */
+    const BADGE_TYPES: Record<string, string> = {
+        'badge-fix-relnotes': 'Fix',
+        'badge-enhance-relnotes': 'Enhancement',
+        'badge-new-relnotes': 'New feature',
+    };
+
+    type BadgeEntry = { table: HTMLElement; type: string; category: string; group: HTMLElement };
+
+    const badgeEntries: BadgeEntry[] = Array.from(
+        document.querySelectorAll<HTMLElement>(Object.keys(BADGE_TYPES).map((cls) => `.${cls}`).join(', ')),
+    )
+        .map((badge): BadgeEntry | null => {
+            const table = badge.closest<HTMLElement>('table');
+            if (!table) return null;
+            const typeClass = Object.keys(BADGE_TYPES).find((cls) => badge.classList.contains(cls));
+            if (!typeClass) return null;
+            const sect2 = table.closest<HTMLElement>('.sect2');
+            const category = getHeadingText(sect2?.querySelector('h3')) || 'General';
+            return { table, type: BADGE_TYPES[typeClass], category, group: sect2 || table };
+        })
+        .filter((entry): entry is BadgeEntry => !!entry);
+
+    if (badgeEntries.length) {
+        const documentView = document.querySelector<HTMLElement>('.documentView');
+
+        if (documentView) {
+            const categories = Array.from(new Set(badgeEntries.map((entry) => entry.category))).sort();
+            const types = ['Fix', 'Enhancement', 'New feature'];
+
+            const filterBar = document.createElement('div');
+            filterBar.classList.add('release-notes-filterbar', 'badge-relnotes-filterbar');
+
+            const { field: categoryField, select: categorySelect } = makeFilterSelect('Feature', categories);
+            const { field: typeField, select: typeSelect } = makeFilterSelect('Type', types);
+
+            filterBar.appendChild(categoryField);
+            filterBar.appendChild(typeField);
+
+            mountFilterBar(filterBar, documentView);
+
+            const applyBadgeFilters = () => {
+                const category = categorySelect.value;
+                const type = typeSelect.value;
+
+                const groupHasVisibleEntry = new Map<HTMLElement, boolean>();
+
+                badgeEntries.forEach((entry) => {
+                    const matches = (!category || entry.category === category) && (!type || entry.type === type);
+                    entry.table.style.display = matches ? '' : 'none';
+                    if (matches) groupHasVisibleEntry.set(entry.group, true);
+                });
+
+                document.querySelectorAll<HTMLElement>('.sect2').forEach((sect2) => {
+                    if (!groupHasVisibleEntry.has(sect2) && badgeEntries.some((e) => e.group === sect2)) {
+                        sect2.style.display = 'none';
+                    } else if (badgeEntries.some((e) => e.group === sect2)) {
+                        sect2.style.display = '';
+                    }
+                });
+
+                document.querySelectorAll<HTMLElement>('.sect1').forEach((sect1) => {
+                    const relevant = badgeEntries.filter((e) => sect1.contains(e.table));
+                    const anyVisible = relevant.some(
+                        (e) => e.table.style.display !== 'none' && (e.group === e.table || e.group.style.display !== 'none'),
+                    );
+                    sect1.style.display = relevant.length && !anyVisible ? 'none' : '';
+                });
+            };
+
+            categorySelect.addEventListener('change', applyBadgeFilters);
+            typeSelect.addEventListener('change', applyBadgeFilters);
+        }
+    }
 };
 
 const isInViewport = (el: HTMLElement) => {
