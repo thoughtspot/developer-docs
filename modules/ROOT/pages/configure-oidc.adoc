@@ -198,12 +198,12 @@ Connection name::
 Provide a name for the configuration of the connection to your identity provider, helping to distinguish and manage multiple connections.
 This appears as the connection name on the Admin Console.
 
-Client Secret::
-Enter the Client Secret associated with the Client ID for secure communication.
-
 Client Id::
 A public identifier for the client, is used by the authorization server to recognize and validate the client.
 Enter the Client ID provided by the OIDC IdP when you registered your application.
+
+Client Secret::
+Enter the Client Secret associated with the Client ID for secure communication.
 
 Scopes::
 The specific permissions or access levels granted by the user during the authentication process. This defines the extent of data and actions the client can perform.
@@ -245,7 +245,7 @@ ThoughtSpot email associated with the email of the user in the IdP.
 Display name:: _Optional._
 The display name for the user.
 
-roles:: _Optional._
+Roles:: _Optional._
 Roles associated with the user. This mapping is crucial for assigning the correct roles and permissions to users based on their authentication through OIDC.
 
 For detailed information on enabling OIDC authentication on your ThoughtSpot instance using IAMv2, and attributes, see link:https://docs.thoughtspot.com/cloud/latest/oidc-iamv2#_enable_oidc_authentication[Enable OIDC authentication, window=_blank].
@@ -308,3 +308,94 @@ If a group is deleted from the OpenID provider server, the corresponding group i
 * link:https://developer.okta.com/docs/concepts/oauth-openid/[Okta documentation]
 * link:https://openid.net/connect/faq/[OpenID Connect documentation]
 
+== #Troubleshoot OIDC authentication#
+
+=== Users see a blank screen or are stuck on redirect after IdP login
+
+The most common cause is a mismatch between the registered *Callback URI* and the URI sent in the authorization request. Verify the following:
+
+. The Callback URI registered in your IdP exactly matches the ThoughtSpot redirect URI:
++
+----
+https://<ThoughtSpot-Host>/callosum/v1/oidc/callback
+----
+. No trailing slash, uppercase difference, or HTTP vs HTTPS mismatch exists.
+. The callback URI is registered for the correct application (client) in your IdP — not a different app or environment.
+
+=== `invalid_client` error from the token endpoint
+
+This means ThoughtSpot is presenting credentials that the IdP does not recognize. Check:
+
+* The *Client ID* and *Client Secret* values configured in ThoughtSpot match what your IdP issued after registering ThoughtSpot as a relying party.
+* ThoughtSpot uses `client_secret_post` as its client authentication method — confirm your IdP application is configured to accept this method. ThoughtSpot does not support `client_secret_basic`.
+
+=== `invalid_scope` error during authorization
+
+ThoughtSpot requires `openid`, `profile`, and `email` scopes. If your IdP returns `invalid_scope`, one of these scopes is not enabled for the registered application. Enable all three scopes in your IdP application settings.
+
+=== Users are provisioned but cannot be found after JIT login
+
+JIT provisioning maps IdP attributes to ThoughtSpot user fields. If the mapped attribute names don't match what the IdP sends in the ID token claims, the user record may be created with missing or incorrect fields.
+
+* In your IdP, inspect the ID token claims returned for a test user (most IdPs offer a token preview or debug tool).
+* Confirm the `preferred_username` claim is present — this maps to the ThoughtSpot `username` field.
+* If the `preferred_username` claim is not sent by your IdP, ask ThoughtSpot Support to remap to an alternative claim (for example, `email` or `sub`).
+// TODO: verify claim remapping support with engineering
+
+=== OIDC works on first login but fails on re-login (session refresh errors)
+
+If ThoughtSpot uses the `iss` + `sub` combination to identify returning users, a change in the IdP's `sub` claim value between sessions causes re-login to fail. This can happen after IdP migration or user account recreation. Contact link:https://www.thoughtspot.com/support[ThoughtSpot Support, window=_blank] to resolve orphaned user mappings.
+
+== #FAQs#
+
+=== What is the difference between OIDC and SAML for ThoughtSpot authentication?
+
+Both SAML and OIDC provide SSO authentication. The key differences are:
+
+[cols="1,2,2"]
+|===
+| | SAML | OIDC
+
+| Protocol
+| XML-based assertion exchange
+| JSON/JWT token exchange (built on OAuth 2.0)
+
+| Primary use case
+| Enterprise SSO, legacy systems
+| Modern apps, mobile, REST API-friendly
+
+| ThoughtSpot IAMv1
+| Supported
+| Supported (requires ThoughtSpot Support)
+
+| ThoughtSpot IAMv2
+| Supported (Admin Console)
+| Supported (Admin Console)
+
+| JIT provisioning
+| Supported
+| Supported
+|===
+
+Choose OIDC if your IdP is a modern provider (Google, Azure AD, Okta) and you prefer JSON-based token flows. Choose SAML if your organization has an existing SAML infrastructure or requires assertion-level attribute mapping.
+
+=== Does ThoughtSpot support PKCE for OIDC?
+
+ThoughtSpot currently uses the Authorization Code flow with `client_secret_post`. PKCE (Proof Key for Code Exchange) is not supported at this time.
+
+
+=== Can I configure multiple OIDC IdPs on one ThoughtSpot instance?
+
+Yes. Multiple OIDC IdPs can be configured on IAMv2 clusters from the Admin Console (*Admin* > *Authentication* > *Identity Providers*). To configure multiple OIDC IdPs on IAMv1, contact link:https://www.thoughtspot.com/support[ThoughtSpot Support, window=_blank].
+
+=== What happens to existing user sessions when OIDC is enabled?
+
+Enabling OIDC does not immediately terminate existing sessions. Users with active sessions remain authenticated until their session expires. New logins use OIDC once it is enabled and set as the default authentication method.
+
+=== Can I use OIDC with ThoughtSpot embedded in an iFrame?
+
+Yes, using `AuthType.OIDCRedirect` in the Visual Embed SDK `init()` call. The flow redirects the full browser window (not just the iFrame) to the IdP, completes authentication, and returns to the embedding application. See xref:configure-oidc.adoc#embedConfig[Enable OIDC authentication in the Visual Embed SDK].
+
+=== Is refresh token support available?
+
+ThoughtSpot does not currently use refresh tokens in its OIDC implementation. When the user's session expires, a new authorization code flow is initiated.

@@ -63,3 +63,45 @@ The React demo shows how to implement trusted authentication as part of an appli
 * link:https://github.com/thoughtspot/thoughtspot_rest_api_v1_python[Python REST API library, window=_blank] +
 A library implementing the V1 and V2 REST APIs in Python
 
+== #FAQs#
+
+=== What is the difference between trusted authentication and SAML SSO?
+
+SAML SSO delegates authentication entirely to an external Identity Provider (IdP). The user is redirected to the IdP login page, authenticates there, and the IdP asserts their identity to ThoughtSpot via a SAML response.
+
+Trusted authentication does not redirect the user to an IdP. Instead, the embedding web application authenticates the user itself (by whatever mechanism it uses — LDAP, OAuth, internal DB, or SAML), then requests a short-lived login token from ThoughtSpot on behalf of that already-authenticated user. ThoughtSpot trusts the application's assertion of identity.
+
+Use trusted authentication when:
+
+* You want a fully seamless, no-redirect embed experience.
+* Your application already manages its own user sessions.
+* You need to impersonate users in back-end REST API calls.
+
+Use SAML when:
+
+* You want ThoughtSpot's own login page to participate in the IdP flow.
+* You are not embedding ThoughtSpot — users access it directly.
+
+=== Can I use trusted authentication without the Visual Embed SDK?
+
+Yes. The token request and session creation steps can be performed entirely via REST API calls without using the Visual Embed SDK. This is the standard pattern for back-end REST API impersonation use cases. See xref:trusted-authentication.adoc#rest-api[REST API back-end use cases].
+
+=== Does trusted authentication work with multi-tenancy (Orgs)?
+
+Yes. When generating a token for a user in a specific Org, include the `org_id` parameter in the `POST /api/rest/2.0/auth/token/full` or `POST /api/rest/2.0/auth/token/custom` request. Without `org_id`, the token is scoped to the default Org for that user.
+
+=== What happens if the secret key is rotated while users are active?
+
+Existing active sessions (cookie-based) are not affected — the session cookie remains valid until it expires. New token requests using the old secret key will fail immediately. Update the secret key in your token request service as soon as it is rotated. For cookieless authentication, active bearer tokens remain valid until their individual `exp` time; subsequent `getAuthToken` calls will fail until the new key is deployed.
+
+=== How do I provision a user just-in-time (JIT) during trusted authentication?
+
+Your token request service can call the ThoughtSpot REST API to create or update the user before returning the login token. See xref:just-in-time-provisioning.adoc[Just-in-time provisioning] for the full procedure and code examples.
+
+=== Can I use trusted authentication with MFA enabled?
+
+Cookie-based trusted authentication (`AuthType.TrustedAuthToken`) is not compatible with MFA because the token exchange bypasses the ThoughtSpot login UI where MFA challenges are presented. Use `AuthType.TrustedAuthTokenCookieless` instead, or contact ThoughtSpot Support to configure MFA exemptions for API-authenticated users.
+
+=== What is the token validity window and can it be changed?
+
+By default, login tokens are valid for a short window (typically 5 minutes). The validity period is configurable per ThoughtSpot instance. Contact link:https://www.thoughtspot.com/support[ThoughtSpot Support, window=_blank] to adjust the token validity window for your deployment.
