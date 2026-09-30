@@ -1,133 +1,123 @@
 = Spotter Analyst API
 :toc: true
 :toclevels: 2
-
 :page-title: Spotter Analyst API
 :page-pageid: spotter-analyst-api
 :page-description: Create, search, update, and delete Spotter Analysts using the REST API
 
-// SOURCE: SCAL-317811; create-analyst.md, search-analyst.md, update-analyst.md, delete-analyst.md
+ThoughtSpot Spotter Analysts are governed AI agents, each configured with a name, description, one or more data sources, and optional instructions, Model Context Protocol (MCP) connectors, and starter prompts. Users converse with an Analyst directly in the Spotter interface.
 
-ThoughtSpot Spotter Analysts are governed AI agents, each configured with a name, description, one or more data sources, and optional instructions, MCP connectors, and starter prompts. Users converse with an Analyst directly in the Spotter interface.
+== Supported endpoints
 
-The Spotter Analyst REST API lets you create, search, update, and delete Analysts programmatically.
-All endpoints are under `/api/rest/2.0/ai/agent/analysts/` and are available from ThoughtSpot Cloud 26.10.0.cl.
+Use the following endpoints to create, search, update, share, or delete Analysts programmatically:
 
-== Prerequisites
+[width="100%", cols="1"]
+|=====
+a|`POST /api/rest/2.0/ai/agent/analysts/create` +
+xref:spotter-analyst-api.adoc#create-analyst[Creates a Spotter Analyst] with a name, description, data sources, and optional instructions, MCP connectors, and starter prompts. +
+__Available on ThoughtSpot Cloud instances from 26.10.0.cl onwards.__
 
-* Spotter must be enabled on your ThoughtSpot instance. Contact ThoughtSpot Support to enable it.
-* All requests require a Bearer token. Use a token scoped to the Org in which the Analyst exists or should be created.
-* Privilege requirements vary by operation. See each endpoint section for details.
+a|`POST /api/rest/2.0/ai/agent/analysts/search` +
+xref:spotter-analyst-api.adoc#search-analysts[Retrieves Analysts visible to the caller], either a single Analyst by identifier or a paginated list ordered by most recent access. +
+__Available on ThoughtSpot Cloud instances from 26.10.0.cl onwards.__
+
+a|`POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/update` +
+xref:spotter-analyst-api.adoc#update-analyst[Updates a Spotter Analyst]. The update is a full replace; omitted optional fields are cleared. +
+__Available on ThoughtSpot Cloud instances from 26.10.0.cl onwards.__
+
+a|`POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/share` [beta betaBackground]^Beta^ +
+xref:spotter-analyst-api.adoc#share-analyst[Updates share permissions on a Spotter Analyst] for one or more users or groups. Granting access also shares the Analyst's data sources with the principal. +
+__Available on ThoughtSpot Cloud instances from 26.10.0.cl onwards.__
+
+a|`POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/delete` +
+xref:spotter-analyst-api.adoc#delete-analyst[Permanently deletes a Spotter Analyst]. This operation is irreversible. +
+__Available on ThoughtSpot Cloud instances from 26.10.0.cl onwards.__
+|=====
 
 == Analyst object
 
-Each Analyst has the following fields:
+Each AI Analyst object in ThoughtSpot has the following properties:
 
-[cols="1,1,3"]
-|===
-| Field | Type | Description
+* `id` +
+__String__. Server-assigned unique identifier.
 
-| `id`
-| string
-| Server-assigned unique identifier.
+* `name` +
+__String__. Display name of the Analyst.
 
-| `name`
-| string
-| Display name of the Analyst.
+* `description` +
+__String__. Description of the Analyst. Maximum 200 characters.
 
-| `description`
-| string
-| Description of the Analyst. Maximum 200 characters.
+* `instructions` +
+__String__. Optional natural-language behavior guidelines for the agent.
 
-| `instructions`
-| string
-| Optional natural-language behavior guidelines for the agent.
+* `sources` +
+__Array of strings__. Data sources the Analyst can query. Each source includes an `id`, `type`, and display `name`. Supported types: `MODEL`, `ANSWER`, `LIVEBOARD`, `CONVERSATION`.
 
-| `sources`
-| array
-| Data sources the Analyst can query. Each source includes an `id`, `type`, and display `name`. Supported types: `MODEL`, `ANSWER`, `LIVEBOARD`, `CONVERSATION`.
+* `mcp_connectors` +
+__Array of strings__. Linked MCP connectors. Each connector includes `id`, `name`, and `icon_url`.
 
-| `mcp_connectors`
-| array
-| Linked MCP connectors. Each connector includes `id`, `name`, and `icon_url`.
+* `starter_prompts` +
+__Array of strings__. Up to 4 suggested prompts shown on the Analyst landing page. Each entry includes `label`, `text`, `order`, and `is_ai_generated`.
 
-| `starter_prompts`
-| array
-| Up to 4 suggested prompts shown on the Analyst landing page. Each entry includes `label`, `text`, `order`, and `is_ai_generated`.
+* `icon_id` +
+__String__. Analyst icon identifier. Analysts created via the API use the default icon until one is set in the UI.
 
-| `icon_id`
-| string
-| Analyst icon identifier. Analysts created via the API use the default icon until one is set in the UI.
+* `updated_time_in_millis` +
+__Integer__. Epoch timestamp in milliseconds of the last update.
 
-| `updated_time_in_millis`
-| integer
-| Epoch timestamp in milliseconds of the last update.
+* `last_accessed_time_in_millis` +
+__Integer__. Epoch timestamp in milliseconds of the last access.
 
-| `last_accessed_time_in_millis`
-| integer
-| Epoch timestamp in milliseconds of the last access.
+* `created_by` +
+User who created the Analyst. Includes `id`, `name`, and `display_name`.
 
-| `created_by`
-| object
-| User who created the Analyst. Includes `id`, `name`, and `display_name`.
+* `updated_by` +
+User who last updated the Analyst. Includes `id`, `name`, and `display_name`.
 
-| `updated_by`
-| object
-| User who last updated the Analyst. Includes `id`, `name`, and `display_name`.
-|===
 
-== Create Analyst
+[#create-analyst]
+== Create an analyst
+To create a Spotter Analyst programmatically, send a `POST` request to the `/api/rest/2.0/ai/agent/analysts/create` endpoint with the Analyst definition in the request body. The definition includes a name, a description, and at least one data source, and can optionally include instructions, MCP connectors, and starter prompts.
 
-`POST /api/rest/2.0/ai/agent/analysts/create`
+Use this endpoint to provision governed Analysts as part of an automated deployment workflow, or to create Analysts programmatically across environments.
 
-Creates a Spotter Analyst. Analysts created via the API use the default icon until one is set in the ThoughtSpot UI.
+[NOTE]
+====
+Analysts created via the API use the default icon until one is set in the ThoughtSpot UI.
+====
 
-=== Privileges required
+=== Required privileges
 
-At least one of the following: `ADMINISTRATION`, `CAN_MANAGE_SPOTTER`, or `CAN_USE_SPOTTER`. The caller must also have view access to every data source listed in `sources`.
+Requires at least one of the following privileges:
+
+* `ADMINISTRATION`
+* `CAN_MANAGE_SPOTTER`
+* `CAN_USE_SPOTTER`
+
+The user must also have at least view access to the data sources specified in the API request.
 
 === Request parameters
 
-[cols="1,1,1,3"]
-|===
-| Parameter | Type | Required | Description
+[width="100%" cols="2,4"]
+[options="header"]
+|=====
+| Parameter | Description
+| `name` |__String__. Display name of the Analyst.
+| `description` |__String__. Description of the Analyst. Maximum 200 characters.
+| `sources` a|__Array of objects__. Data sources the Analyst can query. At least one source is required. The caller must have view access to every referenced source. For each source object, specify the following attributes:
 
-| `name`
-| string
-| Required
-| Display name of the Analyst.
+* `identifier` +
+__String__. Unique ID of the data source object.
+* `type` +
+__String__. Type of the data source object. Valid values: `MODEL`, `ANSWER`, `LIVEBOARD`, and `CONVERSATION`.
+* `name` +
+__String__. Optional. Display name of the data source.
+| `instructions` |__String__. Optional. Natural-language instructions that guide the agent's behavior. Instructions that conflict with system guardrails are rejected with a `409` error.
+| `mcp_connector_identifiers` |__Array of strings__. Optional. Identifiers of MCP connectors to link to the Analyst.
+| `starter_prompts` |__Array of strings__. Optional. Up to 4 plain-text prompts, each between 10 and 250 characters. Display order follows list position.
+|=====
 
-| `description`
-| string
-| Required
-| Description of the Analyst. Maximum 200 characters.
-
-| `sources`
-| array
-| Required
-| At least one data source. Each entry requires an `identifier` and a `type` (`MODEL`, `ANSWER`, `LIVEBOARD`, or `CONVERSATION`). The `name` field is optional. The caller must have view access to every referenced source.
-
-| `instructions`
-| string
-| Optional
-| Natural-language instructions that guide the agent's behavior. Instructions that conflict with system guardrails are rejected with a `409` error.
-
-| `mcp_connector_identifiers`
-| array
-| Optional
-| Identifiers of MCP connectors to link to the Analyst.
-
-| `starter_prompts`
-| array
-| Optional
-| Up to 4 plain-text prompts, each between 10 and 250 characters. Display order follows list position.
-|===
-
-=== Response
-
-Returns `200 OK` and the created `Analyst` object, including the server-assigned `id`.
-
-=== Example
+=== Request example
 
 [source,bash]
 ----
@@ -153,6 +143,12 @@ curl -X POST \
 }'
 ----
 
+=== API Response
+
+Returns `200 OK` and the created `Analyst` object, including the server-assigned `id`.
+
+
+////
 === Error responses
 
 [cols="1,3"]
@@ -167,60 +163,42 @@ curl -X POST \
 | 429 | Rate limit exceeded.
 | 500 | Unexpected server error.
 |===
+////
 
-== Search Analysts
 
-`POST /api/rest/2.0/ai/agent/analysts/search`
+[#search-analysts]
+== Search analysts
+To retrieve the Spotter Analysts visible to the authenticated user, send a `POST` request to the `/api/rest/2.0/ai/agent/analysts/search` endpoint. Use this endpoint to fetch a specific Analyst by its identifier, or to render an Analyst catalog or picker in your app.
 
-Returns Analysts visible to the caller. This endpoint operates in two modes:
+This endpoint operates in two modes:
 
-Fetch mode:: Provide `analyst_identifier` to retrieve a single Analyst. All other filters are ignored and `total_size` is `1`.
+Fetch mode:: Provide `analyst_identifier` in the request body to retrieve a single Analyst. All other filters are ignored and `total_size` is `1`.
 List mode:: Omit `analyst_identifier` to get a paginated list of Analysts, ordered by most recently accessed.
 
-=== Privileges required
+=== Required privileges
+Requires at least one of the following privileges:
 
-At least one of the following: `ADMINISTRATION`, `CAN_MANAGE_SPOTTER`, or `CAN_USE_SPOTTER`.
+* `ADMINISTRATION`
+* `CAN_MANAGE_SPOTTER`
+* `CAN_USE_SPOTTER`
 
 === Request parameters
 
-[cols="1,1,1,3"]
-|===
-| Parameter | Type | Required | Description
+[width="100%" cols="2,4"]
+[options="header"]
+|=====
+| Parameter | Description
+| `analyst_identifier` |__String__. Optional. When provided, returns exactly this Analyst. All other filters are ignored.
+| `record_size` |__Integer__. Optional. Number of records per page. The default value is `50`. The supported range is 1 to 500.
+| `record_offset` |__Integer__. Optional. Zero-based index of the first record. The default value is `0`. The maximum value is `10000`.
+| `query` |__String__. Optional. Case-insensitive substring match on Analyst name.
+| `type` |__String__. Optional. Ownership filter. Valid values are `ALL` (default, returns Analysts created by or shared with the caller), `CREATED_BY_ME`, and `SHARED_TO_ME`.
+|=====
 
-| `analyst_identifier`
-| string
-| Optional
-| When provided, returns exactly this Analyst. All other filters are ignored.
 
-| `record_size`
-| integer
-| Optional
-| Number of records per page. Default: `50`. Range: 1 to 500.
+=== Request examples
 
-| `record_offset`
-| integer
-| Optional
-| Zero-based index of the first record. Default: `0`. Maximum: `10000`.
-
-| `query`
-| string
-| Optional
-| Case-insensitive substring match on Analyst name.
-
-| `type`
-| string
-| Optional
-| Ownership filter. Accepted values: `ALL` (default, returns Analysts created by or shared with the caller), `CREATED_BY_ME`, or `SHARED_TO_ME`.
-|===
-
-=== Response
-
-Returns `200 OK` and an `AnalystSearchResponse` object with:
-
-* `analysts`: the current page of matching `Analyst` objects.
-* `total_size`: total count of matching Analysts before pagination.
-
-=== Example: list all Analysts
+List all Analysts::
 
 [source,bash]
 ----
@@ -236,7 +214,7 @@ curl -X POST \
 }'
 ----
 
-=== Example: fetch a single Analyst
+Fetch a single Analyst::
 
 [source,bash]
 ----
@@ -250,6 +228,14 @@ curl -X POST \
 }'
 ----
 
+=== API Response
+
+Returns `200 OK` and an `AnalystSearchResponse` object with:
+
+* `analysts`: the current page of matching `Analyst` objects.
+* `total_size`: total count of matching Analysts before pagination.
+
+////
 === Error responses
 
 [cols="1,3"]
@@ -260,32 +246,43 @@ curl -X POST \
 | 404 | (Fetch mode) No Analyst with the given identifier exists in the caller's Org.
 | 422 | `record_size` or `record_offset` is out of the permitted range.
 |===
+////
 
-== Update Analyst
 
-`POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/update`
+[#update-analyst]
+== Update an analyst
+To modify an existing Spotter Analyst, send a `POST` request to the `/api/rest/2.0/ai/agent/analysts/{analyst_identifier}/update` endpoint. The Analyst to update is identified by the `analyst_identifier` URL path parameter, and the new definition is passed in the request body.
 
-Updates a Spotter Analyst. The update is a full replace: the Analyst is rewritten from the request body. Any optional field omitted from the request is cleared. Include all fields you want to retain.
+The update is a full replace: the Analyst is rewritten from the request body, and any optional field omitted from the request is cleared. Include all fields you want to retain.
 
 When new sources are added, they are automatically shared with users the Analyst was previously shared with. Those users retain access to a working Analyst.
 
-=== Privileges required
 
-The caller must be the owner of the Analyst, or hold `ADMINISTRATION` or `CAN_MANAGE_SPOTTER` privileges. Users the Analyst is shared with can use it but cannot edit it.
+=== Required privileges
+Requires at least one of the following privileges:
 
-=== Path parameter
+* `ADMINISTRATION`
+* `CAN_MANAGE_SPOTTER`
 
-`analyst_identifier`: unique ID of the Analyst to update, as returned by the Create Analyst or Search Analysts endpoint.
+The API endpoint doesn't allow users to edit the Analyst objects that are shared with them by another user.
 
 === Request parameters
 
-The request body uses the same shape as Create Analyst: `name`, `description`, `sources`, `instructions`, `mcp_connector_identifiers`, and `starter_prompts`.
+[width="100%" cols="2,2,4"]
+[options="header"]
+|=====
+| Parameter | Type | Description
+| `analyst_identifier` | Path parameter |__String__. Unique identifier of the Analyst to update, as returned by the Create an analyst or Search analysts endpoint.
+| `name` | Form parameter |__String__. Display name of the Analyst.
+| `description` | Form parameter |__String__. Description of the Analyst. Maximum 200 characters.
+| `sources` | Form parameter |__Array of objects__. Data sources the Analyst can query. Replaces the existing list in full. When new sources are added, they are automatically shared with users the Analyst was previously shared with, so those users keep a working Analyst.
+| `instructions` | Form parameter |__String__. Optional. Natural-language instructions that guide the agent's behavior. Instructions that conflict with system guardrails are rejected with a `409` error. If instructions are not specified, any existing instructions on the Analyst are removed.
+| `mcp_connector_identifiers` | Form parameter |__Array of strings__. Optional. Identifiers of MCP connectors to link to the Analyst. Replaces the existing list in full. To remove the existing connectors, pass an empty array.
+| `starter_prompts` | Form parameter |__Array of strings__. Optional. Up to 4 plain-text prompts, each between 10 and 250 characters. Replaces the existing list in full. To remove the existing starter prompts, pass an empty array.
+|=====
 
-=== Response
 
-Returns `200 OK` and the updated `Analyst` object, including the refreshed `updated_time_in_millis` and `updated_by` fields.
-
-=== Example
+=== Request examples
 
 [source,bash]
 ----
@@ -317,9 +314,14 @@ curl -X POST \
 
 [NOTE]
 ====
-The update is a full replace. Omitting `instructions`, `mcp_connector_identifiers`, or `starter_prompts` clears those fields on the Analyst. Include every field you want to keep.
+The update operation replaces existing properties of the Analyst object. Ensure that you include every parameter that you want to keep.
 ====
 
+
+=== API Response
+Returns `200 OK` and the updated `Analyst` object, including the refreshed `updated_time_in_millis` and `updated_by` fields.
+
+////
 === Error responses
 
 [cols="1,3"]
@@ -335,39 +337,110 @@ The update is a full replace. Omitting `instructions`, `mcp_connector_identifier
 | 429 | Rate limit exceeded.
 | 500 | Unexpected server error.
 |===
+////
 
-== Delete Analyst
+[#share-analyst]
+== Share an analyst [beta betaBackground]^Beta^
+To share a Spotter Analyst with other ThoughtSpot users and groups, or to change or revoke their access, send a `POST` request to the `/api/rest/2.0/ai/agent/analysts/{analyst_identifier}/share` endpoint. The Analyst to share is identified by the `analyst_identifier` URL path parameter, and the permission assignments are passed in the request body, one entry per principal.
 
-`POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/delete`
+Use `READ_ONLY` or `MODIFY` to grant or change a principal's access, and `NO_ACCESS` to revoke it. When access is granted, the Analyst's data sources are automatically shared with the principal, so the Analyst keeps working for them.
 
-Permanently deletes a Spotter Analyst. This operation is irreversible. Deleted Analysts cannot be recovered.
+Users the Analyst is shared with can use it but cannot edit it. To allow editing, set `share_mode` to `MODIFY`.
 
-=== Privileges required
+=== Required privileges
+Requires at least one of the following privileges:
 
-The caller must be the owner of the Analyst, or hold `ADMINISTRATION` or `CAN_MANAGE_SPOTTER` privileges. Users the Analyst is shared with cannot delete it.
+* `ADMINISTRATION`
+* `CAN_MANAGE_SPOTTER`
 
-=== Path parameter
+Use a Bearer token for the Org in which the Analyst exists.
 
-`analyst_identifier`: unique ID of the Analyst to delete, as returned by the Create Analyst or Search Analysts endpoint.
+=== Request parameters
 
-=== Request body
+Specify the `analyst_identifier` as a path parameter.
 
-None.
+The request body contains a `permissions` array with one entry per principal. A principal may appear at most once per request.
 
-=== Response
+[width="100%" cols="2,2,4"]
+[options="header"]
+|====
+| Parameter |Type |Description
+| `analyst_identifier` |Path parameter |__String__. Unique identifier of the Analyst to share, as returned by the Create an analyst or Search analysts endpoint.
+| `permissions` a|Form parameter a|__Array of objects__. Permission assignments, one entry per principal. A principal may appear at most once per request. For each entry, specify the following attributes:
 
-Returns `200 OK` and an `AnalystDeleteResponse` object containing the `id` of the deleted Analyst.
+* `principal` +
+__Object__. The user or group to assign access to. Specify the following attributes:
 
-=== Example
+** `identifier` +
+__String__. Unique identifier of the user or group.
+** `type` +
+__String__. Type of principal. Valid values: `USER` and `USER_GROUP`.
+
+* `share_mode` +
+__String__. Access level to assign. `READ_ONLY` or `MODIFY` grants or changes the principal's access. `NO_ACCESS` revokes it.
+|====
+
+
+=== Request examples
+
+Share with a user and a group::
 
 [source,bash]
 ----
 curl -X POST \
-  --url 'https://{cluster}/api/rest/2.0/ai/agent/analysts/{analyst_identifier}/delete' \
+  --url 'https://{cluster}/api/rest/2.0/ai/agent/analysts/{analyst_identifier}/share' \
   -H 'Accept: application/json' \
-  -H 'Authorization: Bearer {token}'
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "permissions": [
+    {
+      "principal": {
+        "identifier": "{user-guid}",
+        "type": "USER"
+      },
+      "share_mode": "READ_ONLY"
+    },
+    {
+      "principal": {
+        "identifier": "{group-guid}",
+        "type": "USER_GROUP"
+      },
+      "share_mode": "MODIFY"
+    }
+  ]
+}'
 ----
 
+Revoke access::
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/ai/agent/analysts/{analyst_identifier}/share' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "permissions": [
+    {
+      "principal": {
+        "identifier": "{user-guid}",
+        "type": "USER"
+      },
+      "share_mode": "NO_ACCESS"
+    }
+  ]
+}'
+----
+
+
+=== API Response
+
+Returns an empty `204 No Content` response on success.
+
+
+////
 === Error responses
 
 [cols="1,3"]
@@ -378,9 +451,47 @@ curl -X POST \
 | 401 | Bearer token is missing, expired, or invalid.
 | 403 | The caller is not the Analyst owner and does not hold admin or Spotter-management privileges.
 | 404 | No Analyst with the given identifier exists in the caller's Org.
+| 422 | Validation failure: empty `permissions` array, duplicate principal, or a missing required field.
 | 429 | Rate limit exceeded.
 | 500 | Unexpected server error.
 |===
+////
+
+[#delete-analyst]
+== Delete an analyst
+To permanently delete a Spotter Analyst, send a `POST` request to the `/api/rest/2.0/ai/agent/analysts/{analyst_identifier}/delete` endpoint with the Analyst's unique identifier as the URL path parameter. No request body is required.
+
+[WARNING]
+====
+This operation is irreversible. Deleted Analysts cannot be recovered.
+====
+
+=== Required privileges
+The owners of the Analyst object specified in the API request can delete the object. Other users require at least one of the following privileges:
+
+* `ADMINISTRATION`
+* `CAN_MANAGE_SPOTTER`
+
+The API endpoint doesn't allow users to delete the Analyst objects that are shared with them by another user.
+
+=== Request parameter
+
+Specify the ID of the Analyst to delete in the `analyst_identifier` path parameter.
+
+=== Request example
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/ai/agent/analysts/{analyst_identifier}/delete' \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer {token}'
+----
+
+=== API Response
+
+Returns `200 OK` and an `AnalystDeleteResponse` object containing the `id` of the deleted Analyst.
+
 
 == Related resources
 
