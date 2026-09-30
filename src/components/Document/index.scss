@@ -243,17 +243,17 @@
        own box does not). Plain position: sticky was tried first but
        produced an unexplained gap above the bar and a real overlap with
        the content right after it on this page; see the comment above
-       mountFilterBar for details. Solid background + a bottom border (no
-       border-radius, no surrounding box) so it reads as part of the
-       header stack rather than a floating card once pinned. */
+       mountFilterBar for details. No background fill — just a bottom
+       border (no border-radius, no surrounding box) — so it reads as an
+       inline row of controls rather than a floating card, both in normal
+       flow and once pinned. */
     .release-notes-filterbar {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         margin: 0 0 24px;
-        padding: 10px 16px;
-        background: var(--table-header-bg);
+        padding: 18px 16px;
         border-bottom: 1px solid var(--border-color);
 
         &.is-pinned {
@@ -275,9 +275,9 @@
     .release-notes-filterbar-toggle {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 6px 14px;
-        font-size: 13px;
+        gap: 5px;
+        padding: 4px 10px;
+        font-size: 12px;
         font-weight: 500;
         color: var(--primary-color);
         background: var(--copy-btn-bg);
@@ -386,30 +386,16 @@
         }
     }
 
-    /* Product / Feature category columns are authored as normal table
-       columns (that's what the page-level filter bar in helper.tsx reads
-       its values from), but readers never see them as columns — they're
-       internal filter metadata, not a printed label. Hide everything but
-       the Description column; the <col> hide keeps the table from
-       reserving layout width for the columns nobody sees. */
-    .release-notes-table table col:not(:first-child),
-    table.release-notes-table col:not(:first-child) {
-        display: none;
-    }
-
-    .release-notes-table table th:not(:first-child),
-    .release-notes-table table td:not(:first-child),
-    table.release-notes-table th:not(:first-child),
-    table.release-notes-table td:not(:first-child) {
-        display: none;
-    }
-
-    .release-notes-table table th:first-child,
-    .release-notes-table table td:first-child,
-    table.release-notes-table th:first-child,
-    table.release-notes-table td:first-child {
-        border-right: none;
-    }
+    /* Product / Feature / Version / Type columns are authored as normal
+       table columns (that's what the page-level filter bar in helper.tsx
+       reads its values from), but readers never see them as columns —
+       they're internal filter metadata, not a printed label. Which columns
+       those are varies per table (a plain release-notes table has one
+       visible Description column; a master-list-style table can have two
+       visible columns, e.g. Week + Description), so hiding is done in JS
+       (see the columnIndexByTable-driven loop in customizeDocContent),
+       not with a blanket CSS rule here — a column is metadata if its
+       header has real text; a blank header means it's visible content. */
 
     .release-notes-table table td:first-child,
     table.release-notes-table td:first-child {
@@ -460,6 +446,77 @@
         &.has-overflow.expanded .release-notes-more-btn {
             opacity: 1;
             pointer-events: auto;
+        }
+    }
+
+    /* Opt-in modifier — [.release-notes-table.release-notes-no-header] —
+       for pages whose header row has nothing worth showing (e.g. a
+       master-list page where every visible column's header is left blank,
+       since the label text lives in the row content instead). The <thead>
+       stays in the DOM either way — it's what the column-hiding loop and
+       the filter bar in helper.tsx read the Product/Feature/... labels
+       from — this just hides it visually. */
+    .release-notes-table.release-notes-no-header table thead,
+    table.release-notes-table.release-notes-no-header thead {
+        display: none;
+    }
+
+    /* Border + column treatment matching .cl-table (whats-new.adoc's
+       changelog table) instead of the bordered/grid look the base
+       .release-notes-table rule above applies — no outer border, no
+       column dividers, no per-row dividers, just a rule above the very
+       first row. Kept here as its own override rather than combining the
+       cl-table role directly onto the table, so there's no cross-file
+       cascade order to reason about — this always wins within this
+       stylesheet. */
+    .release-notes-table.release-notes-no-header table,
+    table.release-notes-table.release-notes-no-header {
+        border: none;
+
+        th,
+        td {
+            border-right: none;
+            border-top: none;
+            border-bottom: none;
+        }
+    }
+
+    .release-notes-table.release-notes-no-header table tbody tr,
+    table.release-notes-table.release-notes-no-header tbody tr {
+        border-bottom: none;
+    }
+
+    .release-notes-table.release-notes-no-header table tbody tr:first-child,
+    table.release-notes-table.release-notes-no-header tbody tr:first-child {
+        border-top: 1px solid var(--border-color);
+    }
+
+    /* Left cell (date/week label) — same sticky-while-scrolling behavior
+       as .cl-table's left cell: pinned near the top of the viewport while
+       its row is in view. `:last-child` isn't safe here for the content
+       cell below, since the hidden Product column is still the structural
+       last child even though display:none — so both cells are addressed
+       by position (:first-child / :nth-child(2)) instead. */
+    .release-notes-table.release-notes-no-header table td:first-child,
+    table.release-notes-table.release-notes-no-header td:first-child {
+        color: var(--link-text-color);
+        padding: 28px 36px 28px 0;
+        vertical-align: top;
+
+        > .content {
+            position: sticky;
+            top: 80px;
+        }
+    }
+
+    /* Right cell (description content) */
+    .release-notes-table.release-notes-no-header table td:nth-child(2),
+    table.release-notes-table.release-notes-no-header td:nth-child(2) {
+        padding: 28px 0;
+        vertical-align: top;
+
+        > .content > *:first-child {
+            margin-top: 0;
         }
     }
 

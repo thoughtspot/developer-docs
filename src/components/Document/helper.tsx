@@ -397,10 +397,19 @@ export const customizeDocContent = () => {
     /*
      * Release-notes tables ([.release-notes-table] role in AsciiDoc):
      *  - A single page-level filter bar (Breaking changes toggle, Product,
-     *    Feature category) sits above every dated release section and
-     *    filters matching rows across ALL tables on the page at once — not
-     *    a per-table dropdown. A date (h2/.sect1) or subsection (h3/.sect2)
-     *    collapses out of view entirely once nothing inside it matches.
+     *    and whatever other metadata columns the page's tables author —
+     *    Feature category, Version, ...) sits above every dated release
+     *    section and filters matching rows across ALL tables on the page at
+     *    once — not a per-table dropdown. A date (h2/.sect1) or subsection
+     *    (h3/.sect2) collapses out of view entirely once nothing inside it
+     *    matches.
+     *  - Metadata columns are matched by their header text, not position,
+     *    so different template variants can author different columns (the
+     *    TSE template only has Feature category; the weekly template also
+     *    has Product and Version) without this code caring which column
+     *    index means what on a given table. A table that doesn't author a
+     *    given column simply isn't affected by that filter dimension —
+     *    it's never treated as a non-match.
      *  - Per-row "Show more" for Description cells taller than one line:
      *    the overflow is clipped and blurred (not faded), and the button
      *    itself only appears on hover/focus of the cell rather than sitting
@@ -416,57 +425,154 @@ export const customizeDocContent = () => {
     if (releaseNotesTables.length) {
         const documentView = document.querySelector<HTMLElement>('.documentView');
 
-        // Fixed, org-wide product taxonomy — unlike Feature category (below),
-        // this isn't derived from what's on the page, so it stays stable
-        // even on a page that only happens to mention one or two products.
-        const PRODUCTS = ['ThoughtSpot Cloud', 'ThoughtSpot Embedded', 'Analyst Studio', 'APIs and SDK'];
+        // Fixed, org-wide product taxonomy — unlike the other metadata
+        // columns below, this isn't derived from what's on the page, so it
+        // stays stable even on a page that only happens to mention one or
+        // two products.
+        const PRODUCTS = ['ThoughtSpot Application', 'ThoughtSpot Embedded', 'APIs and SDK', 'AgentSpot', 'MCP Server'];
 
-        const categories = Array.from(
-            new Set(
-                releaseNotesTables
-                    .flatMap((table) => Array.from(table.querySelectorAll<HTMLElement>('tbody tr')))
-                    .map((row) => row.querySelector('td:last-child')?.textContent?.trim() || '')
-                    .filter(Boolean),
-            ),
-        ).sort();
+        // { table -> { header label -> 1-based column index } }, built from
+        // each table's own header row (skipping column 1, Description,
+        // which is never a filter dimension).
+        const columnIndexByTable = new Map<HTMLTableElement, Map<string, number>>();
+        releaseNotesTables.forEach((table) => {
+            const colMap = new Map<string, number>();
+            Array.from(table.querySelectorAll<HTMLElement>('thead th')).forEach((th, i) => {
+                if (i === 0) return;
+                const label = getHeadingText(th);
+                if (label) colMap.set(label, i + 1);
+            });
+            columnIndexByTable.set(table, colMap);
+        });
+
+        // Hide each table's recognized metadata columns (whatever's in its
+        // own colMap — Product, Feature, Version, Type, ...) directly via
+        // inline styles, rather than a blanket "everything but column 1"
+        // CSS rule — that assumed exactly one visible column, which breaks
+        // for a table authored with two visible columns (e.g. Week +
+        // Description on a master-list page). Column 1 is always visible
+        // (colMap never contains it); any other column stays visible too,
+        // as long as its header was left blank when authoring the table.
+        releaseNotesTables.forEach((table) => {
+            if (table.dataset.releaseNotesColsInit) return;
+            table.dataset.releaseNotesColsInit = 'true';
+
+            const colMap = columnIndexByTable.get(table);
+            if (!colMap) return;
+            const hiddenIndices = new Set(Array.from(colMap.values()));
+
+            Array.from(table.querySelectorAll<HTMLElement>('colgroup col')).forEach((col, i) => {
+                if (hiddenIndices.has(i + 1)) col.style.display = 'none';
+            });
+
+            const headerCells = Array.from(table.querySelectorAll<HTMLElement>('thead th'));
+            headerCells.forEach((th, i) => {
+                if (hiddenIndices.has(i + 1)) th.style.display = 'none';
+            });
+            const visibleHeaders = headerCells.filter((_, i) => !hiddenIndices.has(i + 1));
+            visibleHeaders.forEach((th, i) => {
+                th.style.borderRight = i === visibleHeaders.length - 1 ? 'none' : '';
+            });
+
+            Array.from(table.querySelectorAll<HTMLElement>('tbody tr')).forEach((row) => {
+                const cells = Array.from(row.querySelectorAll<HTMLElement>('td'));
+                cells.forEach((td, i) => {
+                    if (hiddenIndices.has(i + 1)) td.style.display = 'none';
+                });
+                const visibleCells = cells.filter((_, i) => !hiddenIndices.has(i + 1));
+                visibleCells.forEach((td, i) => {
+                    td.style.borderRight = i === visibleCells.length - 1 ? 'none' : '';
+                });
+            });
+        });
+
+        const hasProductColumn = Array.from(columnIndexByTable.values()).some((colMap) => colMap.has('Product'));
+
+        // Every other metadata label used by any table on the page, in
+        // first-seen order.
+        const dimensionLabels: string[] = [];
+        columnIndexByTable.forEach((colMap) => {
+            colMap.forEach((_, label) => {
+                if (label !== 'Product' && !dimensionLabels.includes(label)) dimensionLabels.push(label);
+            });
+        });
 
         if (documentView) {
             const filterBar = document.createElement('div');
             filterBar.classList.add('release-notes-filterbar');
 
-            const breakingField = document.createElement('label');
-            breakingField.classList.add('release-notes-filterbar-toggle');
-            const breakingCheckbox = document.createElement('input');
-            breakingCheckbox.type = 'checkbox';
-            const breakingLabel = document.createElement('span');
-            breakingLabel.textContent = 'Breaking changes only';
-            breakingField.appendChild(breakingCheckbox);
-            breakingField.appendChild(breakingLabel);
+            // A "Type" column (Fix / Enhancement / Breaking change / ...)
+            // supersedes the "Breaking changes only" toggle — it's the same
+            // idea generalized into a proper filter dimension. Only fall
+            // back to the toggle on pages whose tables don't author Type —
+            // and only if the page actually has dated .sect2 subsections for
+            // it to collapse; a flat master-list table (e.g. a page linking
+            // out to each release's own digest) has none, so the toggle
+            // would have nothing to do.
+            const hasTypeColumn = dimensionLabels.includes('Type');
+            const hasSect2Structure = document.querySelectorAll('.sect2').length > 0;
+            let breakingCheckbox: HTMLInputElement | null = null;
 
-            const { field: productField, select: productSelect } = makeFilterSelect('Product', PRODUCTS);
-            const { field: categoryField, select: categorySelect } = makeFilterSelect('Category', categories);
+            if (!hasTypeColumn && hasSect2Structure) {
+                const breakingField = document.createElement('label');
+                breakingField.classList.add('release-notes-filterbar-toggle');
+                breakingCheckbox = document.createElement('input');
+                breakingCheckbox.type = 'checkbox';
+                const breakingLabel = document.createElement('span');
+                breakingLabel.textContent = 'Breaking changes only';
+                breakingField.appendChild(breakingCheckbox);
+                breakingField.appendChild(breakingLabel);
+                filterBar.appendChild(breakingField);
+            }
 
-            filterBar.appendChild(breakingField);
-            filterBar.appendChild(productField);
-            filterBar.appendChild(categoryField);
+            const selectsByLabel = new Map<string, HTMLSelectElement>();
+
+            if (hasProductColumn) {
+                const { field, select } = makeFilterSelect('Product', PRODUCTS);
+                filterBar.appendChild(field);
+                selectsByLabel.set('Product', select);
+            }
+
+            dimensionLabels.forEach((label) => {
+                // Version reads newest-first, matching how these pages are
+                // already authored, rather than alphabetically — a lexical
+                // sort would put "1.10.0" ahead of "1.9.0".
+                const preserveDocOrder = label.toLowerCase() === 'version';
+                const values = new Set<string>();
+                releaseNotesTables.forEach((table) => {
+                    const colIndex = columnIndexByTable.get(table)?.get(label);
+                    if (!colIndex) return;
+                    Array.from(table.querySelectorAll<HTMLElement>('tbody tr')).forEach((row) => {
+                        const value = row.querySelector(`td:nth-child(${colIndex})`)?.textContent?.trim();
+                        if (value) values.add(value);
+                    });
+                });
+                const options = preserveDocOrder ? Array.from(values) : Array.from(values).sort();
+
+                const { field, select } = makeFilterSelect(label, options);
+                filterBar.appendChild(field);
+                selectsByLabel.set(label, select);
+            });
 
             mountFilterBar(filterBar, documentView);
 
             const applyFilters = () => {
-                const product = productSelect.value;
-                const category = categorySelect.value;
-                const breakingOnly = breakingCheckbox.checked;
+                const breakingOnly = breakingCheckbox?.checked ?? false;
 
                 releaseNotesTables.forEach((table) => {
+                    const colIndexByLabel = columnIndexByTable.get(table);
                     const rows = Array.from(table.querySelectorAll<HTMLElement>('tbody tr'));
                     let anyRowVisible = false;
 
                     rows.forEach((row) => {
-                        const rowProduct = row.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
-                        const rowCategory = row.querySelector('td:last-child')?.textContent?.trim() || '';
-                        const matches =
-                            (!product || rowProduct === product) &&
-                            (!category || rowCategory === category);
+                        const matches = Array.from(selectsByLabel.entries()).every(([label, select]) => {
+                            const filterValue = select.value;
+                            if (!filterValue) return true; // "All"
+                            const colIndex = colIndexByLabel?.get(label);
+                            if (!colIndex) return true; // table doesn't author this column — not excluded by it
+                            const rowValue = row.querySelector(`td:nth-child(${colIndex})`)?.textContent?.trim() || '';
+                            return rowValue === filterValue;
+                        });
                         row.style.display = matches ? '' : 'none';
                         if (matches) anyRowVisible = true;
                     });
@@ -493,15 +599,20 @@ export const customizeDocContent = () => {
                 });
             };
 
-            productSelect.addEventListener('change', applyFilters);
-            categorySelect.addEventListener('change', applyFilters);
-            breakingCheckbox.addEventListener('change', applyFilters);
+            selectsByLabel.forEach((select) => select.addEventListener('change', applyFilters));
+            breakingCheckbox?.addEventListener('change', applyFilters);
         }
     }
 
     releaseNotesTables.forEach((table) => {
         if (table.dataset.releaseNotesInit) return;
         table.dataset.releaseNotesInit = 'true';
+
+        // Opt-out modifier — [.release-notes-table.release-notes-static] —
+        // for pages that want the full Description text always visible,
+        // with no clip/blur/"Show more" interaction at all (e.g. a long-form
+        // reference page rather than a terse weekly view).
+        if (table.classList.contains('release-notes-static')) return;
 
         const rows = Array.from(table.querySelectorAll<HTMLElement>('tbody tr'));
 
