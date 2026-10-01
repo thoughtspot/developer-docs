@@ -33,8 +33,8 @@ Use this endpoint to resolve `answer_id` references returned by the get conversa
 __Available on ThoughtSpot Cloud instances from 26.7.0.cl onwards.__
 
 a|`POST /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/update` +
-xref:spotter-agent-conversation-mgmt-apis.adoc#update-conversation[Updates the metadata of a saved conversation], such as renaming its title. +
-__Available on ThoughtSpot Cloud instances from 26.7.0.cl onwards.__
+xref:spotter-agent-conversation-mgmt-apis.adoc#update-conversation[Updates the metadata of a saved conversation], such as renaming its title or pinning it to the top of the conversation list. +
+__Available on ThoughtSpot Cloud instances from 26.7.0.cl onwards. The `is_pinned` attribute is available from 26.10.0.cl onwards.__
 
 a|`DELETE /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/delete` +
 xref:spotter-agent-conversation-mgmt-apis.adoc#delete-conversation[Deletes a saved conversation] and all its messages. +
@@ -63,6 +63,7 @@ curl -X POST \
 }'
 ----
 
+=== API response
 If the API request is successful, ThoughtSpot returns the conversation IDs.
 
 [source,JSON]
@@ -311,6 +312,7 @@ Each item in `conversations` represents a saved conversation.
 |`updated_at`|__String__. Timestamp of when the conversation was last updated.
 |`data_source_identifiers` a|__Array of strings__. Unique identifiers of the data sources associated with the conversation.
 |`data_source_names` a|`DataSourceEntry[]`. Display names and identifiers for the data sources associated with the conversation.
+|`analyst_id`|__String__. Unique identifier of the Spotter Analyst the conversation was started from. The value is `null` for conversations not started from an Analyst.
 |=====
 
 ==== DataSourceEntry
@@ -444,7 +446,12 @@ If the API request is successful, ThoughtSpot returns a response body with the a
 
 [#update-conversation]
 == Update a conversation
-To update the metadata of an existing conversation, send a `POST` request to the `/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/update` API endpoint with the conversation ID in the request URL. Currently, the API endpoint allows you to rename the conversation title only.
+To update the metadata of an existing conversation, send a `POST` request to the `/api/rest/2.0/ai/agent/conversations/{conversation_identifier}/update` API endpoint with the conversation ID in the request URL. The API endpoint allows you to rename the conversation title and pin or unpin the conversation.
+
+[NOTE]
+====
+Only conversations created with `enable_save_chat: true` can be pinned. Unsaved conversations are not persisted and cannot be retrieved.
+====
 
 === Request parameters
 
@@ -454,6 +461,8 @@ To update the metadata of an existing conversation, send a `POST` request to the
 |Parameter|Description
 |`conversation_identifier`|__String__. Path parameter. Unique identifier of the conversation to update.
 |`title`|__String__. Form parameter to include in the request body. To rename the display title of the conversation, specify the title string.
+|`is_pinned`|__Boolean__.  When set to `true`, it pins  the conversation for the user. Pinned conversations are surfaced first in `getConversationList`.
+Set to `true` to pin the conversation, `false` to unpin a chat, or omit to leave the pinned state unchanged. Only conversations created with `enable_save_chat: true` can be pinned.
 |=====
 
 ==== API request example
@@ -465,7 +474,35 @@ curl -X POST \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
+  "is_pinned": true,
   "title": "Revenue Analysis — Q1 2026"
+}'
+----
+
+==== API request example: pin a conversation
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversations/0iwTDJU-tlkm/update'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "is_pinned": true
+}'
+----
+
+==== API request example: update title and pin state in a single request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversations/0iwTDJU-tlkm/update'  \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "title": "Revenue Analysis — Q1 2026",
+  "is_pinned": true
 }'
 ----
 
