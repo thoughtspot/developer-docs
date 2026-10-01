@@ -39,6 +39,13 @@ const Document = (props: {
             if (target.closest('.selection-cta-button')) return;
             if (target.closest('.floating-assistant__panel, .floating-assistant__chip-ring')) return;
 
+            // Only offer "Ask SpotterCode" for selections inside the main article
+            // body — not the left nav, header, footer, or right-side doc map/TOC.
+            if (!target.closest('.documentView')) {
+                setSelectionPos(null);
+                return;
+            }
+
             // If mouse didn't move (plain click, not a drag-select), don't re-show
             const moved = Math.abs(e.clientX - mouseDownX) > 3 || Math.abs(e.clientY - mouseDownY) > 3;
             if (!moved) return;
@@ -187,7 +194,7 @@ const Document = (props: {
     // text to copy and no meaningful parent to link back to — hide the copy
     // button and the breadcrumb there. tutorials-overview shows both like any
     // other tutorial content page.
-    const isWalkthroughsLandingPage = props.pageid === 'walkthroughs';
+    const isWalkthroughsLandingPage = props.pageid === 'quickstarts';
     const hideCopyPage = isWalkthroughsLandingPage;
 
     return (

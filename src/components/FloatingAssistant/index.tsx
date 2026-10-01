@@ -12,6 +12,9 @@ import { Message } from './types';
 import { renderMarkdown, formatTimestamp, formatDuration, getPageId, stripMarkdown } from './helpers';
 import { fetchSuggestedQuestions, streamAgentResponse, sendFeedback } from './api';
 
+// Matches 404_PAGE_TITLE in src/intl/en.json.
+const NOT_FOUND_TITLE = 'Not found';
+
 const SparkleIcon = () => (
     <Icon id={IconID.AI_SPARKLE_SELECTED} size={IconSize.XLARGE} color={IconColor.BLUE} />
 );
@@ -46,6 +49,18 @@ const FloatingAssistant: React.FC = () => {
     // rather than fight over screen space.
     const [isTutorialsPage, setIsTutorialsPage] = useState(
         () => typeof window !== 'undefined' && isTutorialsPath(window.location.pathname),
+    );
+    // The 404 page has no fixed pathname to match against (it renders for
+    // whatever bogus URL the user hit), so detect it via document.title
+    // instead. NOTE: a DOM marker (id) doesn't work here — in production,
+    // Gatsby prefetches/pre-mounts the 404 page's component into the live
+    // DOM in the background (for instant fallback on broken links) even
+    // while a completely different, valid page is showing, so
+    // getElementById('page-404') can be true on any page. document.title
+    // isn't affected by that background mount, only by the page actually
+    // being rendered.
+    const [isNotFoundPage, setIsNotFoundPage] = useState(
+        () => typeof document !== 'undefined' && document.title === NOT_FOUND_TITLE,
     );
     const {
         isOpen,
@@ -269,10 +284,62 @@ const FloatingAssistant: React.FC = () => {
         return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
     }, []);
 
+    // This widget mounts into its own React root appended directly to
+    // document.body (see gatsby-browser.js), outside #wrapper/#docsModal, so
+    // it can't inherit the site's data-theme custom properties. Mirror the
+    // site's current theme onto our own root's data-theme attribute instead,
+    // so CSS here can key off #floating-assistant-root[data-theme='dark'].
+    useEffect(() => {
+        const themeRoot = document.getElementById('floating-assistant-root');
+        const setTheme = (theme: 'dark' | 'light') => {
+            // Guard against redundant writes — themeRoot lives inside document.body,
+            // so an unconditional setAttribute here would itself be a mutation that
+            // a body-wide observer could pick back up, looping forever.
+            if (themeRoot && themeRoot.getAttribute('data-theme') !== theme) {
+                themeRoot.setAttribute('data-theme', theme);
+            }
+        };
+
+        let attrObserver: MutationObserver | null = null;
+
+        // Watches the specific #wrapper/#docsModal element for data-theme flips
+        // (e.g. the user toggling dark mode) — scoped to that one element only,
+        // so it never observes themeRoot's own attribute writes above.
+        const watchThemedEl = () => {
+            const themedEl = document.getElementById('wrapper') || document.getElementById('docsModal');
+            if (!themedEl) return;
+            setTheme(themedEl.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+            attrObserver?.disconnect();
+            attrObserver = new MutationObserver(() => {
+                setTheme(themedEl.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+            });
+            attrObserver.observe(themedEl, { attributes: true, attributeFilter: ['data-theme'] });
+        };
+
+        watchThemedEl();
+
+        // #wrapper/#docsModal can be unmounted/remounted on client-side route
+        // changes — re-attach the attribute observer whenever that happens.
+        // childList-only, so this never fires from themeRoot's attribute writes.
+        const bodyObserver = new MutationObserver(watchThemedEl);
+        bodyObserver.observe(document.body, { childList: true, subtree: true });
+
+        return () => {
+            attrObserver?.disconnect();
+            bodyObserver.disconnect();
+        };
+    }, []);
+
     useEffect(() => {
         const handler = (e: CustomEvent<{ location: Location }>) => {
             setIsTutorialsPage(isTutorialsPath(e.detail.location.pathname));
         };
+        window.addEventListener('gatsby-route-update', handler as EventListener);
+        return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
+    }, []);
+
+    useEffect(() => {
+        const handler = () => setIsNotFoundPage(document.title === NOT_FOUND_TITLE);
         window.addEventListener('gatsby-route-update', handler as EventListener);
         return () => window.removeEventListener('gatsby-route-update', handler as EventListener);
     }, []);
@@ -427,6 +494,7 @@ const FloatingAssistant: React.FC = () => {
 
     if (pageId === CUSTOM_PAGE_ID.API_PLAYGROUND) return null;
     if (isTutorialsPage) return null;
+    if (isNotFoundPage) return null;
 
     return (
         <>
@@ -455,7 +523,7 @@ const FloatingAssistant: React.FC = () => {
                         <span className="floating-assistant__title">SpotterCode</span>
                         <button className="floating-assistant__close-btn" onClick={handleClose} aria-label="Close assistant">
                             <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M8.55252 7.73942L3.4796 12.8123L2.22266 11.5554L6.03863 7.73942L2.22266 3.92345L3.4796 2.6665L8.55252 7.73942ZM13.8859 7.73942L8.81293 12.8123L7.55599 11.5554L11.372 7.73942L7.55599 3.92345L8.81293 2.6665L13.8859 7.73942Z" fill="#1D232F"/>
+                                <path d="M8.55252 7.73942L3.4796 12.8123L2.22266 11.5554L6.03863 7.73942L2.22266 3.92345L3.4796 2.6665L8.55252 7.73942ZM13.8859 7.73942L8.81293 12.8123L7.55599 11.5554L11.372 7.73942L7.55599 3.92345L8.81293 2.6665L13.8859 7.73942Z" fill="currentColor"/>
                             </svg>
                         </button>
                     </div>
@@ -579,7 +647,7 @@ const FloatingAssistant: React.FC = () => {
                                                         </>
                                                     ) : (
                                                         i === messages.map((m, idx) => m.role === 'user' ? idx : -1).filter(x => x >= 0).pop() && !isLoading && (
-                                                            <button className="floating-assistant__edit-action-btn" onClick={() => startEdit(i, msg.content, msg.quotedText)} aria-label="Edit message">
+                                                            <button className="floating-assistant__edit-action-btn floating-assistant__edit-action-btn--edit" onClick={() => startEdit(i, msg.content, msg.quotedText)} aria-label="Edit message">
                                                                 <Icon id={IconID.PENCIL} size={IconSize.SMALL} color={IconColor.GRAY} />
                                                             </button>
                                                         )
@@ -685,7 +753,7 @@ const FloatingAssistant: React.FC = () => {
                                     aria-label="Reset conversation"
                                     disabled={messages.length === 0 && !input.trim() && !quotedText}
                                 >
-                                    <Icon id={IconID.RESET} size={IconSize.SMALL} color={IconColor.TEXT_COLOR} />
+                                    <Icon id={IconID.RESET} size={IconSize.SMALL} color={IconColor.GRAY} />
                                 </button>
                                 {isLoading ? (
                                     <button

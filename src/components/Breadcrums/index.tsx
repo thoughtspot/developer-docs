@@ -31,8 +31,8 @@ const Breadcrums: React.FC<BreadcrumsProps> = (props: BreadcrumsProps) => {
                         </li>
                         {props.showWalkthroughsCrumb && (
                             <li>
-                                <a href="/docs/tutorials/walkthroughs">
-                                    Walkthroughs
+                                <a href="/docs/tutorials/quickstarts">
+                                    Quickstarts
                                 </a>
                             </li>
                         )}
