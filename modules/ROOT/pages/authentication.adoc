@@ -589,6 +589,90 @@ If the API request is successful, ThoughtSpot returns a new authentication token
 }
 ----
 
+[#multi-org-tokens]
+=== Multi-Org token scope [beta betaBackground]^Beta^
+By default, a token authorizes API requests in a single Org. From 26.10.0.cl, ThoughtSpot users with cluster-level administration privilege can request a token authorized for multiple Orgs by including the optional `scope` object in the token request, and then select the Org for each request using the `X-Org-Selector` header.
+
+[NOTE]
+====
+* This feature is in Beta and is disabled by default. To enable this feature, contact ThoughtSpot Support.
+* Only users with cluster administration privileges can generate a multi-Org token.
+====
+
+==== Supported endpoints
+
+The `scope` request property is supported on the following token endpoints:
+
+* `POST /api/rest/2.0/auth/token/full`
+* `POST /api/rest/2.0/auth/token/custom` (supports `SPECIFIC_ORGS` only)
+* `POST /api/rest/2.0/auth/token/object`
+
+==== The `scope` request property
+
+[width="100%" cols="2,4"]
+[options="header"]
+|=====
+|Parameter|Description
+|`scope` a|__Object__. Optional. The set of Orgs the token is authorized to operate in, recorded at issuance. Applicable to Tenant Administrators only. Specify the following attributes:
+
+* `org_scope` +
+__String__. Org scope type. Valid values:
+
+** `SPECIFIC_ORGS`: authorizes the token for the Orgs listed in `org_identifiers`.
+** `ALL_MEMBER_ORGS`: authorizes the token for all Orgs the user is a member of. Not supported for custom (ABAC) tokens.
+
+* `org_identifiers` +
+__Array of strings__. ID or name of the Orgs the token is authorized for. Required when `org_scope` is `SPECIFIC_ORGS`; ignored when `org_scope` is `ALL_MEMBER_ORGS`.
+|=====
+
+==== Request example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/full'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "tsAdminUser",
+  "secret_key": "{SECRET_KEY}",
+  "validity_time_in_sec": 86400,
+  "scope": {
+    "org_scope": "SPECIFIC_ORGS",
+    "org_identifiers": ["1", "2", "5"]
+  }
+}'
+----
+
+==== Response properties
+
+When a multi-Org token is issued, the `scope` object in the response includes the following additional properties. The same properties appear in the `POST /api/rest/2.0/auth/token/validate` response, so API clients can inspect which Orgs an existing token is authorized for.
+
+[width="100%" cols="2,4"]
+[options="header"]
+|=====
+|Property|Description
+|`scope.org_scope`|__String__. Org scope the token is authorized for: `SPECIFIC_ORGS` or `ALL_MEMBER_ORGS`. This property is absent for a legacy single-Org token.
+|`scope.org_ids`|__Array__. The Orgs the token is authorized for when `org_scope` is `SPECIFIC_ORGS`.
+|=====
+
+==== Per-request Org selection
+
+Each API request made with a multi-Org token selects one Org from the token's authorized set using the `X-Org-Selector` request header:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/users/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'X-Org-Selector: 2' \
+  --data-raw '{}'
+----
+
+The header selects an Org from the authority the token already holds; it does not grant access to any Org outside the token's scope. Selecting an Org outside the authorized set fails the request.
+
 === Revoking a token
 
 To revoke a token, send a `POST` request with the following attributes to the `/api/rest/2.0/auth/token/revoke` endpoint.
