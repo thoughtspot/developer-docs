@@ -2,6 +2,7 @@ import React from 'react';
 import hljs from 'highlight.js';
 import { MdContentCopy } from '@react-icons/all-files/md/MdContentCopy';
 import { MdCheck } from '@react-icons/all-files/md/MdCheck';
+import { MdFilterList } from '@react-icons/all-files/md/MdFilterList';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import { isTutorialsPath } from '../../utils/app-utils';
@@ -73,6 +74,28 @@ const getHeadingText = (heading: Element | null | undefined) => {
     return clone.textContent?.trim() || '';
 };
 
+/* On a release-notes-no-header table (e.g. a master list grouping several
+ * entries under one date+version), blank out column 1 on every row after
+ * the first in a run of rows sharing the same `data-date-key` — a
+ * multi-item release then shows its header once instead of once per row.
+ * `data-date-key` is set once, from the cell's original text, by the
+ * releaseNotesColsInit pass in customizeDocContent; this function only
+ * toggles the `.release-notes-date-repeat` class, and does it against
+ * *currently visible* rows only, so it's safe to re-run after every filter
+ * change — a row that becomes the first visible member of its group always
+ * gets its header shown, even if it was row 2 or 3 before filtering. */
+const dedupeDateColumn = (table: HTMLTableElement) => {
+    let lastKey: string | null = null;
+    Array.from(table.querySelectorAll<HTMLElement>('tbody tr')).forEach((row) => {
+        if (row.style.display === 'none') return;
+        const cell = row.querySelector<HTMLElement>('td:first-child');
+        if (!cell || !cell.dataset.dateKey) return;
+        const key = cell.dataset.dateKey;
+        cell.classList.toggle('release-notes-date-repeat', key === lastKey);
+        lastKey = key;
+    });
+};
+
 /* Shared by both release-notes filter bars below: a labelled <select> with
  * a leading "All" option, styled via .release-notes-filterbar-field. */
 const makeFilterSelect = (label: string, options: string[]) => {
@@ -104,9 +127,114 @@ const makeFilterSelect = (label: string, options: string[]) => {
     return { field, select };
 };
 
-// Header (60px) + secondary nav (48px) — same offset the site's own
-// SecondaryHeader docks under; see $header-height in variables.scss.
-const FILTERBAR_PIN_TOP = 108;
+/* Horizontal alternative to makeFilterSelect — a row of always-visible tab
+ * buttons (All + one per option), label-less (the options are the label),
+ * for a dimension with few enough values that forcing a click-to-open menu
+ * just adds a step (e.g. a 2-way Feature split). Returns the same
+ * { field, select } shape as makeFilterSelect — `select` isn't a real
+ * <select>, but exposes a `.value` getter and is a real EventTarget, so the
+ * generic `select.value` / `select.addEventListener('change', ...)` call
+ * sites in applyFilters work unmodified either way. */
+const makeFilterToggle = (label: string, options: string[]) => {
+    const field = document.createElement('div');
+    field.classList.add('release-notes-filterbar-togglegroup');
+
+    const pills = document.createElement('div');
+    pills.classList.add('release-notes-filterbar-pills');
+    field.appendChild(pills);
+
+    let currentValue = '';
+    const buttons: HTMLButtonElement[] = [];
+
+    const setActive = (target: HTMLButtonElement) => {
+        buttons.forEach((b) => b.classList.toggle('active', b === target));
+    };
+
+    const makePill = (text: string, value: string) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.classList.add('release-notes-filterbar-pill');
+        btn.setAttribute('aria-label', value ? `Filter by ${label}: ${value}` : `Filter by ${label}: All`);
+        btn.textContent = text;
+        btn.addEventListener('click', () => {
+            currentValue = value;
+            setActive(btn);
+            field.dispatchEvent(new Event('change'));
+        });
+        buttons.push(btn);
+        pills.appendChild(btn);
+        return btn;
+    };
+
+    setActive(makePill('All', ''));
+    options.forEach((option) => makePill(option, option));
+
+    Object.defineProperty(field, 'value', { get: () => currentValue });
+
+    return { field, select: field as unknown as HTMLSelectElement };
+};
+
+/* Icon-triggered dropdown alternative to makeFilterSelect — a funnel-icon
+ * button that opens a scrollable vertical menu, for a dimension with too
+ * many values to spell out as tabs or even a labelled <select> (e.g.
+ * Category, which grows every release). Same { field, select } contract as
+ * makeFilterToggle above. */
+const makeFilterIconDropdown = (label: string, options: string[]) => {
+    const field = document.createElement('div');
+    field.classList.add('release-notes-filterbar-icondropdown');
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.classList.add('release-notes-filterbar-icontrigger');
+    trigger.setAttribute('aria-label', `Filter by ${label}`);
+    trigger.innerHTML = getHTMLFromComponent(<MdFilterList />, 'release-notes-filter-icon');
+    field.appendChild(trigger);
+
+    const menu = document.createElement('div');
+    menu.classList.add('release-notes-filterbar-icon-menu');
+    field.appendChild(menu);
+
+    let currentValue = '';
+    const buttons: HTMLButtonElement[] = [];
+
+    const closeMenu = () => menu.classList.remove('open');
+
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.classList.toggle('open');
+    });
+    document.addEventListener('click', (e) => {
+        if (!field.contains(e.target as Node)) closeMenu();
+    });
+
+    const setActive = (target: HTMLButtonElement, isAll: boolean) => {
+        buttons.forEach((b) => b.classList.toggle('active', b === target));
+        trigger.classList.toggle('active', !isAll);
+    };
+
+    const makeOption = (text: string, value: string) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.classList.add('release-notes-filterbar-icon-option');
+        btn.textContent = text;
+        btn.addEventListener('click', () => {
+            currentValue = value;
+            setActive(btn, value === '');
+            closeMenu();
+            field.dispatchEvent(new Event('change'));
+        });
+        buttons.push(btn);
+        menu.appendChild(btn);
+        return btn;
+    };
+
+    setActive(makeOption('All', ''), true);
+    options.forEach((option) => makeOption(option, option));
+
+    Object.defineProperty(field, 'value', { get: () => currentValue });
+
+    return { field, select: field as unknown as HTMLSelectElement };
+};
 
 // customizeDocContent() reruns on every page navigation in this SPA and
 // rebuilds the filter bar from scratch — without this, each run's
@@ -115,131 +243,292 @@ const FILTERBAR_PIN_TOP = 108;
 // from a page the user already left.
 let teardownFilterBarListeners: (() => void) | null = null;
 
-/* This app shell doesn't scroll the window/body at all (`body` is
- * `overflow-y: hidden`) — the actual scrolling happens inside a nested
- * container (.documentWrapperContainer as of this writing). `window.scroll`
- * / `window.scrollY` are always 0 here; walk up from a known descendant to
- * find whichever ancestor is genuinely scrollable, rather than hardcoding
- * that class name. */
-const findScrollParent = (el: HTMLElement): HTMLElement => {
-    let node = el.parentElement;
-    while (node && node !== document.body) {
-        const style = getComputedStyle(node);
-        if (
-            (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
-            node.scrollHeight > node.clientHeight
-        ) {
-            return node;
-        }
-        node = node.parentElement;
-    }
-    return document.scrollingElement as HTMLElement;
-};
-
-/* Mounts a release-notes filter bar right after the page's own <h1>. It
- * starts in normal flow (no position override) and only becomes
- * `position: fixed` — via the `.is-pinned` class in index.scss — once the
- * user has scrolled it up to the header, at which point it docks there
- * like Stripe's changelog filter bar. Three things this deliberately avoids:
+/* Mounts a release-notes filter bar right after the page's own <h1> (and
+ * its intro paragraph, if it has one), and pins the whole stack
+ * immediately — title, then the intro blurb, then the bar, all
+ * `position: fixed` from first render, never toggled by scroll position.
+ * Everything else on the page (a template's "Release version"/"Upgrade
+ * notes" metadata block, etc.) stays normal scrolling content, right
+ * below the pinned stack's spacer.
  *
- * - Listening on `window`/`document` for scroll: see findScrollParent above
- *   — on this site that never fires, since the window itself never
- *   scrolls. The real scroll container has to be found dynamically and
- *   listened to instead.
- * - `position: sticky` here produces a large, unexplained gap above the
- *   bar and a real layout overlap with the content right after it (tested
- *   directly: switching to `static` removes both) — almost certainly the
- *   same root cause as the point above: sticky's offset is computed
- *   against the nearest scrolling ancestor, not the viewport, and that
- *   ancestor's own box doesn't start at viewport (0,0). Toggling
- *   `position: fixed` via a scroll listener sidesteps that entirely, and
- *   `fixed` is genuinely viewport-relative regardless of which ancestor
- *   scrolls, so its left/width don't need to be recomputed as the user
- *   scrolls — only on resize.
- * - `.documentView`'s own bounding box spans the full viewport width
- *   regardless of the visible sidebar (the sidebar is a `position: fixed`
- *   overlay painted on top of it, not a flex sibling that narrows it —
- *   only .documentView's children get padded to visually clear it), so it
- *   can't be used to compute the pinned bar's left/width. The bar's own
- *   rect, read while still in normal flow, is correct instead — it's a
- *   real rendered child, so it already reflects that padding, same as any
- *   paragraph.
+ * The intro paragraph is whatever plain paragraph immediately follows the
+ * title — found either as a direct sibling (a page with no `==` sections,
+ * e.g. a flat master-list page) or inside Asciidoctor's auto-generated
+ * `#preamble` (a page that does have sections). A page may also author its
+ * own cross-page nav tabs right after that (a `[.release-notes-navtabs]`
+ * paragraph of plain xref links — see the tabbed-changelog sample pages);
+ * when present, the Category filter bar is appended into it (tabs left,
+ * filter right, one row) instead of getting its own tier below, and that
+ * combined row becomes the stack's last tier in place of the bar.
  *
- * A spacer sits right after the bar and only gets a height once pinned,
- * so pinning doesn't yank the content below it upward. */
+ * `top` for the whole stack starts from the title's own natural position
+ * (measured once, before anything is pinned) rather than a hardcoded
+ * header-height constant — this page's title doesn't start right under
+ * the header, there's a breadcrumb row above it first, and a fixed guess
+ * at that combined height sat the pinned title exactly on top of the
+ * breadcrumbs, hiding them. Measuring the title's actual starting point
+ * instead means the stack pins at wherever the title already was, no
+ * matter what's above it.
+ *
+ * Each element's rect is measured up front, in one pass, before any of
+ * them become `position: fixed` — fixing one mid-loop reflows the rest
+ * (a later sibling slides up into the gap the earlier one just left),
+ * which previously corrupted the next element's measured rect and showed
+ * up as the intro paragraph (and briefly, the title) rendering clipped or
+ * overlapping. Measuring everything first, then applying `fixed` to all
+ * of them in a second pass, avoids that reflow entirely.
+ *
+ * Earlier versions only fixed the bar, left the title in normal flow, and
+ * toggled the bar between normal-flow and fixed once scrolled past the
+ * title — that either overlapped the title (if fixed from the start,
+ * since nothing then reserved the title's own space) or left a growing
+ * gap above the bar once scrolled (if the bar's fixed offset assumed the
+ * title was still there after it scrolled away). Pinning everything above
+ * the bar as one stacked unit is the only way "bar stays fixed, directly
+ * below the title/intro" is true both before and after scrolling — so the
+ * title (and intro, if present) become fixed here too, scoped to just the
+ * pages that reach this function (ones with a release-notes-table filter
+ * bar), not every page's title.
+ *
+ * `position: sticky` was tried instead of `fixed` for the bar and
+ * produced a large, unexplained gap above it plus a real layout overlap
+ * with the content right after it (tested directly: switching to
+ * `static` removes both) — almost certainly because sticky's offset is
+ * computed against the nearest scrolling ancestor, not the viewport, and
+ * that ancestor's own box doesn't start at viewport (0,0). `fixed`
+ * doesn't have that problem, at the cost of needing its own left/width
+ * kept in sync on resize (`.documentView`'s own bounding box spans the
+ * full viewport width regardless of the visible sidebar — a
+ * fixed-position overlay painted on top, not a flex sibling that narrows
+ * it — so it can't be used for this; each element's own rect, read once
+ * in normal flow before pinning, already reflects the content column's
+ * padding).
+ *
+ * A spacer sized to the pinned stack's combined height sits where the
+ * title used to be, so pinning everything doesn't yank the rest of the
+ * content upward. */
 const mountFilterBar = (filterBar: HTMLElement, documentView: HTMLElement) => {
-    const docTitle = documentView.querySelector(':scope > h1');
+    const docTitle = documentView.querySelector<HTMLElement>(':scope > h1');
+    const introEl = documentView.querySelector<HTMLElement>(
+        ':scope > h1 + .paragraph, :scope > #preamble > .paragraph:first-child',
+    );
+    // Cross-page nav tabs (All / Embed SDK / REST API / MCP Server on the
+    // tabbed-changelog sample pages) — plain xref links the page itself
+    // authors with a `[.release-notes-navtabs]` block role, not something
+    // this code builds. Pinned alongside the title/intro/bar when present,
+    // same as the intro paragraph, so the primary "which dataset" nav
+    // doesn't scroll away independently of the Category filter beneath it.
+    const navTabsEl = documentView.querySelector<HTMLElement>(
+        ':scope > .release-notes-navtabs, :scope > #preamble > .release-notes-navtabs',
+    );
     const parent = docTitle?.parentNode ?? documentView;
-    const anchor = docTitle ? docTitle.nextSibling : documentView.firstChild;
 
-    parent.insertBefore(filterBar, anchor);
+    // When a page has nav tabs, the Category filter bar rides alongside
+    // them on the same row (tabs left, filter right) instead of its own
+    // row below — matching the single-row look of a page that filters by
+    // Feature + Category in one combined bar (e.g.
+    // release-notes-embed-master-sample.adoc), since these tabbed pages
+    // use the nav tabs themselves as the "which dataset" selector and only
+    // need the bar for Category. Appending it as navTabsEl's own child
+    // (rather than a document sibling) also means it's not a separate
+    // pinned tier below — it's carried along for free as part of
+    // navTabsEl's own box once that's pinned.
+    if (navTabsEl) {
+        navTabsEl.appendChild(filterBar);
+    } else {
+        const insertionPoint = introEl ? introEl.nextSibling : docTitle ? docTitle.nextSibling : documentView.firstChild;
+        parent.insertBefore(filterBar, insertionPoint);
+    }
 
     const spacer = document.createElement('div');
     spacer.classList.add('release-notes-filterbar-spacer');
-    parent.insertBefore(spacer, filterBar.nextSibling);
+    parent.insertBefore(spacer, docTitle ?? documentView.firstChild);
 
-    const scrollParent = findScrollParent(documentView);
+    // The Copy-page dropdown (.document-toolbar, a sibling of documentView,
+    // not a child of it) is `float: right` in normal flow, riding alongside
+    // the title on the same line. Pinning the title takes it out of flow
+    // entirely, which strands the float at the top of whatever's left in
+    // flow (the breadcrumb) instead of next to the now-fixed title — so it
+    // has to be pinned too, aligned to the title's row, or it visually
+    // detaches. Not part of `stack` below: it doesn't stack vertically with
+    // the title/bar, it sits beside the title, keeping its own float-given
+    // left/width and only borrowing the title's pinned `top`.
+    const toolbar = document.querySelector<HTMLElement>('.document-toolbar');
 
-    let pinnedLeft = 0;
-    let pinnedWidth = 0;
-    let pinnedHeight = 0;
-    let pinThresholdScrollTop = 0;
+    const TITLE_INTRO_GAP = 18;
+    const TITLE_CONTROLS_GAP = 12;
+    const INTRO_CONTROLS_GAP = 24;
+    const stack: Array<{ el: HTMLElement; pinnedClass: string; gapAfter: number }> = [];
+    if (docTitle) {
+        stack.push({
+            el: docTitle,
+            pinnedClass: 'release-notes-title-pinned',
+            gapAfter: introEl ? TITLE_INTRO_GAP : TITLE_CONTROLS_GAP,
+        });
+    }
+    if (introEl) {
+        stack.push({ el: introEl, pinnedClass: 'release-notes-intro-pinned', gapAfter: INTRO_CONTROLS_GAP });
+    }
+    // navTabsEl, when present, replaces filterBar as the last tier — the
+    // bar is its child now (see the `if (navTabsEl)` block above), not a
+    // sibling tier of its own.
+    stack.push(
+        navTabsEl
+            ? { el: navTabsEl, pinnedClass: 'release-notes-navtabs-pinned', gapAfter: 0 }
+            : { el: filterBar, pinnedClass: 'is-pinned', gapAfter: 0 },
+    );
 
-    // Left/width/threshold can only be measured correctly while the bar is
-    // in normal flow — briefly drop `.is-pinned` if needed to remeasure.
-    const measure = () => {
-        const wasPinned = filterBar.classList.contains('is-pinned');
-        if (wasPinned) filterBar.classList.remove('is-pinned');
+    const pin = () => {
+        stack.forEach(({ el, pinnedClass }) => {
+            el.classList.remove(pinnedClass);
+            el.style.position = '';
+        });
+        if (toolbar) {
+            toolbar.classList.remove('document-toolbar-pinned');
+            toolbar.style.position = '';
+        }
 
-        const rect = filterBar.getBoundingClientRect();
-        pinnedLeft = rect.left;
-        pinnedWidth = rect.width;
-        pinnedHeight = rect.height;
-        pinThresholdScrollTop = scrollParent.scrollTop + rect.top - FILTERBAR_PIN_TOP;
+        // One measurement pass, with every element still in normal flow —
+        // see the comment above this function for why that matters.
+        const toolbarRect = toolbar?.getBoundingClientRect();
+        const rects = stack.map(({ el }) => el.getBoundingClientRect());
 
-        if (wasPinned) filterBar.classList.add('is-pinned');
+        let top = rects[0].top;
+        let totalHeight = 0;
+        let titleTop = top;
+        stack.forEach(({ el, pinnedClass, gapAfter }, i) => {
+            const rect = rects[i];
+            el.style.top = `${top}px`;
+            el.style.left = `${rect.left}px`;
+            el.style.width = `${rect.width}px`;
+            el.style.position = 'fixed';
+            el.classList.add(pinnedClass);
+            if (el === docTitle) titleTop = top;
+            top += rect.height + gapAfter;
+            totalHeight += rect.height + gapAfter;
+        });
+
+        if (toolbar && toolbarRect) {
+            toolbar.style.top = `${titleTop}px`;
+            toolbar.style.left = `${toolbarRect.left}px`;
+            toolbar.style.width = `${toolbarRect.width}px`;
+            toolbar.style.position = 'fixed';
+            toolbar.classList.add('document-toolbar-pinned');
+        }
+
+        spacer.style.height = `${totalHeight}px`;
+
+        // Read by the release-notes table's sticky date/version cell
+        // (index.scss) so it sticks exactly below the pinned stack instead
+        // of at a fixed guess — this stack's height varies per page
+        // (intro paragraph, nav tabs present or not), so a hardcoded value
+        // there would either leave a gap or let scrolled content peek out
+        // between the pinned elements.
+        documentView.style.setProperty('--release-notes-pinned-stack-height', `${totalHeight}px`);
     };
 
-    const update = () => {
-        const shouldPin = scrollParent.scrollTop >= pinThresholdScrollTop;
-        const isPinned = filterBar.classList.contains('is-pinned');
+    pin();
+    window.addEventListener('resize', pin);
 
-        if (shouldPin && !isPinned) {
-            filterBar.style.left = `${pinnedLeft}px`;
-            filterBar.style.width = `${pinnedWidth}px`;
-            filterBar.classList.add('is-pinned');
-            spacer.style.height = `${pinnedHeight}px`;
-        } else if (!shouldPin && isPinned) {
-            filterBar.classList.remove('is-pinned');
-            spacer.style.height = '0px';
+    teardownFilterBarListeners = () => {
+        window.removeEventListener('resize', pin);
+        stack.forEach(({ el, pinnedClass }) => {
+            el.classList.remove(pinnedClass);
+            el.style.position = '';
+        });
+        if (toolbar) {
+            toolbar.classList.remove('document-toolbar-pinned');
+            toolbar.style.position = '';
         }
     };
 
-    const onResize = () => {
-        measure();
-        update();
+    if (navTabsEl) wireNavTabSwap(navTabsEl, documentView);
+};
+
+let teardownNavTabListeners: (() => void) | null = null;
+
+const pageidFromHref = (href: string): string => {
+    const { pathname } = new URL(href, window.location.origin);
+    return pathname.replace(/^\/+|\/+$/g, '').split('/').pop() ?? '';
+};
+
+/* Clicking a nav tab on the master ("What's new") page swaps in the
+ * target tabbed-sample page's table only, right here — title and intro
+ * stay put, the URL never changes, this never becomes a real navigation.
+ * Only the master page authors `[.release-notes-navtabs]`; the three
+ * per-feature pages it pulls from (Embed SDK / REST API / MCP Server) are
+ * plain standalone pages with their own filter bar and no tabs of their
+ * own — see mountFilterBar's `if (navTabsEl)` branch above.
+ *
+ * After swapping the table, customizeDocContent() re-runs so the Category
+ * filter bar, column hiding, and date dedup all rebuild against the new
+ * table exactly as they would on a real page load — a harmless no-op for
+ * the title/intro/nav-tabs, which haven't changed.
+ *
+ * On failure this logs and leaves the current table exactly as it was —
+ * deliberately no fallback to a real navigation. A tab failing to refresh
+ * should look like nothing happened, not like the user got bounced to a
+ * different page. */
+const swapNavTabContent = async (pageid: string, documentView: HTMLElement) => {
+    const res = await fetch(`/page-data/${pageid}/page-data.json`);
+    if (!res.ok) throw new Error(`page-data fetch failed with ${res.status}`);
+    const data = await res.json();
+    const rawHtml: string | undefined = data?.result?.data?.curPageNode?.html;
+    if (!rawHtml) throw new Error('page-data response missing curPageNode.html');
+
+    const incoming = document.createElement('div');
+    incoming.innerHTML = rawHtml;
+    const newTable = incoming.querySelector<HTMLElement>('.release-notes-table');
+    if (!newTable) throw new Error('fetched page has no .release-notes-table');
+
+    const curTable = documentView.querySelector<HTMLElement>('.release-notes-table');
+    if (curTable) curTable.replaceWith(newTable);
+
+    // The nav tabs themselves don't change (same page, same DOM nodes) —
+    // only which one is "active" needs to catch up to the tab just picked.
+    documentView.querySelectorAll<HTMLAnchorElement>('a.release-notes-navtab').forEach((a) => {
+        a.classList.toggle('active', pageidFromHref(a.href) === pageid);
+    });
+
+    customizeDocContent();
+};
+
+const wireNavTabSwap = (navTabsEl: HTMLElement, documentView: HTMLElement) => {
+    const onClick = (e: MouseEvent) => {
+        const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('a.release-notes-navtab');
+        if (!link) return;
+        e.preventDefault();
+        if (link.classList.contains('active')) return;
+
+        const pageid = pageidFromHref(link.href);
+        swapNavTabContent(pageid, documentView).catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error('[release-notes-navtabs] tab refresh failed', err);
+        });
     };
 
-    measure();
-    update();
-    scrollParent.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', onResize);
-
-    teardownFilterBarListeners = () => {
-        scrollParent.removeEventListener('scroll', update);
-        window.removeEventListener('resize', onResize);
-    };
+    navTabsEl.addEventListener('click', onClick);
+    teardownNavTabListeners = () => navTabsEl.removeEventListener('click', onClick);
 };
 
 export const customizeDocContent = () => {
     /* Tear down the previous page's filter bar listeners (see
      * teardownFilterBarListeners above) before removing its DOM, and
-     * defensively clear any leftover filter bar (e.g. React 18
-     * double-invoking this effect in dev) — rebuilt fresh below if the
-     * current page needs one. */
+     * defensively clear any leftover filter bar and its spacer (e.g. React
+     * 18 double-invoking this effect in dev, or a nav-tab swap re-running
+     * this function on demand — see swapNavTabContent) — rebuilt fresh
+     * below if the current page needs one. Forgetting the spacer here
+     * previously meant every extra run stacked another one on top of the
+     * last, growing a blank gap above the title each time. */
     teardownFilterBarListeners?.();
     teardownFilterBarListeners = null;
-    document.querySelectorAll('.release-notes-filterbar').forEach((el) => el.remove());
+    document.querySelectorAll('.release-notes-filterbar, .release-notes-filterbar-spacer').forEach((el) => el.remove());
+
+    // Nav-tab click listener (see wireNavTabSwap) — same re-run story: torn
+    // down and re-attached fresh each time, including the re-run this same
+    // function triggers at the end of a tab swap.
+    teardownNavTabListeners?.();
+    teardownNavTabListeners = null;
 
     /*
      * Restructure code blocks to have a permanent header bar:
@@ -484,6 +773,14 @@ export const customizeDocContent = () => {
                     td.style.borderRight = i === visibleCells.length - 1 ? 'none' : '';
                 });
             });
+
+            if (table.classList.contains('release-notes-no-header')) {
+                Array.from(table.querySelectorAll<HTMLElement>('tbody tr')).forEach((row) => {
+                    const cell = row.querySelector<HTMLElement>('td:first-child');
+                    if (cell) cell.dataset.dateKey = cell.textContent?.trim() || '';
+                });
+                dedupeDateColumn(table);
+            }
         });
 
         const hasProductColumn = Array.from(columnIndexByTable.values()).some((colMap) => colMap.has('Product'));
@@ -549,7 +846,19 @@ export const customizeDocContent = () => {
                 });
                 const options = preserveDocOrder ? Array.from(values) : Array.from(values).sort();
 
-                const { field, select } = makeFilterSelect(label, options);
+                // "Feature" is always a small, fixed-feeling split (e.g.
+                // Embed SDK vs REST API) — a row of always-visible tabs
+                // reads faster than a dropdown for 2-3 options. "Category"
+                // is the opposite case — a list that keeps growing every
+                // release — so it gets the icon-triggered dropdown instead
+                // of a labelled <select>, to stay compact regardless of how
+                // many values it accumulates. Every other dimension
+                // (Product, Type, Version, ...) keeps the plain dropdown.
+                const lowerLabel = label.toLowerCase();
+                const { field, select } =
+                    lowerLabel === 'feature' ? makeFilterToggle(label, options)
+                    : lowerLabel === 'category' ? makeFilterIconDropdown(label, options)
+                    : makeFilterSelect(label, options);
                 filterBar.appendChild(field);
                 selectsByLabel.set(label, select);
             });
@@ -579,6 +888,8 @@ export const customizeDocContent = () => {
 
                     const sect2 = table.closest<HTMLElement>('.sect2');
                     if (sect2) sect2.dataset.hasVisibleRows = anyRowVisible ? 'true' : 'false';
+
+                    if (table.classList.contains('release-notes-no-header')) dedupeDateColumn(table);
                 });
 
                 document.querySelectorAll<HTMLElement>('.sect2').forEach((sect2) => {

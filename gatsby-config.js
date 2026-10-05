@@ -74,6 +74,9 @@ class CustomDocConverter {
                 if (attributes.window) {
                     anchorMarkup += ` target="${attributes.window}"`;
                 }
+                if (attributes.role) {
+                    anchorMarkup += ` class="${attributes.role}"`;
+                }
                 return `<a ${anchorMarkup}>${node.getText()}</a>`;
             }
         }
