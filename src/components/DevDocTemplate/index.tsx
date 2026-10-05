@@ -228,7 +228,9 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
      * page (gatsby-node.js doesn't vary $pageId per version-wrapper page), so the real page
      * being shown in the nested iframe is tracked via the ?pageid= query param instead. */
     useEffect(() => {
-        const currentPageId = curPageNode.pageAttributes.pageid;
+        const currentPageId = isVersionedIframe
+            ? new URLSearchParams(location.search).get('pageid') || 'introduction'
+            : curPageNode.pageAttributes.pageid;
         // tutorials-overview is also linked from nav.adoc's own "Tutorials" section
         // (so it has a real breadcrumb entry), which would otherwise dynamically
         // claim it under 'guides' and show the wrong sidebar. Force it under
