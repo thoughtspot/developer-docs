@@ -153,6 +153,7 @@ __Optional__
 |__Nullable__. `ENABLE` or `DISABLE` authentication for a particular Org.  When enabled, a new org-level access token is generated if one does not exist. When disabled, the existing org-level access token is revoked.
 
 |`org_identifier`
+|__String__. Name or ID of the Org for which to enable or disable trusted authentication. Specify this attribute within the `org_preferences` array.
 
 |=====
 
@@ -555,6 +556,125 @@ curl -X POST \
 ====
 If `auto_create` is set to `true` and the username specified in the API request already exists in ThoughtSpot, the `/api/rest/2.0/auth/token/custom` API does not update user properties such as display name, email, Org, or group assignments.
 ====
+
+[#multi-org-tokens]
+=== Multi-Org tokens [beta betaBackground]^Beta^
+By default, a token authorizes API requests in a single Org. From 26.10.0.cl, ThoughtSpot users with cluster administration privileges can request a token authorized for multiple Orgs by including the optional `scope` object in the token request, and then select the Org for each request using the `X-Org-Selector` header.
+
+[NOTE]
+====
+* This feature is in Beta and is disabled by default. To enable this feature, contact ThoughtSpot Support.
+* Only users with cluster administration privileges can generate a multi-Org token.
+====
+
+==== Supported endpoints
+
+The `scope` request property is supported on the following token endpoints:
+
+* `POST /api/rest/2.0/auth/token/full`
+* `POST /api/rest/2.0/auth/token/custom` (supports `SPECIFIC_ORGS` only)
+* `POST /api/rest/2.0/auth/token/object`
+
+==== The `scope` request property
+
+[width="100%" cols="2,4"]
+[options="header"]
+|=====
+|Parameter|Description
+|`scope` a|__Object__. Optional. The set of Orgs the token is authorized to operate in, recorded at issuance. Requires cluster administration privileges. Specify the following attributes:
+
+* `org_scope` +
+__String__. Org scope type. Valid values:
+
+** `SPECIFIC_ORGS`: authorizes the token for the Orgs listed in `org_identifiers`.
+** `ALL_MEMBER_ORGS`: authorizes the token for all Orgs the user is a member of. Not supported for custom (ABAC) tokens.
+
+* `org_identifiers` +
+__Array of strings__. ID or name of the Orgs the token is authorized for. Required when `org_scope` is `SPECIFIC_ORGS`; ignored when `org_scope` is `ALL_MEMBER_ORGS`.
+|=====
+
+==== Request example
+A multi-Org token request replaces `org_id` with the `scope` object. The issued token is authorized for every Org in the requested set, and each API request selects its target Org with the `X-Org-Selector` header.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/auth/token/full' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+  "username": "tsAdminUser",
+  "secret_key": "{SECRET_KEY}",
+  "validity_time_in_sec": 86400,
+  "scope": {
+    "org_scope": "SPECIFIC_ORGS",
+    "org_identifiers": ["1", "2", "5"]
+  }
+}'
+----
+
+[NOTE]
+The `scope` object in a single-Org token response carries no `org_scope` or `org_ids` properties. API requests made with this token always execute in the Org the token was issued for; the `X-Org-Selector` header is not required.
+
+==== Response properties
+When a multi-Org token is issued, the `scope` object in the response includes the following additional properties.
+
+[source,JSON]
+----
+{
+  "token": "{AUTH_TOKEN}",
+  "creation_time_in_millis": 1675129264089,
+  "expiration_time_in_millis": 1675129564089,
+  "scope": {
+    "access_type": "FULL",
+    "org_id": 1,
+    "metadata_id": null,
+    "org_scope": "SPECIFIC_ORGS",
+    "org_ids": [
+      {
+        "id": 1,
+        "name": "Org-Finance"
+      },
+      {
+        "id": 2,
+        "name": "Org-Sales"
+      },
+      {
+        "id": 5,
+        "name": "Org-Marketing"
+      }
+    ]
+  },
+  "valid_for_user_id": "59a122dc0-38d7-43e7-bb90-86f724c7b602",
+  "valid_for_username": "tsAdminUser"
+}
+----
+
+The same properties appear in the `POST /api/rest/2.0/auth/token/validate` response, so API clients can inspect which Orgs an existing token is authorized for.
+
+[width="100%" cols="2,4"]
+[options="header"]
+|=====
+|Property|Description
+|`scope.org_scope`|__String__. Org scope the token is authorized for: `SPECIFIC_ORGS` or `ALL_MEMBER_ORGS`. This property is absent for a legacy single-Org token.
+|`scope.org_ids`|__Array__. The Orgs the token is authorized for when `org_scope` is `SPECIFIC_ORGS`.
+|=====
+
+==== Per-request Org selection
+Each API request made with a multi-Org token selects one Org from the token's authorized set using the `X-Org-Selector` request header:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/users/search'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  -H 'X-Org-Selector: 2' \
+  --data-raw '{}'
+----
+
+The header selects an Org from the authority the token already holds; it does not grant access to any Org outside the token's scope. Selecting an Org outside the authorized set fails the request.
 
 === Generating a session token
 To generate a new authentication token for an existing authenticated session, send a `GET` request to `/api/rest/2.0/auth/session/token`. This endpoint mints a fresh bearer token valid for 24 hours. It does not return the token currently held by the caller's session, but issues a new token derived from the authenticated session context.

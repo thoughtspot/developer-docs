@@ -1,0 +1,398 @@
+= Embed Spotter Analyst
+:toc: true
+:toclevels: 2
+
+:page-title: Embed Spotter Analyst
+:page-pageid: embed-spotter-analyst
+:page-description: Embed a single, pinned Spotter Analyst in your app using the Visual Embed SDK
+
+ThoughtSpot Spotter Analysts are governed AI agents configured with specific data sources, instructions, and starter prompts. Using the Visual Embed SDK, you can embed a single Analyst in your app. This locks the experience to that Analyst, so users get consistent, governed answers without choosing a data source or another Analyst.
+
+This page shows how to embed one Analyst using the `SpotterEmbed` component.
+
+== Before you begin
+
+Before you embed an Analyst, make sure that you have the following:
+
+* Your ThoughtSpot instance is on version 26.10.0.cl or later. Embedding a Spotter Analyst also requires Visual Embed SDK version 1.53.0 or later.
+* GUID of the Analyst to embed. You can copy the GUID from the URL of the Spotter Analyst page or find the GUID using the xref:spotter-analyst-api.adoc#search-analysts[search Analysts] API endpoint.
+* GUID of the data model to use for queries. You can use the model that the Analyst is already configured with. If the Analyst spans multiple models, you need the GUID of each model.
+* Access for the users who see the embed. Users must have access to the Analyst and its data sources. To grant access, share the Analyst with the users or groups. To share an Analyst programmatically, see xref:spotter-analyst-api.adoc#share-analyst[Share an Analyst].
+* Your embedding app's domain in the Content Security Policy (CSP) Visual Embed hosts and Cross-Origin Resource Sharing (CORS) allowlists. For more information, see xref:security-settings.adoc[Security settings].
+
+== Import the SDK components
+
+Import the `SpotterEmbed` SDK library and the required components into your app environment:
+
+**npm**
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    AuthType,
+    init,
+    Action,
+} from '@thoughtspot/visual-embed-sdk';
+----
+
+**ES6**
+[source,JavaScript]
+----
+<script type="module">
+    import {
+        SpotterEmbed,
+        AuthType,
+        init,
+        Action,
+    } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/index.js';
+</script>
+----
+
+In server-side rendered frameworks such as Next.js, Nuxt, and SvelteKit, the SDK reads `window` when it's imported. To avoid window reference errors, import the SDK dynamically:
+
+[source,JavaScript]
+----
+const { init, SpotterEmbed, AuthType, Action } =
+    await import('@thoughtspot/visual-embed-sdk');
+----
+
+== Configure the host URL and authentication method
+
+Specify the ThoughtSpot host URL in `thoughtSpotHost` and the authentication type in `authType`. For testing purposes, you can use `AuthType.None`, which uses the browser's existing ThoughtSpot session. For information about other authentication options, see xref:embed-authentication.adoc[Authentication].
+
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: 'https://{cluster}', // Replace with your ThoughtSpot application URL
+    authType: AuthType.None, // Use the appropriate AuthType for your setup
+});
+----
+
+== Specify the Analyst and data source to embed
+
+Create an instance of the `SpotterEmbed` object, and pin it to one Analyst by using `spotterAnalystConfig.analystId`.
+
+The `analystId` is the GUID of the Analyst to embed. When you specify it, the embed opens with this Analyst and doesn't show the default Spotter or the *Show all* Analysts list.
+
+Optionally, specify the data source that Spotter queries:
+
+* `worksheetId` +
+GUID of the model to query. Include it alongside `analystId`.  
+* `dataSources` +
+Array that contains one GUID for each model, for an Analyst that spans multiple models. If you set both `dataSources` and `worksheetId`, `dataSources` takes precedence.
+
+The following example embeds one Analyst that uses a single model:
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    frameParams: { width: '100%', height: '100%' },
+    worksheetId: '{model-guid}',
+
+    // Specify the Analyst ID
+    spotterAnalystConfig: {
+        analystId: '{analyst-guid}',
+    },
+});
+----
+
+If the Analyst spans multiple models, use `dataSources` instead of `worksheetId`:
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    frameParams: { width: '100%', height: '100%' },
+    dataSources: ['{model-guid-1}', '{model-guid-2}'],
+
+    // Specify the Analyst ID
+    spotterAnalystConfig: {
+        analystId: '{analyst-guid}',
+    },
+});
+----
+
+== Customize the Analyst interface
+
+You can customize the following aspects of the embedded Analyst interface:
+
+* <<_hiding_the_analyst_switcher_and_edit_controls,Hiding the Analyst switcher and edit controls>>
+* <<_customizing_sidebar_visibility,Customizing sidebar visibility>>
+* <<_customizing_the_chat_interface,Customizing the chat interface>>
+* <<_customizing_styles_and_themes,Customizing styles and themes>>
+* <<_customizing_app_interactions,Customizing app interactions>>
+
+=== Hiding the Analyst switcher and edit controls
+
+To make sure that users can't switch to another Analyst or to the default Spotter, hide the relevant controls by using the following action IDs in `hiddenActions`:
+
+* `Action.SpotterAnalystSidebar` +
+Hides the Analyst selection panel in the sidebar.
+* `Action.SpotterDefaultAnalyst` +
+Hides the default Spotter entry in the Analyst selection panel.
+* `Action.SpotterAnalystList` +
+Hides the *Show all* Analysts entry in the Analyst selection panel.
+
+To hide the Analyst authoring controls, use the following action IDs in `hiddenActions`:
+
+* `Action.SpotterAnalystCreate` +
+Hides the *Create* action in the Analyst interface.
+* `Action.SpotterAnalystEdit` +
+Hides the *Edit* action in the Analyst interface.
+* `Action.SpotterAnalystDelete` +
+Hides the *Delete* action in the Analyst interface.
+* `Action.SpotterAnalystMakeACopy` +
+Hides the *Make a copy* action in the Analyst interface.
+* `Action.SpotterAnalystShare` +
+Hides the *Share* action in the Analyst interface.
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    // ...other embed view configuration options
+
+    // Hide the controls that let users switch Analysts and edit them
+    hiddenActions: [
+        Action.SpotterAnalystSidebar,
+        Action.SpotterDefaultAnalyst,
+        Action.SpotterAnalystList,
+        Action.SpotterAnalystCreate,
+        Action.SpotterAnalystEdit,
+        Action.SpotterAnalystDelete,
+        Action.SpotterAnalystMakeACopy,
+        Action.SpotterAnalystShare,
+    ],
+});
+----
+
+[IMPORTANT]
+====
+Hiding a control removes it from the interface, but it doesn't restrict what users can do. To enforce data security and governance, use data security rules and object sharing permissions.
+====
+
+=== Customizing sidebar visibility
+
+To show only one Analyst without a chat history sidebar, set `enablePastConversationsSidebar` to `false` in the `spotterSidebarConfig` object.
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    // ...other embed view configuration options
+
+    // Turn the chat history sidebar off explicitly
+    spotterSidebarConfig: {
+        enablePastConversationsSidebar: false,
+    },
+});
+----
+
+If a narrow sidebar rail remains visible, for example an expand toggle, a *New chat* icon, or a footer, hide the sidebar shell by adding the following action IDs to `hiddenActions`. These action IDs are available from ThoughtSpot Cloud 26.3.0.cl.
+
+* `Action.SpotterSidebarHeader` +
+Hides the sidebar title and toggle button.
+* `Action.SpotterSidebarToggle` +
+Hides the sidebar expand and collapse button.
+* `Action.SpotterNewChat` +
+Hides the *New chat* button.
+* `Action.SpotterSidebarFooter` +
+Hides the sidebar footer, which includes the documentation link.
+* `Action.SpotterDocs` +
+Hides only the documentation or best practices link in the sidebar footer.
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    // ...other embed view configuration options
+
+    // Hide the Analyst switcher and the sidebar shell
+    hiddenActions: [
+        Action.SpotterAnalystSidebar,
+        Action.SpotterDefaultAnalyst,
+        Action.SpotterAnalystList,
+        Action.SpotterSidebarHeader,
+        Action.SpotterSidebarToggle,
+        Action.SpotterNewChat,
+        Action.SpotterSidebarFooter,
+    ],
+});
+----
+
+If you want to keep the chat history sidebar, with its expand toggle and *New chat* button, set `enablePastConversationsSidebar` to `true` and hide only the Analyst controls described in the previous section.
+
+To customize the actions available for saved chats and conversation sharing, see xref:customize-spotter-sidebar.adoc#_customizing_sidebar_menu_actions[Customizing the Spotter sidebar panel] and xref:customize-spotter-sharing.adoc[Customizing conversation sharing options].
+
+=== Customizing the chat interface
+
+If you want to show only the chat interface, without extra options such as starter prompts or a data source selector, use the options described in the following sections.
+
+==== Hiding the data source selector
+
+To keep users on the data source that you specify, set `hideSourceSelection` to `true`. This hides the data source selector. To show the selected data source but prevent users from changing it, set `disableSourceSelection` to `true` instead.
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    // ...other embed view configuration options
+
+    // Hide the data source selector
+    hideSourceSelection: true,
+});
+----
+
+==== Hiding chat interface controls
+
+To hide other controls in the chat interface, use the following action IDs in `hiddenActions`:
+
+* `Action.SpotterChatConnectors` +
+Hides the connectors in the chat interface.
+* `Action.SpotterChatModeSwitcher` +
+Hides the mode switcher in the chat interface.
+* `Action.SpotterFeedback` +
+Hides the feedback widget.
+
+==== Customizing starter prompt pills
+
+Starter prompts are suggested questions that appear as pills near the chat input area. You can show them, change their labels and questions as needed, or hide them from the chat interface.
+
+Starter prompts are off by default. To turn them on, set `enable` to `true` in the `starterPrompts` object of `spotterChatConfig`. Then use the `starterPrompts` options to customize the pills and their labels.
+
+To show or hide individual prompt pills, use `hiddenActions` with the following action IDs:
+
+* `Action.QuickSearchPill` for the *Quick search* pill
+* `Action.DeepAnalysisPill` for the *Deep analysis* pill
+* `Action.DataLiteracyPill` for the *Know your data* pill
+
+[source,JavaScript]
+----
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    // ...other embed view configuration options
+    spotterChatConfig: {
+        starterPrompts: {
+            enable: true,
+            quick: {
+                label: 'Common questions',
+                questions: [
+                    {
+                        label: 'Top products',
+                        prompt: 'What are the top products by revenue?',
+                    },
+                ],
+            },
+        },
+    },
+    // Hide the Deep analysis and Know your data pills
+    hiddenActions: [Action.DeepAnalysisPill, Action.DataLiteracyPill],
+});
+----
+
+For more information, see xref:customize-spotter-chat-experience.adoc#_spotter_starter_prompts[Customizing the Spotter chat experience].
+
+=== Customizing styles and themes
+
+To customize the styles and theme of the embedded Spotter Analyst to match your app's branding, use the xref:css-customization.adoc[CSS customization framework].
+
+=== Customizing app interactions
+
+To listen to the events emitted by the embedded ThoughtSpot component, use the xref:event-embedEvents.adoc[embed event] handlers.
+
+To allow your app to trigger actions in the embedded ThoughtSpot component, use the xref:events-hostEvents.adoc[host events].
+
+== Render the embedded object
+
+[source,JavaScript]
+----
+spotterEmbed.render();
+----
+
+== Code sample
+
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    AuthType,
+    init,
+    Action,
+} from '@thoughtspot/visual-embed-sdk';
+
+// Initialize the ThoughtSpot Visual Embed SDK with your ThoughtSpot URL and authentication type.
+init({
+    thoughtSpotHost: 'https://{cluster}', // Replace with your ThoughtSpot application URL
+    authType: AuthType.None, // Use the appropriate AuthType for your setup
+});
+
+// Find the container element in your HTML where the SpotterEmbed will be rendered.
+const container = document.getElementById('ts-embed');
+if (container) {
+    // Create and configure the SpotterEmbed
+    const spotterEmbed = new SpotterEmbed(container, {
+        frameParams: {
+            height: '100%', // Set the height of the embedded frame
+            width: '100%', // Set the width of the embedded frame
+        },
+
+        // ID of the model to query. For an Analyst that spans multiple models,
+        // use dataSources: ['{model-guid-1}', '{model-guid-2}'] instead.
+        worksheetId: '{model-guid}',
+
+        // Specify the Analyst ID
+        spotterAnalystConfig: { analystId: '{analyst-guid}' },
+
+        // Turn the chat history sidebar off explicitly
+        spotterSidebarConfig: { enablePastConversationsSidebar: false },
+
+        // Hide the controls that switch Analysts
+        hiddenActions: [
+            Action.SpotterAnalystSidebar,
+            Action.SpotterDefaultAnalyst,
+            Action.SpotterAnalystList,
+        ],
+
+        // Hide the data source selector
+        hideSourceSelection: true,
+    });
+
+    // Render the SpotterEmbed in the container.
+    spotterEmbed.render();
+}
+----
+
+== Verify your embed
+
+* Load the embedded object. +
+If the embedding is successful, you'll see the Spotter page for the Analyst that you pinned.
+* Verify that the Analyst switcher is hidden and that users can't open another Analyst or the default Spotter.
+* Start a chat session, ask a question, and view the results.
+* Verify that the customization settings are applied.
+
+If you see a blank screen or an error, see <<troubleshooting,Troubleshooting>>.
+
+[#troubleshooting]
+== Troubleshooting
+
+[cols="2,3"]
+|====
+| Issue | Resolution
+
+| The embed doesn't load because of a CSP or CORS error
+| Add your host app origin to the CSP Visual Embed hosts and CORS allowlists. An entry matches the whole origin, including the port. For the valid domain formats, see xref:security-settings.adoc#port-protocol[Security settings].
+
+| A ThoughtSpot login form appears, or the embed spins with no error
+| There is no session. Check the network tab for a `401` response from `/callosum/v1/session/info`. If you use `AuthType.None`, sign in to the ThoughtSpot instance in another tab. For production instances, ThoughtSpot recommends token-based trusted authentication. For more information, see xref:embed-authentication.adoc[Embed authentication].
+
+| The data source or Analyst can't be found
+| Check that the user is signed in to the correct Org, and that the user has view access to the Analyst and its data model.
+
+| The embed doesn't open the Analyst
+| Check that the embed has the correct Analyst GUID, and that your ThoughtSpot instance is on version 26.10.0.cl or later.
+|====
+
+== Additional resources
+
+* xref:spotter-analyst-api.adoc[Spotter Analyst API]
+* xref:customize-spotter-analysts.adoc[Configure Spotter Analysts]
+* xref:customize-spotter-embed.adoc[Customize Spotter embed]
+* xref:customize-spotter-chat-experience.adoc[Customizing the Spotter chat experience]
+* xref:customize-spotter-sidebar.adoc[Customizing the Spotter sidebar panel]
+* xref:event-embedEvents.adoc[Embed events reference]
+* xref:events-hostEvents.adoc[Host events reference]
+* xref:embed-spotter.adoc[Embed Spotter experience]
