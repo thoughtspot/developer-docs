@@ -114,6 +114,7 @@ module.exports = {
                 'getting-started', 'VisualEmbedSdk',
                 'embed-spotter', 'embed-spotter-agent', 'embed-ai-search-analytics',
                 'search-embed', 'embed-searchbar', 'embed-a-viz', 'embed-liveboard',
+                'customize-liveboard-layout', 'customize-liveboard-filters', 'liveboard-data-downloads',
                 'full-embed', 'full-app-customize', 'react-app-embed', 'embed-without-sdk',
                 'mobile-embed', 'embed-ts-mobile-react-native', 'embed-ts-flutter',
                 'embed-ts-swift', 'embed-ts-android',
