@@ -15,7 +15,14 @@ For information about receiving responses as a real-time event stream, see xref:
 The `/api/rest/2.0/ai/agent/conversation/create` API endpoint creates a new conversation session with Spotter Agent for a specific or multi-data context and returns a conversation ID.
 
 === Request parameters
-The request body must include the `metadata_context`. REST API clients must have at least view access to the data source objects specified in the API request to create a conversation session and use it for subsequent queries.
+The request body must include the conversation context with exactly one of the following parameters:
+
+* `metadata_context` to set the data context directly.
+* `analyst_identifier` to start the conversation from a Spotter Analyst.
+
+Passing both, or neither, is rejected with a `422` error.
+
+REST API clients must have at least view access to the data source objects specified in the API request to create a conversation session and use it for subsequent queries.
 
 [width="100%" cols="2,4"]
 [options='header']
@@ -32,6 +39,8 @@ To set a specific data source object, use `data_source_identifier`. +
 To set multi-data context, use `data_source_identifiers`.
 ** `data_source` [.version-badge.deprecated]#Deprecated# +
 This option is deprecated in 26.5.0.cl. ThoughtSpot recommends using the `DATA_SOURCE` with `data_source_context` and data source IDs instead.
+
+|`analyst_identifier` |__String__. Optional. Unique identifier of a Spotter Analyst to start the conversation from. The conversation uses the Analyst's configuration, including its data sources, agent instructions, and connectors, so `metadata_context` must be omitted. For information about Analyst management endpoints, see xref:spotter-analyst-api.adoc[Spotter Analyst API].
 
 |`conversation_settings` a|__Optional__. Defines additional parameters for the conversation context. You can set any of the following attributes as needed:
 
@@ -86,6 +95,23 @@ curl -X POST \
 }'
 ----
 
+Start a conversation from a Spotter Analyst::
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "analyst_identifier": "{analyst-guid}",
+  "conversation_settings": {
+    "enable_save_chat": true
+  }
+}'
+----
+
 For multi-data source context::
 
 [source,cURL]
@@ -119,7 +145,8 @@ If the API request is successful, the API returns the conversation ID and identi
 ----
 {
   "conversation_id": "wwHQ5j8O8dQC",
-  "conversation_identifier": "wwHQ5j8O8dQC"
+  "conversation_identifier": "wwHQ5j8O8dQC",
+  "analyst_id": "9f8e7d6c-5b4a-3210-fedc-ba9876543210"
 }
 ----
 
@@ -127,6 +154,8 @@ If the API request is successful, the API returns the conversation ID and identi
 Use this for all subsequent message calls.
 * `conversation_id` [.version-badge.deprecated]#Deprecated# +
 Returns the same value as `conversation_identifier`.
+* `analyst_id` +
+If the conversation context uses a Spotter Analyst agent, the API endpoint returns the `analyst_id` in response. The value is `null` otherwise.
 
 == Send queries to a conversation session
 
