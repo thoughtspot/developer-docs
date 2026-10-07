@@ -18,11 +18,34 @@ When configuring xref:configure-saml.adoc[SAML SSO] in ThoughtSpot UI, you can s
 
 By default, ThoughtSpot sends e-mail messages to a new user and enables onboarding workflows when they log in for the first time, even when you are embedding ThoughtSpot content. To alter this behavior at a system-wide level, you need to xref:customize-email-settings.adoc[Customize the onboarding settings].
 The user update API also allows setting onboarding experience values for an individual user. If you need to modify the default behavior beyond the available UI options, contact your ThoughtSpot team.
+#To specify whether an activation email is sent to a new user, set the `trigger_activation_email` parameter in the `POST /api/rest/2.0/users/create` request.#
 
 [NOTE]
 ====
 ThoughtSpot supports local management of users. For initial development and testing purposes, you can create users in ThoughtSpot and manage their profiles locally. However, in large production environments, avoid creating local user profiles to reduce administration overhead.
 ====
+
+=== #Required privileges#
+#To create, edit, or delete users, assign users to groups, transfer objects from one user to another, or activate, deactivate, or log out users, you need administrator privileges (`ADMINISTRATION`).#
+
+#If Role-Based Access Control (RBAC) is enabled on your instance, the `USER_ADMINISTRATION` (*Can manage users*) privilege is required. On instances with Orgs, this privilege allows managing users only within the Org context of the API request. For more information, see xref:roles.adoc[Role-based access control].#
+
+=== #User attributes#
+#Note the following points about user attributes:#
+
+* #*Username*: The username must be unique. An API request to create a user with a username that already exists returns an error.#
+* #*Account type*: The `account_type` attribute indicates how the user was created and how the user authenticates. Valid values are:#
+** #`LOCAL_USER`: A user created and authenticated locally in ThoughtSpot. This is the default account type.#
+** #`LDAP_USER`: A user imported from an LDAP server.#
+** #`SAML_USER`: A user authenticated through SAML SSO.#
+** #`OIDC_USER`: A user authenticated through OpenID Connect (OIDC).#
+** #`REMOTE_USER`: A user authenticated by an external system.#
++
+#When users are imported from an external server, such as an LDAP server or an IdP, ThoughtSpot assigns the account type automatically. For example, a user imported from an LDAP server is added as `LDAP_USER`.#
+* #*Visibility*: The `visibility` attribute determines whether other users can share objects with the user. By default, users are set to `SHARABLE`, which allows other users and groups to share objects with them. To prevent other users from finding the user and sharing objects with them, set `visibility` to `NON_SHARABLE`. In multi-tenant deployments, users are commonly set to `NON_SHARABLE`.#
+
+=== #Password reset#
+#After you reset a user's password with the `POST /api/rest/2.0/users/reset-password` endpoint, you can log the user out of their active sessions by using the `POST /api/rest/2.0/users/force-logout` endpoint. The user must then log in again with the new password.#
 
 
 ////
@@ -107,7 +130,7 @@ ThoughtSpot is gradually migrating its users to link:https://docs.thoughtspot.co
 
 * The `email` attribute is mandatory when creating a user in ThoughtSpot Okta. ThoughtSpot recommends that users provide a valid email address during user creation.
 * You must set a password during user creation if you do not want to trigger an activation email.
-* The default value for `usertype` will be `OIDC_USER`.
+* The default value for #`account_type`# will be `OIDC_USER`.
 
 Administrators can manage the user account status for all users. For IAMv2 users, the API response for the following APIs will also include `SUSPENDED` as a user state:
 
@@ -167,12 +190,21 @@ For more information, see the following pages:
 == User group creation and update
 #Groups can be created via the xref:rest-api-v2-reference.adoc#_groups[REST API v2 group endpoints].#
 
+#To create, edit, or delete groups, you need administrator privileges. If RBAC is enabled on your instance, the `GROUP_ADMINISTRATION` (*Can manage groups*) privilege is required. To assign Roles to a group or remove Roles from a group, you need both the `GROUP_ADMINISTRATION` and `ROLE_ADMINISTRATION` privileges.#
+
 The xref:api-user-management.adoc#group-privileges[Group privileges] are set directly on groups, either during group creation or via a group update API call.
 
+=== #Group hierarchy#
+#ThoughtSpot supports hierarchical groups. You can create a parent group and add other groups to it as sub-groups. For example, you can create a parent group called `Site` and add your tenant groups to it. Sub-groups inherit the privileges of the parent group.#
+
+#To add sub-groups to a group or remove sub-groups from it, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fupdate-user-group">POST /api/rest/2.0/groups/{group_identifier}/update</a>+++ endpoint. Removing a sub-group from a group removes only the association; it does not delete the sub-group from ThoughtSpot.#
+
 == User association to groups
-You can add users to specific groups when creating a user or group via REST API endpoints.
+You can add users to specific groups when creating a user or group via REST API endpoints. #When you assign a user to a group, the user inherits the privileges and Roles assigned to that group.#
 
 #To add users to an existing group or remove users from it, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fupdate-user-group">POST /api/rest/2.0/groups/{group_identifier}/update</a>+++ endpoint with the `user_identifiers` parameter and the `ADD`, `REMOVE`, or `REPLACE` operation. To update the groups of a single user, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fupdate-user">POST /api/rest/2.0/users/{user_identifier}/update</a>+++ endpoint with the `group_identifiers` parameter.#
+
+#Removing a user from a group removes only the group association; it does not delete the user from ThoughtSpot. To delete a user, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fdelete-user">POST /api/rest/2.0/users/{user_identifier}/delete</a>+++ endpoint.#
 
 #To get a list of users assigned to a group, use the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fgroups%2Fsearch-user-groups">POST /api/rest/2.0/groups/search</a>+++ endpoint.#
 
@@ -180,6 +212,17 @@ You can add users to specific groups when creating a user or group via REST API 
 Access to objects is determined by content *shared* directly to the user or the groups they belong to. It is easier to manage and audit sharing through groups rather than object sharing at the individual user level.
 
 Users can share objects or modify sharing properties through the UI or via an API call to the #`POST /api/rest/2.0/security/metadata/share` endpoint#.
+
+#Note the following points about sharing objects via REST API:#
+
+* #To share an object, you must have edit access to the object.#
+* #The `share_mode` attribute can be set to `READ_ONLY` (*Can view*), `MODIFY` (*Can edit*), or `NO_ACCESS`. Setting `share_mode` to `NO_ACCESS` removes any access previously granted to a user or group.#
+* #To send a share notification to the users and groups with whom the object is shared, set `notify_on_share` to `true`.#
+* #To make a shared Liveboard or Answer discoverable, set `has_lenient_discoverability` to `true`.#
+
+#To audit access, use the `POST /api/rest/2.0/security/metadata/fetch-permissions` endpoint to get the users and groups that have access to an object, or the `POST /api/rest/2.0/security/principals/fetch-permissions` endpoint to get the objects a user or group can access.#
+
+#For more information and examples, see xref:access-control-sharing.adoc[Access control and sharing].#
 
 [#group-privileges]
 == Group privileges
