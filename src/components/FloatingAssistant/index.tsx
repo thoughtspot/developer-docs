@@ -47,6 +47,14 @@ const FloatingAssistant: React.FC = () => {
     const [isTutorialsPage, setIsTutorialsPage] = useState(
         () => typeof window !== 'undefined' && isTutorialsPath(window.location.pathname),
     );
+    // Older-version wrapper pages (e.g. /docs/26.9.0.cl) load the frozen version's site in a
+    // nested iframe (VersionIframe, src carries ?_iframe=1). The wrapper already mounts its own
+    // assistant, so the nested copy must not render a second one. Read once at load: the flag
+    // is on the iframe's initial URL, and in-page navigation inside it may drop the param.
+    const [isNestedIframe] = useState(
+        () => typeof window !== 'undefined'
+            && new URLSearchParams(window.location.search).get('_iframe') === '1',
+    );
     const {
         isOpen,
         setIsOpen,
@@ -427,6 +435,7 @@ const FloatingAssistant: React.FC = () => {
 
     if (pageId === CUSTOM_PAGE_ID.API_PLAYGROUND) return null;
     if (isTutorialsPage) return null;
+    if (isNestedIframe) return null;
 
     return (
         <>
