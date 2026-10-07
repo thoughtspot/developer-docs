@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { isPublicSite } from '../../utils/app-utils';
 import './index.scss';
 
 interface VersionIframeProps {
@@ -38,6 +39,11 @@ const VersionIframe: React.FC<VersionIframeProps> = ({
                 url.hash = location?.hash;
             }
             url.searchParams.set('_iframe', '1');
+            // Tell the nested site its wrapper is the public docs site (not the product), so it
+            // can show the public hero gradient instead of the in-product banner.
+            if (isPublicSite(window.location.search)) {
+                url.searchParams.set('_public', '1');
+            }
         }
 
         return url.toString();
