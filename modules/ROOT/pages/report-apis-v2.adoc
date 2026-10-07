@@ -95,6 +95,15 @@ curl -X POST \
 
 For *PDF* downloads, you can specify additional parameters to customize the page orientation and include or exclude the cover page, logo, footer text, and page numbers.
 
+#The following `pdf_options` attributes determine the content of the PDF:#
+
+* #`include_cover_page`: Adds a cover page with the Liveboard title.#
+* #`include_filter_page`: Adds a page that lists the filters applied to the Liveboard.#
+* #`include_custom_logo`: Adds the custom wide logo, if one is configured for your instance, to the footer of each page.#
+* #`page_footer_text`: Adds the specified text to the footer of each page.#
+* #`include_page_number`: Adds the page number to the footer of each page.#
+* #`truncate_table`: Includes only the first page of each table visualization in the PDF.#
+
 You can now also download continuous pdfs which matches the full length of your Liveboard, without breaking them into multiple A4 pages.
 
 * `page_size = CONTINUOUS` Unlike the A4 format, which introduces forced page breaks between visualizations, this continuous flow maintains your exact design and intended layout.
@@ -232,22 +241,28 @@ include::{path}/transient-lb-content.adoc[]
 
 [source,JavaScript]
 ----
-< iframe src = "http://ts_host:port/" id = "ts-embed" > < /iframe>
-< script src = "/path/to/liveboard.js" > < /script>
-< script >
-    const embed = new LiveboardEmbed("#embed", {
-        frameParams: {},
-    });
-    async function liveboardData() {
+const embed = new LiveboardEmbed("#embed", {
+    frameParams: {},
+    liveboardId: "<liveboard-GUID>",
+});
+
+async function downloadLiveboardReport() {
     const transientPinboardContent = await embed.trigger(HostEvent.getExportRequestForCurrentPinboard);
-    const liveboardDataResponse = await fetch("https://ts_host:port/api/rest/2.0/report/liveboard", {
+    const payload = {
+        metadata_identifier: "<liveboard-GUID>",
+        file_format: "PDF",
+        transient_content: JSON.stringify(transientPinboardContent.data),
+    };
+    const response = await fetch("https://{ThoughtSpot-Host}/api/rest/2.0/report/liveboard", {
         method: "POST",
-        body: createFormDataObjectWith({
-            "transient_content": transientPinboardContent,
-        }),
+        headers: {
+            Authorization: "Bearer {access-token}",
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
     });
- }
-< /script>
+    const file = await response.blob();
+}
 ----
 
 See also, link:https://developers.thoughtspot.com/docs/Enumeration_HostEvent#_getexportrequestforcurrentpinboard[HostEvent.getExportRequestForCurrentPinboard].
