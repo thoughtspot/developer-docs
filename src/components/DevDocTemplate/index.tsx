@@ -663,20 +663,8 @@ if (isVersionedIframe) {
         return cName;
     };
 
-    // Nested version site (?_iframe=1) whose wrapper is the public docs site (VersionIframe adds
-    // ?_public=1), as opposed to a wrapper embedded in the product. It is still "embedded" for
-    // layout/nav, but keeps the public hero (gradient) instead of the flat in-product banner.
-    const isPublicWrapperIframe = () => {
-        if (!isBrowser()) return false;
-        const urlParams = new URLSearchParams(location.search);
-        return urlParams.get('_iframe') === '1' && urlParams.get('_public') === '1';
-    };
-
     const getWrapperClassName = () => {
-        if (!isEmbeddedContext()) return '';
-        return isPublicWrapperIframe()
-            ? 'embedded-mode embedded-public-hero'
-            : 'embedded-mode';
+        return isEmbeddedContext() ? 'embedded-mode' : '';
     };
 
     const getCloudLatestVersion = () => {
