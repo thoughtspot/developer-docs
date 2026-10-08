@@ -12,15 +12,15 @@ Metadata parameterization with variables allows administrators to reuse and prop
 
 == Before you begin
 
-* Ensure that that xref:variables.adoc[variables are available] on your instance. You can use the xref:variables.adoc#_get_details_of_variables[variable search API] to get a list of variables.
+* Ensure that xref:variables.adoc[variables are available] on your instance. You can use the xref:variables.adoc#_get_variables[variable search API] to get a list of variables.
 * Ensure that you have edit access to the Connections and Tables to which you want to assign variables.
 
 == How to parameterize objects
 You can update the properties of a Connection or Table to parameterize or remove parameterization by using one of the following options:
 
 * Use REST APIs +
-To parameterize the properties of a metadata object, send an xref:metadata-parameterization.adoc#_remove_parameterization_using_rest_api[API request to the `/api/rest/2.0/metadata/parameterize` endpoint]. +
-To remove parameterization, use the xref:metadata-parameterization.adoc#_remove_parameterization_using_rest_api[the `/api/rest/2.0/metadata/parameterize` API endpoint].
+To parameterize the properties of a metadata object, send an xref:metadata-parameterization.adoc#_parameterize_object_properties[API request to the `/api/rest/2.0/metadata/parameterize-fields` endpoint]. +
+To remove parameterization, use the xref:metadata-parameterization.adoc#_remove_parameterization[the `/api/rest/2.0/metadata/unparameterize` API endpoint].
 * Edit the TML representation of the object +
 You can edit the TML object directly and assign variables. +
 For example, to parameterize the properties of a Table, open the TML of the Table object in the edit mode and assign the variables to the properties as shown here:
@@ -34,8 +34,13 @@ table:
   db_table: "${TABLE_VAR}"
 ----
 
-== Parameterize object properties using REST API
-To parameterize properties of a metadata object, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Fparameterize-metadata">/api/rest/2.0/metadata/parameterize</a>+++ API endpoint, with the following attributes in the request body.
+== Parameterize object properties
+To parameterize one or more properties of a metadata object, send a `POST` request to the `/api/rest/2.0/metadata/parameterize-fields` API endpoint, with the following attributes in the request body.
+
+[NOTE]
+====
+The legacy endpoint `/api/rest/2.0/metadata/parameterize` is deprecated and replaced with the `/api/rest/2.0/metadata/parameterize-fields` endpoint, which allows you to parameterize multiple fields in a single API request.
+====
 
 === Request parameters
 In your `POST` request body, include the following parameters:
@@ -59,7 +64,7 @@ Note that this attribute is __optional__ if a GUID is specified as `metadata_ide
 
 * `ATTRIBUTE`  for Tables
 * `CONNECTION_PROPERTY` for Connections
-|`field_name` a|__String__. The name of the field to parameterize.
+|`field_names` a|__Array of strings__. A JSON array of the name fields to parameterize.
 
 For tables, use one of the following names, depending on the property that you want to parameterize:
 
@@ -77,14 +82,18 @@ For connection objects, specify the exact name of the field or property to param
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/parameterize'  \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/metadata/parameterize-fields'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "metadata_identifier": "eefd754f-7146-432d-9ad6-2c730264ecc8",
   "field_type": "ATTRIBUTE",
-  "field_name": "schemaName",
+  "field_names": [
+    "schemaName",
+    "databaseName",
+    "tableName"
+  ],
   "variable_identifier": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "metadata_type": "LOGICAL_TABLE"
 }'
@@ -92,7 +101,7 @@ curl -X POST \
 
 If the API request is successful, ThoughtSpot returns a 204 response indicating that the variable has been successfully assigned to the specified object.
 
-== Remove parameterization using REST API
+== Remove parameterization
 To remove the variables assigned to a Connection or Table and restore static values, send a `POST` request to the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fmetadata%2Funparameterize-metadata">/api/rest/2.0/metadata/unparameterize</a>+++ API endpoint, with the following attributes in the request body.
 
 === Request parameters

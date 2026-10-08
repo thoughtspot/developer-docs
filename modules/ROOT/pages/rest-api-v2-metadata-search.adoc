@@ -135,7 +135,7 @@ The value of `metadata_header` is a complex object with the most important set o
 
 === Response format for Liveboards
 
-On ThoughtSpot instances running 10.11.0.cl or later version, you can also specify the Liveboard version in the `liveboard_response_version` attribute. Valid values for this attribute are:
+You can also specify the Liveboard version in the `liveboard_response_version` attribute. Valid values for this attribute are:
 
 * `V1` +
 Use this option to fetch Liveboard details in the legacy response format. If no value is specified for the `liveboard_response_version` attribute, the `V1` option will be used in the API request by default.
@@ -3739,6 +3739,96 @@ The details of each object type is a complex object that is unique to each objec
 
 The JSON output for `metadata_detail` varies for Liveboards based on the response version specified in the API request. For more information, see xref:rest-api-v2-metadata-search.adoc#lbResponse[Liveboard response format].
 
+=== include_personalised_views
+When fetching Liveboard metadata with `include_details: true`, you can also request the list of Personalized Views saved on each Liveboard by setting `include_personalised_views` to `true`.
+
+This parameter is only applicable to `LIVEBOARD` type objects and has no effect on other metadata types. It requires `include_details` to also be `true` in the same request.
+
+[source,JSON]
+----
+{
+  "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ],
+  "include_details": true,
+  "include_personalised_views": true
+}
+----
+
+When both parameters are set to `true`, each Liveboard object in the response will include a `personalised_views` array nested within `metadata_detail`:
+
+[source,JSON]
+----
+[
+  {
+    "metadata_id": "4081f38c-1f26-4354-a418-af14136e3bd7",
+    "metadata_name": "Sales Overview",
+    "metadata_type": "LIVEBOARD",
+    "metadata_detail": {
+      "personalised_views": [
+        {
+          "view_guid": "6e3d11b2-9a4f-4c1e-8b5a-2f3d7e0c1a9d",
+          "view_name": "Q1 Revenue View",
+          "author_guid": "59481331-ee53-42be-a548-bd87be6ddd4a",
+          "author_name": "Alice Johnson",
+          "is_public": false
+        },
+        {
+          "view_guid": "a9c42f17-3b8e-4d20-91fa-7c5e2d0b8f3a",
+          "view_name": "Executive Summary",
+          "author_guid": "67e15c06-d153-4924-a4cd-ff615393b60f",
+          "author_name": "Bob Smith",
+          "is_public": true
+        }
+      ]
+    },
+    "metadata_header": {...},
+    "visualization_headers": null,
+    "dependent_objects": null,
+    "incomplete_objects": null,
+    "stats": null
+  }
+]
+----
+
+The `personalised_views` array contains one object per saved Personalized View on the Liveboard. Each object has the following properties:
+
+[width="100%",cols="2,1,4"]
+|====
+|Property|Type|Description
+
+|`view_guid`
+|String
+|Unique GUID of the Personalized View.
+
+|`view_name`
+|String
+|Display name of the Personalized View as set by its author.
+
+|`author_guid`
+|String
+|GUID of the ThoughtSpot user who created this Personalized View.
+
+|`author_name`
+|String
+|Display name of the user who created this Personalized View.
+
+|`is_public`
+|Boolean
+|If `true`, the Personalized View is shared publicly and visible to other users with access to the Liveboard. If `false`, the view is private to its author.
+|====
+
+[NOTE]
+====
+If a Liveboard has no saved Personalized Views, the `personalised_views` array will be empty (`[]`). If `include_personalised_views` is `false` or omitted, the `personalised_views` key will not appear in `metadata_detail`.
+====
+
+[#isSparklineEnabled]
+=== Sparkline setting for KPI Answers
+The `POST /api/rest/2.0/metadata/search` API response includes the `isSparklineEnabled` parameter in the `AnswerSpecHeader` object for Answers of the KPI chart type. This boolean parameter indicates whether the sparkline trend line is enabled for the KPI visualization.
+
 === include_dependent_objects
 Data objects in ThoughtSpot like Tables and Worksheets have **dependent objects** that connect to them. Liveboards and Answers do not have dependent objects, they can only be a dependent object.
 
@@ -3783,7 +3873,7 @@ The `include_worksheet_search_assist_data` boolean parameter includes details ab
 
 [NOTE]
 ====
-The Search Assist feature is a deprecated feature and is not available on ThoughtSpot instances from 10.4.0.cl onwards.
+The Search Assist feature is a deprecated feature and is no longer available on ThoughtSpot instances.
 ====
 
 === Other include attributes

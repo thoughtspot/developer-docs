@@ -31,7 +31,7 @@ For TML modification tips and recommendations, see xref:modify-tml.adoc[TML modi
 
 [NOTE]
 ====
-Worksheets are deprecated in ThoughtSpot and replaced by Models from 10.12.0.cl onwards.
+Worksheets are deprecated in ThoughtSpot and replaced by Models.
 ====
 
 == TML import and export via REST API
@@ -76,6 +76,74 @@ If you import only a Model object, it may take some time for the Model to become
 However, if you import a Model along with Liveboards, answers, and other dependent objects in a single API call, the imported objects will be immediately available for use.
 ====
 
+[#personalized-views-portability]
+== Personalized Views portability
+
+Personalized Views support improved portability across ThoughtSpot environments. When importing a Liveboard TML that contains Personalized Views, ThoughtSpot uses smart merge logic to avoid creating duplicate views:
+
+* Views that exist only in the target environment are preserved.
+* New views in the imported TML are appended.
+* Views that are present in both the target environment and the imported TML are updated.
+
+To match Personalized Views by `obj_id` during import, set `enable_personalized_view_upsert` to `true` in the `POST /api/rest/2.0/metadata/tml/import` API request. ThoughtSpot then checks the target environment for an existing Personalized View with a matching `obj_id`. If a match is found, the import updates the existing view rather than creating a duplicate. If no match is found, a new Personalized View is created.
+
+The previous limit of 100 Personalized Views per Liveboard on TML import is removed. You can import all the Personalized Views associated with a Liveboard without any views being dropped.
+
+The following fields are added to the Personalized View TML to make it easier to migrate Personalized Views between environments:
+
+`author`::
+A new `author` field is added to the Personalized View TML during export. This field maps to the username or email address of the view owner, and is used to assign or delegate ownership to another user during import.
+
+`obj_id`::
+A new `obj_id` field provides stable cross-environment object identity for inter-Org deployments, consistent with other object types. Use the same `obj_id` value across environments to ensure consistent identity during migrations.
+
+=== Example for a Personalized View TML with Object ID
+
+[source,yaml]
+----
+  views:
+  - view_guid: ff83055b-a867-43e7-978e-106e907e1912
+    obj_id: California-LT-ff83855b
+    name: California - LT
+    view_filters:
+    - column:
+      - Retail Sales - Classic::Store State
+      oper: in
+      values:
+      - California
+    is_public: false
+    author:
+      username: user1
+      user_email: user1@thoughtspot.com
+----
+
+=== Collections `obj_id` support
+
+The `obj_id` attribute is also supported for the *Collections* object type in TML import and export APIs. This enables stable cross-environment identification for Collections, matching the behavior already available for Models, Liveboards, Answers, and other object types.
+
+To assign or update the `obj_id` of a Collection, use the `POST /api/rest/2.0/metadata/identity/update` API endpoint.
+
+=== Limitation without this feature enabled
+
+ThoughtSpot's link:https://docs.thoughtspot.com/software/latest/personalized-liveboard-views[personalized Liveboard views] let users apply filters and save configurations as named views on a Liveboard.
+If the smart merge behavior is not applied, user-saved views can be lost when a Liveboard is updated and re-imported in multi-environment deployments (for example, a Dev instance and a Prod instance), using the xref:#_import_tml[TML import API] or the UI *Import TML* option.
+If the import is performed by an administrator account, all personalized views saved by end users are removed as part of this replacement.
+
+Why this happens?::
+
+Personalized views are stored as user-owned objects linked to the Liveboard's GUID. When an admin imports a Liveboard TML that matches an existing GUID, the import operation overwrites the Liveboard, and the associated user views are not carried forward.
++
+This happens because personalized views are created and usually owned by end users in a different environment (likely a Prod instance). They are not included in Liveboard TML files exported from a development or staging environment, so the import has no record of them.
+
+Workarounds::
+. Import as a non-admin user -
++
+The simplest workaround is to perform the final TML import in the production environment using a *non-admin user account* that has edit access to the Liveboard, rather than an admin account.
+Because non-admin users do not have the authority to overwrite user-linked metadata during import, ThoughtSpot preserves the existing personalized views attached to the Liveboard.
+. Embed existing saved views in the TML before import -
++
+You can export the current saved views from the production Liveboard, append them to the updated TML, and then import the combined TML.
+
 == Import TML objects asynchronously
 The REST v1 and v2  `metadata/tml/import` APIs import TML objects synchronously. When you try to import large and complex metadata objects, the synchronous import operation takes more time to process data and sometimes can result in a timeout error.
 
@@ -103,7 +171,7 @@ __Optional__ |__Boolean__. Specify if import operation must be run for all Orgs 
 
 __Requires Org administration privileges to access TML objects across all Orgs.__| `false`
 
-|`import_policy`  a|__String__. Available from 10.5.0.cl. Policy to follow during import. The allowed values are:
+|`import_policy`  a|__String__. Policy to follow during import. The allowed values are:
 
 * `PARTIAL` +
 Imports objects that validate successfully. Skips the objects that do not validate successfully and their dependent objects if any.
@@ -121,7 +189,11 @@ __Optional__
 When set to `true`, this attribute enables diff check to identify the objects that haven’t been changed since the last import or TML update. This feature eliminates importing redundant objects and helps optimize the import process. |`false`
 |`enable_large_metadata_validation` +
 __Optional__
-|__Boolean__. Available from 10.5.0.cl. Enables validation for large metadata objects. Set to `true` if the database contains multiple thousands of tables. When enabled, it allows for schema validation of one table at a time and helps circumvent the metadata fetching limitations of the Cloud Data Warehouse (CDW).
+|__Boolean__. Enables validation for large metadata objects. Set to `true` if the database contains multiple thousands of tables. When enabled, it allows for schema validation of one table at a time and helps circumvent the metadata fetching limitations of the Cloud Data Warehouse (CDW).
+|`false`
+|`enable_personalized_view_upsert` +
+__Optional__
+|__Boolean__. Set to `true` to update and insert Personalized Views in a Liveboard during TML import. When enabled, Personalized Views are preserved or created as part of the import operation instead of being discarded.
 |`false`
 |====
 ////

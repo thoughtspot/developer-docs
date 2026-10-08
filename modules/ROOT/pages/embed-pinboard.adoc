@@ -135,6 +135,46 @@ const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
 When `fullHeight` is set to `true`, the SDK ignores the `isLiveboardHeaderSticky:true` setting, and the Liveboard header will not be sticky.
 ====
 
+[#compact-header]
+=== Enable compact Liveboard header
+By default, embedded Liveboards display a full-height header bar that contains the Liveboard title, description, filter chips, tab navigation, and action menu. You can switch to a more space-efficient layout by enabling the compact header.
+
+The compact header reduces the vertical footprint of the header area, integrates tabs and filter chips into a single condensed row, and moves the *Edit* button into the header's overflow action menu.
+
+The compact header is generally available and the `isLiveboardCompactHeaderEnabled` attribute is set to `true` by default on all ThoughtSpot embedded instances using Visual Embed SDK v1.51.0 or later. To explicitly enable or disable the compact header, set `isLiveboardCompactHeaderEnabled` in the `LiveboardViewConfig` object.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    //... other embed config properties
+    isLiveboardCompactHeaderEnabled: true,
+});
+----
+
+When `isLiveboardCompactHeaderEnabled` is `true`, the following UI changes apply compared to the standard header:
+
+[width="100%",cols="2,4",options="header"]
+|====
+|Area |Change
+|Header height |The header renders in a condensed, shorter height to maximize the visible content area.
+|Edit button |The *Edit* button is removed from the top-level header and is accessible from the header overflow (*...*) menu.
+|Filter chips |Filter chips are rendered inside the compact header's integrated filter row, replacing the separate floating filter panel.
+|Tabs |The tab bar is incorporated into the compact header row, rather than appearing as a separate element below the header.
+|Sticky scroll behavior |The scroll threshold at which the sticky header attaches to the top of the viewport is recalculated for the compact header's shorter height. This may affect the scroll position at which the header becomes sticky compared to the standard header.
+|====
+
+==== Hiding the Liveboard title in compact header
+In the compact header, you can hide the Liveboard title by setting `showLiveboardTitle` to `false` in the `LiveboardViewConfig` object:
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    //... other embed config properties
+    isLiveboardCompactHeaderEnabled: true,
+    showLiveboardTitle: false,
+});
+----
+
 === Customize Liveboard tabs
 
 By default, the first tab created on a Liveboard is set as the home tab. You can set any tab as an active tab using the `activeTabId` property in the Visual Embed SDK as shown in the example here:
@@ -161,6 +201,68 @@ The `activeTabId` property is available only in the `LiveboardEmbed` package and
 
 For example, a template Liveboard with many different KPIs could be reduced down to a smaller set by giving a user an interface to select the particular visualizations to show, storing their selections, and using that saved set of visualization GUIDs as the array for `visibleVizs` on page load (there is an equivalent xref:embed-events.adoc[HostEvent] called `SetVisibleVizs` to make an update after the Liveboard has loaded).
 
+=== Customizing filter visibility
+To hide the entire header area, including filters and the Liveboard menu, set `hideLiveboardHeader` to `true`. You can then trigger filter interactions programmatically using host events.
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed', {
+  ... // other liveboard view config
+  hideLiveboardHeader: true,
+});
+----
+
+If the Liveboard has multiple tabs and the compact header is enabled, you can hide filters and parameters that are not relevant to the visualizations on the active tab by setting `hideIrrelevantChipsInLiveboardTabs` to `true`. This feature is generally available and `hideIrrelevantChipsInLiveboardTabs` is set to `true` by default on all ThoughtSpot embedded instances using Visual Embed SDK v1.51.0 or later.
+
+[NOTE]
+====
+This feature is supported only if the compact header is enabled on your Liveboard. To enable the compact header, use the `isLiveboardCompactHeaderEnabled` attribute.
+====
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        width: '100%',
+        height: '100%',
+    },
+    liveboardId: '<%=liveboardGUID%>', // Replace it with your Liveboard ID
+    isLiveboardCompactHeaderEnabled: true,
+    hideIrrelevantChipsInLiveboardTabs: true,
+    // ... other embed view configuration settings
+});
+----
+
+When `hideIrrelevantChipsInLiveboardTabs` is `true`:
+
+* Filter chips backed by data sources that are *not used by any visualization on the active tab* are hidden automatically when the user switches tabs.
+* A *Show irrelevant filters* toggle button appears in the filter row when at least one chip is hidden, allowing users to temporarily reveal all chips.
+* When the user clicks *Show irrelevant filters*, a complementary *Hide irrelevant filters* button appears to restore the filtered view.
+
+[#personalized-view]
+=== Embed a personalized Liveboard view
+You can embed a saved personalized Liveboard view by specifying the `personalizedViewId` along with the `liveboardId` in the `LiveboardViewConfig` object.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        width: '100%',
+        height: '100%',
+    },
+    liveboardId: '<%=liveboardGUID%>', // Replace it with your Liveboard ID
+    personalizedViewId: '<%=personalizedViewGUID%>', // Replace it with the ID of the saved personalized view
+});
+----
+
+[#edit-viz-in-liveboard]
+=== Edit visualizations within the Liveboard view
+Users can edit the underlying query of an Answer directly within the Liveboard. When this feature is enabled, the edit button appears in the floating toolbar of the Answer when the Liveboard is opened in edit mode. Clicking the edit button opens the Answer interface preloaded with the current query context of the Answer. Users can make edits and save the changes without leaving the Liveboard.
+
+[#kpi-charts]
+=== KPI charts in embedded Liveboards
+Embedded Liveboards support advanced controls for KPI chart customization. For more information, see link:https://docs.thoughtspot.com/software/latest/chart-kpi#advanced[KPI charts, window=_blank].
+
 [#noteTiles]
 === Add Note tiles
 You can add a link:https://docs.thoughtspot.com/software/latest/liveboard-notes[Liveboard Note tile, window=_blank] with custom text, images, and links on an embedded Liveboard.
@@ -174,6 +276,48 @@ When turned on, the `enable2ColumnLayout` allows for customising the Liveboard b
 The current 12 column layout changes to 2 columns per row at 1024px, and to 1 column per row layout at 630px in the new Liveboard experience. Once enabled, these breakpoints would apply to all Liveboards in the ThoughtSpot instance, and cannot be set only for individual Liveboards.
 
 These breakpoint widths are customisable for the embedded customers. Contact ThoughtSpot support for assistance with customisation.
+
+[#liveboard-data-cache]
+=== Liveboard browser cache and refresh
+ThoughtSpot supports browser-side data caching for Liveboards to improve load performance for users who revisit the same Liveboard within a session. Users can clear the cache by clicking the refresh icon in the Liveboard header.
+
+To enable Liveboard data caching, set `enableLiveboardDataCache` to `true`.
+
+[source,javascript]
+----
+const liveboardEmbed = new LiveboardEmbed('#embed-container', {
+    frameParams: {
+        width: '100%',
+        height: '100%',
+    },
+    liveboardId: '<Your-Liveboard-ID>',
+    enableLiveboardDataCache: true,
+});
+----
+
+When data caching is enabled, the refresh icon appears in the Liveboard header. Users can click this button to clear the browser cache and fetch fresh data.
+
+[.bordered]
+[.widthAuto]
+--
+image::./images/liveboard-refresh.png[Liveboard refresh]
+--
+
+The Visual Embed SDK also provides the following action IDs and events to customize the cache refresh visibility and workflow.
+
+[width="100%",cols="2,4"]
+|====
+|ID | Description
+
+|xref:Action.adoc#_refreshliveboardbrowsercache[Action.RefreshLiveboardBrowserCache]
+|Action ID to show, hide, or disable the *Refresh* button in the Liveboard header.
+
+|xref:EmbedEvent.adoc#_refreshliveboardbrowsercache[EmbedEvent.RefreshLiveboardBrowserCache]
+|Emitted when a user clicks the *Refresh* button in the Liveboard header.
+
+|xref:HostEvent.adoc#_refreshliveboardbrowsercache[HostEvent.RefreshLiveboardBrowserCache]
+|Triggers a browser cache refresh programmatically for all visualization containers on the embedded Liveboard.
+|====
 
 === Customize filters
 
@@ -370,28 +514,43 @@ liveboardEmbed.trigger(HostEvent.UpdateFilters, {
 ----
 |=====
 
-==== Customize filter visibility in Liveboard tabs
-Filters and parameters that are not relevant to the visualizations in a tab can be hidden by default on an embedded Liveboard. This feature is disabled by default on ThoughtSpot embedded instances. To enable this feature, set `hideIrrelevantChipsInLiveboardTabs` to `true`.
-
-[NOTE]
-====
-This feature is supported only if compact header is enabled on your Liveboard. To enable compact header, use the `isLiveboardCompactHeaderEnabled` attribute.
-====
+[#centralized-filter-modal]
+==== Centralized filter modal [earlyAccess eaBackground]#Early Access#
+Liveboard users can modify multiple filters and parameters in a single session using the centralized filter modal. This feature is disabled by default on ThoughtSpot embedded instances. To enable it on embedded Liveboards, set `isCentralizedLiveboardFilterUXEnabled` to `true`.
 
 [source,JavaScript]
 ----
 const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
-    frameParams: {
-        width: '100%',
-        height: '100%',
-    },
-    liveboardId: '<%=liveboardGUID%>', // Replace it with your Liveboard ID
-    isLiveboardCompactHeaderEnabled: true,
-    hideIrrelevantChipsInLiveboardTabs: true,
-    // ... other embed view configuration settings
+    //... other embed config properties
+    isCentralizedLiveboardFilterUXEnabled: true,
 });
 ----
 
+[#current-period-filters]
+==== Current period inclusion in rolling date filters
+Rolling date filters with the *Last <N> <Period>* and *Next <N> <Period>* filter types support including the current period. To show, hide, or disable this option, use `isThisPeriodInDateFiltersEnabled` or `Action.IncludeCurrentPeriod`.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    //... other embed config properties
+    isThisPeriodInDateFiltersEnabled: true,
+    // Alternatively, use hiddenActions or disabledActions to hide or disable the option
+    // hiddenActions: [Action.IncludeCurrentPeriod],
+});
+----
+
+[#filter-interactivity]
+==== Filter interactivity
+The enhanced filter interactivity feature allows users to add, update, or remove filters in an embedded Liveboard using interactive filter chips. This feature is generally available and enabled by default on ThoughtSpot embedded instances. To explicitly enable or disable it, use the `isEnhancedFilterInteractivityEnabled` attribute.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    //... other embed config properties
+    isEnhancedFilterInteractivityEnabled: true,
+});
+----
 
 ////
 
@@ -462,14 +621,133 @@ liveboardEmbed.trigger(HostEvent.UpdateFilters, {
 
 ////
 
-=== Liveboard grouping and styling [earlyAccess eaBackground]#Early Access#
-You can now create a visual group of Answers and note tiles together in the Liveboard. You can select multiple Answers and notes in the Liveboard editor. You can also style parts of the Liveboard, groups and Answers with the new styling panel.
-To enable this feature, set `isLiveboardMasterpiecesEnabled` to `true`.
-It is important to note the following changes which happen in the Liveboard UI and layout when this feature is active.
+[#_liveboard_download_options]
+=== Liveboard download options
+Embedding application users can download Liveboards in the PDF, XLSX, and CSV formats. If `isContinuousLiveboardPDFEnabled` [beta betaBackground]^Beta^ is set to `true`, users can download the PDF with a continuous layout as seen in the UI, with each tab on a single page. When this parameter is set to `false`, users can download the Liveboard PDF in the A4 format with a paginated view.
 
-* All tiles on the Liveboard will now have a default border and an increased border-radius, resulting in more pronounced curved corners. This is part of the broader visualization tile customization options done to enhance the visual appearance of charts and tables.
-* For Note tiles, the default scrollbar is now hidden for long content. Users must scroll within the tile area itself, and if the tile is not sized appropriately for its content, it may appear clipped due to the new container styles. This change emphasizes the importance of properly sizing Note tiles to avoid content being visually cut off.
-* If a Liveboard is saved with Groups in the ThoughtSpot interface, but the embedding code does not have the grouping and styling feature enabled, the Liveboard will fail to load and throw an error.
+[NOTE]
+====
+Starting with Visual Embed SDK version 1.48.x, the new multi-format download experience is available on embedded Liveboards and can be enabled using the `isContinuousLiveboardPDFEnabled` and `isLiveboardXLSXCSVDownloadEnabled` parameters. The *Download* action in the Liveboard's more options menu is controlled by `Action.DownloadLiveboard` instead of `Action.Download` and `Action.DownloadAsPdf`. `Action.DownloadAsPdf` remains valid for controlling PDF download on individual visualizations (chart and table tiles) within a Liveboard.
+====
+
+The `POST /api/rest/2.0/report/liveboard` REST API endpoint also supports continuous PDF downloads. For more information, see xref:data-report-v2-api.adoc[Data and Report APIs].
+
+==== Excel export for pivot tables
+Pivot table visualizations can be exported to Excel format. The `POST /api/rest/2.0/report/answer` and `POST /api/rest/2.0/schedules/create` REST API endpoints also support pivot tables in `.xlsx` downloads. To enable pivot formatting on your ThoughtSpot instance, contact ThoughtSpot Support.
+
+==== XLSX and CSV in Liveboard scheduled exports
+To enable Liveboard scheduled exports in XLSX and CSV format from the embed view, ensure that `isGranularXLSXCSVSchedulesEnabled` is set to `true`.
+
+[source,javascript]
+----
+const embed = new LiveboardEmbed('#tsEmbed', {
+    //...
+    isGranularXLSXCSVSchedulesEnabled: true, // enable scope selection for XLSX and CSV Liveboard scheduled jobs.
+});
+----
+
+==== Download actions and behavior
+
+[width=100%, cols="2,3,4"]
+[options="header"]
+|=====
+| Download action
+| SDK parameter
+| Action ID for show/hide control
+
+| **Download** menu action
+| Enabled by default.
+a| Use `Action.DownloadLiveboard` to show, hide, or disable the *Download* action in the menu.
+
+| Continuous PDF [beta betaBackground]^Beta^
+a| `isContinuousLiveboardPDFEnabled` +
+Enables or disables the continuous PDF option in Liveboard downloads.
+a| Use the `Action.DownloadLiveboardAsContinuousPDF` action ID to show or hide the *PDF (Continuous)* option in the *Download* modal.
+
+| XLSX download
+a| `isLiveboardXLSXCSVDownloadEnabled` +
+Enables the XLSX and CSV download options in the *Download* modal.
+a| `Action.DownloadLiveboardAsXlsx` - action ID to show or hide the XLSX option in the *Download* modal.
+
+| CSV download
+a| `isLiveboardXLSXCSVDownloadEnabled` +
+Enables the XLSX and CSV download options in the *Download* modal.
+a| `Action.DownloadLiveboardAsCsv` - action ID to show, hide, or disable the CSV option in the *Download* modal.
+
+| PDF cover and filter pages
+| `coverAndFilterOptionInPDF` is generally available and enabled by default. The *Include cover page* and *Include filter page(s)* checkboxes appear in the PDF download modal.
+a| Use `Action.CoverAndFilterOptionInPDF` to hide the checkboxes for including or excluding cover and filter pages in the Liveboard PDF download dialog.
+|=====
+
+==== Example
+The following example enables the *PDF (Continuous)*, *XLSX*, and *CSV* options in the Liveboard *Download* modal.
+
+[source,javascript]
+----
+const embed = new LiveboardEmbed('#tsEmbed', {
+  isContinuousLiveboardPDFEnabled: true,
+  isLiveboardXLSXCSVDownloadEnabled: true,
+});
+----
+
+To hide or disable the download options, specify the following action IDs:
+
+[source,javascript]
+----
+const embed = new LiveboardEmbed('#tsEmbed', {
+  //...
+  hiddenActions: [
+    Action.DownloadLiveboard, // Hides the Download parent action from the more options menu
+    Action.DownloadLiveboardAsContinuousPDF, // Hides the Continuous PDF download option from the Download modal
+    Action.DownloadLiveboardAsCsv, // Hides the CSV download option from the Download modal
+    Action.DownloadLiveboardAsXlsx // Hides the XLSX download option from the Download modal
+  ],
+  // Use either `hiddenActions` or visibleActions, not both, to avoid errors
+  //visibleActions: [
+    //Action.DownloadLiveboard, // Shows the Download parent action in the more options menu
+    //Action.DownloadLiveboardAsContinuousPDF, // Shows the Continuous PDF download option
+    //Action.DownloadLiveboardAsCsv, // Shows the CSV download option
+    //Action.DownloadLiveboardAsXlsx // Shows the XLSX download option
+  //]
+});
+----
+
+[source,javascript]
+----
+const embed = new LiveboardEmbed('#tsEmbed', {
+  //...
+  disabledActions: [
+    Action.DownloadLiveboard,// Disables the Download parent action in the more options menu
+    Action.DownloadLiveboardAsContinuousPDF, // Disables the Continuous PDF download option in the Download modal
+    Action.DownloadLiveboardAsCsv, // Disables the CSV download option in the Download modal
+    Action.DownloadLiveboardAsXlsx, // Disables the XLSX download option in the Download modal
+  ],
+});
+----
+
+==== HostEvent workflow for the download actions
+Use the HostEvent IDs to trigger download actions on an embedded Liveboard.
+
+* `HostEvent.DownloadLiveboardAsContinuousPDF` +
+To open the *Download* modal with the continuous PDF download option selected.
+* `HostEvent.DownloadAsPdf` +
+To trigger the standard PDF (A4) download action. To download a specific Liveboard visualization, specify the GUID of the visualization in the `vizId` key.
+* `HostEvent.DownloadAsXlsx` +
+To open the *Download* modal with the XLSX option selected when `isLiveboardXLSXCSVDownloadEnabled` is enabled in the embed view.
+* `HostEvent.DownloadAsCsv` +
+To open the *Download* modal with the CSV option selected when `isLiveboardXLSXCSVDownloadEnabled` is enabled in the embed view.
+
+[#_liveboard_grouping_and_styling]
+=== Liveboard grouping and styling
+You can create a visual group of Answers and note tiles together in the Liveboard. You can select multiple Answers and notes in the Liveboard editor. You can also style parts of the Liveboard, groups, and Answers with the styling panel.
+
+This feature is generally available and enabled by default on ThoughtSpot embedded instances. You can control it using the `isLiveboardMasterpiecesEnabled` property in the SDK.
+
+Note the following changes that occur in the Liveboard UI and layout when this feature is enabled.
+
+* All tiles on the Liveboard have a default border and an increased border-radius, resulting in more pronounced curved corners. This is part of the broader visualization tile customization options to enhance the visual appearance of charts and tables.
+* For Note tiles, the default scrollbar is now hidden for long content. Users must scroll within the tile area itself, and if the tile is not sized appropriately for its content, it may appear clipped due to the new container styles. This change emphasizes the importance of sizing Note tiles to avoid content being visually cut off.
+* If a Liveboard is saved with Groups in the ThoughtSpot interface, but the embedding code has the grouping and styling feature disabled (`isLiveboardMasterpiecesEnabled` is set to `false`), the Liveboard fails to load and returns an error.
 +
 [.bordered]
 [.widthAuto]
@@ -477,7 +755,9 @@ It is important to note the following changes which happen in the Liveboard UI a
 image::./images/lb-grp-styling-error.png[Liveboard with groups styling error]
 --
 +
-To embed a Liveboard that uses Groups, you must set `isLiveboardMasterpiecesEnabled` to `true` in your embedding configuration. This is required for compatibility with the new grouping and styling features; otherwise, the embedded Liveboard will not render correctly.
+To embed a Liveboard that uses Groups, ensure that `isLiveboardMasterpiecesEnabled` is set to `true` in your embedding configuration. This is required for compatibility with the grouping and styling features; otherwise, the embedded Liveboard does not render correctly.
+
+For more information, see link:https://docs.thoughtspot.com/software/latest/liveboard-grouping-styling[Liveboard grouping and styling, window=_blank].
 
 [#grp-style]
 ==== CSS variables for visualization groups and style elements
@@ -485,7 +765,7 @@ Use the following variables to customize the Liveboard visualization groups and 
 
 [NOTE]
 ====
-To enable this feature contact ThoughtSpot support and set `isLiveboardMasterpiecesEnabled` to `true` in the SDK .
+These variables apply when the Liveboard grouping and styling feature is enabled (`isLiveboardMasterpiecesEnabled` is set to `true`).
 ====
 
 [width="100%" cols="7,7"]
