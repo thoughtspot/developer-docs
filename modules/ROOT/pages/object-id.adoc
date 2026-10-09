@@ -1,0 +1,236 @@
+= Object ID (obj_id)
+:toc: true
+:toclevels: 2
+
+:page-title: Object ID (obj_id)
+:page-pageid: object-id
+:page-description: Use Object ID (obj_id) to reference ThoughtSpot objects by a stable, user-defined identifier across Orgs and instances
+
+Every object in ThoughtSpot has a system-generated GUID. GUIDs are minted per instance, so the same Liveboard promoted from a development environment to a production environment has a different GUID in each one.
+
+An Object ID (`obj_id`) is a customer-defined, human-readable identifier that you assign to an object in addition to its GUID. An `obj_id` survives renames, TML export and import, and moves between Orgs and instances. Because you choose the value, related copies of an object in different Orgs can share the same `obj_id`, and your deployment scripts, Git-based CI/CD pipelines, and host application can reference the object without maintaining a GUID mapping for each environment.
+
+Object ID is generally available from ThoughtSpot Cloud 26.9.0.cl.
+
+== Key concepts
+
+* `obj_id` is *user-settable* and *unique per Org*. Each Org can have only one object with a particular `obj_id`.
+* The combination of Org ID and `obj_id` is the uniqueness key, so the same `obj_id` in two Orgs refers to two different objects. This is by design.
+* The `obj_id` of an object is returned as `metadata_obj_id` in the `POST /api/rest/2.0/metadata/search` API response, and as `obj_id` in TML.
+* Object ID is the key that TML-based deployment, xref:publishing-overview.adoc[publishing], and xref:git-provider-integration.adoc[Git provider integration] build on.
+
+== Enable Object ID
+
+Object ID must be enabled on your ThoughtSpot instance before `obj_id` participates in TML export, TML import, and metadata search. Until it is enabled, ThoughtSpot continues to resolve objects by GUID and name.
+
+To use `obj_id` in ThoughtSpot URLs, an additional setting is required. For more information, see xref:object-id-in-urls.adoc[Object ID in ThoughtSpot URLs].
+
+== Supported object types
+
+The following object types support `obj_id`:
+
+[cols="2,2,4", options="header"]
+|===
+|Object type |TML kind |Notes
+
+|Liveboard |`liveboard` |Exported in TML and resolved first on import.
+|Answer |`answer` |
+|Model |`model` |Includes Worksheets.
+|Table |`table` |
+|SQL View |`sql_view` |
+|Column |None |Supported on columns within Tables and Models.
+|Connection |`connection` |
+|Collection |None |
+|Custom action |None |Supported for custom actions managed through the API or the server.
+|Personalized View |None |For information about importing Personalized Views with `obj_id`, see xref:tml-import.adoc[TML import].
+|Variable |None |Supported from 26.10.0.cl. Template variables can also reference Object IDs from 26.10.0.cl.
+|Memory |None |Carries an Object ID through the Model it is tagged to.
+|Group |None |
+|Role |None |
+|===
+
+[IMPORTANT]
+====
+The `obj_id` field appears in the TML of every object kind, but TML import honors it only for the supported object types. The presence of `obj_id` in a TML file does not mean that the object type supports Object ID.
+====
+
+=== Objects that do not support obj_id
+
+The following objects do not have an `obj_id`:
+
+[cols="2,5", options="header"]
+|===
+|Object |Behavior
+
+|Visualization on a Liveboard
+|In TML, a visualization is identified only by `viz_guid`. Objects that reference a visualization, such as Monitor alerts, Liveboard schedules, and related links, depend on a GUID that differs between Orgs.
+
+|Liveboard tab
+|A tab is identified only by its `id`, which is a GUID.
+
+|Monitor alert (KPI alert)
+|The alert has no `obj_id` of its own. Its TML includes `pinboard_obj_id` and `answer_obj_id`, which resolve on import, but the visualization reference is a GUID that must already exist in the target environment.
+
+|Schedule
+|Liveboard schedules reference visualizations through `included_viz_id`, which is a GUID.
+
+|Webhook
+|The `obj_id` field is present in webhook TML but is ignored on import.
+
+|Parameter
+|Parameters have no `obj_id` and do not migrate by name.
+
+|Semantic integration
+|Semantic integrations have no `obj_id` and do not migrate by name.
+
+|User
+|Users are identified by name in TML and migrate without an `obj_id`.
+
+|Tag
+|Tags are identified by name in TML and migrate without an `obj_id`.
+
+|Org
+|Orgs are part of the uniqueness key (Org ID + `obj_id`), so they do not have an `obj_id` themselves.
+|===
+
+=== TML kinds that ignore obj_id on import
+
+The `obj_id` field is present in the following TML kinds but is ignored during import:
+
+* `Join`
+* `user_object`
+* `webhook`
+* `column_security_rules`
+* `nl_instruction`
+* `column_alias`
+* `nls_feedback`
+* `cohort`
+* `monitor_alert`
+
+== obj_id format and constraints
+
+An `obj_id` value must meet the following requirements:
+
+[cols="2,4", options="header"]
+|===
+|Constraint |Requirement
+
+|Length |1 to 64 characters
+|Allowed characters |Letters, digits, and the special characters hyphen (`-`), underscore (`_`), period (`.`), and tilde (`~`). Spaces are not allowed.
+|Uniqueness |Unique within an Org
+|===
+
+*Valid examples:* `sales-weekly-performance`, `finance_ledger.prod`, `retail~kpis-v2`
+
+[TIP]
+====
+Do not use a value that has the same format as a GUID. When ThoughtSpot resolves an identifier in a URL, a GUID-shaped value is always tried as a GUID first, so a GUID-shaped `obj_id` might not resolve as expected.
+====
+
+== How objects get an obj_id
+
+* New objects are assigned an `obj_id` when they are created.
+* Objects that existed before Object ID was enabled are not assigned an `obj_id` retroactively. They receive an automatically generated `obj_id` the first time the object is updated or imported through TML.
+* You can assign or change the `obj_id` of any supported object at any time. For more information, see <<_setting_and_updating_obj_id,Setting and updating obj_id>>.
+
+An automatically generated `obj_id` appends the first segment of the object's GUID to the object name. For example, `RetailSalesRAD-KPIs-c1e4043a`. If the `metadata_obj_id` property in the `/metadata/search` API response is `null`, the object has not been updated since Object ID was enabled.
+
+== obj_id resolution
+
+How ThoughtSpot resolves an identifier depends on where you use it.
+
+=== REST API endpoints
+
+When an identifier is passed to a REST API v2.0 endpoint that accepts an `object_identifier`, ThoughtSpot resolves it in the following order:
+
+. `obj_id`
+. GUID
+. Name
+
+This allows `obj_id` to be used anywhere a GUID or name is accepted in those fields. Existing integrations that use GUIDs or names continue to work.
+
+The `POST /api/rest/2.0/metadata/search` endpoint and the metadata update endpoints also accept an `obj_identifier` field. When you use `obj_identifier`, ThoughtSpot resolves the value strictly as an `obj_id`, without falling back to the object name.
+
+=== TML import
+
+During TML import, ThoughtSpot matches the TML to an existing object in the following order:
+
+. `obj_id`
+. GUID
+. Name
+
+If the `obj_id` in the TML does not match any object in the target Org, ThoughtSpot falls back to the GUID in the TML and updates that object. The import returns a `WARNING` status in this case. It does not create a duplicate object or fail the import.
+
+=== ThoughtSpot URLs
+
+In ThoughtSpot URLs, a GUID is always tried first, and object names are never resolved. For more information, see xref:object-id-in-urls.adoc[Object ID in ThoughtSpot URLs].
+
+[NOTE]
+====
+`obj_id` resolution is always scoped to the Org of the user making the request. The Org ID + `obj_id` combination uniquely identifies an object across the entire ThoughtSpot instance.
+====
+
+== Setting and updating obj_id
+
+You can set or change the `obj_id` of an object by using the REST API or by editing the object's TML.
+
+=== Using the update-obj-id API
+
+The `POST /api/rest/2.0/metadata/update-obj-id` endpoint updates the `obj_id` of one or more objects. Identify each object by its GUID (`metadata_identifier`) or by its current `obj_id` (`current_obj_id`).
+
+Using the GUID:
+
+[,json]
+----
+{
+  "metadata": [
+    {
+      "metadata_identifier": "c1e4043a-4524-4fcb-a20f-9e7aff4dc972",
+      "new_obj_id": "sales-pipeline-v1"
+    }
+  ]
+}
+----
+
+Using the current `obj_id`:
+
+[,json]
+----
+{
+  "metadata": [
+    {
+      "current_obj_id": "sales-pipeline-v1-c1e4043a",
+      "new_obj_id": "sales-pipeline-v1"
+    }
+  ]
+}
+----
+
+The request accepts an array, so you can update multiple objects in a single API call.
+
+=== Using the metadata headers update API
+
+The `POST /api/rest/2.0/metadata/headers/update` endpoint also sets the `obj_id` in an object's header. From 26.10.0.cl, this endpoint and the `update-obj-id` endpoint support the `ROLE` and `TEMPLATE_VARIABLE` types.
+
+=== Using TML
+
+Set the `obj_id` property in the object's TML and import the TML. For examples, see xref:deploy-with-tml-apis.adoc[Deploy with TML APIs].
+
+== Behavior and limitations
+
+Renaming an obj_id::
+After you change an object's `obj_id`, the previous value no longer resolves. Integrations, scripts, and URLs that use the old value must be updated to use the new value.
+
+Org scope::
+The same `obj_id` in two Orgs resolves to two different objects. Make sure requests are made in the context of the Org where the `obj_id` is set.
+
+Delete operations::
+The `POST /api/rest/2.0/metadata/delete` endpoint does not accept `obj_identifier`. Use GUIDs when deleting objects in automation scripts.
+
+== Related resources
+
+* xref:object-id-in-urls.adoc[Object ID in ThoughtSpot URLs]
+* xref:intro-thoughtspot-objects.adoc[ThoughtSpot objects]
+* xref:development-and-deployment.adoc[Development and deployment]
+* xref:deploy-with-tml-apis.adoc[Deploy with TML APIs]
+* xref:tml-import.adoc[TML import]

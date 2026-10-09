@@ -1,0 +1,122 @@
+= Object ID in ThoughtSpot URLs
+:toc: true
+:toclevels: 2
+
+:page-title: Object ID in ThoughtSpot URLs
+:page-pageid: object-id-urls
+:page-description: Use an Object ID (obj_id) instead of a GUID in ThoughtSpot URLs so that deep links work in every environment
+
+You can use an object's xref:object-id.adoc[Object ID] (`obj_id`) in place of its GUID in a ThoughtSpot URL. Because you assign the same `obj_id` to an object in every environment, a URL built with an `obj_id` opens the correct object in development, staging, and production.
+
+Object ID in ThoughtSpot URLs is available from ThoughtSpot Cloud 26.11.0.cl and ThoughtSpot Software 27.3.0.sw. The feature is disabled by default.
+
+== When to use Object ID in URLs
+
+GUIDs are generated separately on each ThoughtSpot instance and in each Org. When content is promoted from one environment to another, every object gets a new GUID, so any URL built with a GUID works only in the environment where it was created. Without Object ID, embedded applications and deployment pipelines have to maintain a GUID mapping table for each environment and update it after every deployment.
+
+Use `obj_id` in URLs if:
+
+* Your host application builds ThoughtSpot URLs or deep links programmatically.
+* You promote content across environments by using TML or a CI/CD pipeline.
+* You want links to keep working after content is redeployed.
+
+With `obj_id`, you assign a stable identifier to an object once and use it in every environment.
+
+== Before you begin
+
+* Object ID must be enabled on your instance. For more information, see xref:object-id.adoc#_enable_object_id[Enable Object ID].
+* The objects you want to link to must have an `obj_id`. Objects created before Object ID was enabled do not have an `obj_id` until one is assigned or generated. For more information, see xref:object-id.adoc#_how_objects_get_an_obj_id[How objects get an obj_id].
+
+== Enable Object ID in URLs
+
+Object ID in URLs is disabled by default and there is no setting for it in the ThoughtSpot UI. To enable it on your instance, contact ThoughtSpot Support. The feature is enabled without a restart.
+
+[NOTE]
+====
+Enabling this feature affects only URLs. Object ID in REST APIs and TML works independently of this setting.
+====
+
+== Supported URLs
+
+You can use an `obj_id` in place of the GUID in the following URLs:
+
+[cols="2,4", options="header"]
+|===
+|Object |URL format
+
+|Liveboard |`https://{ThoughtSpot-host}/#/insights/pinboard/{id}`
+|Answer |`https://{ThoughtSpot-host}/#/insights/answer/{id}`
+|Collection |`https://{ThoughtSpot-host}/insights/collections/{id}` +
+In nested collection paths, each segment is resolved separately.
+|Model, Worksheet, Table, or View |`https://{ThoughtSpot-host}/#/data/tables/{id}`
+|Connection |`https://{ThoughtSpot-host}/#/data/embrace/{id}`
+|===
+
+In each URL, `{id}` can be either the object's GUID or its `obj_id`. Both formats are accepted on the same URLs.
+
+=== Example
+
+A Liveboard URL with a GUID differs in each environment:
+
+----
+https://{ThoughtSpot-host}/#/insights/pinboard/a3f9c2e1-7b44-4d8e-9f10-6c2b5e8d1a07
+----
+
+The same Liveboard URL with an `obj_id` is identical in development, staging, and production:
+
+----
+https://{ThoughtSpot-host}/#/insights/pinboard/sales-weekly-performance
+----
+
+== How ThoughtSpot resolves the identifier in a URL
+
+ThoughtSpot resolves the identifier in a URL on the server, in the following order:
+
+. *GUID first.* If the identifier is a GUID that matches an existing object of the expected type, ThoughtSpot opens that object. An `obj_id` can never override a valid GUID.
+. *Object ID.* Otherwise, ThoughtSpot looks up the identifier as an `obj_id` in the current user's Org.
+. *Type check.* If the `obj_id` belongs to an object of a different type, for example, a Model `obj_id` in a Liveboard URL, the object is not opened.
+
+[IMPORTANT]
+====
+Object names are never resolved in URLs. Only the GUID or the `obj_id` of an object can be used.
+====
+
+== Unsupported objects
+
+The following objects do not have a URL in ThoughtSpot, so `obj_id` cannot be used to open them in a URL. You can still reference them by `obj_id` through the REST APIs.
+
+* Groups
+* Roles
+* Custom actions
+* Columns
+* Personalized Views
+* Visualizations and tabs within a Liveboard
+
+== Backward compatibility
+
+* All existing GUID-based URLs, bookmarks, and saved links continue to work.
+* There is no breaking change to the Visual Embed SDK public API.
+* You can adopt `obj_id` gradually. For example, you can move high-value deep links to `obj_id` and keep using GUIDs for other links.
+
+== Limitations
+
+* If you change an object's `obj_id`, URLs that use the previous value no longer resolve. Update any links that use the old value.
+* `obj_id` values are unique within an Org. The same `obj_id` in two Orgs opens a different object in each Org.
+* For the `obj_id` format and character limit, see xref:object-id.adoc#_obj_id_format_and_constraints[obj_id format and constraints].
+
+== Troubleshooting
+
+An obj_id in a URL returns an invalid identifier error (HTTP 400)::
+Object ID in URLs is not enabled on your instance, or the object type is not supported in URLs. If the same `obj_id` works in REST API requests, the URL feature is not enabled. Contact ThoughtSpot Support to enable it. This is a configuration setting, not a defect.
+
+The URL opens a different object than expected::
+The `obj_id` is resolved in the Org of the user who opens the URL. Make sure the user is in the Org where the `obj_id` was set.
+
+An obj_id in GUID format does not resolve::
+A value in GUID format is always tried as a GUID first. If a real object has that GUID, that object is opened. Assign the object an `obj_id` that is not in GUID format.
+
+== Related resources
+
+* xref:object-id.adoc[Object ID (obj_id)]
+* xref:intro-thoughtspot-objects.adoc[ThoughtSpot objects]
+* xref:development-and-deployment.adoc[Development and deployment]
