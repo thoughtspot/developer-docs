@@ -17,105 +17,24 @@ The following figure illustrates the object model hierarchy in ThoughtSpot withi
 image::./images/object_model_hierarchy.png[Object Model Hierarchy]
 
 == Object identifiers
-Every object in ThoughtSpot has a globally unique ID (GUID), visible in URLs and in REST API responses as the `id` or `metadata_id` property. GUIDs are unique within a ThoughtSpot instance and thus cannot repeat in different Orgs.
 
-Objects have an additional `obj_id` property that is *user-settable* and *unique per Org*. It appears as `metadata_obj_id` in responses from the `/metadata/search` REST API.
+[#object-identifiers]
+Every object in ThoughtSpot has a globally unique ID (GUID), visible in URLs and in REST API responses as the `id` or `metadata_id` property. GUIDs are unique within a ThoughtSpot instance and thus cannot repeat in different Orgs. Because GUIDs are generated separately on each instance, a copy of an object in another Org or instance has a different GUID.
 
-Each Org can have one object with a particular `obj_id`. The combination of `org_id` + `obj_id` is unique per instance, so it is equivalent to the object's GUID.
+[#_supported_object_types]
+Supported objects also have an Object ID (`obj_id`) property that is *user-settable* and *unique per Org*. The combination of `org_id` + `obj_id` is unique per instance, so it is equivalent to the object's GUID. The `obj_id` appears as `metadata_obj_id` in responses from the `/metadata/search` REST API.
 
-`obj_id` enables TML export and import across Orgs and instances, allowing ThoughtSpot to automatically determine the object's GUID without manual GUID mapping.
+[#_obj_id_format_and_constraints]
+Because you choose the `obj_id`, related copies of an object in different Orgs and instances can share the same value. This allows ThoughtSpot to match objects during TML import without manual GUID mapping, and allows you to reference objects in REST API requests and ThoughtSpot URLs with the same identifier in every environment.
 
-=== Supported object types
+[#_obj_id_resolution]
+For more information, see the following pages:
 
-Currently, `obj_id` is supported for the following object types:
-
-// SOURCE: PRD doc section "Requirements"; SCAL-317366 description
-
-* Answers
-* Data Model
-* Logical Tables
-* Liveboards
-* Visualizations
-* Collections
-* Personalized Views
-* Roles
-* Template variables
-
-=== obj_id format and constraints
-
-// SOURCE: PRD doc section "Identity Constraints and Object-ID Specification"; SCAL-314582
-`obj_id` values must meet the following requirements:
-
-[cols="2,3", options="header"]
-|===
-|Constraint | Requirement
-
-|Allowed characters | Lowercase alphanumeric, dots, and hyphens: `[a-z0-9.-]`
-|Casing | Strictly lowercase
-|Maximum length | 64 characters
-|GUID exclusion | Must not match a standard GUID format to prevent ambiguity
-|===
-
-*Valid examples:* `sales.pipeline.v1`, `finance-ledger-prod`, `ingestion-worker-01`
-
-=== obj_id resolution
-
-// SOURCE: PRD doc section "Deterministic Keying and Distributed Consistency"; SCAL-317366
-When an identifier is passed to a REST API endpoint that accepts an `object_identifier`, ThoughtSpot resolves it in the following order:
-
-. `obj_id` (user-defined identifier)
-. GUID
-. Name
-
-This resolution order enables `obj_id` to be used anywhere a GUID or name is accepted in the REST API v2.0 endpoints that support the `object_identifier` field. Backward compatibility with existing GUID-based and name-based integrations is fully maintained.
-
-[NOTE]
-====
-`obj_id` resolution is scoped to the Org. An `obj_id` value is unique within a single Org. The `org_id` + `obj_id` combination uniquely identifies an object across the entire ThoughtSpot instance.
-====
-
-=== Setting and updating obj_id
-
-`obj_id` values can be set or updated using the following REST API endpoints:
-
-* `POST /api/rest/2.0/metadata/update-obj-id` +
-Updates the `obj_id` for one or more metadata objects. Accepts the object's GUID (`metadata_identifier`) or its current `obj_id` (`current_obj_id`).
-
-// SOURCE: deploy-with-tml-apis.adoc; SCAL-317366
-[,json]
-----
-{
-  "metadata": [
-    {
-      "metadata_identifier": "c1e4043a-4524-4fcb-a20f-9e7aff4dc972",
-      "new_obj_id": "sales-pipeline-v1"
-    }
-  ]
-}
-----
-
-Or, using the current `obj_id`:
-
-[,json]
-----
-{
-  "metadata": [
-    {
-      "current_obj_id": "sales-pipeline-v1-c1e4043a",
-      "new_obj_id": "sales-pipeline-v1"
-    }
-  ]
-}
-----
-
-The request accepts an array, allowing multiple objects to be updated in a single API call.
-
-[NOTE]
-====
-Objects are assigned an automatic `obj_id` after the first change to the object once the feature is enabled on your instance. The auto-generated format appends the first segment of the GUID: for example, `RetailSalesRAD-KPIs-c1e4043a`. If the `metadata_obj_id` property in the `/metadata/search` response is `null`, the object has not been updated since the feature was enabled.
-====
-
-For information about using `obj_id` in CI/CD workflows, see xref:deploy-with-tml-apis.adoc[Deploy with TML APIs] and xref:development-and-deployment.adoc[Development and deployment].
+[#_setting_and_updating_obj_id]
+* xref:object-id.adoc[Object ID (obj_id)] +
+Supported object types, `obj_id` format and constraints, how identifiers are resolved, and how to set or update an `obj_id`.
+* xref:object-id-in-urls.adoc[Object ID in ThoughtSpot URLs] +
+Use an `obj_id` instead of a GUID in Liveboard, Answer, Collection, data object, and connection URLs.
 
 == Data modeling
 A data model requires at least one link:https://docs.thoughtspot.com/cloud/latest/connections[connection, window=_blank] and one link:https://docs.thoughtspot.com/cloud/latest/connect-data[Table, window=_blank] to use link:https://docs.thoughtspot.com/cloud/latest/search-data[Search data, window=_blank] to create content.
@@ -179,19 +98,28 @@ ThoughtSpot's link:https://docs.thoughtspot.com/cloud/latest/data-security[acces
 * The author can share the object with their groups using the *Shareable* property.
 * The author can share the object with other users in *Shareable* groups that the *author* belongs to, and if the other *user* is also marked *Shareable*.
 
-An administrator can share any object with any group or user without restrictions. ThoughtSpot administrators can add users locally link:https://docs.thoughtspot.com/cloud/latest/user-management[in the UI, window=_blank] or via xref:user-api.adoc[REST API]. Similarly, they can manage groups and sharing privileges by using the *Groups* feature in the UI or via REST API.
+An administrator can share any object with any group or user without restrictions. ThoughtSpot administrators can add users locally link:https://docs.thoughtspot.com/cloud/latest/user-management[in the UI, window=_blank] or via xref:api-user-management.adoc[REST API v2.0]. Similarly, they can manage groups and sharing privileges by using the *Groups* feature in the UI or via xref:api-user-management.adoc[REST API v2.0].
 
 === Single sign-on
 If xref:configure-saml.adoc[SAML] or xref:configure-oidc.adoc[OpenID Connect (OIDC)] integration is enabled on your instance, users who authenticate with external identity providers (IdP) can log in to ThoughtSpot with their Single Sign-On credentials.
 Embedded ThoughtSpot instances also support the xref:trusted-authentication.adoc[trusted authentication] method to sign in application users.
 
 == Object properties in REST API
-Object representations in the ThoughtSpot REST API include the following properties:
+The `POST /api/rest/2.0/metadata/search` REST API v2.0 endpoint returns the following properties for each object:
+
+* `metadata_id` +
+GUID of the object. Unique within a given ThoughtSpot instance.
+* `metadata_obj_id` +
+User-defined string identifier for the object (`obj_id`). Unique within a given Org. For more information, see xref:object-id.adoc[Object ID (obj_id)].
+* `metadata_name` +
+Name of the object.
+* `metadata_type` +
+Object type, for example, `LIVEBOARD`. For the list of types, see <<_object_names_in_rest_api_v1,Object types in REST API v2.0>>.
+
+The `metadata_header` object in the response includes the following properties:
 
 * `id` +
-GUID of the object. Unique within a given ThoughtSpot instance.
-* `obj_id` +
-User-defined string identifier for the object. Unique within a given Org.
+GUID of the object. Same as `metadata_id`.
 * `author` +
 GUID of the user who created / uploaded the object, or had the object transferred to them.
 * `owner` +
@@ -205,25 +133,31 @@ GUID of the user who last modified the object.
 * `tags` +
 Array of tag objects representing the tags assigned to the object.
 
-== Object names in REST API v1
-Object type names in ThoughtSpot REST API v1 differ from the current names shown in the ThoughtSpot UI. Data objects have both a `type` and a `subtypes` field in the REST API, allowing you to request all valid data objects or specify an individual subtype.
+For more information, see xref:rest-api-v2-metadata-search.adoc[Metadata search API].
 
-The following notation is used in REST API v1 for object types:
+[#_object_names_in_rest_api_v1]
+== Object types in REST API v2.0
+Object type names in ThoughtSpot REST API v2.0 differ from the names shown in the ThoughtSpot UI. Use the following values in the `type` attribute of REST API v2.0 requests, such as `/metadata/search`:
 
-* *Answers*: `QUESTION_ANSWER_BOOK`
-* *Liveboards*: `PINBOARD_ANSWER_BOOK`
-* *Connections*: `DATA_SOURCE`
-* *Data objects*: `LOGICAL_TABLE`, with the following subtypes:
-** *Tables*: `ONE_TO_ONE_LOGICAL`
-** *Models*: `WORKSHEET`
-** *Views*: `AGGR_WORKSHEET`
-** *SQL views*: `SQL_VIEW`
-** *CSV imported data*: `USER_DEFINED`
+* *Liveboards*: `LIVEBOARD`
+* *Answers*: `ANSWER`
+* *Connections*: `CONNECTION`
+* *Data objects*: `LOGICAL_TABLE`
 * *Joins*: `LOGICAL_RELATIONSHIP`
 * *Columns*: `LOGICAL_COLUMN`
 * *Tags*: `TAG`
 * *Users*: `USER`
 * *Groups*: `USER_GROUP`
+* *Collections*: `COLLECTION`
+
+For the `LOGICAL_TABLE` type, you can also specify the following values in the `subtypes` attribute to filter the results:
+
+* *Tables*: `ONE_TO_ONE_LOGICAL`
+* *Models*: `WORKSHEET`
+* *Private Models*: `PRIVATE_WORKSHEET`
+* *Views*: `AGGR_WORKSHEET`
+* *SQL Views*: `SQL_VIEW`
+* *CSV imported data*: `USER_DEFINED`
 
 Column and join objects with their own GUIDs do exist within the ThoughtSpot system, but they are connected to *Tables*, *Models*, or other data objects. Columns and joins can be viewed or modified only within the context of the data object to which they belong.
 
