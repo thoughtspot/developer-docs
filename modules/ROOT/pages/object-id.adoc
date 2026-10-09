@@ -151,6 +151,18 @@ This allows `obj_id` to be used anywhere a GUID or name is accepted in those fie
 
 The `POST /api/rest/2.0/metadata/search` endpoint and the metadata update endpoints also accept an `obj_identifier` field. When you use `obj_identifier`, ThoughtSpot resolves the value strictly as an `obj_id`, without falling back to the object name.
 
+In the `/metadata/search` API, `obj_identifier` is supported for the following object types:
+
+* `LIVEBOARD`
+* `ANSWER`
+* `LOGICAL_TABLE`
+* `LOGICAL_COLUMN`
+* `CONNECTION`
+* `USER_GROUP`
+* `COLLECTION`
+
+Other object types, such as Roles and Personalized Views, can have an `obj_id`, but you cannot search for them by `obj_identifier`. To find these objects, search by GUID or name and read the `metadata_obj_id` value in the response.
+
 === TML import
 
 During TML import, ThoughtSpot matches the TML to an existing object in the following order:
@@ -176,7 +188,22 @@ You can set or change the `obj_id` of an object by using the REST API or by edit
 
 === Using the update-obj-id API
 
-The `POST /api/rest/2.0/metadata/update-obj-id` endpoint updates the `obj_id` of one or more objects. Identify each object by its GUID (`metadata_identifier`) or by its current `obj_id` (`current_obj_id`).
+The `POST /api/rest/2.0/metadata/update-obj-id` endpoint updates the `obj_id` of one or more objects. The endpoint uses the metadata header update mechanism to apply the change.
+
+Required privileges::
+`DATAMANAGEMENT` (*Can manage data*) or `ADMINISTRATION` (*Can administer ThoughtSpot*). If Role-Based Access Control (RBAC) is enabled, the `ORG_ADMINISTRATION` (*Can manage Orgs*) privilege is also required.
+
+Request parameters::
+For each object in the `metadata` array:
++
+* Identify the object by using either `current_obj_id` alone, or `metadata_identifier`.
+* `metadata_identifier` accepts the object's GUID or name. If you use the name, you must also specify the object `type`, for example, `ANSWER` or `LOGICAL_TABLE`.
+* `new_obj_id` is always required. The value must follow the xref:object-id.adoc#_obj_id_format_and_constraints[obj_id format] and be unique within the Org.
+
+[TIP]
+====
+Before updating Object IDs, export the TML of the objects as a backup.
+====
 
 Using the GUID:
 
@@ -206,7 +233,39 @@ Using the current `obj_id`:
 }
 ----
 
-The request accepts an array, so you can update multiple objects in a single API call.
+Using the object name and type:
+
+[,json]
+----
+{
+  "metadata": [
+    {
+      "metadata_identifier": "Sales Pipeline",
+      "type": "ANSWER",
+      "new_obj_id": "sales-pipeline-answer"
+    }
+  ]
+}
+----
+
+The request accepts an array, so you can update multiple objects in a single API call. Each object in the array can use a different identification method:
+
+[,json]
+----
+{
+  "metadata": [
+    {
+      "current_obj_id": "retail-kpis-c1e4043a",
+      "new_obj_id": "retail-kpis"
+    },
+    {
+      "metadata_identifier": "Sales Model",
+      "type": "LOGICAL_TABLE",
+      "new_obj_id": "sales-model"
+    }
+  ]
+}
+----
 
 === Using the metadata headers update API
 
