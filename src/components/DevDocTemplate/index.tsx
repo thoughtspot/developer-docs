@@ -12,6 +12,7 @@ import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { Analytics } from '@vercel/analytics/react';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
+import { useRadianceTheme } from '../../utils/radiance';
 import { passThroughHandler, fetchChild, getPageIdFromHref } from '../../utils/doc-utils';
 import Header from '../Header';
 import SecondaryHeader, { DocCategory, CATEGORY_PAGEIDS, CATEGORY_NAV_ID } from '../SecondaryHeader';
@@ -20,6 +21,7 @@ import Docmap from '../Docmap';
 import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
+import '../../assets/styles/radiance-home.css';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './playGround/RESTAPI';
 import GraphQLPlayGround from './playGround/GraphQL';
@@ -129,6 +131,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return prefersDark;
     });
     const [key, setKey] = useState('');
+
+    // Keeps the Radiance hero surface (home.adoc) in the site's current theme.
+    useRadianceTheme(isDarkMode);
 
     // Pre-process all category nav HTMLs once ({{navprefix}} substitution applied to each)
     const processedNavMap = React.useMemo(() =>
