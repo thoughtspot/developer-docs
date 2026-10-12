@@ -4,121 +4,103 @@
 
 :page-title: Link Customization APIs
 :page-pageid: link-customization-api
-:page-description: Use Link Customization APIs to programmatically manage the URL templates ThoughtSpot uses when generating shareable links.
+:page-description: Use the Link Customization REST API v2 endpoints to manage the URL templates ThoughtSpot uses when generating shareable links.
+:keywords: link customization, shareable links, URL templates, share link, embedded application, REST API
 
 ThoughtSpot generates shareable links for Liveboards, Answers, visualizations, SpotIQ insights, Spotter conversations, and other objects. These links appear in scheduled emails, the Share dialog, and alert notifications.
 
-By default, shareable links point to your ThoughtSpot instance. If you embed ThoughtSpot in your own application, you can redirect these links to your application using the Link Customization APIs. When a user clicks a shared link, they are directed to your embedding application instead of the ThoughtSpot application.
+By default, shareable links point to your ThoughtSpot instance. If you embed ThoughtSpot in your own application, you can use the Link Customization REST API v2 endpoints to redirect these links to your application. When a user clicks a shared link, they are directed to your embedding application instead of the ThoughtSpot application.
 
 [NOTE]
 ====
 The Link Customization APIs are available on ThoughtSpot Cloud 26.11.0.cl and later.
 ====
 
-== Overview
+== Link customization workflow
+Each link type has a URL template with placeholders that ThoughtSpot replaces with the object details when it generates a link. To customize the links:
 
-The Link Customization APIs allow you to read and update the URL templates used when ThoughtSpot generates shareable links. Each link type has a URL template with placeholders that ThoughtSpot substitutes at generation time.
+. <<search-link-customizations, Retrieve the current URL templates>> +
+Call `POST /api/rest/2.0/customization/links/search` to view the templates in effect at the cluster level or for your Org.
+. <<update-link-customizations, Update the URL templates>> +
+Call `POST /api/rest/2.0/customization/links/update` with the `REPLACE` operation to set a template, or with the `RESET` operation to clear an override.
 
-Two endpoints are available:
+=== Scopes
+You can manage the templates at the following scopes:
 
-* **Search** — Retrieves the current URL templates.
-* **Update** — Sets or resets URL templates.
+* `CLUSTER`: Sets the default templates that all Orgs inherit. Available only to callers in the primary Org.
+* `ORG`: Sets the templates for the caller's Org and overrides the cluster default. Requires Orgs to be enabled on your instance.
 
-Templates can be managed at two scopes:
-
-* `CLUSTER` — Sets the default templates that all Orgs inherit. Available only to callers in the primary Org.
-* `ORG` — Sets templates for the caller's Org, overriding the cluster default. Requires Orgs to be enabled.
-
-== Required privileges
-
-These endpoints require one of the following privileges:
+=== Required privileges
+To use the Link Customization APIs, the user requires one of the following privileges:
 
 * `ADMINISTRATION` (**Can administer ThoughtSpot**)
 * `DEVELOPER` (**Has developer privilege**)
 
-== Supported link types and placeholders
+[#link-types]
+=== Supported link types and placeholders
+Each link type requires specific placeholders in its URL template. ThoughtSpot rejects a template that does not include the required placeholders.
 
-Each link type requires specific placeholders in its URL template. A template missing a required placeholder is rejected.
-
-[width="100%" cols="2,2,3"]
-[options='header']
+[cols="2,2,3", options="header"]
 |===
-|Link type |Required placeholders |Example template
-
-|`LIVEBOARD_SHARE_URL`
-|`{object-id}`, `{ts-query-params}`
-|`\https://analytics.acme.com/dashboards/{object-id}?{ts-query-params}`
-
-|`VISUALIZATION_SHARE_URL`
-|`{object-id}`, `{sub-object-id}`, `{ts-query-params}`
-|`\https://analytics.acme.com/dashboards/{object-id}/charts/{sub-object-id}?{ts-query-params}`
-
-|`ANSWER_SHARE_URL`
-|`{object-id}`, `{ts-query-params}`
-|`\https://analytics.acme.com/answers/{object-id}?{ts-query-params}`
-
-|`SPOTIQ_ANALYSIS_URL`
-|`{object-id}`
-|`\https://analytics.acme.com/insights/{object-id}`
-
-|`UNSUBSCRIBE_URL`
-|none
-|`\https://analytics.acme.com/account/email-preferences`
-
-|`GENERIC_URL`
-|`{path}`
-|`\https://analytics.acme.com/{path}`
-
-|`CONVERSATION_SHARE_URL`
-|`{conversation-id}`, `{ts-query-params}`
-|`\https://analytics.acme.com/spotter/{conversation-id}?{ts-query-params}`
+|Link type | Required placeholders | Example template
+| `LIVEBOARD_SHARE_URL`
+| `{object-id}`, `{ts-query-params}`
+| `\https://analytics.acme.com/dashboards/{object-id}?{ts-query-params}`
+| `VISUALIZATION_SHARE_URL`
+| `{object-id}`, `{sub-object-id}`, `{ts-query-params}`
+| `\https://analytics.acme.com/dashboards/{object-id}/charts/{sub-object-id}?{ts-query-params}`
+| `ANSWER_SHARE_URL`
+| `{object-id}`, `{ts-query-params}`
+| `\https://analytics.acme.com/answers/{object-id}?{ts-query-params}`
+| `SPOTIQ_ANALYSIS_URL`
+| `{object-id}`
+| `\https://analytics.acme.com/insights/{object-id}`
+| `UNSUBSCRIBE_URL`
+| None
+| `\https://analytics.acme.com/account/email-preferences`
+| `GENERIC_URL`
+| `{path}`
+| `\https://analytics.acme.com/{path}`
+| `CONVERSATION_SHARE_URL`
+| `{conversation-id}`, `{ts-query-params}`
+| `\https://analytics.acme.com/spotter/{conversation-id}?{ts-query-params}`
 |===
 
-`{ts-query-params}` is optional on any type that does not require it. ThoughtSpot substitutes it wherever it appears and removes it when there is nothing to substitute.
+`{ts-query-params}` is optional for any link type that does not require it. ThoughtSpot substitutes it wherever it appears and removes it when there is nothing to substitute, so it never appears in a generated link.
 
 [#search-link-customizations]
-== Search link customizations
+== Searching link customizations
+The `/api/rest/2.0/customization/links/search` API endpoint retrieves the URL templates that ThoughtSpot uses to generate shareable links, at the cluster level or for the Org that the caller is signed in to. Use this endpoint to verify what an Org has customized before you modify it, or to confirm the destination URLs used in scheduled emails and the Share dialog.
 
-Retrieves the URL templates at the cluster level or for the caller's Org.
-
-=== Endpoint
-
-----
-POST /api/rest/2.0/customization/links/search
-----
+Cluster-level templates are the default that Orgs inherit. Org-level templates override that default.
 
 === Request parameters
-
-[width="100%" cols="2,1,1,4"]
-[options='header']
+[cols="2,4", options="header"]
 |===
-|Parameter |Type |Required |Description
+|Parameter | Description
+| `scope`
+a|__String__. Optional. The scope to retrieve:
 
-|`scope`
-|String
-|No
-|`CLUSTER` or `ORG`. Omit to return whichever scope the caller can access.
+* `CLUSTER` returns the cluster templates. Available only to callers in the primary Org.
+* `ORG` returns the templates for the Org that the caller is signed in to. Requires Orgs to be enabled.
+
+If you omit the parameter, the API returns the scopes that the caller can access.
 |===
-
-=== Response
-
-Returns an array of link preferences. Each entry includes the `scope`, a `templates` array with the `type`, `value`, and `is_overridden` flag for each link type.
-
-The `is_overridden` flag is `true` when the scope stores a value that differs from what it would otherwise inherit.
 
 === Example request
 
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/links/search' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/links/search'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {access_token}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{}'
 ----
 
 === Example response
+If the API request is successful, the API returns an array of link preferences, one for each scope. The following example shows two of the seven link types for each scope. The API always returns all link types, whether they are customized or not.
 
 [source,JSON]
 ----
@@ -137,59 +119,95 @@ curl -X POST \
         "is_overridden": false
       }
     ]
+  },
+  {
+    "scope": "ORG",
+    "org": {
+      "id": 1234567890,
+      "name": "Sales"
+    },
+    "templates": [
+      {
+        "type": "LIVEBOARD_SHARE_URL",
+        "value": "https://analytics.acme.com/dashboards/{object-id}?{ts-query-params}",
+        "is_overridden": true
+      },
+      {
+        "type": "CONVERSATION_SHARE_URL",
+        "value": "https://acme.thoughtspot.cloud/#/insights/conv-assist/s/{conversation-id}?{ts-query-params}",
+        "is_overridden": false
+      }
+    ]
   }
 ]
 ----
 
+=== Response parameters
+[cols="2,4", options="header"]
+|===
+| Parameter | Description
+| `scope` | The scope that the link templates apply to: `CLUSTER` or `ORG`.
+| `org` | The Org that the link templates belong to. Present only when `scope` is `ORG`. Includes the `id` and `name` of the Org.
+| `templates`
+a| The effective URL template for every link type at this scope. Each entry includes the following attributes:
+
+* `type`: The link type. For the list of supported types, see <<link-types,Supported link types and placeholders>>.
+* `value`: The effective URL template at the requested scope.
+* `is_overridden`: `true` when the scope stores a value that differs from the value it would otherwise inherit. For `ORG`, the inherited value is the cluster template. For `CLUSTER`, it is the ThoughtSpot default. The value is `false` when they match.
+|===
+
+=== Response codes
+[cols="1,3", options="header"]
+|===
+| HTTP status code | Description
+| **200** | Link preferences retrieved successfully.
+| **400** | Invalid request.
+| **401** | Authentication token is missing, expired, or invalid.
+| **403** | The caller does not have the required privilege.
+| **500** | Unexpected server error.
+|===
+
 [#update-link-customizations]
-== Update link customizations
-
-Updates the URL templates at the cluster level or for the caller's Org.
-
-=== Endpoint
-
-----
-POST /api/rest/2.0/customization/links/update
-----
+== Updating link customizations
+The `/api/rest/2.0/customization/links/update` API endpoint updates the URL templates that ThoughtSpot uses to generate shareable links, at the cluster level or for the Org that the caller is signed in to. Use this endpoint to point shared links to your embedding application, so that a link in a scheduled email or the Share dialog opens your page instead of the ThoughtSpot application.
 
 === Request parameters
-
-[width="100%" cols="2,1,1,4"]
-[options='header']
+[cols="2,4", options="header"]
 |===
-|Parameter |Type |Required |Description
+|Parameter | Description
+| `scope`
+a|__String__. The scope to apply the templates at:
 
-|`scope`
-|String
-|No
-|`CLUSTER` or `ORG` (default). `CLUSTER` is available only to callers in the primary Org.
+* `ORG` (default) updates the templates for the Org that the caller is signed in to. Requires Orgs to be enabled.
+* `CLUSTER` updates the defaults that all Orgs inherit. Available only to callers in the primary Org.
+| `operation`
+a|__String__. Optional. The operation to perform:
 
-|`operation`
-|String
-|No
-|`REPLACE` (default) sets each listed type to the `value` provided. `RESET` clears each listed type so it falls back to the inherited template.
+* `REPLACE` (default) sets each listed link type to the `value` provided in the request.
+* `RESET` clears each listed link type, so an Org falls back to the cluster template and the cluster falls back to the ThoughtSpot default.
+| `templates`
+a|__Array of objects__. The link types to update. At least one entry is required. For each entry, specify the following attributes:
 
-|`templates`
-|Array
-|Yes
-|List of template objects. Each object requires a `type`. For `REPLACE`, include a `value` with the URL template. For `RESET`, omit `value`.
+* `type`. __String__. The link type. For the list of supported types, see <<link-types,Supported link types and placeholders>>.
+* `value`. __String__. The URL template, including the placeholders that the link type requires. Required for `REPLACE`. Do not specify it for `RESET`.
 |===
 
-=== Behavior
+=== Update behavior
+* This is a partial update. Only the link types listed in `templates` change. All other link types keep their current value, whether it is set at this scope or inherited.
+* The API rejects a request that includes the same link type more than once.
+* The API rejects a request that includes a `value` with the `RESET` operation.
+* To clear every override, list all link types with the `RESET` operation.
+* Resetting at the cluster level changes only the cluster default. An Org that has set its own value keeps it.
 
-* This is a partial update. Only the types listed in `templates` change. Unlisted types keep their current value.
-* A repeated type in the `templates` array is rejected.
-* `RESET` clears the override, so an Org falls back to the cluster template and the cluster falls back to the ThoughtSpot default.
-* Supplying a `value` with a `RESET` operation is rejected.
+=== Example request
 
-=== Example request — Replace a template
-
+.Replace a template
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/links/update' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/links/update'  \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {access_token}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "scope": "ORG",
   "operation": "REPLACE",
@@ -202,14 +220,13 @@ curl -X POST \
 }'
 ----
 
-=== Example request — Reset a template
-
+.Reset a template
 [source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/links/update' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/links/update'  \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {access_token}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "scope": "ORG",
   "operation": "RESET",
@@ -221,31 +238,22 @@ curl -X POST \
 }'
 ----
 
-=== Response
+=== Response codes
+If the API request is successful, the API returns `204 No Content` without a response body.
 
-Returns `204 No Content` on success.
-
-== Error codes
-
-[width="80%" cols="1,3"]
-[options='header']
+[cols="1,3", options="header"]
 |===
-|HTTP status |Description
-
-|`400`
-|Invalid request. For example, a missing required placeholder, a duplicate type, or a `value` supplied with `RESET`.
-
-|`401`
-|Unauthorized. The caller is not authenticated.
-
-|`403`
-|Forbidden. The caller does not have the required privilege.
-
-|`500`
-|Unexpected server error.
+| HTTP status code | Description
+| **204** | Link preferences updated successfully.
+| **400** | Invalid request. For example, a template is missing a required placeholder, a link type is repeated, or a `value` is supplied with `RESET`.
+| **401** | Authentication token is missing, expired, or invalid.
+| **403** | The caller does not have the required privilege.
+| **500** | Unexpected server error.
 |===
 
-== Related information
+== Additional resources
 
-* xref:rest-api-v2-reference.adoc[REST API v2.0 Reference]
+* xref:rest-api-v2-reference.adoc#_link_customization[REST API v2.0 Reference]
 * xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Flink-customization%2Fsearch-link-customizations">REST API Playground - Search link customizations endpoint</a>+++
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Flink-customization%2Fupdate-link-customizations">REST API Playground - Update link customizations endpoint</a>+++

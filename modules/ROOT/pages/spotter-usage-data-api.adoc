@@ -4,221 +4,190 @@
 
 :page-title: Spotter Usage Data APIs
 :page-pageid: spotter-usage-data-api
-:page-description: Use the Spotter Usage Data APIs to manage Spotter question allowances for users, user groups, and Orgs.
+:page-description: Use the Spotter usage data REST API v2 endpoints to manage Spotter question allowances for users, user groups, and Orgs.
+:keywords: Spotter usage, usage pools, usage limits, question allowance, Spotter limits, REST API
 
-Spotter usage pools let administrators control how many Spotter questions a user, user group, or Org can ask. Each pool tracks a question allowance, a warning threshold, and how many questions have been consumed.
+Spotter usage pools let administrators control how many Spotter questions a user, user group, or Org can ask. Each pool tracks a question allowance, a warning threshold, and the number of questions consumed.
 
-The Spotter Usage Data REST API v2.0 endpoints allow you to create, retrieve, update, and delete usage pools programmatically. Use these APIs to provision limits for new users, monitor consumption, raise or lower limits, or reset usage at the start of a billing period.
+ThoughtSpot provides public REST API v2 endpoints to create, retrieve, update, and delete usage pools programmatically for the following purposes:
+
+* To provision limits for new users or groups.
+* To monitor consumption and find pools that are close to their limit.
+* To raise or lower the limits.
+* To reset usage at the start of a billing period.
 
 [NOTE]
 ====
-[.version-badge.new]#Beta# +
-The Spotter Usage Data APIs are in Beta in ThoughtSpot Cloud 26.11.0.cl. Breaking changes may be introduced before the endpoints are made Generally Available.
+The Spotter usage data APIs are in Beta in ThoughtSpot Cloud 26.11.0.cl. Breaking changes may be introduced before the endpoints are made Generally Available.
 ====
 
-== Concepts
+== Usage pools and metering
+A *usage pool* is a Spotter question allowance assigned to an entity: a user, a user group, or an Org. Each pool tracks the following values:
 
-=== Usage pools
-
-A *usage pool* is a Spotter question allowance assigned to an entity — a user, a user group, or an Org. Each pool tracks:
-
-* `usage` — questions consumed from the pool.
-* `warning_limit` — usage level at which users start seeing a warning. Optional.
-* `limit` — maximum questions the pool allows. Optional; when absent the pool is unlimited.
+* `usage` +
+The number of questions consumed from the pool.
+* `warning_limit` +
+The usage level at which users start seeing a warning. Optional.
+* `limit` +
+The maximum number of questions that the pool allows. Optional. If it is not set, the pool is unlimited.
 
 === Metering scope
-
-A cluster meters Spotter usage at exactly one scope: per user, per user group, or per Org. The first pool created on the cluster sets the scope. Every pool created after that must use the same `entity_type`. To switch scope, delete all existing pools first using the <<delete-usage-data,Delete>> endpoint.
+A cluster meters Spotter usage at exactly one scope: per user, per user group, or per Org. The first pool created on the cluster sets the scope, and every pool created after that must use the same `entity_type`. To switch the scope, delete all existing pools using the <<delete-usage-data,delete usage data>> API endpoint.
 
 === How users draw from pools
-
-A user draws from every pool that meters them: their own pool (if per-user metering), the pools of the user groups they belong to, including inherited groups (if per-group metering), or their Org's pool (if per-Org metering). Totals in the <<get-usage-data-for-user,Get Usage Data for User>> response are sums across those pools.
+A user draws from every pool that meters them. Depending on the metering scope of the cluster, these are the user's own pool (per user), the pools of the user groups that the user belongs to, including inherited groups (per user group), or the pool of the user's Org (per Org). The totals in the <<get-usage-data-for-user,get usage data for user>> response are sums across these pools. For example, a user in two groups with limits of 100 and 50 has a `total_limit` of 150.
 
 A user who draws from no pool is not metered and can use Spotter without a limit.
 
-== Required privileges
+=== Required privileges
+To use the Spotter usage data APIs, the user requires the following privileges:
 
-* **Get usage data for user** — Any user can retrieve their own usage. Retrieving another user's usage requires `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege.
-* **Search, Update, Delete** — Require `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege. Users with only `CAN_MANAGE_SPOTTER`, and Org administrators without cluster-level `ADMINISTRATION`, cannot call these endpoints.
+* **Get usage data for user**: Any user can retrieve their own usage. To retrieve another user's usage, the user requires `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege. `CAN_MANAGE_SPOTTER` is not sufficient.
+* **Search, update, and delete usage data**: These endpoints require `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege. Users with only `CAN_MANAGE_SPOTTER`, and Org administrators without cluster-level `ADMINISTRATION`, cannot call these endpoints.
 
 [#get-usage-data-for-user]
-== Get usage data for user
+== Getting usage data for a user [beta betaBackground]^Beta^
+The `GET /api/rest/2.0/ai/usage-data/user` API endpoint retrieves a user's combined Spotter usage: every usage pool that the user draws from, with usage, warning limits, and limits summed across them. Use this endpoint to show users how many Spotter questions they have left, or to check whether a user is blocked by a usage limit.
 
-Retrieves a user's combined Spotter usage: every usage pool the user draws from, with usage, warning limits, and limits summed across them. Use this endpoint to show users how many Spotter questions they have left or to check whether a user is blocked by a usage limit.
-
-=== Endpoint
-
-----
-GET /api/rest/2.0/ai/usage-data/user
-----
-
-=== Query parameters
-
-[width="100%", cols="2,1,1,4", options="header"]
+=== Request parameters
+[cols="2,4", options="header"]
 |===
-| Parameter | Type | Required | Description
-
+|Parameter | Description
 | `user_identifier`
-| String
-| No
-| GUID of the user whose usage to retrieve. Defaults to the authenticated user. Passing another user's GUID requires `ADMINISTRATION` privilege.
-
+|__String__. Optional. Query parameter. GUID of the user whose usage you want to retrieve. If you omit this parameter, the API returns the usage of the authenticated user. Passing another user's GUID requires `ADMINISTRATION` privilege.
 |===
 
-=== Response
+=== Example request
 
-If the request is successful, the API returns a `summary` object with the following properties:
-
-[width="100%", cols="2,1,4", options="header"]
-|===
-| Property | Type | Description
-
-| `pools`
-| Array
-| The individual pools the user draws from.
-
-| `total_usage`
-| Integer
-| Total questions consumed across all pools.
-
-| `total_warning_limit`
-| Integer
-| Sum of warning limits across all pools.
-
-| `total_limit`
-| Integer
-| Sum of limits across all pools.
-
-| `total_remaining`
-| Integer
-| Questions the user can still ask. Absent when `has_unlimited_pool` is `true`.
-
-| `is_at_warning`
-| Boolean
-| `true` when usage has reached the combined warning limit.
-
-| `is_at_limit`
-| Boolean
-| `true` when usage has reached the combined limit and further Spotter questions are blocked.
-
-| `has_unlimited_pool`
-| Boolean
-| `true` when any of the user's pools has no limit, making the user effectively unlimited.
-
-|===
-
-=== Request example
-
-.cURL
-[source, cURL]
+.Retrieve the authenticated user's usage
+[source,cURL]
 ----
 curl -X GET \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/user' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/user'  \
   -H 'Accept: application/json' \
-  -H 'Authorization: Bearer {access-token}'
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
 ----
 
-.cURL (retrieve another user's usage)
-[source, cURL]
+.Retrieve another user's usage
+[source,cURL]
 ----
 curl -X GET -G \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/user' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/user'  \
   -H 'Accept: application/json' \
-  -H 'Authorization: Bearer {access-token}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-urlencode 'user_identifier={user-guid}'
 ----
 
-=== Response codes
+=== Example response
+If the API request is successful, the API returns the following response:
 
-[width="100%", cols="1,3", options="header"]
+[source,JSON]
+----
+{
+  "summary": {
+    "pools": [
+      {
+        "key": {
+          "entity_type": "USER_GROUP",
+          "entity_identifier": "{group-guid-1}"
+        },
+        "usage": 120,
+        "warning_limit": 80,
+        "limit": 100,
+        "updated_time_in_millis": 1793433600000,
+        "updated_by": "{admin-user-guid}"
+      },
+      {
+        "key": {
+          "entity_type": "USER_GROUP",
+          "entity_identifier": "{group-guid-2}"
+        },
+        "usage": 0,
+        "warning_limit": 40,
+        "limit": 50,
+        "updated_time_in_millis": 1793433600000,
+        "updated_by": "{admin-user-guid}"
+      }
+    ],
+    "total_usage": 120,
+    "total_warning_limit": 120,
+    "total_limit": 150,
+    "total_remaining": 30,
+    "is_at_warning": true,
+    "is_at_limit": false,
+    "has_unlimited_pool": false
+  }
+}
+----
+
+=== Response parameters
+[cols="2,4", options="header"]
+|===
+| Parameter | Description
+| `summary`
+a| The user's combined usage across every pool that the user draws from. The object includes the following attributes:
+
+* `pools`: The individual pools that the user draws from. Each entry has the same attributes as an entry in the `usage_data` array returned by the <<search-usage-data,search usage data>> API. The array is empty if the user is not metered.
+* `total_usage`: Total questions consumed across all pools.
+* `total_warning_limit`: Sum of the warning limits across all pools.
+* `total_limit`: Sum of the limits across all pools.
+* `total_remaining`: Questions that the user can still ask. Absent when `has_unlimited_pool` is `true`.
+* `is_at_warning`: `true` when usage has reached the combined warning limit.
+* `is_at_limit`: `true` when usage has reached the combined limit and further Spotter questions are blocked. For a user who is not metered, the value is `false`.
+* `has_unlimited_pool`: `true` when any of the user's pools has no limit, which makes the user effectively unlimited.
+|===
+
+=== Response codes
+[cols="1,3", options="header"]
 |===
 | HTTP status code | Description
 | **200** | Successful operation.
 | **400** | Invalid request.
 | **401** | Authentication token is missing, expired, or invalid.
 | **403** | The caller requested another user's usage without `ADMINISTRATION` privilege.
-| **500** | Internal server error.
+| **500** | Unexpected server error.
 |===
 
 [#search-usage-data]
-== Search usage data
+== Searching usage data [beta betaBackground]^Beta^
+The `/api/rest/2.0/ai/usage-data/search` API endpoint retrieves Spotter usage pools. A usage pool is the Spotter question allowance configured for a user, user group, or Org, together with the number of questions consumed from it. Use this endpoint to monitor usage across your users, for example, to find pools that are close to their limit.
 
-Retrieves Spotter usage pools. A usage pool is the Spotter question allowance configured for a user, user group, or Org, together with how many questions have been consumed. Use this endpoint to monitor usage across your users, for example to find pools that are close to their limit.
+To retrieve every pool on the cluster, send an empty request body. To retrieve specific pools, pass `keys`. The API omits keys that match no pool from the response.
 
-=== Endpoint
-
-----
-POST /api/rest/2.0/ai/usage-data/search
-----
+To see the combined usage of a single user across every pool the user draws from, use the <<get-usage-data-for-user,get usage data for user>> API endpoint.
 
 === Request parameters
-
-[width="100%", cols="2,1,1,4", options="header"]
+[cols="2,4", options="header"]
 |===
-| Parameter | Type | Required | Description
-
+|Parameter | Description
 | `keys`
-| Array of objects
-| No
-| Keys of the pools to retrieve. Each key has an `entity_type` (`USER`, `USER_GROUP`, or `ORG`) and an `entity_identifier` (the GUID of the user or user group, or the ID of the Org). Omit to retrieve every pool on the cluster.
+a|__Array of objects__. Optional. The pools to retrieve. If you omit this parameter, the API returns every pool on the cluster. For each key, specify the following attributes:
 
+* `entity_type`. __String__. Type of entity that the pool meters: `USER`, `USER_GROUP`, or `ORG`. It must match the scope that the cluster meters at.
+* `entity_identifier`. __String__. GUID of the user or user group, or the ID of the Org.
 |===
 
-=== Response
+=== Example request
 
-If the request is successful, the API returns `usage_data`, one entry per pool:
-
-[width="100%", cols="2,1,4", options="header"]
-|===
-| Property | Type | Description
-
-| `key`
-| Object
-| The entity the pool meters, with `entity_type` and `entity_identifier`.
-
-| `usage`
-| Integer
-| Questions consumed from the pool.
-
-| `warning_limit`
-| Integer
-| Usage level at which users are warned. Absent when no warning is configured.
-
-| `limit`
-| Integer
-| Maximum questions the pool allows. Absent when the pool is unlimited.
-
-| `updated_time_in_millis`
-| Long
-| Timestamp of when the pool was last configured.
-
-| `updated_by`
-| String
-| User who last configured the pool.
-
-|===
-
-=== Request example
-
-.cURL (retrieve all pools)
-[source, cURL]
+.Retrieve all pools
+[source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/search' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/search'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {access-token}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{}'
 ----
 
-.cURL (retrieve specific pools)
-[source, cURL]
+.Retrieve specific pools
+[source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/search' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/search'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {access-token}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "keys": [
     {
@@ -229,78 +198,83 @@ curl -X POST \
 }'
 ----
 
-=== Response codes
+=== Example response
+If the API request is successful, the API returns the following response:
 
-[width="100%", cols="1,3", options="header"]
+[source,JSON]
+----
+{
+  "usage_data": [
+    {
+      "key": {
+        "entity_type": "USER",
+        "entity_identifier": "{user-guid}"
+      },
+      "usage": 120,
+      "warning_limit": 400,
+      "limit": 500,
+      "updated_time_in_millis": 1793433600000,
+      "updated_by": "{admin-user-guid}"
+    }
+  ]
+}
+----
+
+=== Response parameters
+[cols="2,4", options="header"]
+|===
+| Parameter | Description
+| `usage_data`
+a| One entry for each pool. Each entry includes the following attributes:
+
+* `key`: The entity that the pool meters, with `entity_type` and `entity_identifier`.
+* `usage`: Number of questions consumed from the pool.
+* `warning_limit`: Usage level at which users are warned that they are approaching the limit. Absent when no warning is configured.
+* `limit`: Maximum number of questions that the pool allows. Absent when the pool is unlimited.
+* `updated_time_in_millis`: Time of the last change to the pool configuration, in milliseconds since epoch.
+* `updated_by`: ID of the user who last changed the pool configuration.
+|===
+
+=== Response codes
+[cols="1,3", options="header"]
 |===
 | HTTP status code | Description
 | **200** | Successful operation.
 | **400** | Invalid request.
 | **401** | Authentication token is missing, expired, or invalid.
 | **403** | The caller does not have `ADMINISTRATION` privilege.
-| **500** | Internal server error.
+| **500** | Unexpected server error.
 |===
 
 [#update-usage-data]
-== Create or update usage data
+== Creating or updating usage data [beta betaBackground]^Beta^
+The `/api/rest/2.0/ai/usage-data/update` API endpoint creates or updates Spotter usage pools. Use this endpoint to provision limits for new users or groups, raise or lower an existing limit, or reset usage at the start of a billing period.
 
-Creates or updates Spotter usage pools. Use this endpoint to provision limits for new users or groups, raise or lower an existing limit, or reset usage at the start of a billing period.
-
-A pool that does not exist is created. Fields omitted from an update keep their current value.
-
-=== Endpoint
-
-----
-POST /api/rest/2.0/ai/usage-data/update
-----
+A pool that does not exist is created. Fields omitted from an update keep their current value. Every key must use the scope that the cluster meters at. To switch the scope, delete the existing pools first.
 
 === Request parameters
-
-[width="100%", cols="2,1,1,4", options="header"]
+[cols="2,4", options="header"]
 |===
-| Parameter | Type | Required | Description
-
+|Parameter | Description
 | `updates`
-| Array of objects
-| Yes
-| At least one entry. Each entry contains the following properties.
+a|__Array of objects__. The changes to apply, one entry for each pool. At least one entry is required. For each entry, specify the following attributes:
 
-| `updates[].key`
-| Object
-| Yes
-| The pool to create or update, with `entity_type` (`USER`, `USER_GROUP`, or `ORG`) and `entity_identifier` (the GUID of the user or user group, or the ID of the Org).
-
-| `updates[].limit`
-| Integer
-| No
-| Maximum Spotter questions the pool allows.
-
-| `updates[].warning_limit`
-| Integer
-| No
-| Usage level at which users are warned that they are approaching the limit.
-
-| `updates[].usage`
-| Integer
-| No
-| Questions consumed so far. Set to `0` to reset the pool.
-
+* `key`. __Object__. The pool to create or update. Specify the `entity_type` (`USER`, `USER_GROUP`, or `ORG`) and the `entity_identifier` (the GUID of the user or user group, or the ID of the Org). The `entity_type` must match the scope that the cluster meters at.
+* `limit`. __Integer__. Optional. Maximum number of Spotter questions that the pool allows.
+* `warning_limit`. __Integer__. Optional. Usage level at which users are warned that they are approaching the limit.
+* `usage`. __Integer__. Optional. Number of questions consumed so far. Set it to `0` to reset the pool.
 |===
 
-=== Response
+=== Example request
 
-If the request is successful, the API returns `usage_data`, with each updated pool as it stands after the change. The response structure is the same as the <<search-usage-data,Search>> response.
-
-=== Request example
-
-.cURL (create a pool for a user)
-[source, cURL]
+.Create a pool for a user
+[source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/update' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/update'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {access-token}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "updates": [
     {
@@ -315,14 +289,14 @@ curl -X POST \
 }'
 ----
 
-.cURL (reset a pool's usage to zero)
-[source, cURL]
+.Reset the usage of a pool to zero
+[source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/update' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/update'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {access-token}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "updates": [
     {
@@ -336,63 +310,70 @@ curl -X POST \
 }'
 ----
 
-=== Response codes
+=== Example response
+If the API request is successful, the API returns `usage_data` with each updated pool as it stands after the change. The response has the same structure as the response of the <<search-usage-data,search usage data>> API.
 
-[width="100%", cols="1,3", options="header"]
+[source,JSON]
+----
+{
+  "usage_data": [
+    {
+      "key": {
+        "entity_type": "USER",
+        "entity_identifier": "{user-guid}"
+      },
+      "usage": 0,
+      "warning_limit": 400,
+      "limit": 500,
+      "updated_time_in_millis": 1793433600000,
+      "updated_by": "{admin-user-guid}"
+    }
+  ]
+}
+----
+
+=== Response codes
+[cols="1,3", options="header"]
 |===
 | HTTP status code | Description
 | **200** | Successful operation.
-| **400** | `updates` is empty, a key is missing its `entity_type` or `entity_identifier`, or a key uses a different `entity_type` from the cluster's existing pools.
+| **400** | Invalid request. For example, `updates` is empty, a key is missing its `entity_type` or `entity_identifier`, or a key uses a different `entity_type` from the existing pools on the cluster.
 | **401** | Authentication token is missing, expired, or invalid.
 | **403** | The caller does not have `ADMINISTRATION` privilege.
-| **500** | Internal server error.
+| **500** | Unexpected server error.
 |===
 
 [#delete-usage-data]
-== Delete usage data
-
-Deletes Spotter usage pools. Use this endpoint to remove a limit from a user, user group, or Org, or to clear every pool before switching the metering scope.
+== Deleting usage data [beta betaBackground]^Beta^
+The `/api/rest/2.0/ai/usage-data/delete` API endpoint deletes Spotter usage pools. Use this endpoint to remove a limit from a user, user group, or Org, or to clear every pool before switching the metering scope.
 
 Deleting a pool removes its limit rather than blocking its users. A user who no longer draws from any pool is not metered and can use Spotter without a limit.
 
 [WARNING]
 ====
-This operation cannot be undone. To recreate a deleted pool, use the <<update-usage-data,Create or update>> endpoint. The new pool's usage restarts from `0`.
+This operation cannot be undone. To recreate a deleted pool, use the <<update-usage-data,create or update usage data>> API endpoint. The usage of the new pool restarts from `0`.
 ====
 
-=== Endpoint
-
-----
-POST /api/rest/2.0/ai/usage-data/delete
-----
-
 === Request parameters
-
-[width="100%", cols="2,1,1,4", options="header"]
+[cols="2,4", options="header"]
 |===
-| Parameter | Type | Required | Description
-
+|Parameter | Description
 | `keys`
-| Array of objects
-| Yes
-| At least one entry. Each key has an `entity_type` (`USER`, `USER_GROUP`, or `ORG`) and an `entity_identifier` (the GUID of the user or user group, or the ID of the Org).
+a|__Array of objects__. The pools to delete. At least one entry is required. For each key, specify the following attributes:
 
+* `entity_type`. __String__. Type of entity that the pool meters: `USER`, `USER_GROUP`, or `ORG`. It must match the scope that the cluster meters at.
+* `entity_identifier`. __String__. GUID of the user or user group, or the ID of the Org.
 |===
 
-=== Response
+=== Example request
 
-If the request is successful, the API returns `deleted_keys`, the keys of the pools that existed and were deleted. Keys that matched no pool are omitted from the response.
-
-=== Request example
-
-.cURL
-[source, cURL]
+[source,cURL]
 ----
 curl -X POST \
-  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/delete' \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/usage-data/delete'  \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer {access-token}' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
   --data-raw '{
   "keys": [
     {
@@ -403,14 +384,37 @@ curl -X POST \
 }'
 ----
 
-=== Response codes
+=== Example response
+If the API request is successful, the API returns `deleted_keys`, the keys of the pools that existed and were deleted. The API omits keys that matched no pool.
 
-[width="100%", cols="1,3", options="header"]
+[source,JSON]
+----
+{
+  "deleted_keys": [
+    {
+      "entity_type": "ORG",
+      "entity_identifier": "{org-id}"
+    }
+  ]
+}
+----
+
+=== Response codes
+[cols="1,3", options="header"]
 |===
 | HTTP status code | Description
 | **200** | Successful operation.
-| **400** | `keys` is empty, or a key is missing its `entity_type` or `entity_identifier`.
+| **400** | Invalid request. For example, `keys` is empty, or a key is missing its `entity_type` or `entity_identifier`.
 | **401** | Authentication token is missing, expired, or invalid.
 | **403** | The caller does not have `ADMINISTRATION` privilege.
-| **500** | Internal server error.
+| **500** | Unexpected server error.
 |===
+
+== Additional resources
+
+* xref:rest-api-v2-reference.adoc#_ai[REST API v2.0 Reference]
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fai%2Fget-usage-data-for-user">REST API Playground - Get usage data for user endpoint</a>+++
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fai%2Fsearch-usage-data">REST API Playground - Search usage data endpoint</a>+++
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fai%2Fupdate-usage-data">REST API Playground - Update usage data endpoint</a>+++
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fai%2Fdelete-usage-data">REST API Playground - Delete usage data endpoint</a>+++

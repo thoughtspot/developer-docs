@@ -10,31 +10,147 @@ This page documents the changes introduced in each release of the Visual Embed S
 
 == Version 1.54.0, November 2026
 
-    [width="100%", cols="1,4"]
-    |====
-    |[tag greenBackground]#NEW#
-    a|
-    [discrete]
-    ===== SpotterX embed support
-    You can now embed the SpotterX experience using the `SpotterEmbed`, `LiveboardEmbed`, or `AppEmbed` components. Set `spotterVersion` to `SpotterVersion.SpotterX` to enable the next-generation Spotter interface with improved chat layout, enhanced branding controls, and consistent configuration across all embed contexts.
+[width="100%", cols="1,4"]
+|====
+|[tag greenBackground]#NEW#
+a|
+[discrete]
+===== Spotter experience version
+You can now load the updated Spotter experience introduced in ThoughtSpot 26.11.0.cl in embedded views. Set `spotterExperienceVersion` to `SpotterExperienceVersion.SPOTTER_2026_11` in the view configuration of `SpotterEmbed`, `LiveboardEmbed`, or `AppEmbed`. When this property is set, the embed loads the updated Spotter surface instead of the default conversation surface.
 
-    For more information, see xref:embed-spotter.adoc[Embed Spotter experience] and xref:customize-spotter-embed.adoc[Customize the Spotter embed view].
+This property is available in SDK 1.53.0 and later and requires ThoughtSpot Cloud 26.11.0.cl or later.
 
-    |[tag greenBackground]#NEW#
-    a|
-    [discrete]
-    ===== Host-controlled tooltip rendering
-    The SDK now supports host-controlled tooltip rendering for embedded charts. Use the `onTooltipShow` callback to intercept the default tooltip and render a custom tooltip in your host application. The callback receives the tooltip data (column names, values, and point metadata), and you can return custom HTML content or suppress the tooltip entirely.
+[source,javascript]
+----
+const embed = new SpotterEmbed('#tsEmbed', {
+    ... // other embed view config
+    spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11,
+});
+----
 
-    |[tag greenBackground]#NEW#
-    a|
-    [discrete]
-    ===== Programmatic Liveboard filter overrides [Beta]
-    You can now programmatically update Liveboard filter values at runtime using URL-based filter overrides, without re-rendering the entire component.
+For more information, see xref:embed-spotter.adoc[Embed Spotter experience] and xref:customize-spotter-embed.adoc[Customize the Spotter embed view].
 
-    |====
+|[tag greenBackground]#NEW#
+a|
+[discrete]
+===== Filter and Parameter overrides on Liveboard load
+`LiveboardEmbed` now supports the `liveboardOverride` property to apply filter and Parameter values when a Liveboard loads. Specify the overrides for each data source (Model) in the `dataSourceOverride` array. Each entry can include the following arrays:
 
-    == Version 1.53.0, October 2026
+* `filterQuery` +
+Filters to apply. Each item includes a `filterQueryToken` in search sentence form, such as `color = red`.
+* `parameterQuery` +
+Parameter values to apply. Each item includes a `parameterQueryToken`, such as `discount = 10`.
+
+To scope a filter or Parameter to a Liveboard tab or group, add `tabName` and `groupName` to the item. Clauses without a query token are dropped.
+
+In an embedded Liveboard, `liveboardOverride` is the only way to set these overrides at load time. The `filter` and `parameter` URL query parameters are ignored.
+
+[source,javascript]
+----
+const embed = new LiveboardEmbed('#tsEmbed', {
+    ... // other embed view config
+    liveboardOverride: {
+        dataSourceOverride: [{
+            dataSourceIdentifier: '<model-guid>',
+            filterQuery: [{
+                tabName: 'Sales',
+                groupName: 'Region',
+                filterQueryToken: 'color = red',
+            }],
+            parameterQuery: [{
+                parameterQueryToken: 'discount = 10',
+            }],
+        }],
+    },
+});
+----
+
+|[tag greenBackground]#NEW#
+a|
+[discrete]
+===== Separate Edit actions and events for Liveboards and visualizations
+The SDK now distinguishes the *Edit* action on the Liveboard page from the *Edit* action in the visualization menu. The existing `Action.Edit` and `EmbedEvent.Edit` continue to work and apply to both.
+
+* `Action.EditLiveboard` +
+Controls the *Edit* action on the Liveboard page only.
+* `Action.EditVisualization` +
+Controls the *Edit* action in the visualization menu only.
+* `EmbedEvent.EditLiveboard` +
+Emitted when a user clicks *Edit* on a Liveboard. It is emitted along with `EmbedEvent.Edit`.
+* `EmbedEvent.EditVisualization` +
+Emitted when a user clicks *Edit* on a visualization in a Liveboard. It is emitted along with `EmbedEvent.Edit`.
+* `HostEvent.EditLiveboard` +
+Triggers the *Edit* action on the Liveboard.
+* `HostEvent.EditVisualization` +
+Triggers the *Edit* action on a specific visualization in a Liveboard. Requires `vizId` in the payload.
+
+|[tag greenBackground]#NEW#
+a|
+[discrete]
+===== Action IDs for Chart Settings V2
+The following `Action` enum members control the visibility and disabled state of the menu items in Chart Settings V2:
+
+* `Action.ChartTypeSettings` +
+*Chart Type*
+* `Action.LayoutSettings` +
+*Layout*
+* `Action.ColumnSettings` +
+*Column*
+* `Action.AxisSettings` +
+*Axis*
+* `Action.DataLabelSettings` +
+*Data Label*
+* `Action.TooltipSettings` +
+*Tooltip*
+* `Action.LegendSettings` +
+*Legend*
+* `Action.DisplaySettings` +
+*Display*
+* `Action.QuerySettings` +
+*Query Details*
+* `Action.CustomSettings` +
+*Custom Action*
+* `Action.MuzeAiSettings` +
+*Muze AI*
+* `Action.RAnalysisSettings` +
+*R Analysis*
+
+|[tag greenBackground]#NEW#
+a|
+[discrete]
+===== Answer edit panel visibility
+The `hideAnswerEditPanel` property hides the answer edit panel when set to `true`. Supported in `AppEmbed` and `SearchEmbed`.
+
+|[tag greenBackground]#NEW#
+a|
+[discrete]
+===== SpotterViz file upload controls
+The `SpotterVizConfig` object supports the following properties to control file uploads in the SpotterViz chat input on embedded Liveboards and full application embeds:
+
+* `fileUploadEnabled` +
+Set to `false` to hide the file upload option. The default value is `true`.
+* `fileUploadFileTypes` +
+Restricts the file types allowed for upload to a subset of the types SpotterViz supports, for example, `['csv', 'pdf']`. Specify file extensions with or without the leading dot. Unsupported types and empty lists are ignored.
+
+|[tag greenBackground]#MODIFIED#
+a|
+[discrete]
+===== Stricter payload type checking for host events in TypeScript
+From SDK 1.52.0, unknown fields in the payload of a known `HostEvent` fail to compile when you call `embed.trigger()`. From SDK 1.54.0, the payload is checked strictly against the event contract, and required fields are enforced. Update your `trigger()` calls to match the payload for each event.
+|====
+
+////
+Removed pending confirmation from the SDK team: no `onTooltipShow` callback exists in the
+visual-embed-sdk repository (main at v1.53.1, including all remote branches).
+
+|[tag greenBackground]#NEW#
+a|
+[discrete]
+===== Host-controlled tooltip rendering
+The SDK now supports host-controlled tooltip rendering for embedded charts. Use the `onTooltipShow` callback to intercept the default tooltip and render a custom tooltip in your host application. The callback receives the tooltip data (column names, values, and point metadata), and you can return custom HTML content or suppress the tooltip entirely.
+////
+
+== Version 1.53.0, October 2026
 
 [width="100%", cols="1,4"]
 |====
@@ -185,7 +301,7 @@ Emitted when the Share action in the menu displayed for a chat in the chat histo
 Emitted when the user toggles the "include new messages since last shared version" checkbox in the share modal.
 * `EmbedEvent.SpotterShareModalCancelButtonClicked` +
 Emitted when the Cancel button in the share conversation modal is clicked.
-* `EmbedEvent.SpotterShareStaleInfoBannerDismissed`+
+* `EmbedEvent.SpotterShareStaleInfoBannerDismissed` +
 Emitted when the user dismisses the banner that shows the text, "This data may have changed since the last time you had a chat."
 * `EmbedEvent.SpotterSharedConversationExitButtonClicked` +
 Emitted when a user exits the shared conversation read-only view.
@@ -254,7 +370,6 @@ Color used for negative/failure indicators.
 
 For more information, see xref:css-customization.adoc[CSS customization framework].
 
-||
 |====
 
 ////
@@ -310,10 +425,10 @@ These new CSS variables are available for Liveboard layout and header customizat
 Sets the left and right margins of the Liveboard header. Set this to the same pixel value as `liveboardGutter` in `LiveboardViewConfig` to align the header with the tile grid.
 
 * `--ts-var-liveboard-dual-column-breakpoint` +
-Sets the container width threshold at which the Liveboard layout collapses from 12 columns to 2 columns. +
+Sets the container width threshold at which the Liveboard layout collapses from 12 columns to 2 columns.
 
 * `--ts-var-liveboard-single-column-breakpoint` +
-Sets the container width threshold at which the Liveboard layout collapses from 2 columns to a single column. +
+Sets the container width threshold at which the Liveboard layout collapses from 2 columns to a single column.
 
 For more information, see xref:customize-css-styles.adoc#liveboard-layout-vars[Liveboard layout CSS variables] and xref:customize-css-styles.adoc#_liveboard[Liveboard CSS variables].
 
@@ -339,7 +454,7 @@ The following Liveboard embedding settings are set to `true` by default on all T
 Hides filters that are not relevant to the displayed visualization.
 * `isLiveboardCompactHeaderEnabled` +
 Enables compact header layout in embedded Liveboards.
-*  `coverAndFilterOptionInPDF` +
+* `coverAndFilterOptionInPDF` +
 Enables the *Include cover page* and *Include filter page(s)* checkboxes in the Liveboard download modal.
 * `isLiveboardMasterpiecesEnabled` +
 Enables the xref:customize-liveboard-layout.adoc#liveboard-grouping-styling[Liveboard styling and grouping] feature.
@@ -455,8 +570,8 @@ Liveboard download actions::
 
 The following action IDs are introduced in the SDK for the download buttons at the Liveboard level:
 
-* `Action.DownloadLiveboard` +
-* `Action.DownloadLiveboardAsXlsx` +
+* `Action.DownloadLiveboard`
+* `Action.DownloadLiveboardAsXlsx`
 * `Action.DownloadLiveboardAsCsv`
 
 Test email for Liveboard scheduled jobs::
@@ -669,7 +784,7 @@ Is emitted when a saved chat is deleted.
 * `EmbedEvent.SpotterConversationSelected` +
 Is emitted when a saved chat is selected in the chat history sidebar.
 
-|[tag greenBackground]#NEW# | `enableLinkOverridesV2` +
+|[tag greenBackground]#NEW# | `enableLinkOverridesV2`
 
 Use this configuration setting to override ThoughtSpot URLs on hover or when opening in a new tab. This is recommended over the earlier `linkOverride` flag for a better user experience.
 
@@ -704,7 +819,7 @@ Events::
 On Spotter embed deployments running version 26.2.0.cl or later, the *Add to Coaching* feature is enabled by default. To disable or hide the *Add to Coaching* button, use the xref:Action.adoc#_inconversationtraining[InConversationTraining] action ID.
 ====
 
-|[tag greenBackground]#NEW# a| **Liveboard experience enhancements** +
+|[tag greenBackground]#NEW# a| **Liveboard experience enhancements**
 
 Styling and grouping::
 
@@ -730,6 +845,7 @@ The following action IDs are available for the data publishing menu actions in t
 * `Action.ManagePublishing` for *Manage publishing*
 * `Action.Unpublish` for *Unpublish*
 * `Action.Parameterize` for *Parameterize*
+
 |[tag greenBackground]#NEW#  a| **Error handling improvements**
 
 To handle errors in the embedding workflows, the SDK includes the following features:
@@ -746,7 +862,7 @@ For more information, see link:https://developers.thoughtspot.com/docs/Enumerati
 [width="100%" cols="1,4"]
 |====
 
-|[tag redBackground]#DEPRECATED# | **Use `minimumHeight` instead of `defaultHeight`** +
+|[tag redBackground]#DEPRECATED# | **Use `minimumHeight` instead of `defaultHeight`**
 
 The `defaultHeight` parameter is deprecated in Visual Embed SDK v1.44.2 and later.
 To set the minimum height of the embed container for ThoughtSpot components such as a Liveboard, use the `minimumHeight` attribute instead.
@@ -873,7 +989,7 @@ You can also set the margin property for lazy loading to define when the visuali
 
 For more information, see xref:lazy-loading-fullheight.adoc[Lazy loading of visualizations in an embedded Liveboard].
 
-|[tag greenBackground]#NEW# a| *Full application embed* +
+|[tag greenBackground]#NEW# a| *Full application embed*
 
 You can now enable the persona-based left navigation panel and home page experience on your ThoughtSpot instance. This feature is disabled by default on ThoughtSpot instances and is available for Early Access. When it's enabled on your ThoughtSpot instance, you can roll out the new experience on embedding applications by configuring the xref:AppViewConfig.adoc#_discoveryexperience[`discoveryExperience`] attribute.
 
@@ -889,17 +1005,17 @@ Developers can now control whether a visualization or Liveboard can be presented
 |[tag greenBackground]#NEW#  a| *PDF download settings* +
 Developers can now control the display of *Include cover page* and *Include filter page(s)* options on the Download PDF dialog for Liveboards. The *Include cover page* and *Include filter page(s)* options are disabled by default on ThoughtSpot instances. When this feature is enabled, developers can use the `coverAndFilterOptionInPDF` attribute to show or hide these options for the Liveboard users in their embedding app.
 
-|[tag greenBackground]#NEW# a| *Parameter for overriding a default primary action* +
+|[tag greenBackground]#NEW# a| *Parameter for overriding a default primary action*
 
 If Spotter is enabled on your instance, the *Spotter* button appears by default as the primary action on embedded Liveboard charts; if Spotter is not enabled, the *Explore* button is set as the primary action. If you want to replace the primary action with a different action, you can now use the `primaryAction` attribute.
 
 For more information, see xref:embed-actions.adoc#_override_default_primary_actions[Override default primary action].
 
-|[tag greenBackground]#NEW# a| *Full application embed experience enhancements* +
+|[tag greenBackground]#NEW# a| *Full application embed experience enhancements*
 
 The SDK now includes the `hideObjectSearch` property, which allows developers to hide the object search button in the navigation bar when embedding the full application.
 
-|[tag greenBackground]#NEW#  a| *Host events* +
+|[tag greenBackground]#NEW#  a| *Host events*
 
 In this version, the SDK introduces the following host event handlers:
 
@@ -984,7 +1100,7 @@ Emits when a query prompt in Spotter embed is edited.
 Emits when a Spotter query is reset.
 - `EmbedEvent.PreviewSpotterData` +
 Emits when a user clicks the Preview data button in the Spotter conversation panel.
-- `EmbedEvent.SpotterQueryTriggered`
+- `EmbedEvent.SpotterQueryTriggered` +
 Emits when a Spotter query is triggered.
 
 The following embed events are also supported in Spotter embed:
@@ -1033,7 +1149,7 @@ Additionally, the SDK provides the `StringIDsUrl` attribute to allow using a JSO
 
 For more information, see xref:customize-text-strings.adoc[Customize text strings].
 
-|[tag greenBackground]#NEW# a| *Hide columns on list pages* +
+|[tag greenBackground]#NEW# a| *Hide columns on list pages*
 
 In full app embedding, you can now hide the following columns on the *Liveboards* and *Answers* listing pages using the `hiddenListColumns` array:
 
@@ -1046,7 +1162,7 @@ In full app embedding, you can now hide the following columns on the *Liveboards
 * *Tags* +
 `hiddenListColumns: [ListPageColumns.Tags]`
 * *Share* +
-`hiddenListColumns: [ListPageColumns.Share]` +
+`hiddenListColumns: [ListPageColumns.Share]`
 
 For more information, see xref:full-app-customize.adoc#_hide_columns_on_list_pages_new_experience[Customize full application embed].
 |====
@@ -1200,9 +1316,9 @@ Action ID to show, hide, or disable the **Analyze CTA** action on a KPI chart.
 
 |[tag greenBackground]#NEW#  a|The following parameters are available for customizing Search experience:
 
-* `collapseDataPanel`
+* `collapseDataPanel` +
 Minimizes the data panel view. Users can click the data panel header any time to expand the panel.
-* `collapseSearchBar`
+* `collapseSearchBar` +
 Sets the initial state of the search bar when embedding a saved Answer.
 
 |[tag greenBackground]#NEW# a| The following settings are available for customizing the new home page and navigation experience in full app embedding:
@@ -1234,7 +1350,7 @@ You can set the `homePageSearchBarMode` property to one of the following options
 
 ** `aiAnswer`  +
 Displays the search bar for Natural Language Search.
-** `none`
+** `none` +
 Hides the Search bar on the **Home** page. Note that it only hides the Search bar on the **Home** page and doesn't affect the Object Search bar visibility on the top navigation bar.
 ** `objectSearch` (default) +
 Displays Object Search bar on the **Home** page.
@@ -1259,25 +1375,25 @@ Use this action enumeration to disable, show, or hide the **Manage tags** button
 
 [width="100%" cols="1,4"]
 |====
-|[tag greenBackground]#NEW#  a| The following new action enumerations are available in this version: +
+|[tag greenBackground]#NEW#  a| The following new action enumerations are available in this version:
 
-* `Action.CreateLiveboard` for the *Create Liveboard* menu action on the Liveboards lists page. +
+* `Action.CreateLiveboard` for the *Create Liveboard* menu action on the Liveboards lists page.
 * `Action.SyncToTeams` for the **Sync to Teams** menu action on Liveboard visualizations.
 * `Action.SyncToSlack` for the **Sync to Slack** action on Liveboard visualizations.
 * `Action.AddQuerySet` for the **Add Query Set** action on the data panel (new experience) of the Search page.
 * `Action.AddColumnSet` for the **Add Column Set** action on the data panel (new experience) of the Search page.
 * `Action.AddDataPanelObjects` for the **Add** menu that includes sub-menu options such as Formulas, Parameters, Query set, and Column set actions.
 * `Action.OrganiseFavourites` for the **Organize** action above the Favorites panel on the modular Homepage (New experience)
+
 For more information, see xref:Action.adoc[Actions].
 |[tag greenBackground]#NEW#| Developers can now use the `disableRedirectionLinksInNewTab` parameter to disable links and redirection of links in the embedded view.
 |[tag greenBackground]#NEW# a|You can now enable `enable2ColumnLayout` on a Liveboard to adjust the page view according to the width and resolution of users' devices.
-||
 |====
 
 == Version 1.31.x, July 2024
 [width="100%" cols="1,4"]
 |====
-|[tag greenBackground]#NEW#  a| Runtime filters +
+|[tag greenBackground]#NEW#  a| Runtime filters
 
 * `NOT_IN` operator for Runtime filters.
 For more information, see xref:runtime-filters.adoc#runtimeFilterOp[Runtime filters].
@@ -1290,10 +1406,10 @@ For more information, see xref:runtime-filters.adoc#runtimeFilterOp[Runtime filt
 |====
 |[tag greenBackground]#NEW#  a| **CSS variables for new homepage experience**
 
-* `--ts-var-home-watchlist-selected-text-color` +
-* `--ts-var-home-card-color` +
-* `--ts-var-home-favorite-suggestion-card-text-color` +
-* `--ts-var-home-favorite-suggestion-card-background` +
+* `--ts-var-home-watchlist-selected-text-color`
+* `--ts-var-home-card-color`
+* `--ts-var-home-favorite-suggestion-card-text-color`
+* `--ts-var-home-favorite-suggestion-card-background`
 * `--ts-var-home-favorite-suggestion-card-icon-color`
 
 For more information, see xref:css-customization.adoc#_homepage_modules_new_experience_mode[CSS variables and overrides].
@@ -1385,8 +1501,8 @@ For more information, see link:https://developers.thoughtspot.com/docs/Function_
 
 |[tag greenBackground]#NEW#| You can now override the default number, date, and currency format defined by your locale settings. To override the default settings, use the following parameters:
 
-* `numberFormatLocale` +
-* `dateFormatLocale` +
+* `numberFormatLocale`
+* `dateFormatLocale`
 * `currencyFormat`
 
 For more information, see xref:locale-setting.adoc#_set_locale_in_the_sdk[Customize locale].
@@ -1492,9 +1608,9 @@ Show, disable, or hide the **Add Tab** action on a Liveboard.
 Show, disable, or hide the Liveboard views saved by a user.
 * `Action.LiveboardUsers`  +
 Show, disable, or hide Liveboard users.
-* `Action.SageAnswerFeedback`
+* `Action.SageAnswerFeedback` +
 Show, disable, or hide the feedback widget on AI-generated Answer page.
-* `Action.EditSageAnswer`
+* `Action.EditSageAnswer` +
 Show, disable, or hide the **Edit** action on the AI-generated Answer page.
 
 For more information, see xref:Action.adoc[Actions].
@@ -1529,17 +1645,17 @@ For more information, see xref:Action.adoc[Actions].
 
 [width="100%" cols="1,4"]
 |====
-|[tag greenBackground]#NEW# a| The SDK supports the following performance optimization enhancements: +
+|[tag greenBackground]#NEW# a| The SDK supports the following performance optimization enhancements:
 
 * Ability to pre-render a generic instance of the ThoughtSpot component using the `prerenderGeneric` attribute. The generic instance uses the default host and flags and can be rendered in the background to improve application response.
 * Ability to use an iFrame from a pre-rendered iFrame pool using the `usePrerenderedIfAvailable` attribute.
 |====
 
 ////
-|[tag greenBackground]#NEW# a| New events for Liveboard filters +
+|[tag greenBackground]#NEW# a| New events for Liveboard filters
 
-* `EmbedEvent.FilterChanged` +
-* `HostEvent.GetFilters` +
+* `EmbedEvent.FilterChanged`
+* `HostEvent.GetFilters`
 * `HostEvent.UpdateFilters`
 ////
 
@@ -1558,7 +1674,7 @@ For more information, see xref:security-settings.adoc#_block_access_to_non_embed
 |====
 
 ////
-|[tag greenBackground]#NEW# a| The SDK supports the following performance optimization enhancements: +
+|[tag greenBackground]#NEW# a| The SDK supports the following performance optimization enhancements:
 
 * Ability to pre-render a generic instance of the ThoughtSpot component using the `prerenderGeneric` attribute. The generic instance uses the default host and flags and can be rendered in the background to improve application response.
 * Ability to use an iFrame from a pre-rendered iFrame pool using the `usePrerenderedIfAvailable` attribute.
@@ -1602,7 +1718,7 @@ For more information, see xref:embed-events.adoc[Events].
 
 The following events are deprecated from version 1.21.0 onwards.
 
-* `HostEvent.Download` +
+* `HostEvent.Download`
 * `EmbedEvent.Download`
 
 You can use the `DownloadAsPng`, `DownloadAsXlsx`, `DownloadAsCsv` and `DownloadAsPdf` events for download actions.
@@ -1620,11 +1736,11 @@ Use the following action enumeration members instead of `Action.Download` to sho
 * `Action.DownloadAsXlsx`
 * `Action.DownloadAsPng`
 
-To disable or hide download actions, you can use `Action.Download` in the `disabledActions` and `hiddenActions` arrays respectively. However, if you are using the `visibleActions` array to show or hide actions on a visualization or Answer, include the following download action enumerations along with `Action.Download` in the array: +
+To disable or hide download actions, you can use `Action.Download` in the `disabledActions` and `hiddenActions` arrays respectively. However, if you are using the `visibleActions` array to show or hide actions on a visualization or Answer, include the following download action enumerations along with `Action.Download` in the array:
 
-** `Action.DownloadAsCsv` +
-** `Action.DownloadAsPdf` +
-** `Action.DownloadAsXlsx` +
+** `Action.DownloadAsCsv`
+** `Action.DownloadAsPdf`
+** `Action.DownloadAsXlsx`
 ** `Action.DownloadAsPng`
 
 |[tag greenBackground]#NEW# a| The SDK includes new attributes to customize the experience for embedded app users:
@@ -1696,21 +1812,21 @@ For more information, see xref:embed-authentication.adoc#_saml_redirection[SAML 
 
 [width="100%" cols="1,4"]
 |====
-|[tag greenBackground]#NEW# a|The new version of the SDK provides the `SearchBarEmbed` JavaScript package to embed only the ThoughtSpot Search bar in your app. +
+|[tag greenBackground]#NEW# a|The new version of the SDK provides the `SearchBarEmbed` JavaScript package to embed only the ThoughtSpot Search bar in your app.
 
 For more information, see xref:embed-searchbar.adoc[Embed ThoughtSpot search bar].
 
 |[tag greenBackground]#NEW# a|The `customCSS` property in the `customizations` object supports new variables to customize the UI elements on Liveboard, visualization, and Answer pages. You can also use these variables to define custom styles in the CSS file. +
 For more information, see xref:css-customization.adoc[Customize CSS].
-|[tag greenBackground]#NEW# |The new version of the SDK allows fetching TML objects via `GetTML` host event. This event is triggered when a user clicks on the *Show underlying data* action on a Liveboard visualization or Answer page. +
+|[tag greenBackground]#NEW# |The new version of the SDK allows fetching TML objects via `GetTML` host event. This event is triggered when a user clicks on the *Show underlying data* action on a Liveboard visualization or Answer page.
 
 For more information, see xref:HostEvent.adoc#_gettml[GetTML].
 
 |[tag greenBackground]#NEW# a| The new version of the SDK introduces the following enums in the `Action` object:
 
-* `Action.SyncToOtherApps` +
-* `Action.SyncToSheets` +
-* `Action.ManagePipelines` +
+* `Action.SyncToOtherApps`
+* `Action.SyncToSheets`
+* `Action.ManagePipelines`
 
 You can use these enums to show, hide, or disable *Sync to sheets*, *Sync to other apps*, and *Manage pipelines* menu actions on a Liveboard visualization or Answer.
 
@@ -1724,12 +1840,13 @@ Bug fixes to the trusted authentication feature.
 == Version 1.17.0, November 2022
 
 The new version of the SDK introduces several new features and enhancements.
+
 [width="100%" cols="1,4"]
 |====
-|[tag orangeBackground]#MODIFIED# a|The `AuthType` property is modified and supports new enums. +
+|[tag orangeBackground]#MODIFIED# a|The `AuthType` property is modified and supports new enums.
 
-* `AuthType.SAML` is renamed as `AuthType.SAMLRedirect` +
-* `AuthType.OIDC` is renamed as `AuthType.OIDCRedirect` +
+* `AuthType.SAML` is renamed as `AuthType.SAMLRedirect`
+* `AuthType.OIDC` is renamed as `AuthType.OIDCRedirect`
 * `AuthType.AuthServer` is renamed to `AuthType.TrustedAuthToken` +
 This enhancement does not introduce any breaking changes to your current implementation.
 |[tag greenBackground]#NEW# a|To use your current SAML or OIDC authentication setup and redirect users to the IdP for authentication within the embedded iFrame, you can now use `AuthType.EmbeddedSSO`. +
@@ -1867,6 +1984,7 @@ For more information, see xref:embed-actions.adoc[Show or hide UI actions].
 |====
 |[tag greenBackground]#NEW#|The `detectCookieAccessSlow` parameter in the SDK allows your app to check if third-party cookies are enabled on the browser. This parameter is available only for trusted and `Basic` authentication types.
 |====
+
 == Version 1.10.3, May 2022
 
 Bug fix and improvements to the `logout` method.
@@ -1882,7 +2000,7 @@ Bug fix and improvements to the `logout` method.
 [width="100%" cols="1,4"]
 |====
 |[tag greenBackground]#NEW#|You can now use the `logout` method to log out embed users.
-|[tag orangeBackground]#MODIFIED# a| Note the following changes: +
+|[tag orangeBackground]#MODIFIED# a| Note the following changes:
 
 * You can now use the `loginFailedMessage` property on init to display the `Not logged in` message when a user login fails. You can customize this message by defining a custom text string in the `loginFailedMessage` attribute.
 * The `init` method now returns an event emitter which can be used to listen to `AuthStatus` such as login failure, success, or user logout.
@@ -1945,7 +2063,7 @@ For more information, see xref:embed-ts-react-app.adoc[Embed ThoughtSpot in a Re
 
 For more information, see xref:embed-pinboard.adoc[Embed a Liveboard].
 
-|[tag greenBackground]#NEW#  a| The following events are now available in the SDK: +
+|[tag greenBackground]#NEW#  a| The following events are now available in the SDK:
 
 * `LiveboardRendered` (EmbedEvent)
 
@@ -1957,10 +2075,10 @@ For more information, see xref:event-embedEvents.adoc[Events reference].
 |====
 |[tag greenBackground]#NEW#  a| The SDK now includes the following new enumerations for UI actions:
 
-* `Action.AnswerDelete` +
-* `Action.AnswerChartSwitcher` +
-* `Action.AddToFavorites` +
-* `Action.EditDetails` +
+* `Action.AnswerDelete`
+* `Action.AnswerChartSwitcher`
+* `Action.AddToFavorites`
+* `Action.EditDetails`
 
 For more information, see xref:embed-actions.adoc#standard-actions[Show or hide UI actions].
 
@@ -2024,7 +2142,6 @@ For more information, see xref:event-embedEvents.adoc[Events reference].
 
 [width="100%" cols="1,4"]
 |====
-||
 |[tag greenBackground]#NEW# | +++<h5>Render embedded objects in queue</h5>+++
 
 The SDK now supports rendering embedded objects in a queue. If you have multiple embedded objects, you can enable the `queueMultiRenders` parameter to queue your embedded objects and render them one after another. This feature helps in decreasing the load on the web browsers and improving your application loading experience. By default, this attribute is set to `false`.
@@ -2051,7 +2168,6 @@ For more information, see xref:event-embedEvents.adoc[Events reference].
 
 [width="100%" cols="1,4"]
 |====
-||
 |[tag greenBackground]#NEW# a|+++<h5>+++Prefetch API+++</h5>+++
 
 The `prefetch` API fetches static resources from a given URL before your application loads. Web browsers can then cache the prefetched resources locally and serve them from a user's local disk. You can use this API to load the embedded objects faster and improve your application response time.
@@ -2096,7 +2212,6 @@ For more information, see xref:embed-events.adoc[Events and app integration].
 
 [width="100%" cols="1,4"]
 |====
-||
 |[tag greenBackground]#NEW#  a|  +++<h5>searchOptions</h5>+++
 
 The `searchEmbed` SDK package introduces the `searchOptions` parameter for setting search tokens. The `searchOptions` parameter includes the following attributes:
