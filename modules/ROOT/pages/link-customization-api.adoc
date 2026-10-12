@@ -1,0 +1,251 @@
+= Link Customization APIs
+:toc: true
+:toclevels: 2
+
+:page-title: Link Customization APIs
+:page-pageid: link-customization-api
+:page-description: Use Link Customization APIs to programmatically manage the URL templates ThoughtSpot uses when generating shareable links.
+
+ThoughtSpot generates shareable links for Liveboards, Answers, visualizations, SpotIQ insights, Spotter conversations, and other objects. These links appear in scheduled emails, the Share dialog, and alert notifications.
+
+By default, shareable links point to your ThoughtSpot instance. If you embed ThoughtSpot in your own application, you can redirect these links to your application using the Link Customization APIs. When a user clicks a shared link, they are directed to your embedding application instead of the ThoughtSpot application.
+
+[NOTE]
+====
+The Link Customization APIs are available on ThoughtSpot Cloud 26.11.0.cl and later.
+====
+
+== Overview
+
+The Link Customization APIs allow you to read and update the URL templates used when ThoughtSpot generates shareable links. Each link type has a URL template with placeholders that ThoughtSpot substitutes at generation time.
+
+Two endpoints are available:
+
+* **Search** — Retrieves the current URL templates.
+* **Update** — Sets or resets URL templates.
+
+Templates can be managed at two scopes:
+
+* `CLUSTER` — Sets the default templates that all Orgs inherit. Available only to callers in the primary Org.
+* `ORG` — Sets templates for the caller's Org, overriding the cluster default. Requires Orgs to be enabled.
+
+== Required privileges
+
+These endpoints require one of the following privileges:
+
+* `ADMINISTRATION` (**Can administer ThoughtSpot**)
+* `DEVELOPER` (**Has developer privilege**)
+
+== Supported link types and placeholders
+
+Each link type requires specific placeholders in its URL template. A template missing a required placeholder is rejected.
+
+[width="100%" cols="2,2,3"]
+[options='header']
+|===
+|Link type |Required placeholders |Example template
+
+|`LIVEBOARD_SHARE_URL`
+|`{object-id}`, `{ts-query-params}`
+|`\https://analytics.acme.com/dashboards/{object-id}?{ts-query-params}`
+
+|`VISUALIZATION_SHARE_URL`
+|`{object-id}`, `{sub-object-id}`, `{ts-query-params}`
+|`\https://analytics.acme.com/dashboards/{object-id}/charts/{sub-object-id}?{ts-query-params}`
+
+|`ANSWER_SHARE_URL`
+|`{object-id}`, `{ts-query-params}`
+|`\https://analytics.acme.com/answers/{object-id}?{ts-query-params}`
+
+|`SPOTIQ_ANALYSIS_URL`
+|`{object-id}`
+|`\https://analytics.acme.com/insights/{object-id}`
+
+|`UNSUBSCRIBE_URL`
+|none
+|`\https://analytics.acme.com/account/email-preferences`
+
+|`GENERIC_URL`
+|`{path}`
+|`\https://analytics.acme.com/{path}`
+
+|`CONVERSATION_SHARE_URL`
+|`{conversation-id}`, `{ts-query-params}`
+|`\https://analytics.acme.com/spotter/{conversation-id}?{ts-query-params}`
+|===
+
+`{ts-query-params}` is optional on any type that does not require it. ThoughtSpot substitutes it wherever it appears and removes it when there is nothing to substitute.
+
+[#search-link-customizations]
+== Search link customizations
+
+Retrieves the URL templates at the cluster level or for the caller's Org.
+
+=== Endpoint
+
+----
+POST /api/rest/2.0/customization/links/search
+----
+
+=== Request parameters
+
+[width="100%" cols="2,1,1,4"]
+[options='header']
+|===
+|Parameter |Type |Required |Description
+
+|`scope`
+|String
+|No
+|`CLUSTER` or `ORG`. Omit to return whichever scope the caller can access.
+|===
+
+=== Response
+
+Returns an array of link preferences. Each entry includes the `scope`, a `templates` array with the `type`, `value`, and `is_overridden` flag for each link type.
+
+The `is_overridden` flag is `true` when the scope stores a value that differs from what it would otherwise inherit.
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/links/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {access_token}' \
+  --data-raw '{}'
+----
+
+=== Example response
+
+[source,JSON]
+----
+[
+  {
+    "scope": "CLUSTER",
+    "templates": [
+      {
+        "type": "LIVEBOARD_SHARE_URL",
+        "value": "https://acme.thoughtspot.cloud/#/pinboard/{object-id}?{ts-query-params}",
+        "is_overridden": false
+      },
+      {
+        "type": "CONVERSATION_SHARE_URL",
+        "value": "https://acme.thoughtspot.cloud/#/insights/conv-assist/s/{conversation-id}?{ts-query-params}",
+        "is_overridden": false
+      }
+    ]
+  }
+]
+----
+
+[#update-link-customizations]
+== Update link customizations
+
+Updates the URL templates at the cluster level or for the caller's Org.
+
+=== Endpoint
+
+----
+POST /api/rest/2.0/customization/links/update
+----
+
+=== Request parameters
+
+[width="100%" cols="2,1,1,4"]
+[options='header']
+|===
+|Parameter |Type |Required |Description
+
+|`scope`
+|String
+|No
+|`CLUSTER` or `ORG` (default). `CLUSTER` is available only to callers in the primary Org.
+
+|`operation`
+|String
+|No
+|`REPLACE` (default) sets each listed type to the `value` provided. `RESET` clears each listed type so it falls back to the inherited template.
+
+|`templates`
+|Array
+|Yes
+|List of template objects. Each object requires a `type`. For `REPLACE`, include a `value` with the URL template. For `RESET`, omit `value`.
+|===
+
+=== Behavior
+
+* This is a partial update. Only the types listed in `templates` change. Unlisted types keep their current value.
+* A repeated type in the `templates` array is rejected.
+* `RESET` clears the override, so an Org falls back to the cluster template and the cluster falls back to the ThoughtSpot default.
+* Supplying a `value` with a `RESET` operation is rejected.
+
+=== Example request — Replace a template
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/links/update' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {access_token}' \
+  --data-raw '{
+  "scope": "ORG",
+  "operation": "REPLACE",
+  "templates": [
+    {
+      "type": "LIVEBOARD_SHARE_URL",
+      "value": "https://analytics.acme.com/dashboards/{object-id}?{ts-query-params}"
+    }
+  ]
+}'
+----
+
+=== Example request — Reset a template
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/links/update' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {access_token}' \
+  --data-raw '{
+  "scope": "ORG",
+  "operation": "RESET",
+  "templates": [
+    {
+      "type": "LIVEBOARD_SHARE_URL"
+    }
+  ]
+}'
+----
+
+=== Response
+
+Returns `204 No Content` on success.
+
+== Error codes
+
+[width="80%" cols="1,3"]
+[options='header']
+|===
+|HTTP status |Description
+
+|`400`
+|Invalid request. For example, a missing required placeholder, a duplicate type, or a `value` supplied with `RESET`.
+
+|`401`
+|Unauthorized. The caller is not authenticated.
+
+|`403`
+|Forbidden. The caller does not have the required privilege.
+
+|`500`
+|Unexpected server error.
+|===
+
+== Related information
+
+* xref:rest-api-v2-reference.adoc[REST API v2.0 Reference]
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
