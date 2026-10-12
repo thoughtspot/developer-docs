@@ -1,0 +1,282 @@
+= Input Table APIs
+:toc: true
+:toclevels: 2
+
+:page-title: Input Table APIs
+:page-pageid: input-table-api
+:page-description: Use Input Table APIs to create, manage, and write data to input tables linked to ThoughtSpot models.
+
+Input tables are user-editable tables stored in an external Cloud Data Warehouse (CDW) and linked to a ThoughtSpot model (worksheet). They allow analysts to enter or import data directly from the ThoughtSpot UI without requiring access to the underlying warehouse.
+
+The Input Table REST API v2.0 endpoints allow you to create and manage input tables, add or remove columns, and write data programmatically.
+
+[NOTE]
+====
+The Input Table APIs are available on ThoughtSpot Cloud 26.11.0.cl and later.
+====
+
+== Required privileges
+
+All Input Table API endpoints require one of the following privileges:
+
+* `DATAMANAGEMENT` (**Can manage data**)
+* `ADMINISTRATION` (**Can administer ThoughtSpot**)
+
+If link:https://developers.thoughtspot.com/docs/rbac[Role-Based Access Control (RBAC), window=_blank] is enabled on your instance, the `CAN_MANAGE_INPUT_TABLES` (**Can manage input tables**) privilege is required.
+
+The caller must also have `MODIFY` permission on the input table or model object, depending on the operation.
+
+[#create-input-table]
+== Create an input table
+
+Creates an input table and links it to a ThoughtSpot model. The physical table is created in the external CDW using the connection, database, and schema derived from the model's metadata.
+
+=== Endpoint
+
+----
+POST /api/rest/2.0/input-tables/create
+----
+
+=== Request body parameters
+
+[width="100%" cols="2,1,1,4"]
+[options='header']
+|===
+|Parameter |Type |Required |Description
+
+|`table_name`
+|String
+|Yes
+|Physical name of the table in the external warehouse. Must start with a letter or underscore, contain only letters, digits, and underscores, and be at most 128 characters.
+
+|`model_identifier`
+|String
+|Yes
+|GUID or name of the model (worksheet) to link the input table to.
+
+|`table_definition`
+|Object
+|Yes
+|Describes the table schema. See the table definition parameters below.
+|===
+
+==== Table definition
+
+[width="100%" cols="2,1,1,4"]
+[options='header']
+|===
+|Parameter |Type |Required |Description
+
+|`referenced_columns`
+|Array of Strings
+|Yes
+|Names of columns on the linked model to include as read-only reference (key) columns. At least one is required. Each name must match exactly one visible model column and resolve to exactly one physical base column. Formula, cohort, or constant columns cannot be referenced.
+
+|`new_columns`
+|Array of Objects
+|Yes
+|List of new editable columns. Each column requires `name`, `data_type` (for example, `VARCHAR`, `DOUBLE`, `DATE`), and `type` (`ATTRIBUTE` or `MEASURE`). Optionally include `allowed_values` (at most 500 values) to create a fixed-choice column.
+
+|`referenced_column_time_dimensions`
+|Array of Objects
+|No
+|Locks selected date columns to a specific time dimension (grain) at creation. Each entry has a `column_identifier` and a `time_dimension`. Accepted values: `HOURLY`, `DAILY`, `WEEKLY`, `MONTHLY`, `QUARTERLY`, `YEARLY`.
+|===
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/create' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {access_token}' \
+  --data-raw '{
+  "table_name": "forecast_data",
+  "model_identifier": "model-guid-here",
+  "table_definition": {
+    "referenced_columns": ["Region", "Quarter"],
+    "new_columns": [
+      {
+        "name": "forecast_revenue",
+        "data_type": "DOUBLE",
+        "type": "MEASURE"
+      },
+      {
+        "name": "confidence_level",
+        "data_type": "VARCHAR",
+        "type": "ATTRIBUTE",
+        "allowed_values": ["HIGH", "MEDIUM", "LOW"]
+      }
+    ]
+  }
+}'
+----
+
+[#create-input-table-column]
+== Add columns to an input table
+
+Adds one or more new editable columns to an existing input table. This widens the physical table in the CDW and refreshes the ThoughtSpot metadata.
+
+=== Endpoint
+
+----
+POST /api/rest/2.0/input-tables/{input_table_identifier}/columns/create
+----
+
+=== Request body parameters
+
+[width="100%" cols="2,1,1,4"]
+[options='header']
+|===
+|Parameter |Type |Required |Description
+
+|`column_definition.columns`
+|Array of Objects
+|Yes
+|List of new editable columns. Each column requires `name`, `data_type`, and `type` (`ATTRIBUTE` or `MEASURE`). Optionally include `allowed_values`.
+|===
+
+=== Response
+
+Returns the added columns with their generated GUIDs.
+
+[source,JSON]
+----
+{
+  "columns": [
+    {
+      "name": "forecast_revenue",
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+    }
+  ]
+}
+----
+
+[#delete-input-table]
+== Delete an input table
+
+Deletes an input table, unlinks it from its owner model, removes it from the connection metadata, and drops the physical table from the CDW. This action is irreversible.
+
+=== Endpoint
+
+----
+POST /api/rest/2.0/input-tables/{input_table_identifier}/delete
+----
+
+=== Response
+
+Returns `204 No Content` on success.
+
+[NOTE]
+====
+Deleting an input table does not delete the linked model. However, any Answers or Liveboards that reference columns from the deleted input table will lose access to that data.
+====
+
+[#delete-input-table-column]
+== Delete an input table column
+
+Deletes a single editable column from an input table. This removes the column from the ThoughtSpot metadata and drops the physical column from the CDW. This action is irreversible.
+
+=== Endpoint
+
+----
+POST /api/rest/2.0/input-tables/{input_table_identifier}/columns/{column_identifier}/delete
+----
+
+Only columns added directly to the input table (editable, non-referenced columns) can be deleted. The request is rejected if the column is a referenced (model-projected) column or is still referenced by an existing Answer or Liveboard.
+
+Use the `id` field returned by `createInputTableColumn` or `createInputTable` as the `column_identifier`.
+
+=== Response
+
+Returns `204 No Content` on success.
+
+[#update-input-table]
+== Write rows to an input table
+
+Writes rows into an existing input table using a keyed upsert (MERGE) operation. Rows are matched on the input table's key columns (the columns mapped to the linked model). Matched rows are updated in place. Unmatched rows are inserted.
+
+=== Endpoint
+
+----
+POST /api/rest/2.0/input-tables/{input_table_identifier}/update
+----
+
+=== Request body parameters
+
+[width="100%" cols="2,1,1,4"]
+[options='header']
+|===
+|Parameter |Type |Required |Description
+
+|`columns`
+|Array of Strings
+|Yes
+|Ordered list of column names to write. Must include every key column and at least one non-key column.
+
+|`rows`
+|Array of Arrays
+|Yes
+|List of rows. Each row is an array of string values in the same order as `columns`. An empty value writes `NULL`.
+|===
+
+=== Date value handling
+
+* `DATE` columns accept ISO calendar dates (`yyyy-MM-dd`, for example `2025-01-01`). Epoch numbers are also accepted but resolved in the cluster's local time zone.
+* `DATE_TIME` and `TIME` columns accept epoch numbers only.
+* All values in a column must use the same format.
+
+=== Write semantics
+
+* **Matched rows**: only the non-key columns present in `columns` are overwritten. Columns not included keep their existing values.
+* **New rows**: a new row is inserted. Non-key columns not included are set to `NULL`.
+* This is not a full-table replace. Existing rows whose keys are not in the payload are untouched.
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/{input_table_identifier}/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {access_token}' \
+  --data-raw '{
+  "columns": ["Region", "Quarter", "forecast_revenue"],
+  "rows": [
+    ["West", "Q1 2026", "500000"],
+    ["East", "Q1 2026", "750000"]
+  ]
+}'
+----
+
+=== Response
+
+Returns `rows_loaded`, the number of rows written (updated + inserted).
+
+== Error codes
+
+[width="80%" cols="1,3"]
+[options='header']
+|===
+|HTTP status |Description
+
+|`400`
+|Invalid request. For example, a mismatched column name, missing key column, or incompatible data type.
+
+|`401`
+|Unauthorized. The caller is not authenticated.
+
+|`403`
+|Forbidden. The caller does not have the required privilege or permission.
+
+|`500`
+|Unexpected server error.
+|===
+
+== Related information
+
+* xref:rest-api-v2-reference.adoc[REST API v2.0 Reference]
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
