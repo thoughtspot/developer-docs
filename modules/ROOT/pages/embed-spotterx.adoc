@@ -1,0 +1,166 @@
+= Embed SpotterX experience
+:toc: true
+:toclevels: 2
+
+:page-title: Embed SpotterX
+:page-pageid: embed-spotterx
+:page-description: SpotterX is the next-generation Spotter experience. You can enable SpotterX in standalone Spotter, Liveboard, and full app embeds using the Visual Embed SDK.
+
+[.version-badge.new]#26.11.0.cl#
+
+SpotterX is the next-generation Spotter experience in ThoughtSpot. It provides a redesigned conversational interface with an improved chat layout, enhanced white-label and branding controls, and a consistent configuration surface across all supported embed contexts.
+
+SpotterX is opt-in. Existing Spotter embeds remain unchanged unless you explicitly enable SpotterX in your embed configuration.
+
+// SOURCE: SCAL-326037
+
+== Before you begin
+
+To embed SpotterX, you need the following access and setup:
+
+* Access to a ThoughtSpot instance running 26.11.0.cl or later, with SpotterX enabled. To enable SpotterX on your instance, contact your ThoughtSpot administrator.
+* Your host application domain added to xref:security-settings.adoc[ThoughtSpot CSP and CORS allowlists].
+* Visual Embed SDK v1.54.0 or later.
+// TODO: verify with engineering — confirm the minimum SDK version required for SpotterX
+
+== Supported embed contexts
+
+You can enable SpotterX in the following embed contexts:
+
+[width="100%", cols="2,4"]
+[options='header']
+|===
+|Embed context|Description
+
+|Standalone Spotter (`SpotterEmbed`)
+|The full SpotterX conversational experience embedded as a standalone component.
+
+|Liveboard (`LiveboardEmbed`)
+|SpotterX available within an embedded Liveboard. See <<spotterx-liveboard, SpotterX in Liveboard embeds>>.
+
+|Full app (`AppEmbed`)
+|SpotterX available across the full embedded ThoughtSpot application experience.
+|===
+
+Configuration behavior is consistent across all three contexts — the same configuration surface applies whether SpotterX runs standalone, in a Liveboard, or in a full app embed.
+
+== Enable SpotterX
+
+To enable SpotterX, set the `spotterVersion` property to `SpotterVersion.SpotterX` in your embed configuration.
+
+// TODO: verify with engineering — confirm the exact enum and property names published in the SDK for SpotterX enablement
+
+**Code sample for embedding the SpotterX experience**
+
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    AuthType,
+    init,
+    EmbedEvent,
+    HostEvent,
+    SpotterVersion
+} from '@thoughtspot/visual-embed-sdk';
+
+// Initialize the ThoughtSpot Visual Embed SDK
+init({
+    thoughtSpotHost: 'https://your-thoughtspot-host',
+    authType: AuthType.None,
+});
+
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        height: '100%',
+        width: '100%',
+    },
+    worksheetId: '<datasource-guid>', // Replace with GUID of the data source
+    spotterVersion: SpotterVersion.SpotterX, // Enable SpotterX
+    // ...other embed configuration attributes
+});
+
+// Register event listeners
+spotterEmbed.on(EmbedEvent.Init, () => {
+    // Show loading indicator
+});
+spotterEmbed.on(EmbedEvent.Load, () => {
+    // Hide loading indicator
+});
+
+// Render the embed
+spotterEmbed.render();
+----
+
+[#spotterx-liveboard]
+== SpotterX in Liveboard embeds
+
+SpotterX is supported in embedded Liveboards. When enabled, users can start a Spotter conversation from the embedded Liveboard context and analyze the data behind Liveboard visualizations conversationally.
+
+To enable SpotterX in a Liveboard embed, set `spotterVersion` in the `LiveboardEmbed` configuration:
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    liveboardId: '<liveboard-guid>', // Replace with GUID of the Liveboard
+    spotterVersion: SpotterVersion.SpotterX, // Enable SpotterX in the Liveboard embed
+    // ...other embed configuration attributes
+});
+liveboardEmbed.render();
+----
+
+// TODO: verify with engineering — confirm the configuration property and any additional flags required to enable the Spotter on Liveboards experience in embed mode (for example, whether the instance-level "Spotter 3 Liveboard experience" setting must also be enabled)
+
+[NOTE]
+====
+The Spotter on Liveboards experience must be enabled on your ThoughtSpot instance. To enable this feature, contact your ThoughtSpot administrator.
+====
+
+== White-label and branding controls
+
+SpotterX supports white-label controls for text, labels, icons, and instance-level branding behavior across all embed surfaces:
+
+* **Text strings and labels** — Use the `customizations.content.strings` object in the SDK `init` call to replace visible UI text with custom labels.
+* **Icons** — Use the icon override framework to replace SpotterX interface icons. For more information, see xref:customize-icons.adoc[Customize icons].
+* **Styles** — Use CSS variables via `customizations.style.customCSS` to adjust colors, fonts, and component appearance. SpotterX consumes `--ts-var` CSS variables for chat chrome styling. For more information, see xref:css-customization.adoc[CSS customization framework].
+* **Instance-level branding suppression** — Branding suppression works across all embed surfaces.
+
+// SOURCE: SCAL-326037, SCAL-337856
+
+== Lifecycle events and runtime control
+
+Host applications can observe SpotterX lifecycle events and trigger supported actions through the `EmbedEvent` and `HostEvent` framework:
+
+* Use `EmbedEvent` members to listen to SpotterX lifecycle and interaction events in the embedded view.
+* Use `HostEvent` members to trigger supported actions in the SpotterX interface from your host application.
+
+// TODO: verify with engineering — confirm the full list of EmbedEvents and HostEvents supported by SpotterX in the initial release
+
+== Roll back to Spotter 3
+
+SpotterX rollback is a configuration value change plus re-render:
+
+. Set `spotterVersion` to `SpotterVersion.Spotter3` in your embed configuration.
+. Re-render the embed component.
+
+No data or conversation history is affected by the rollback.
+
+// SOURCE: SCAL-326037
+
+== Migration considerations
+
+SpotterX has a new DOM structure. If your embedding application relies on custom CSS selectors targeting the internal DOM of the classic Spotter interface, review and update your customizations after switching to SpotterX. ThoughtSpot recommends using the published `--ts-var` CSS variables and the SDK customization framework instead of DOM-based selectors.
+
+== Known limitations
+
+* Full feature parity with Spotter 3 is not available in the initial SpotterX release.
+* Spotter Actions and `defaultQueryMode` are not included in the initial release.
+
+// SOURCE: SCAL-326037
+
+== Additional resources
+
+* xref:embed-spotter.adoc[Embed Spotter experience]
+* xref:customize-spotter-embed.adoc[Customize the Spotter embed view]
+* xref:embed-ai-analytics.adoc[Feature status and availability in embed mode]
+* link:https://developers.thoughtspot.com/docs/Class_SpotterEmbed[SpotterEmbed classes and methods]
+* link:https://docs.thoughtspot.com/cloud/latest/spotter[Spotter Product Documentation]

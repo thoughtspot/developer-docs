@@ -1,0 +1,345 @@
+= Input Table APIs
+:toc: true
+:toclevels: 2
+
+:page-title: Input Table APIs
+:page-pageid: input-table-api
+:page-description: Use the Input Table REST API v2 endpoints to create input tables, add or remove columns, and write data to input tables linked to ThoughtSpot models.
+:keywords: input table, input tables, writeback, Cloud Data Warehouse, model, REST API
+
+Input tables are user-editable tables stored in an external Cloud Data Warehouse (CDW) and linked to a ThoughtSpot model. They allow analysts to enter or import data directly from the ThoughtSpot UI without requiring access to the underlying warehouse.
+
+ThoughtSpot provides public REST API v2 endpoints to manage input tables programmatically for the following purposes:
+
+* To create an input table and link it to a model as part of an automated deployment workflow.
+* To add or remove editable columns as your data requirements change.
+* To write data, such as forecasts, targets, or other planning inputs, from an external application or pipeline to an input table.
+
+[NOTE]
+====
+The Input Table APIs are available on ThoughtSpot Cloud 26.11.0.cl and later.
+====
+
+== Input table workflow
+To create an input table and populate it with data:
+
+. <<create-input-table, Create an input table>> +
+Call `POST /api/rest/2.0/input-tables/create` with the model to link, the model columns to reference as key columns, and the new editable columns. The response returns the `input_table_id` and the ID of each column.
+. <<create-input-table-column, Add columns to the input table>> (optional) +
+Call `POST /api/rest/2.0/input-tables/{input_table_identifier}/columns/create` to add more editable columns later.
+. <<update-input-table, Update the input table>> +
+Call `POST /api/rest/2.0/input-tables/{input_table_identifier}/update` to insert or update rows.
+. <<delete-input-table-column, Delete a column>> or <<delete-input-table, delete the input table>> (optional) +
+Call the delete endpoints to remove a column or the entire table when it is no longer required.
+
+=== Required privileges
+All Input Table API endpoints require one of the following privileges:
+
+* `DATAMANAGEMENT` (**Can manage data**)
+* `ADMINISTRATION` (**Can administer ThoughtSpot**)
+
+If link:https://developers.thoughtspot.com/docs/rbac[Role-Based Access Control (RBAC), window=_blank] is enabled on your instance, the `CAN_MANAGE_INPUT_TABLES` (**Can manage input tables**) privilege is required.
+
+The caller must also have `MODIFY` permission on the following objects:
+
+* The model specified in `model_identifier`, to create an input table.
+* The input table, to add or delete columns, write rows, or delete the table.
+
+[#create-input-table]
+== Creating an input table
+The `/api/rest/2.0/input-tables/create` API endpoint creates an input table and links it to a ThoughtSpot model. The physical table is created in the same connection, database, and schema as the linked model. Ensure that the connection user has `CREATE TABLE` permission in the target schema and that upload is enabled on the connection. If upload is disabled, the API returns a `400` error.
+
+=== Request parameters
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `table_name`
+|__String__. Physical name of the table to create in the external warehouse. The name must start with a letter or underscore, contain only letters, digits, and underscores, and be at most 128 characters.
+| `model_identifier`
+|__String__. GUID or name of the model (worksheet) to link the input table to. ThoughtSpot derives the connection, database, and schema for the physical table from this model.
+| `table_definition`
+a|__Object__. Defines the table schema. Specify the following attributes:
+
+* `referenced_columns` +
+__Array of strings__. Names of the model columns to include as read-only reference columns, as they appear on the model. These columns become the key columns of the input table. The input table is joined to the model on these columns, and rows are matched on them when you write data. At least one column is required. Each name must match exactly one visible model column and resolve to exactly one physical base column. You cannot reference formula, cohort, or constant columns.
+* `new_columns` +
+__Array of objects__. The new editable columns to create. For each column, specify the following attributes:
+
+** `name`. __String__. Display name of the column.
+** `data_type`. __String__. Data type of the column in the warehouse, for example, `VARCHAR`, `DOUBLE`, or `DATE`. The supported values depend on the underlying CDW.
+** `type`. __String__. Semantic role of the column: `ATTRIBUTE` for dimension columns or `MEASURE` for numeric columns.
+** `allowed_values`. __Array of strings__. Optional. Up to 500 permitted values, which turn the column into a fixed-choice column. Each value must be non-empty, at most 8192 characters, and valid for the column's `data_type`: a number for numeric types, `true` or `false` for `BOOL`, and an epoch integer for `DATE`, `DATE_TIME`, and `TIME`. Writes that contain any other non-empty value are rejected. If you omit this attribute, the column accepts any value that its data type supports.
+* `referenced_column_time_dimensions` +
+__Array of objects__. Optional. Locks the referenced date columns to a specific time dimension (grain) at creation. Each entry includes the `column_identifier`, which is the name of the referenced model column exactly as specified in `referenced_columns`, and the `time_dimension`. Supported values for `time_dimension` are `HOURLY`, `DAILY`, `WEEKLY`, `MONTHLY`, `QUARTERLY`, and `YEARLY`. If you omit a column, ThoughtSpot applies no bucketing to it. The time dimension applies only to `DATE` and `DATE_TIME` columns. `HOURLY` requires a `DATE_TIME` column. If you specify `HOURLY` for a `DATE` column, it is ignored and the column is not bucketed. Date-part grains, such as day of the week, and grains on `TIME` columns are not supported. Time dimensions apply only to referenced columns. Columns created through `new_columns` are always unbucketed.
+|===
+
+=== Request example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "table_name": "forecast_data",
+  "model_identifier": "{model-guid}",
+  "table_definition": {
+    "referenced_columns": ["Region", "Quarter"],
+    "new_columns": [
+      {
+        "name": "forecast_revenue",
+        "data_type": "DOUBLE",
+        "type": "MEASURE"
+      },
+      {
+        "name": "confidence_level",
+        "data_type": "VARCHAR",
+        "type": "ATTRIBUTE",
+        "allowed_values": ["HIGH", "MEDIUM", "LOW"]
+      }
+    ]
+  }
+}'
+----
+
+=== API Response
+Returns `200 OK` and the input table ID with the details of each column in the input table.
+
+[source,JSON]
+----
+{
+  "input_table_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "input_columns": [
+    {
+      "name": "Region",
+      "id": "b1c2d3e4-0000-1111-2222-333344445555",
+      "mapped_column_id": "c7d8e9f0-1234-5678-abcd-ef0987654321"
+    },
+    {
+      "name": "Quarter",
+      "id": "d2e3f4a5-1111-2222-3333-444455556666",
+      "mapped_column_id": "e8f9a0b1-2345-6789-bcde-f01987654322"
+    },
+    {
+      "name": "forecast_revenue",
+      "id": "a9b8c7d6-9999-8888-7777-666655554444"
+    },
+    {
+      "name": "confidence_level",
+      "id": "f0a1b2c3-3333-4444-5555-666677778888"
+    }
+  ]
+}
+----
+
+The response includes the following parameters:
+
+[cols="2,4", options="header"]
+|===
+| Parameter | Description
+| `input_table_id`
+| GUID of the new input table. Use this value as the `input_table_identifier` path parameter in the other Input Table API endpoints.
+| `input_columns`
+a| Every column on the new table. Each entry includes the following attributes:
+
+* `name`: Display name of the column.
+* `id`: GUID of the column.
+* `mapped_column_id`: GUID of the model column that the input column is mapped from. Present only for referenced columns.
+
+Use the column IDs to address specific columns in later calls without a separate lookup.
+| `message_info`
+| A note that is present only when ThoughtSpot renames a referenced column to keep the column names of the input table unique. If a model column name occurs in more than one base table, ThoughtSpot prefixes it with the base table name. For example, `Region` becomes `sales_Region`. The final name of the renamed column is also available in `input_columns`, and it is the name you must use when you write rows.
+|===
+
+[#create-input-table-column]
+== Adding columns to an input table
+The `/api/rest/2.0/input-tables/{input_table_identifier}/columns/create` API endpoint adds one or more editable columns to an existing input table. This operation widens the physical table in the CDW and refreshes the metadata of the input table in ThoughtSpot, so that the new columns are available on the linked model.
+
+You can add only new editable columns with this endpoint. A column added this way is never a key column and does not have a time dimension.
+
+=== Request parameters
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `input_table_identifier`
+|__String__. Path parameter. GUID of the input table to add the columns to.
+| `column_definition`
+a|__Object__. Defines the columns to add. Specify the following attribute:
+
+* `columns` +
+__Array of objects__. The new editable columns. For each column, specify the `name`, `data_type`, and `type` (`ATTRIBUTE` or `MEASURE`). Optionally, include `allowed_values`. The column name must not collide with an existing column on the table. For more information about these attributes, see <<create-input-table,Creating an input table>>.
+|===
+
+=== Request example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/{input_table_identifier}/columns/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "column_definition": {
+    "columns": [
+      {
+        "name": "forecast_margin",
+        "data_type": "DOUBLE",
+        "type": "MEASURE"
+      }
+    ]
+  }
+}'
+----
+
+=== API Response
+Returns `200 OK` and the added columns with their generated GUIDs. Use these GUIDs as the `column_identifier` to <<delete-input-table-column,delete a column>>.
+
+[source,JSON]
+----
+{
+  "columns": [
+    {
+      "name": "forecast_margin",
+      "id": "6b3a8f21-9c4d-4e77-bf2a-1d5e7c9a0b34"
+    }
+  ]
+}
+----
+
+[#update-input-table]
+== Updating an input table
+The `/api/rest/2.0/input-tables/{input_table_identifier}/update` API endpoint writes rows into an existing input table using a keyed upsert (MERGE) operation. ThoughtSpot matches the rows in the request with the existing rows on the key columns of the input table, which are the columns mapped to the linked model. A matched row is updated in place, and a row whose key is not found is inserted.
+
+=== Request parameters
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `input_table_identifier`
+|__String__. Path parameter. GUID of the input table to write to.
+| `columns`
+|__Array of strings__. Ordered list of the column names to write. The column names must exactly match the names defined when the input table was created. The list must include every key column and at least one non-key column. Key columns identify a row but are never overwritten, so a payload with only key columns is rejected.
+| `rows`
+|__Array of arrays__. The rows to write. At least one row is required. An empty `rows` array is rejected. Each row is an array of string values in the same order as `columns`, with exactly one value per column. Pass all values as strings regardless of the data type of the column. An empty value writes `NULL` to the cell.
+|===
+
+=== Date value handling
+* For `DATE` columns, pass an ISO calendar date (`yyyy-MM-dd`), for example, `2025-01-01`. ThoughtSpot stores the value exactly as written, without time zone conversion. Epoch numbers, in seconds or milliseconds, are also accepted, but they are resolved in the cluster's local time zone, so a UTC-midnight epoch can land on the previous day on clusters west of UTC. Use the ISO format.
+* `DATE_TIME` and `TIME` columns accept epoch numbers only. An ISO value is rejected.
+* All rows must use the same format for a given column. A calendar-invalid date, such as `2026-02-30`, is rejected.
+
+=== Write semantics
+* **Matched rows**: Only the non-key columns in `columns` are overwritten. Columns that you do not include keep their existing values.
+* **New rows**: A new row is inserted. Non-key columns that you do not include are set to `NULL`.
+* This is not a full-table replace. Existing rows whose keys are not in the request are not changed.
+* The operation is idempotent. Retrying the same request is safe.
+
+The API rejects the request if a column name does not match the table schema, the number of values in a row does not match the number of `columns`, a key column is missing, no non-key column is specified, or a value is not compatible with the data type of its column.
+
+=== Request example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/{input_table_identifier}/update'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "columns": ["Region", "Quarter", "forecast_revenue"],
+  "rows": [
+    ["West", "Q1 2026", "500000"],
+    ["East", "Q1 2026", "750000"]
+  ]
+}'
+----
+
+=== API Response
+Returns `200 OK` and the number of rows written, which is the sum of rows updated and rows inserted. The count is the number reported by the warehouse. If the warehouse completes the load but does not report a count, the API returns a `500` error.
+
+[source,JSON]
+----
+{
+  "rows_loaded": 2
+}
+----
+
+[#delete-input-table-column]
+== Deleting an input table column
+The `/api/rest/2.0/input-tables/{input_table_identifier}/columns/{column_identifier}/delete` API endpoint deletes a single editable column from an input table. This operation removes the column from the input table metadata in ThoughtSpot and drops the physical column from the CDW. All data stored in the column is permanently deleted.
+
+[WARNING]
+====
+This operation cannot be undone.
+====
+
+You can delete only the columns that were added directly to the input table (editable, non-referenced columns). The API rejects the request if the column is a referenced (model-projected) column or if an existing Answer or Liveboard still references it.
+
+=== Request parameters
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `input_table_identifier`
+|__String__. Path parameter. GUID of the input table that owns the column.
+| `column_identifier`
+|__String__. Path parameter. GUID of the column to delete. Use the `id` returned for the column in the response of the <<create-input-table,create input table>> API (`input_columns`) or the <<create-input-table-column,add columns>> API (`columns`).
+|===
+
+This endpoint does not require a request body.
+
+=== Request example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/{input_table_identifier}/columns/{column_identifier}/delete'  \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+=== API Response
+Returns `204 No Content` if the column is deleted and the physical column is dropped from the CDW.
+
+[#delete-input-table]
+== Deleting an input table
+The `/api/rest/2.0/input-tables/{input_table_identifier}/delete` API endpoint deletes an input table. This operation unlinks the input table from its owner model, removes it from the connection metadata, and drops the physical table from the CDW. All data stored in the input table is permanently deleted.
+
+[WARNING]
+====
+This operation cannot be undone.
+====
+
+Deleting an input table does not delete the linked model. However, any Answers or Liveboards that reference columns from the deleted input table lose access to that data and may return errors until you update the affected visualizations.
+
+=== Request parameters
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `input_table_identifier`
+|__String__. Path parameter. GUID of the input table to delete. ThoughtSpot derives the owner model from the metadata of the input table.
+|===
+
+This endpoint does not require a request body.
+
+=== Request example
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/input-tables/{input_table_identifier}/delete'  \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+=== API Response
+Returns `204 No Content` if the input table is deleted and the physical table is dropped from the CDW.
+
+== Additional resources
+
+* xref:rest-api-v2-reference.adoc#_input_tables[REST API v2.0 Reference]
+* xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Finput-tables%2Fcreate-input-table">REST API Playground - Create input table endpoint</a>+++
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Finput-tables%2Fcreate-input-table-column">REST API Playground - Create input table column endpoint</a>+++
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Finput-tables%2Fupdate-input-table">REST API Playground - Update input table endpoint</a>+++
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Finput-tables%2Fdelete-input-table-column">REST API Playground - Delete input table column endpoint</a>+++
+* +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Finput-tables%2Fdelete-input-table">REST API Playground - Delete input table endpoint</a>+++
