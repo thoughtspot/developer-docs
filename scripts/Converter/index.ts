@@ -1117,6 +1117,9 @@ class TypeDocParser {
             `${member.comment?.shortText || ''}`
                 .replace(/\*\*|`/g, '')
                 .replace(/\s+/g, ' ')
+                // Backslashes first, then the pipes: escaping a pipe adds a backslash, and a
+                // backslash already in the text would otherwise change what that means.
+                .replace(/\\/g, '\\\\')
                 .replace(/\|/g, '\\|')
                 .trim();
 
