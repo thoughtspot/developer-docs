@@ -3,6 +3,7 @@ import hljs from 'highlight.js';
 import { MdContentCopy } from '@react-icons/all-files/md/MdContentCopy';
 import { MdCheck } from '@react-icons/all-files/md/MdCheck';
 import { MdFilterList } from '@react-icons/all-files/md/MdFilterList';
+import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import { isTutorialsPath } from '../../utils/app-utils';
@@ -174,31 +175,47 @@ const makeFilterToggle = (label: string, options: string[]) => {
     return { field, select: field as unknown as HTMLSelectElement };
 };
 
-/* Icon-triggered dropdown alternative to makeFilterSelect — a funnel-icon
- * button that opens a scrollable vertical menu, for a dimension with too
- * many values to spell out as tabs or even a labelled <select> (e.g.
- * Category, which grows every release). Same { field, select } contract as
- * makeFilterToggle above. */
-const makeFilterIconDropdown = (label: string, options: string[]) => {
+/* Icon-triggered panel alternative to makeFilterSelect — a funnel-icon
+ * button that opens a menu of one or more multi-select checkbox sections,
+ * for a dimension (or group of dimensions) with too many values to spell
+ * out as tabs or a labelled <select> (e.g. Category, which grows every
+ * release), or that explicitly calls for checking more than one value at
+ * once (e.g. Topic + State on the "All" tab's page). One section per
+ * `{ label, options }` entry; a page that only has one such dimension
+ * (e.g. just Category) gets a one-section panel. Unlike makeFilterSelect/
+ * makeFilterToggle, there's no single `.value` — callers read
+ * `getSelectedValues(label)` per section instead, since more than one
+ * option can be checked at a time. */
+const makeFilterPanel = (sections: Array<{ label: string; options: string[] }>) => {
     const field = document.createElement('div');
     field.classList.add('release-notes-filterbar-icondropdown');
 
     const trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.classList.add('release-notes-filterbar-icontrigger');
-    trigger.setAttribute('aria-label', `Filter by ${label}`);
-    trigger.innerHTML = getHTMLFromComponent(<MdFilterList />, 'release-notes-filter-icon');
+    trigger.setAttribute('aria-label', `Filter by ${sections.map((s) => s.label).join(', ')}`);
+
+    const triggerLabel = document.createElement('span');
+    triggerLabel.textContent = 'Filter';
+    trigger.appendChild(triggerLabel);
+
+    const triggerIcon = document.createElement('span');
+    triggerIcon.classList.add('release-notes-filterbar-icontrigger-icon');
+    triggerIcon.innerHTML = getHTMLFromComponent(<MdFilterList />, 'release-notes-filter-icon');
+    trigger.appendChild(triggerIcon);
+
     field.appendChild(trigger);
+
+    const badge = document.createElement('span');
+    badge.classList.add('release-notes-filterbar-icon-badge');
+    badge.hidden = true;
+    trigger.appendChild(badge);
 
     const menu = document.createElement('div');
     menu.classList.add('release-notes-filterbar-icon-menu');
     field.appendChild(menu);
 
-    let currentValue = '';
-    const buttons: HTMLButtonElement[] = [];
-
     const closeMenu = () => menu.classList.remove('open');
-
     trigger.addEventListener('click', (e) => {
         e.stopPropagation();
         menu.classList.toggle('open');
@@ -207,33 +224,93 @@ const makeFilterIconDropdown = (label: string, options: string[]) => {
         if (!field.contains(e.target as Node)) closeMenu();
     });
 
-    const setActive = (target: HTMLButtonElement, isAll: boolean) => {
-        buttons.forEach((b) => b.classList.toggle('active', b === target));
-        trigger.classList.toggle('active', !isAll);
+    const selectedBySection = new Map<string, Set<string>>();
+    sections.forEach(({ label }) => selectedBySection.set(label, new Set()));
+
+    const updateActiveState = () => {
+        const total = Array.from(selectedBySection.values()).reduce((n, set) => n + set.size, 0);
+        trigger.classList.toggle('active', total > 0);
+        badge.hidden = total === 0;
+        badge.textContent = String(total);
     };
 
-    const makeOption = (text: string, value: string) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.classList.add('release-notes-filterbar-icon-option');
-        btn.textContent = text;
-        btn.addEventListener('click', () => {
-            currentValue = value;
-            setActive(btn, value === '');
-            closeMenu();
-            field.dispatchEvent(new Event('change'));
+    sections.forEach(({ label, options }, i) => {
+        // A one-section panel (just Category, on most pages) skips the
+        // heading — the trigger's own aria-label already says what it
+        // filters, a repeated heading would be redundant.
+        if (sections.length > 1) {
+            const heading = document.createElement('div');
+            heading.classList.add('release-notes-filterbar-panel-heading');
+            heading.textContent = `Filter by ${label.toLowerCase()}`;
+            menu.appendChild(heading);
+        }
+
+        options.forEach((option) => {
+            const optionRow = document.createElement('label');
+            optionRow.classList.add('release-notes-filterbar-icon-option');
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.addEventListener('change', () => {
+                const selected = selectedBySection.get(label)!;
+                if (checkbox.checked) selected.add(option); else selected.delete(option);
+                updateActiveState();
+                field.dispatchEvent(new Event('change'));
+            });
+
+            const text = document.createElement('span');
+            text.textContent = option;
+
+            optionRow.appendChild(checkbox);
+            optionRow.appendChild(text);
+            menu.appendChild(optionRow);
         });
-        buttons.push(btn);
-        menu.appendChild(btn);
-        return btn;
-    };
 
-    setActive(makeOption('All', ''), true);
-    options.forEach((option) => makeOption(option, option));
+        if (sections.length > 1 && i < sections.length - 1) {
+            menu.appendChild(document.createElement('hr')).classList.add('release-notes-filterbar-panel-divider');
+        }
+    });
 
-    Object.defineProperty(field, 'value', { get: () => currentValue });
+    const clearButton = document.createElement('button');
+    clearButton.type = 'button';
+    clearButton.classList.add('release-notes-filterbar-panel-clear');
+    clearButton.textContent = 'Clear all';
+    clearButton.addEventListener('click', () => {
+        selectedBySection.forEach((set) => set.clear());
+        menu.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((checkbox) => {
+            checkbox.checked = false;
+        });
+        updateActiveState();
+        field.dispatchEvent(new Event('change'));
+    });
+    menu.appendChild(clearButton);
 
-    return { field, select: field as unknown as HTMLSelectElement };
+    const getSelectedValues = (label: string): string[] => Array.from(selectedBySection.get(label) ?? []);
+
+    return { field, getSelectedValues };
+};
+
+/* Free-text search box for the filter bar — matches against a row's full
+ * (visible) text, not a single column, so it catches a hit in the
+ * description, date, version, or category alike. Debounced in
+ * customizeDocContent (not here) since this is just the field itself. */
+const makeFilterSearch = () => {
+    const field = document.createElement('label');
+    field.classList.add('release-notes-filterbar-search');
+
+    const icon = document.createElement('span');
+    icon.classList.add('release-notes-filterbar-search-icon');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = getHTMLFromComponent(<BiSearch />, 'release-notes-search-icon-svg');
+    field.appendChild(icon);
+
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.placeholder = 'Search';
+    input.setAttribute('aria-label', 'Search release notes');
+    field.appendChild(input);
+
+    return { field, input };
 };
 
 // customizeDocContent() reruns on every page navigation in this SPA and
@@ -446,6 +523,16 @@ const mountFilterBar = (filterBar: HTMLElement, documentView: HTMLElement) => {
 };
 
 let teardownNavTabListeners: (() => void) | null = null;
+
+// The "All" tab's Topic filter values, mapped to the tabbed-sample page
+// each one corresponds to — see the Topic-specific listener in
+// customizeDocContent, where checking exactly one of these swaps straight
+// to that page instead of filtering the "All" table down to it.
+const TOPIC_TAB_PAGEIDS: Record<string, string> = {
+    'Embed SDK': 'embed-sdk-changelog-tabbed-sample',
+    'REST API': 'rest-api-changelog-tabbed-sample',
+    'MCP Server': 'mcp-server-changelog-tabbed-sample',
+};
 
 const pageidFromHref = (href: string): string => {
     const { pathname } = new URL(href, window.location.origin);
@@ -822,13 +909,37 @@ export const customizeDocContent = () => {
                 filterBar.appendChild(breakingField);
             }
 
-            const selectsByLabel = new Map<string, HTMLSelectElement>();
+            // Every dimension exposes the same { getValues(): string[] }
+            // shape regardless of which widget backs it — a native <select>
+            // or the Feature toggle group only ever returns zero or one
+            // value, the Category/Topic/State panel can return several at
+            // once (multi-select) — so applyFilters below can treat every
+            // dimension identically rather than special-casing multi-select.
+            const selectsByLabel = new Map<string, { getValues: () => string[] }>();
+            const changeTargets: EventTarget[] = [];
 
             if (hasProductColumn) {
                 const { field, select } = makeFilterSelect('Product', PRODUCTS);
                 filterBar.appendChild(field);
-                selectsByLabel.set('Product', select);
+                selectsByLabel.set('Product', { getValues: () => (select.value ? [select.value] : []) });
+                changeTargets.push(select);
             }
+
+            // Category, Topic, and State (and the search box below) read as
+            // secondary, "narrow it further" actions — grouped together and
+            // pushed to the far right of the bar, away from the primary
+            // Feature tabs and other dropdowns on the left (see
+            // .release-notes-filterbar-controls in index.scss). Category/
+            // Topic/State specifically share ONE funnel-icon panel (see
+            // makeFilterPanel) rather than one button each — a page authors
+            // either just Category (the three per-feature tabbed-sample
+            // pages, release-notes-embed-master-sample) or just Topic +
+            // State (the "All" tab), never more than one of these three at
+            // once today, but the panel supports any combination.
+            const rightControls = document.createElement('div');
+            rightControls.classList.add('release-notes-filterbar-controls');
+            const PANEL_DIMENSIONS = ['category', 'topic', 'state'];
+            const panelSections: Array<{ label: string; options: string[] }> = [];
 
             dimensionLabels.forEach((label) => {
                 // Version reads newest-first, matching how these pages are
@@ -840,54 +951,141 @@ export const customizeDocContent = () => {
                     const colIndex = columnIndexByTable.get(table)?.get(label);
                     if (!colIndex) return;
                     Array.from(table.querySelectorAll<HTMLElement>('tbody tr')).forEach((row) => {
-                        const value = row.querySelector(`td:nth-child(${colIndex})`)?.textContent?.trim();
-                        if (value) values.add(value);
+                        // A cell can carry more than one value (e.g. Topic:
+                        // "Embed SDK, REST API") — each still needs to show
+                        // up once as its own option in the filter.
+                        const cellText = row.querySelector(`td:nth-child(${colIndex})`)?.textContent?.trim();
+                        cellText?.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => values.add(v));
                     });
                 });
                 const options = preserveDocOrder ? Array.from(values) : Array.from(values).sort();
 
+                const lowerLabel = label.toLowerCase();
+                if (PANEL_DIMENSIONS.includes(lowerLabel)) {
+                    panelSections.push({ label, options });
+                    return;
+                }
+
                 // "Feature" is always a small, fixed-feeling split (e.g.
                 // Embed SDK vs REST API) — a row of always-visible tabs
-                // reads faster than a dropdown for 2-3 options. "Category"
-                // is the opposite case — a list that keeps growing every
-                // release — so it gets the icon-triggered dropdown instead
-                // of a labelled <select>, to stay compact regardless of how
-                // many values it accumulates. Every other dimension
-                // (Product, Type, Version, ...) keeps the plain dropdown.
-                const lowerLabel = label.toLowerCase();
+                // reads faster than a dropdown for 2-3 options. Every other
+                // non-panel dimension (Product, Version, ...) keeps the
+                // plain single-select dropdown.
                 const { field, select } =
-                    lowerLabel === 'feature' ? makeFilterToggle(label, options)
-                    : lowerLabel === 'category' ? makeFilterIconDropdown(label, options)
-                    : makeFilterSelect(label, options);
+                    lowerLabel === 'feature' ? makeFilterToggle(label, options) : makeFilterSelect(label, options);
                 filterBar.appendChild(field);
-                selectsByLabel.set(label, select);
+                selectsByLabel.set(label, { getValues: () => (select.value ? [select.value] : []) });
+                changeTargets.push(select);
             });
+
+            if (panelSections.length) {
+                const { field, getSelectedValues } = makeFilterPanel(panelSections);
+                rightControls.appendChild(field);
+                panelSections.forEach(({ label }) => {
+                    selectsByLabel.set(label, { getValues: () => getSelectedValues(label) });
+                });
+
+                // Topic only exists on the "All" tab, and its three values
+                // are exactly the other three tabs by another name —
+                // checking exactly one is the same request as clicking
+                // that tab, so it does that instead of filtering locally
+                // (jumping to that page's own, fuller content rather than
+                // just this page's Topic-tagged subset of it). Checking
+                // two or more can't be expressed as "go to one tab" — that
+                // stays a local filter, and the tab bar stays on "All".
+                if (panelSections.some((s) => s.label === 'Topic')) {
+                    field.addEventListener('change', () => {
+                        const selectedTopics = getSelectedValues('Topic');
+                        const soleTopicPageid =
+                            selectedTopics.length === 1 ? TOPIC_TAB_PAGEIDS[selectedTopics[0]] : undefined;
+                        if (soleTopicPageid) {
+                            swapNavTabContent(soleTopicPageid, documentView).catch((err) => {
+                                // eslint-disable-next-line no-console
+                                console.error('[release-notes-navtabs] tab switch failed', err);
+                                applyFilters(true);
+                            });
+                            return;
+                        }
+                        applyFilters(true);
+                    });
+                } else {
+                    changeTargets.push(field);
+                }
+            }
+
+            const { field: searchField, input: searchInput } = makeFilterSearch();
+            rightControls.appendChild(searchField);
+            filterBar.appendChild(rightControls);
 
             mountFilterBar(filterBar, documentView);
 
-            const applyFilters = () => {
+            // "Load more" pagination — one button per table, right after it,
+            // shown only once that table has more *matching* rows than are
+            // currently revealed. PAGE_SIZE is generous enough that it never
+            // engages on a page built from many small per-section tables
+            // (e.g. one table per month) — it only does anything useful on
+            // a long flat table (a master-list-style page), where the
+            // button appears and reveals PAGE_SIZE more rows per click.
+            const PAGE_SIZE = 10;
+            const visibleCounts = new Map<HTMLTableElement, number>();
+            const loadMoreButtons = new Map<HTMLTableElement, HTMLButtonElement>();
+            releaseNotesTables.forEach((table) => {
+                visibleCounts.set(table, PAGE_SIZE);
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.classList.add('release-notes-loadmore');
+                button.textContent = 'Load more';
+                button.style.display = 'none';
+                button.addEventListener('click', () => {
+                    visibleCounts.set(table, (visibleCounts.get(table) ?? PAGE_SIZE) + PAGE_SIZE);
+                    applyFilters(false);
+                });
+                table.insertAdjacentElement('afterend', button);
+                loadMoreButtons.set(table, button);
+            });
+
+            // A filter/search change should jump back to the first page of
+            // results rather than stay scrolled deep into whatever was
+            // expanded before — only "Load more" itself (resetPagination:
+            // false) should grow a table's visible count.
+            const applyFilters = (resetPagination = true) => {
                 const breakingOnly = breakingCheckbox?.checked ?? false;
+                const searchQuery = searchInput.value.trim().toLowerCase();
+                if (resetPagination) releaseNotesTables.forEach((table) => visibleCounts.set(table, PAGE_SIZE));
 
                 releaseNotesTables.forEach((table) => {
                     const colIndexByLabel = columnIndexByTable.get(table);
                     const rows = Array.from(table.querySelectorAll<HTMLElement>('tbody tr'));
-                    let anyRowVisible = false;
 
-                    rows.forEach((row) => {
-                        const matches = Array.from(selectsByLabel.entries()).every(([label, select]) => {
-                            const filterValue = select.value;
-                            if (!filterValue) return true; // "All"
+                    const matchingRows = rows.filter((row) => {
+                        const matchesDimensions = Array.from(selectsByLabel.entries()).every(([label, dimension]) => {
+                            const selectedValues = dimension.getValues();
+                            if (selectedValues.length === 0) return true; // "All" / nothing checked
                             const colIndex = colIndexByLabel?.get(label);
                             if (!colIndex) return true; // table doesn't author this column — not excluded by it
                             const rowValue = row.querySelector(`td:nth-child(${colIndex})`)?.textContent?.trim() || '';
-                            return rowValue === filterValue;
+                            // A cell can carry more than one value (Topic);
+                            // a row matches if it has ANY selected value —
+                            // multiple checked boxes within one dimension
+                            // OR together, same as a real multi-select would.
+                            const rowValues = rowValue.split(',').map((v) => v.trim()).filter(Boolean);
+                            return selectedValues.some((v) => rowValues.includes(v));
                         });
-                        row.style.display = matches ? '' : 'none';
-                        if (matches) anyRowVisible = true;
+                        const matchesSearch = !searchQuery || (row.textContent?.toLowerCase().includes(searchQuery) ?? false);
+                        return matchesDimensions && matchesSearch;
                     });
 
+                    const limit = visibleCounts.get(table) ?? PAGE_SIZE;
+                    const visibleRows = new Set(matchingRows.slice(0, limit));
+                    rows.forEach((row) => {
+                        row.style.display = visibleRows.has(row) ? '' : 'none';
+                    });
+
+                    const loadMoreButton = loadMoreButtons.get(table);
+                    if (loadMoreButton) loadMoreButton.style.display = matchingRows.length > limit ? '' : 'none';
+
                     const sect2 = table.closest<HTMLElement>('.sect2');
-                    if (sect2) sect2.dataset.hasVisibleRows = anyRowVisible ? 'true' : 'false';
+                    if (sect2) sect2.dataset.hasVisibleRows = matchingRows.length > 0 ? 'true' : 'false';
 
                     if (table.classList.contains('release-notes-no-header')) dedupeDateColumn(table);
                 });
@@ -910,8 +1108,16 @@ export const customizeDocContent = () => {
                 });
             };
 
-            selectsByLabel.forEach((select) => select.addEventListener('change', applyFilters));
-            breakingCheckbox?.addEventListener('change', applyFilters);
+            changeTargets.forEach((target) => target.addEventListener('change', () => applyFilters(true)));
+            breakingCheckbox?.addEventListener('change', () => applyFilters(true));
+
+            let searchDebounce: ReturnType<typeof setTimeout>;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchDebounce);
+                searchDebounce = setTimeout(() => applyFilters(true), 200);
+            });
+
+            applyFilters(true);
         }
     }
 

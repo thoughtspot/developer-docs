@@ -271,10 +271,15 @@
         }
     }
 
-    // Category filter (icon dropdown) reads right-to-left as a secondary,
-    // "narrow it further" action — pushed to the far right of the bar,
-    // away from the primary Feature tabs on the left.
-    .release-notes-filterbar-icondropdown {
+    // Category filter and the search box both read as secondary, "narrow
+    // it further" actions — grouped together and pushed to the far right
+    // of the bar, away from the primary Feature tabs on the left (see the
+    // dimensionLabels loop in helper.tsx, which routes Category's field
+    // into this wrapper instead of appending it to the bar directly).
+    .release-notes-filterbar-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         margin-left: auto;
     }
 
@@ -542,33 +547,71 @@
         }
     }
 
-    /* Icon-triggered dropdown — made by makeFilterIconDropdown() in
-       helper.tsx, for a dimension with too many values for tabs (e.g.
-       Category, which grows with every release). Same visual theme as the
-       "Copy page" dropdown (src/components/CopyPageDropdown/index.scss) —
-       reuses the same CSS custom properties so it reads as the same
-       pattern rather than a one-off. */
+    /* Icon-triggered panel — made by makeFilterPanel() in helper.tsx, for
+       one or more multi-select checkbox sections (Category alone on most
+       pages; Topic + State together on the "All" tab). Same visual theme
+       as the "Copy page" dropdown (src/components/CopyPageDropdown/
+       index.scss) — reuses the same CSS custom properties so it reads as
+       the same pattern rather than a one-off. */
     .release-notes-filterbar-icondropdown {
         position: relative;
     }
 
-    .release-notes-filterbar-icontrigger {
+    // Selection count overlaid on the trigger's corner once at least one
+    // checkbox is checked — the only way to tell at a glance that this
+    // (otherwise icon-only) control has an active filter. Absolutely
+    // positioned rather than inline so it doesn't disturb the trigger's
+    // own fixed-size, centered-icon layout.
+    .release-notes-filterbar-icon-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        min-width: 15px;
+        height: 15px;
+        padding: 0 3px;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1;
+        color: #fff;
+        background: var(--link-text-color);
+        border-radius: 999px;
+
+        // The `display` above would otherwise win over the `hidden`
+        // attribute's own (lower-specificity) UA style, keeping the badge
+        // visible even at zero selections — this restores `hidden` as the
+        // one source of truth for whether it shows at all.
+        &[hidden] {
+            display: none;
+        }
+    }
+
+    .release-notes-filterbar-icontrigger {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
         // Matches the toggle-group pill's own box height (14px text +
-        // 6px bottom padding + 2px border), so the icon lines up with
-        // the "Embed SDK" / "REST API" text beside it instead of
-        // towering over it.
-        width: 28px;
+        // 6px bottom padding + 2px border), so it lines up with the
+        // "Embed SDK" / "REST API" text beside it instead of towering
+        // over it.
         height: 28px;
-        padding: 0;
+        padding: 0 10px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
         color: var(--primary-color);
         background: var(--body-background-color);
         border: none;
-        border-radius: 6px;
+        border-radius: 999px;
         cursor: pointer;
         transition: all 0.15s ease;
+
+        .release-notes-filterbar-icontrigger-icon {
+            display: inline-flex;
+        }
 
         svg {
             width: 16px;
@@ -610,17 +653,19 @@
         }
     }
 
+    // One checkbox + label per option, not a button — more than one can be
+    // checked at once (multi-select), so clicking an option no longer
+    // closes the menu or replaces the previous selection.
     .release-notes-filterbar-icon-option {
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: 8px;
         width: 100%;
-        padding: 9px 12px;
+        padding: 7px 12px;
         font-family: inherit;
         font-size: 13px;
         font-weight: 400;
-        text-align: left;
         color: var(--primary-color);
-        background: transparent;
-        border: none;
         border-radius: 5px;
         cursor: pointer;
 
@@ -628,9 +673,128 @@
             background: var(--copy-btn-bg);
         }
 
-        &.active {
+        input[type='checkbox'] {
+            flex-shrink: 0;
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            accent-color: var(--link-text-color);
+            cursor: pointer;
+        }
+    }
+
+    // One per extra section beyond the first (Topic / State on the "All"
+    // tab) — labels which checkboxes below it belong together. Skipped
+    // entirely for a one-section panel (just Category), where it would
+    // only repeat what the trigger's own aria-label already says.
+    .release-notes-filterbar-panel-heading {
+        padding: 8px 12px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--secondary-color);
+    }
+
+    .release-notes-filterbar-panel-divider {
+        margin: 6px 4px;
+        border: none;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .release-notes-filterbar-panel-clear {
+        display: block;
+        width: 100%;
+        margin-top: 4px;
+        padding: 7px 12px;
+        font-family: inherit;
+        font-size: 12.5px;
+        font-weight: 500;
+        text-align: left;
+        color: var(--link-text-color);
+        background: transparent;
+        border: none;
+        border-top: 1px solid var(--border-color);
+        cursor: pointer;
+
+        &:hover {
+            background: var(--copy-btn-bg);
+        }
+    }
+
+    /* Free-text search box — made by makeFilterSearch() in helper.tsx.
+       Same pill-ish treatment as the other filter fields, with the search
+       icon inset on the left. */
+    .release-notes-filterbar-search {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+
+        input {
+            width: 160px;
+            padding: 6px 10px 6px 30px;
+            font-family: inherit;
+            font-size: 13px;
+            color: var(--primary-color);
+            background: var(--copy-btn-bg);
+            border: 1px solid var(--rd-sys-color-border-bold);
+            border-radius: 999px;
+            transition: border-color 0.15s ease, width 0.15s ease;
+
+            &::placeholder {
+                color: var(--secondary-color);
+            }
+
+            &:focus-visible {
+                outline: none;
+                border-color: var(--link-text-color);
+                width: 200px;
+            }
+
+            // Default (and WebKit's own) search-input decorations don't
+            // match this theme — the custom icon below replaces them.
+            &::-webkit-search-cancel-button,
+            &::-webkit-search-decoration {
+                display: none;
+            }
+        }
+    }
+
+    .release-notes-filterbar-search-icon {
+        position: absolute;
+        left: 10px;
+        display: inline-flex;
+        color: var(--secondary-color);
+        pointer-events: none;
+
+        svg {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    /* "Load more" pagination — made in customizeDocContent (helper.tsx),
+       one per release-notes table, inserted right after it. Hidden by
+       default; only shown once that table has more matching rows than are
+       currently revealed. Plain pill button, centered, intentionally
+       unobtrusive next to the filter bar's own pill styling. */
+    .release-notes-loadmore {
+        display: block;
+        margin: 20px auto;
+        padding: 8px 20px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--primary-color);
+        background: var(--copy-btn-bg);
+        border: 1px solid var(--rd-sys-color-border-bold);
+        border-radius: 999px;
+        cursor: pointer;
+        transition: border-color 0.15s ease, color 0.15s ease;
+
+        &:hover {
             color: var(--link-text-color);
-            font-weight: 600;
+            border-color: var(--link-text-color);
         }
     }
 
