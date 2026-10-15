@@ -58,6 +58,8 @@ import VersionIframe from '../VersionIframe';
 // Key of the merged nav-in-product-help.adoc entry in processedNavMap (pageid minus 'nav-' prefix).
 // Not a real DocCategory/tab — used only to pick the left sidebar content when embedded in-product.
 const IN_PRODUCT_NAV_KEY = 'in-product-help';
+// Key of nav-sdk-reference.adoc in processedNavMap; also the 'sdk-reference' DocCategory.
+const SDK_REFERENCE_NAV_KEY = 'sdk-reference';
 
 // Session key remembering which sidebar category the visitor was last in. Pages like the
 // changelogs are listed in several category navs, and every in-site navigation is a full page
@@ -252,7 +254,12 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             }
         });
         const map: Record<string, DocCategory[]> = {};
-        Object.entries(processedNavMap).forEach(([navKey, html]) => {
+        // The SDK reference nav goes last, so it comes last in the list of a page that the
+        // Embedding nav also links to (e.g. VisualEmbedSdk).
+        const orderedNavs = Object.entries(processedNavMap).sort(
+            ([a], [b]) => Number(a === SDK_REFERENCE_NAV_KEY) - Number(b === SDK_REFERENCE_NAV_KEY),
+        );
+        orderedNavs.forEach(([navKey, html]) => {
             const cat = navKeyToCategory[navKey];
             if (navKey === IN_PRODUCT_NAV_KEY || !cat) return;
             const doc = new DOMParser().parseFromString(html as string, 'text/html');
@@ -285,6 +292,12 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         // First try the auto-derived map from nav files
         const categories = pageIdToCategories[currentPageId];
         if (categories?.length) {
+            // The pages of the SDK reference always show its own sidebar, also for a visitor who
+            // comes from the Embedding nav (which links to its landing page).
+            if (categories.includes('sdk-reference')) {
+                setActiveCategory('sdk-reference');
+                return;
+            }
             // A page listed in several category navs (e.g. the changelogs, which sit in both
             // "What's new" and their product's nav) stays in the sidebar the visitor came from.
             // A direct visit has no previous category and gets the product nav, not "What's new".
