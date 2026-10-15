@@ -60,6 +60,13 @@ const LeftSideBar = (props: {
         });
         if (tag) {
             tag.classList.add('active');
+            // On a page that is only reachable from a hidden sub-menu, mark the
+            // visible parent entry as the active one instead.
+            divElement
+                .querySelector('.nav-hidden-children a.active')
+                ?.closest('.nav-hidden-children')
+                ?.parentElement?.querySelector(':scope > p a')
+                ?.classList.add('active');
         }
 
         const updatedHTML = addExpandCollapseImages(

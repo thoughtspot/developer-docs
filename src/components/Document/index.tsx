@@ -6,6 +6,7 @@ import Breadcrums from '../Breadcrums';
 import LinkableHeader from '../LinkableHeader';
 import WasThisHelpful from '../WasThisHelpful';
 import CopyPageDropdown from '../CopyPageDropdown';
+import EmbedTypeFilter from '../EmbedTypeFilter';
 import { HOME_PAGE_ID } from '../../configs/doc-configs';
 import { isTutorialsPath } from '../../utils/app-utils';
 import parse, { HTMLReactParserOptions, domToReact, attributesToProps } from 'html-react-parser';
@@ -176,6 +177,13 @@ const Document = (props: {
 
     const options: HTMLReactParserOptions = {
         replace: (domNode: any) => {
+            // Placeholder emitted by the typedoc converter on the Action reference page.
+            if (domNode.type === 'tag' && domNode.attribs?.class === 'embed-type-filter') {
+                const embedTypes = (domNode.attribs['data-embed-types'] || '')
+                    .split(',')
+                    .filter(Boolean);
+                return <EmbedTypeFilter embedTypes={embedTypes} />;
+            }
             if (domNode.type === 'tag' &&
                 ['h2', 'h3', 'h4'].includes(domNode.name) &&
                 !domNode.parent?.attribs?.class?.includes('non-link')
