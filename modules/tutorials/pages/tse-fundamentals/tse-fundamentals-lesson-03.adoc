@@ -2,7 +2,7 @@
 :toc!:
 
 :page-title: Security setup
-:page-pageid:  tse-fundamentals__lesson-03
+:page-pageid: tse-fundamentals__lesson-03
 :page-description: This lesson covers the security setup necessary to embed ThoughtSpot into TSE applications.
 
 ThoughtSpot Embedded applications operate securely with ThoughtSpot. This lesson will walk you through the security setup required for embedding ThoughtSpot.
@@ -24,11 +24,10 @@ Security when using ThoughtSpot and ThoughtSpot Embedded can be in the following
 [options='header']
 |=====
 |Security setting| Managed at
-|Embed / web security are the security settings that allow you to embed ThoughtSpot into your application|ThoughtSpot Embedded
+|Embed / web security are the security settings that allow you to embed ThoughtSpot into your application. For more information, see <<_embed_web_security,Embed / web security>>.|ThoughtSpot Embedded
 |Authentication determines how you will authenticate the user with ThoughtSpot. Both the authentication supported by ThoughtSpot and ThoughtSpot Embedded have to be considered.|  ThoughtSpot Embedded +
  ThoughtSpot Analytics application
-|Content security is managed by ThoughtSpot to determine what content a user has access to, such as Tables, Models (formerly Worksheets), and Liveboards. Data security can be controlled separately | ThoughtSpot Analytics application.
-For more information, see xref:_embed_web_security[the following sections].
+|Content security is managed by ThoughtSpot to determine what content a user has access to, such as Tables, Models (formerly Worksheets), and Liveboards. Data security can be controlled separately | ThoughtSpot Analytics application
 |System privileges / roles define what a user can do inside ThoughtSpot, such as downloading data or using SpotIQ.|ThoughtSpot Analytics application
 |Data security restricts the columns or rows of data from the source data. Data security is managed via row-level security settings or column sharing in ThoughtSpot. It can also be controlled using pass-through security to the Cloud data warehouse.| ThoughtSpot Analytics application
 |=====
@@ -37,7 +36,7 @@ For more information, see xref:_embed_web_security[the following sections].
 
 The embed and web security settings determine which applications can embed ThoughtSpot and make API calls via JavaScript (cross-site scripting).
 
-Security settings are set on the *Developer > Customisations > Security Settings* page in the ThoughtSpot UI. You can see this page if you have Developer or Administrator privileges. To configure the settings, you will need administrator privileges.
+Security settings are set on the *Develop* > *Customizations* > *Security settings* page in the ThoughtSpot UI. You can see this page if you have Developer or Administrator privileges. To configure the settings, you will need administrator privileges.
 
 [.widthAuto]
 [.bordered]
@@ -47,7 +46,7 @@ The following are the most important settings for embedding ThoughtSpot. Except 
 
 === CSP visual embed hosts
 
-CSP visual embed hosts are the URLs that are permitted to embed ThoughtSpot. For example, `\https://mycoolapp.mycompany.com`. If your app URL is not in the list, then you will get CSP errors when embedding. For development, you can add localhost, but it's not recommended for production environments. You only need a port if you are using a non-standard port such as 80, 443.
+CSP visual embed hosts are the URLs that are permitted to embed ThoughtSpot. For example, `\https://mycoolapp.mycompany.com`. If your app URL is not in the list, then you will get CSP errors when embedding. For development, you can add localhost, but it's not recommended for production environments. You only need to specify a port if you are using a non-standard port such as 8080. If you add `localhost` or any non-HTTPS domain, include the `http` protocol, for example `\http://localhost:8000`.
 
 === CSP connect-src domains
 
@@ -55,9 +54,9 @@ The CSP connect-src domains are those domains that you can send data _to_. This 
 
 === CORS trusted domains
 
-Domains added to CORS allowlist can use cross-site scripting, that is, calling web service endpoints (including login) from a web application. Command-line applications and tools, such as CURL, are not impacted by this setting. The values are the list of domains (without protocol) and any non-standard ports, such as 8080. If CORS isn't set, you will see CORS errors in the console log for web service calls.
+Domains added to CORS allowlist can use cross-site scripting, that is, calling web service endpoints (including login) from a web application. Command-line applications and tools, such as CURL, are not impacted by this setting. The values are the list of domains and any non-standard ports, such as 8080. You can omit the protocol for `https` domains, but you must include it for `localhost` and other non-HTTPS domains. If CORS isn't set, you will see CORS errors in the console log for web service calls.
 
-You will need to add the CORS setting either in your system or the trial instance. Add `localhost:8000` if that's your URL.  Note that `127.0.0.1` is not the same, so if you are using an IP, set that instead.
+You will need to add the CORS setting either in your system or the trial instance. Add `\http://localhost:8000` if that's your URL.  Note that `127.0.0.1` is not the same, so if you are using an IP, set that instead.
 
 For more details, see the link:https://developers.thoughtspot.com/docs/security-settings[security setting] documentation, which also includes constraints on values for the above settings.
 
@@ -75,7 +74,8 @@ The following table lists the types of authentication, the associated link:https
 | SSO with iframe redirect | AuthType.EmbeddedSSO | SSO or OIDC when iframe redirect is supported by the IdP. | No
 | link:https://en.wikipedia.org/wiki/SAML_2.0[SAML] | AuthType.SAMLRedirect | SSO with SAML | Yes
 | link:https://openid.net/connect/[OIDC] | AuthType.OIDCRedirect | SSO with Open ID Connect | No
-| Trusted Authentication | AuthType.AuthServer | ThoughtSpot token-based approach | Yes
+| Trusted Authentication (cookie-based) | AuthType.TrustedAuthToken | ThoughtSpot token-based approach that creates a session cookie | Yes
+| Trusted Authentication (cookieless) | AuthType.TrustedAuthTokenCookieless | ThoughtSpot token-based approach that doesn't depend on third-party cookies. Recommended for production. | Yes
 |===
 
 Each of these approaches is explored in detail in the following sections.
@@ -103,7 +103,7 @@ SAML configuration requires Administrator privileges in ThoughtSpot. It shows up
 [.bordered]
 image::images/tutorials/tse-fundamentals/lesson-03-saml-configuration.png[SAML configuration dialog]
 
-Once you have the SAML federation set up for ThoughtSpot, you also have to enable the SAML redirect for the authentication. This is set from the *Developer | Security Settings*. If this value is not set, then you will get errors trying to redirect back to your application.
+Once you have the SAML federation set up for ThoughtSpot, you also have to enable the SAML redirect for the authentication. This is set from the *Develop* > *Customizations* > *Security settings* page. If this value is not set, then you will get errors trying to redirect back to your application.
 
 [.widthAuto]
 [.bordered]
@@ -126,7 +126,7 @@ Trusted authentication is a ThoughtSpot specific approach to authentication that
 [.bordered]
 image:images/tutorials/tse-fundamentals/lesson-03-saml-trusted-auth-config.png[Trusted auth configuration]
 
-To enable trusted authentication you have to navigate to the Developer | Security Settings page and enable it via the toggle switch. Note that only an administrator can make this change. Once enabled, you will get a cluster wide key that you can copy and use in API calls. KEEP THIS KEY PRIVATE! It is a cluster wide key that allows you to create sessions on behalf of any user.
+To enable trusted authentication you have to navigate to the *Develop* > *Customizations* > *Security settings* page and enable it via the toggle switch. Note that only an administrator can make this change. Once enabled, you will get a cluster wide key that you can copy and use in API calls. KEEP THIS KEY PRIVATE! It is a cluster wide key that allows you to create sessions on behalf of any user.
 
 NOTE: On instances with Orgs enabled, you can also enable trusted authentication at the org level in addition to the instance level. The token created can only be used to log into the given org.
 
