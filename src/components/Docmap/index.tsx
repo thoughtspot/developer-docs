@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import t from '../../utils/lang-utils';
+import { DOC_FILTER_EVENT } from '../../utils/doc-filter-events';
 import './index.scss';
 
 const Docmap = (props: {
@@ -9,6 +10,8 @@ const Docmap = (props: {
 }) => {
     const [toc, setToc] = useState('');
     const [activeId, setActiveId] = useState('');
+    // Sections that a page filter (the Action page) has hidden: their entries are hidden here too.
+    const [hiddenIds, setHiddenIds] = useState<string[]>([]);
     const tocRef = useRef<HTMLDivElement>(null);
     const visibleHeadings = useRef<Set<string>>(new Set());
 
@@ -67,6 +70,36 @@ const Docmap = (props: {
             visibleHeadings.current.clear();
         };
     }, [toc]);
+
+    useEffect(() => {
+        const onFilter = (event: Event) =>
+            setHiddenIds((event as CustomEvent).detail?.hiddenIds || []);
+        window.addEventListener(DOC_FILTER_EVENT, onFilter);
+        return () => window.removeEventListener(DOC_FILTER_EVENT, onFilter);
+    }, []);
+
+    // Hide the entries of the hidden sections. This runs again whenever the list is rebuilt
+    // (toc), so the entries stay hidden.
+    useEffect(() => {
+        const root = tocRef.current;
+        if (!root || !hiddenIds.length) return undefined;
+        const hidden = new Set(hiddenIds);
+        const hiddenEntries: HTMLElement[] = [];
+        root.querySelectorAll('a[href^="#"]').forEach((link) => {
+            const id = (link.getAttribute('href') || '').slice(1);
+            const entry = link.closest<HTMLElement>('li');
+            if (hidden.has(id) && entry) {
+                entry.style.display = 'none';
+                hiddenEntries.push(entry);
+            }
+        });
+        return () => {
+            hiddenEntries.forEach((entry) => {
+                // eslint-disable-next-line no-param-reassign
+                entry.style.display = '';
+            });
+        };
+    }, [hiddenIds, toc]);
 
     // Apply activeTag class to the li containing the active TOC link
     useEffect(() => {

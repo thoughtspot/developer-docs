@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MdFilterList } from '@react-icons/all-files/md/MdFilterList';
 import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
+import { dispatchHiddenIds } from '../../utils/doc-filter-events';
 import './index.scss';
 
 // "A", "A and B", "A, B, and C"
@@ -26,8 +27,9 @@ const OTHER = 'Other';
  * yet. It shows under "All", in a search, and when "Other" is checked, which is
  * only offered while such actions exist.
  *
- * Hidden actions are also removed from the Index and from the right-hand
- * "on this page" list.
+ * Hidden actions are also removed from the Index of the page. The right-hand "on this
+ * page" list (Docmap) is told which sections are hidden (see utils/doc-filter-events)
+ * and hides those entries itself.
  */
 const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
     const { embedTypes } = props;
@@ -92,6 +94,7 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
 
         const search = query.trim().toLowerCase();
         let uncategorizedCount = 0;
+        const hiddenIds: string[] = [];
         const actionSections = Array.from(
             view.querySelectorAll<HTMLElement>('.sect2'),
         );
@@ -113,13 +116,16 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
             hide(section);
             const id = section.querySelector('h3')?.id;
             if (!id) return;
-            // The Index links end in "#id" after the page path; the right-hand
-            // "on this page" list links to "#id" directly.
-            document.querySelectorAll(`a[href$="#${id}"]`).forEach((link) => {
+            hiddenIds.push(id);
+            // The entry in the Index of this page. Its link ends in "#id" after the page
+            // path. The query stays inside the page content: the right-hand "on this
+            // page" list belongs to Docmap, which hides its own entries (see below).
+            view.querySelectorAll(`a[href$="#${id}"]`).forEach((link) => {
                 hide(link.closest<HTMLElement>('li'));
             });
         });
         setUncategorized(uncategorizedCount);
+        dispatchHiddenIds(hiddenIds);
 
         return () => {
             hiddenEntries.forEach((el) => {
@@ -128,6 +134,9 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
             });
         };
     }, [selected, query]);
+
+    // Leaving the page: the right-hand list must not keep entries hidden.
+    useEffect(() => () => dispatchHiddenIds([]), []);
 
     return (
         <div className="embed-type-filter" ref={rootRef}>
