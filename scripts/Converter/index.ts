@@ -13,6 +13,8 @@ interface SdkReferenceConfig {
     excludeDeprecatedMembersOf: string[];
     kindFallbackGroups: Record<string, string>;
     groupOverrides: Record<string, string[]>;
+    // The groups whose items follow the order of their list in groupOverrides.
+    curatedOrder: string[];
     groupPatterns: { group: string; pattern: string }[];
     descriptions: Record<string, string>;
     landingPage: {
@@ -829,9 +831,9 @@ class TypeDocParser {
             this.childrenIdMap[parent]?.kindString ===
             TypeDocReflectionKind.Project
         ) {
-            return `[.typedoc-${node.kindString.replace(/ /g, '_')}]#xref:${
-                node.name
-            }.adoc[${node.name}]#`;
+            return `[.typedoc-${node.kindString.replace(/ /g, '_')}]#xref:${this.fileKeyOf(
+                node,
+            )}.adoc[${node.name}]#`;
         }
 
         const grandParent = this.childrenIdMap[parent]?.parentId;
@@ -844,7 +846,7 @@ class TypeDocParser {
             let newLinkText = `[.typedoc-${node.kindString.replace(
                 / /g,
                 '_',
-            )}]#xref:${this.childrenIdMap[parent].name}.adoc`;
+            )}]#xref:${this.fileKeyOf(this.childrenIdMap[parent])}.adoc`;
             newLinkText += `#${this.convertToAdocSectionLink(node.name)}`;
             const visibleName = includeParent
                 ? `${this.childrenIdMap[parent].name}.${node.name}`
@@ -928,6 +930,9 @@ class TypeDocParser {
     // the deprecated members of the enumerations in excludeDeprecatedMembersOf,
     // before anything is built. They get no page, no nav entry or index entry, and
     // a reference to one renders as plain text, not as a broken link.
+    // The top-level items that were left out of the docs, for the reference check.
+    public excludedPageNames: string[] = [];
+
     private excludeDeprecatedNodes = (project: TypeDocNode) => {
         const removeFrom = (
             parent: TypeDocNode,
@@ -955,13 +960,11 @@ class TypeDocParser {
             );
         };
 
-        removeFrom(
-            project,
-            (project.children || []).filter((node) =>
-                this.isExcludedFromDocs(node, sdkReferenceConfig.excludeDeprecated),
-            ),
-            'deprecated or hidden items',
+        const excludedItems = (project.children || []).filter((node) =>
+            this.isExcludedFromDocs(node, sdkReferenceConfig.excludeDeprecated),
         );
+        this.excludedPageNames = excludedItems.map((node) => node.name);
+        removeFrom(project, excludedItems, 'deprecated or hidden items');
         sdkReferenceConfig.excludeDeprecatedMembersOf.forEach((name) => {
             const parent = (project.children || []).find(
                 (node) => node.name === name,
@@ -1521,20 +1524,61 @@ class TypeDocParser {
         }
     };
 
+    // The name of the file and the page of an item. It is the name of the item, except on a
+    // case-insensitive file system (macOS, Windows), where two items of one kind whose
+    // names differ only by letter case would overwrite each other. The later one then gets
+    // a suffix, here and in every link to it, so that its page is not lost.
+    private fileKeys: Record<number, string> = {};
+
+    private fileKeyOf = (node: TypeDocNode) => this.fileKeys[node.id] || node.name;
+
+    private assignFileKeys = (project: TypeDocNode, caseInsensitive: boolean) => {
+        this.fileKeys = {};
+        const byLowerCase: Record<string, TypeDocNode[]> = {};
+        (project.children || []).forEach((node) => {
+            const key = `${node.kindString}/${node.name.toLowerCase()}`;
+            byLowerCase[key] = [...(byLowerCase[key] || []), node];
+        });
+        const collisions = Object.values(byLowerCase).filter(
+            (nodes) => nodes.length > 1,
+        );
+        collisions.forEach((nodes) => {
+            [...nodes]
+                .sort((a, b) => (a.name < b.name ? -1 : 1))
+                .slice(1)
+                .forEach((node, index) => {
+                    if (caseInsensitive) {
+                        this.fileKeys[node.id] = `${node.name}-${index + 2}`;
+                    }
+                });
+        });
+        if (!collisions.length) return;
+        const pairs = collisions
+            .map((nodes) => nodes.map((node) => node.name).join(' and '))
+            .join(', ');
+        console.warn(
+            caseInsensitive
+                ? `File names that differ only by letter case (${pairs}). This file system is case-insensitive, so the later one of each pair is written under a name with a suffix, here and in its links. A Linux build writes each under its own name. The SDK should rename one of them.`
+                : `Names that differ only by letter case (${pairs}). They are separate files here, but on macOS and Windows they would overwrite each other. The SDK should rename one of them.`,
+        );
+    };
+
     private getPageId = (node: TypeDocNode) => {
-        return encodePageId(`${node.kindString}_${node.name}`);
+        return encodePageId(`${node.kindString}_${this.fileKeyOf(node)}`);
     };
 
     public handleProjectNode = (
         node: TypeDocNode,
         indexPageId = 'VisualEmbedSdk',
         callBack: (pageId: string, content: string) => void,
+        options: { caseInsensitiveFileSystem?: boolean } = {},
     ) => {
         const projectNode = node;
         this.excludeDeprecatedNodes(projectNode);
         this.applyCommentFixes(projectNode);
         this.warnAboutUnsupportedNodes(projectNode);
         this.generateMap(projectNode);
+        this.assignFileKeys(projectNode, Boolean(options.caseInsensitiveFileSystem));
         this.loadActionEmbedTypes();
         // Pages that list every item of one kind (Enumeration, Class, ...),
         // linked from the landing page.
@@ -1585,7 +1629,7 @@ class TypeDocParser {
 
             group.children.forEach((id) => {
                 const child = this.childrenIdMap[id];
-                const pageId = `${child.kindString}_${child.name}`;
+                const pageId = `${child.kindString}_${this.fileKeyOf(child)}`;
                 const heading = this.getHeadingString({
                     title: child.name,
                     pageId,
@@ -1685,19 +1729,32 @@ class TypeDocParser {
         ].join('\n\n');
     };
 
-    // The items of a group. A group that the config lists in full (groupOverrides)
-    // keeps the order of that list, so the embed class and its view config come
-    // first. Any other group keeps the order of the SDK, enumerations first.
+    // The items of a group. A group in curatedOrder follows the order of its list in
+    // groupOverrides, so the embed class and its view config come first. An item that
+    // the SDK adds to such a group and that is not in the list yet comes after the listed
+    // ones, in SDK order, and is reported so that it gets added to the list. Any other
+    // group keeps the order of the SDK, enumerations first.
     private getGroupItems = (group: string): TypeDocLinkingNode[] => {
         const items = this.groupMap[group] || [];
         const listed = sdkReferenceConfig.groupOverrides[group];
-        if (!listed || !items.every((item) => listed.includes(item.name))) {
-            return items;
+        if (!listed || !sdkReferenceConfig.curatedOrder.includes(group)) return items;
+
+        const inList = items
+            .filter((item) => listed.includes(item.name))
+            .sort((a, b) => listed.indexOf(a.name) - listed.indexOf(b.name));
+        const notInList = items.filter((item) => !listed.includes(item.name));
+        if (notInList.length && !this.reportedUnlistedGroups.has(group)) {
+            this.reportedUnlistedGroups.add(group);
+            console.warn(
+                `Category ${group} : ${notInList.length} items are not in its list in groupOverrides in sdk-reference-config.json, so they come after the listed ones, in SDK order. Add them to the list to place them : ${notInList
+                    .map((item) => item.name)
+                    .join(', ')}`,
+            );
         }
-        return [...items].sort(
-            (a, b) => listed.indexOf(a.name) - listed.indexOf(b.name),
-        );
+        return [...inList, ...notInList];
     };
+
+    private reportedUnlistedGroups = new Set<string>();
 
     // Groups in the order set in the config, then any other group A-Z.
     private getOrderedGroupNames = () => {
@@ -1836,6 +1893,28 @@ class TypeDocParser {
 
 }
 
+// Whether the file system treats File and file as one name, as macOS and Windows do by
+// default. Checked by writing a file and looking for it under another case.
+const isCaseInsensitiveFileSystem = (dir: string) => {
+    const probe = path.join(dir, `.case-probe-${process.pid}`);
+    fs.writeFileSync(probe, '');
+    try {
+        return fs.existsSync(path.join(dir, `.CASE-PROBE-${process.pid}`));
+    } finally {
+        fs.unlinkSync(probe);
+    }
+};
+
+// The id that Asciidoctor gives a heading, which is what an xref#anchor has to match:
+// lower case, other characters dropped, spaces and hyphens become underscores.
+const asciidoctorId = (heading: string) =>
+    `_${heading
+        .toLowerCase()
+        .replace(/[^a-z0-9 _.-]+/g, '')
+        .replace(/[ .-]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/_$/, '')}`;
+
 class TypedocConverter {
     private typedDocParser = new TypeDocParser();
 
@@ -1862,6 +1941,62 @@ class TypedocConverter {
         fs.writeFileSync(filePath, content);
     }
 
+    // A hand-written page that links to a generated page, or to an anchor on it, that is not
+    // there any more (an item or member that was excluded or removed) has a dead link. Say
+    // so, for every hand-written page in modules/, not only the Action IDs page.
+    private warnAboutDeadReferences = (
+        files: { filePath: string; content: string }[],
+    ) => {
+        const anchorsOfPage: Record<string, Set<string>> = {};
+        files.forEach(({ filePath, content }) => {
+            anchorsOfPage[path.basename(filePath, '.adoc')] = new Set(
+                [...content.matchAll(/^={2,6} (.+)$/gm)].map((match) =>
+                    asciidoctorId(match[1].trim()),
+                ),
+            );
+        });
+        const excluded = new Set(this.typedDocParser.excludedPageNames);
+
+        const dead: string[] = [];
+        const visit = (dir: string) => {
+            fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    if (entry.name !== 'generated' && entry.name !== 'node_modules') {
+                        visit(full);
+                    }
+                    return;
+                }
+                if (!entry.name.endsWith('.adoc')) return;
+                fs.readFileSync(full, 'utf8')
+                    .split('\n')
+                    .forEach((line, index) => {
+                        [...line.matchAll(/xref:([^\s#[\]]+)\.adoc(?:#([^\s[]+))?/g)].forEach(
+                            ([, page, anchor]) => {
+                                const where = `${full}:${index + 1}`;
+                                if (anchorsOfPage[page]) {
+                                    if (anchor && !anchorsOfPage[page].has(anchor)) {
+                                        dead.push(`${where} ${page}.adoc#${anchor}`);
+                                    }
+                                } else if (excluded.has(page)) {
+                                    dead.push(`${where} ${page}.adoc (excluded from the docs)`);
+                                }
+                            },
+                        );
+                    });
+            });
+        };
+        visit('modules');
+
+        if (dead.length) {
+            console.warn(
+                `Hand-written pages link to generated pages or anchors that do not exist (an item or member was excluded or removed). Update or remove these links :\n${dead
+                    .map((entry) => `    ${entry}`)
+                    .join('\n')}`,
+            );
+        }
+    };
+
     public generateFiles = (typedocNode: TypeDocNode) => {
         // starting node should be a project node
         if (typedocNode.kindString !== TypeDocReflectionKind.Project) {
@@ -1874,6 +2009,9 @@ class TypedocConverter {
 
         // Build every file first, so that a failure part way leaves the previous
         // output in place instead of a half written one.
+        const caseInsensitiveFileSystem = isCaseInsensitiveFileSystem(
+            'modules/ROOT/pages',
+        );
         const files: { filePath: string; content: string }[] = [];
         this.typedDocParser.handleProjectNode(
             typedocNode,
@@ -1887,24 +2025,26 @@ class TypedocConverter {
                     content,
                 });
             },
+            { caseInsensitiveFileSystem },
         );
 
-        // Two pages whose file names differ only by letter case (the SDK has DrillDownRequest
-        // and DrilldownRequest) are two files on Linux, but on macOS and Windows the second
-        // overwrites the first, so a page and every link to it is missing there.
-        const byLowerCase: Record<string, string[]> = {};
-        files.forEach(({ filePath }) => {
-            const key = filePath.toLowerCase();
-            byLowerCase[key] = [...(byLowerCase[key] || []), path.basename(filePath, '.adoc')];
-        });
-        const collisions = Object.values(byLowerCase).filter((names) => names.length > 1);
-        if (collisions.length) {
-            console.warn(
-                `File names that differ only by letter case overwrite each other on case-insensitive file systems (macOS, Windows), so one page of each pair is missing there : ${collisions
-                    .map((names) => names.join(' and '))
-                    .join(', ')}`,
-            );
+        // On a case-insensitive file system the parser has already given the later one of two
+        // names that differ only by letter case a suffix. If two files would still be one, stop:
+        // writing them would silently lose a page.
+        if (caseInsensitiveFileSystem) {
+            const seen: Record<string, string> = {};
+            files.forEach(({ filePath }) => {
+                const key = filePath.toLowerCase();
+                if (seen[key] && seen[key] !== filePath) {
+                    throw new Error(
+                        `${seen[key]} and ${filePath} are one file on this file system, so one page would be lost`,
+                    );
+                }
+                seen[key] = filePath;
+            });
         }
+
+        this.warnAboutDeadReferences(files);
 
         // Both folders hold only generated files (they are git ignored). Clear
         // them so that a page for an item that was removed, or excluded, from
