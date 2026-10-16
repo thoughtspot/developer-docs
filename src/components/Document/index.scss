@@ -107,6 +107,16 @@
     width: calc(98%);
     color: var(--primary-color);
 
+    // A flat release-notes list has no right-hand nav (see DevDocTemplate), so
+    // its content now reaches the page's right edge — keep a margin there so
+    // the filter/search bar and table text don't sit hard against it. 104px is
+    // wide enough to clear the floating SpotterCode chip (fixed at the top
+    // right, 24px in, 61px across) so it can't overlap the Copy page button.
+    &:has(.release-notes-static) {
+        box-sizing: border-box;
+        padding-right: 104px;
+    }
+
     .document-toolbar {
         float: right;
         margin-left: 16px;
@@ -225,6 +235,839 @@
             // the last line of code once expanded.
             margin: 16px auto 10px;
         }
+    }
+
+    /* ── Release-notes tables ([.release-notes-table] role) ───────────── */
+    /* Page-level filter bar — sits once above every dated release section
+       and filters matching rows across ALL release-notes tables on the
+       page at once (Breaking changes toggle, Product, Feature category).
+       The same bar (and CSS) is reused by the badge-style pages further
+       down, just with different fields (Feature category, Type).
+
+       Pinned (position: fixed) from the moment it mounts, directly below
+       the page's own <h1> — which is pinned too, see
+       release-notes-title-pinned below — rather than toggling fixed/normal
+       flow based on scroll position. `top` is set inline by mountFilterBar
+       in helper.tsx (not here), since it has to sit right below the
+       title's actual height, which varies per page; left/width are also
+       set inline, from the bar's own rect measured once in normal flow
+       (it already reflects the padding that keeps real content clear of
+       the sidebar overlay — .documentView's own box does not). Plain
+       position: sticky was tried first but produced an unexplained gap
+       above the bar and a real overlap with the content right after it on
+       this page; see the comment above mountFilterBar for details. No
+       background fill on the bar itself — just a bottom border (no
+       border-radius, no surrounding box) — so it reads as part of the
+       pinned header stack rather than a floating card. */
+    .release-notes-filterbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 24px;
+        // No left/right padding — left/width are set inline from the
+        // bar's own measured rect (see mountFilterBar), which already
+        // reflects its natural flow position; horizontal padding here
+        // would shift its text past that position, misaligning it from
+        // the table's own flush-left column below.
+        padding: 18px 0;
+        background: var(--body-background-color);
+        border-bottom: 1px solid var(--border-color);
+
+        &.is-pinned {
+            position: fixed;
+            margin: 0;
+            z-index: 20;
+        }
+    }
+
+    // Category filter and the search box both read as secondary, "narrow
+    // it further" actions — grouped together and pushed to the far right
+    // of the bar, away from the primary Feature tabs on the left (see the
+    // dimensionLabels loop in helper.tsx, which routes Category's field
+    // into this wrapper instead of appending it to the bar directly).
+    .release-notes-filterbar-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+    }
+
+    .release-notes-filterbar-spacer {
+        height: 0;
+    }
+
+    /* The page's own <h1>, pinned by mountFilterBar (helper.tsx) so it
+       stays directly above the filter bar (and intro paragraph, if any)
+       regardless of scroll — see the comment on mountFilterBar for why
+       the whole stack has to be fixed together. Solid background so page
+       content scrolling underneath doesn't show through either the title
+       or the rest of the pinned stack beneath it. */
+    // No left/right padding — same reasoning as .release-notes-filterbar
+    // above: `left`/`width` already reflect the title's natural flow
+    // position, so added horizontal padding would only push its text out
+    // of alignment with the table below. The gap below the title (before
+    // the intro paragraph or the bar) is a numeric offset set inline by
+    // mountFilterBar (TITLE_INTRO_GAP / TITLE_CONTROLS_GAP), not padding here.
+    h1.release-notes-title-pinned {
+        position: fixed;
+        margin: 0;
+        padding: 18px 0 0;
+        background: var(--body-background-color);
+        z-index: 21;
+    }
+
+    /* The page's intro paragraph, pinned right below the title when one is
+       present — same idea as h1.release-notes-title-pinned above. Spacing
+       above/below it is the numeric TITLE_INTRO_GAP / INTRO_BAR_GAP offset
+       mountFilterBar computes, not padding here. */
+    .paragraph.release-notes-intro-pinned {
+        position: fixed;
+        margin: 0;
+        background: var(--body-background-color);
+        z-index: 21;
+    }
+
+    /* Cross-page nav tabs on the tabbed-changelog sample pages (All / Embed
+       SDK / REST API / MCP Server) — plain xref links the page itself
+       authors with a `[.release-notes-navtabs]` block role, styled to read
+       as the same underline-tab pattern as the in-page Feature toggle
+       (.release-notes-filterbar-pill). The Category filter bar
+       (mountFilterBar, helper.tsx) is appended as this row's second flex
+       child when nav tabs are present — tabs left, filter right, one row —
+       matching the single-row look of a page that filters by Feature +
+       Category together (e.g. release-notes-embed-master-sample.adoc),
+       rather than a separate, mostly-empty row of its own below. This div
+       is what carries the padding/border-bottom that row needs; the
+       `.release-notes-filterbar` nested inside it (see below) is stripped
+       back down to a bare flex item. */
+    .release-notes-navtabs {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 0;
+        border-bottom: 1px solid var(--border-color);
+
+        // Asciidoctor wraps the xref links in their own <p> — that's the
+        // actual tab row; gap has to live here, not on the outer div,
+        // since the <p> is this div's only authored child.
+        p {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin: 0;
+        }
+    }
+
+    .release-notes-navtabs a {
+        padding: 0 0 6px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--secondary-color);
+        border-bottom: 2px solid transparent;
+        transition: color 0.15s ease, border-color 0.15s ease;
+
+        &:hover {
+            color: var(--primary-color);
+        }
+
+        &.active {
+            color: var(--link-text-color);
+            border-bottom-color: var(--link-text-color);
+        }
+    }
+
+    // Merged into the nav-tabs row (see above) instead of keeping its own
+    // row — no padding/border/background of its own, just a plain flex
+    // item riding along in navTabsEl's pinned box.
+    .release-notes-navtabs .release-notes-filterbar {
+        padding: 0;
+        margin: 0;
+        border: none;
+        background: transparent;
+
+        &.is-pinned {
+            position: static;
+        }
+    }
+
+    /* Pinned alongside the title/intro/bar by mountFilterBar when present —
+       same reasoning as h1.release-notes-title-pinned above. No left/right
+       padding, same as the rest of the stack, so it lines up with the
+       table's own flush-left edge below. */
+    .paragraph.release-notes-navtabs-pinned {
+        position: fixed;
+        margin: 0;
+        background: var(--body-background-color);
+        z-index: 21;
+    }
+
+    /* The Copy-page dropdown (.document-toolbar) floats right alongside the
+       title in normal flow; it isn't inside documentView, so it's not part
+       of the title/bar stack above, but it's pinned by the same
+       mountFilterBar once the title is — otherwise, with the title taken
+       out of flow, the float collapses to the top of whatever's left in
+       flow (the breadcrumb) instead of riding next to the title. Pinned to
+       the title's own `top`, kept above it so its menu (z-index: 50 in
+       CopyPageDropdown) still opens over the title. */
+    .document-toolbar-pinned {
+        position: fixed;
+        float: none;
+        margin: 0;
+        z-index: 22;
+    }
+
+    /* Stripe-changelog-style pills: rounded, bordered chips rather than
+       plain labelled dropdowns — same treatment for a <select>-based field
+       and the Breaking-changes checkbox toggle below. */
+    .release-notes-filterbar-field,
+    .release-notes-filterbar-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--primary-color);
+        background: var(--copy-btn-bg);
+        border: 1px solid var(--rd-sys-color-border-bold);
+        border-radius: 999px;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+
+        &:hover {
+            border-color: var(--link-text-color);
+        }
+    }
+
+    .release-notes-filterbar-field {
+        span:first-child {
+            color: var(--secondary-color);
+        }
+
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            border: none;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            font-weight: 600;
+            color: var(--primary-color);
+            cursor: pointer;
+
+            &:focus-visible {
+                outline: none;
+            }
+        }
+
+        .release-notes-filterbar-chevron {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            margin-left: 1px;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid var(--secondary-color);
+        }
+    }
+
+    .release-notes-filterbar-toggle {
+        input[type='checkbox'] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            display: inline-grid;
+            place-content: center;
+            border: 1.5px solid var(--rd-sys-color-border-bold);
+            border-radius: 4px;
+            cursor: pointer;
+
+            &::before {
+                content: '';
+                width: 8px;
+                height: 8px;
+                border-radius: 2px;
+                background: var(--link-text-color);
+                transform: scale(0);
+                transition: transform 0.1s ease;
+            }
+
+            &:checked::before {
+                transform: scale(1);
+            }
+        }
+
+        // Filled/active pill state once checked, same idea as Stripe's
+        // filter chips highlighting once a value is applied.
+        &:has(input:checked) {
+            background: var(--link-text-color);
+            border-color: var(--link-text-color);
+            color: #fff;
+
+            input[type='checkbox'] {
+                border-color: #fff;
+
+                &::before {
+                    background: #fff;
+                }
+            }
+        }
+    }
+
+    /* Horizontal toggle group — made by makeFilterToggle() in helper.tsx,
+       for a dimension with few enough values (e.g. Feature: Embed SDK /
+       REST API) that always-visible tabs beat a dropdown. No label text —
+       the options speak for themselves with only 2-3 values. Underlined-tab
+       look (active tab in link color with a colored rule beneath it,
+       inactive tabs plain text) rather than a bordered pill group. */
+    .release-notes-filterbar-togglegroup {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .release-notes-filterbar-pills {
+        display: inline-flex;
+        gap: 20px;
+    }
+
+    .release-notes-filterbar-pill {
+        padding: 0 0 6px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--secondary-color);
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        transition: color 0.15s ease, border-color 0.15s ease;
+
+        &:hover {
+            color: var(--primary-color);
+        }
+
+        &.active {
+            color: var(--link-text-color);
+            border-bottom-color: var(--link-text-color);
+        }
+    }
+
+    /* Icon-triggered panel — made by makeFilterPanel() in helper.tsx, for
+       one or more multi-select checkbox sections (Category alone on most
+       pages; Topic + State together on the "All" tab). Same visual theme
+       as the "Copy page" dropdown (src/components/CopyPageDropdown/
+       index.scss) — reuses the same CSS custom properties so it reads as
+       the same pattern rather than a one-off. */
+    .release-notes-filterbar-icondropdown {
+        position: relative;
+    }
+
+    // Selection count overlaid on the trigger's corner once at least one
+    // checkbox is checked — the only way to tell at a glance that this
+    // (otherwise icon-only) control has an active filter. Absolutely
+    // positioned rather than inline so it doesn't disturb the trigger's
+    // own fixed-size, centered-icon layout.
+    .release-notes-filterbar-icon-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 15px;
+        height: 15px;
+        padding: 0 3px;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1;
+        color: #fff;
+        background: var(--link-text-color);
+        border-radius: 999px;
+
+        // The `display` above would otherwise win over the `hidden`
+        // attribute's own (lower-specificity) UA style, keeping the badge
+        // visible even at zero selections — this restores `hidden` as the
+        // one source of truth for whether it shows at all.
+        &[hidden] {
+            display: none;
+        }
+    }
+
+    .release-notes-filterbar-icontrigger {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        // Matches the toggle-group pill's own box height (14px text +
+        // 6px bottom padding + 2px border), so it lines up with the
+        // "Embed SDK" / "REST API" text beside it instead of towering
+        // over it.
+        height: 28px;
+        padding: 0 10px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--primary-color);
+        background: var(--body-background-color);
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+
+        .release-notes-filterbar-icontrigger-icon {
+            display: inline-flex;
+        }
+
+        svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        &:hover {
+            background: var(--copy-btn-bg);
+            color: var(--link-text-color);
+        }
+
+        &.active {
+            color: var(--link-text-color);
+        }
+    }
+
+    #wrapper[data-theme='dark'] .release-notes-filterbar-icontrigger,
+    #docsModal[data-theme='dark'] .release-notes-filterbar-icontrigger {
+        background: #26282C;
+    }
+
+    .release-notes-filterbar-icon-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        // Anchored to the trigger's right edge: the trigger sits at the right
+        // of the bar, so a menu that opened rightwards would run off-screen.
+        right: 0;
+        left: auto;
+        // A column per section; trimmed back from the header Resources
+        // panel's footprint (400px) to keep it compact.
+        min-width: 21rem;
+        width: max-content;
+        max-width: min(44rem, calc(100vw - 80px));
+        max-height: 420px;
+        overflow-y: auto;
+        padding: 10px 8px 8px;
+        background: var(--copy-page-menu-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        box-shadow: var(--box-shadow-hover);
+        z-index: 50;
+
+        &.open {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            column-gap: 8px;
+        }
+    }
+
+    // One column per section (Topic / State / Month / ...).
+    .release-notes-filterbar-panel-section {
+        flex: 1 1 10rem;
+        min-width: 10rem;
+    }
+
+    // One checkbox + label per option, not a button — more than one can be
+    // checked at once (multi-select), so clicking an option no longer
+    // closes the menu or replaces the previous selection.
+    .release-notes-filterbar-icon-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 7px 10px;
+        font-family: inherit;
+        font-size: 12.5px;
+        font-weight: 400;
+        color: var(--primary-color);
+        border-radius: 5px;
+        cursor: pointer;
+
+        &:hover {
+            background: var(--copy-btn-bg);
+        }
+
+        input[type='checkbox'] {
+            flex-shrink: 0;
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            accent-color: var(--link-text-color);
+            cursor: pointer;
+        }
+    }
+
+    // One per extra section beyond the first (Topic / State on the "All"
+    // tab) — labels which checkboxes below it belong together. Skipped
+    // entirely for a one-section panel (just Category), where it would
+    // only repeat what the trigger's own aria-label already says.
+    .release-notes-filterbar-panel-heading {
+        padding: 6px 10px 4px;
+        font-size: 10.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--secondary-color);
+    }
+
+    .release-notes-filterbar-panel-clear {
+        display: block;
+        flex: 0 0 100%;
+        width: 100%;
+        margin-top: 4px;
+        padding: 6px 10px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        text-align: left;
+        color: var(--link-text-color);
+        background: transparent;
+        border: none;
+        border-top: 1px solid var(--border-color);
+        cursor: pointer;
+
+        &:hover {
+            background: var(--copy-btn-bg);
+        }
+    }
+
+    /* Free-text search box — made by makeFilterSearch() in helper.tsx.
+       Same pill-ish treatment as the other filter fields, with the search
+       icon inset on the left. */
+    .release-notes-filterbar-search {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+
+        input {
+            width: 160px;
+            padding: 6px 10px 6px 30px;
+            font-family: inherit;
+            font-size: 13px;
+            color: var(--primary-color);
+            background: var(--copy-btn-bg);
+            border: 1px solid var(--rd-sys-color-border-bold);
+            border-radius: 999px;
+            transition: border-color 0.15s ease, width 0.15s ease;
+
+            &::placeholder {
+                color: var(--secondary-color);
+            }
+
+            &:focus-visible {
+                outline: none;
+                border-color: var(--link-text-color);
+                width: 200px;
+            }
+
+            // Default (and WebKit's own) search-input decorations don't
+            // match this theme — the custom icon below replaces them.
+            &::-webkit-search-cancel-button,
+            &::-webkit-search-decoration {
+                display: none;
+            }
+        }
+    }
+
+    .release-notes-filterbar-search-icon {
+        position: absolute;
+        left: 10px;
+        display: inline-flex;
+        color: var(--secondary-color);
+        pointer-events: none;
+
+        svg {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    /* "Load more" pagination — made in customizeDocContent (helper.tsx),
+       one per release-notes table, inserted right after it. Hidden by
+       default; only shown once that table has more matching rows than are
+       currently revealed. Plain pill button, centered, intentionally
+       unobtrusive next to the filter bar's own pill styling. */
+    .release-notes-loadmore {
+        display: block;
+        margin: 20px auto;
+        padding: 8px 20px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--primary-color);
+        background: var(--copy-btn-bg);
+        border: 1px solid var(--rd-sys-color-border-bold);
+        border-radius: 999px;
+        cursor: pointer;
+        transition: border-color 0.15s ease, color 0.15s ease;
+
+        &:hover {
+            color: var(--link-text-color);
+            border-color: var(--link-text-color);
+        }
+    }
+
+    /* Repeated date/version label on a grouped row — see the
+       dedupeDateColumn() pass in customizeDocContent (helper.tsx), which
+       blanks out column 1 on every row after the first in a run of rows
+       that share the same date+version, so a multi-item release shows its
+       header once instead of once per row. visibility (not display) keeps
+       the cell's own layout box, so row heights/alignment don't shift. */
+    .release-notes-date-repeat {
+        visibility: hidden;
+    }
+
+    /* Full grid borders — release-notes tables use a distinct, bordered
+       look rather than the row-only dividers of a plain content table. */
+    .release-notes-table > table,
+    table.release-notes-table {
+        border: 1px solid var(--border-color);
+
+        > thead > tr > th,
+        > tbody > tr > td {
+            border-right: 1px solid var(--border-color-tr);
+
+            &:last-child {
+                border-right: none;
+            }
+        }
+    }
+
+    /* Product / Feature / Version / Type columns are authored as normal
+       table columns (that's what the page-level filter bar in helper.tsx
+       reads its values from), but readers never see them as columns —
+       they're internal filter metadata, not a printed label. Which columns
+       those are varies per table (a plain release-notes table has one
+       visible Description column; a master-list-style table can have two
+       visible columns, e.g. Week + Description), so hiding is done in JS
+       (see the columnIndexByTable-driven loop in customizeDocContent),
+       not with a blanket CSS rule here — a column is metadata if its
+       header has real text; a blank header means it's visible content. */
+
+    .release-notes-table > table > tbody > tr > td:first-child,
+    table.release-notes-table > tbody > tr > td:first-child {
+        position: relative;
+
+        .release-notes-desc {
+            max-height: 1.6em;
+            overflow: hidden;
+            position: relative;
+        }
+
+        &.has-overflow:not(.expanded) .release-notes-desc::after {
+            content: '';
+            position: absolute;
+            top: 1.6em;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            pointer-events: none;
+        }
+
+        &.expanded .release-notes-desc {
+            max-height: none;
+            overflow: visible;
+        }
+
+        .release-notes-more-btn {
+            display: block;
+            margin: 6px 0 2px;
+            padding: 4px 14px;
+            font-size: 12.5px;
+            font-weight: 500;
+            font-family: 'Optimo-Plain', sans-serif;
+            color: var(--link-text-color);
+            background: var(--copy-btn-bg);
+            border: 1px solid var(--rd-sys-color-border-bold);
+            border-radius: 999px;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+        }
+
+        &.has-overflow:hover .release-notes-more-btn,
+        &.has-overflow:focus-within .release-notes-more-btn,
+        &.has-overflow.expanded .release-notes-more-btn {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    }
+
+    /* Opt-in modifier — [.release-notes-table.release-notes-no-header] —
+       for pages whose header row has nothing worth showing (e.g. a
+       master-list page where every visible column's header is left blank,
+       since the label text lives in the row content instead). The <thead>
+       stays in the DOM either way — it's what the column-hiding loop and
+       the filter bar in helper.tsx read the Product/Feature/... labels
+       from — this just hides it visually. */
+    .release-notes-table.release-notes-no-header > table > thead,
+    table.release-notes-table.release-notes-no-header > thead {
+        display: none;
+    }
+
+    /* Border + column treatment matching .cl-table (whats-new.adoc's
+       changelog table) instead of the bordered/grid look the base
+       .release-notes-table rule above applies — no outer border, no
+       column dividers, no per-row dividers, just a rule above the very
+       first row. Kept here as its own override rather than combining the
+       cl-table role directly onto the table, so there's no cross-file
+       cascade order to reason about — this always wins within this
+       stylesheet. */
+    .release-notes-table.release-notes-no-header > table,
+    table.release-notes-table.release-notes-no-header {
+        border: none;
+
+        > thead > tr > th,
+        > tbody > tr > td {
+            border-right: none;
+            border-top: none;
+            border-bottom: none;
+        }
+    }
+
+    .release-notes-table.release-notes-no-header > table > tbody > tr,
+    table.release-notes-table.release-notes-no-header > tbody > tr {
+        border-bottom: none;
+    }
+
+    .release-notes-table.release-notes-no-header > table > tbody > tr:first-child,
+    table.release-notes-table.release-notes-no-header > tbody > tr:first-child {
+        border-top: 1px solid var(--border-color);
+    }
+
+    /* Left cell (date/week label) — same sticky-while-scrolling behavior
+       as .cl-table's left cell: pinned near the top of the viewport while
+       its row is in view. `:last-child` isn't safe here for the content
+       cell below, since the hidden Product column is still the structural
+       last child even though display:none — so both cells are addressed
+       by position (:first-child / :nth-child(2)) instead. */
+    .release-notes-table.release-notes-no-header > table > tbody > tr > td:first-child,
+    table.release-notes-table.release-notes-no-header > tbody > tr > td:first-child {
+        color: var(--link-text-color);
+        padding: 16px 20px 16px 0;
+        vertical-align: top;
+
+        > .content {
+            position: sticky;
+            // Set inline on .documentView by mountFilterBar (helper.tsx) to
+            // match the pinned title/intro/nav-tabs/filter-bar stack's
+            // actual height, which varies per page — a fixed guess here
+            // previously let this stick too high on pages with a taller
+            // stack (e.g. one with an intro paragraph and nav tabs), poking
+            // a sliver of scrolled-past content out between the pinned
+            // elements once the page scrolled.
+            // +12px so the stuck label keeps a gap below the pinned panel's
+            // bottom rule instead of touching it.
+            top: calc(var(--release-notes-pinned-stack-height, 80px) + 12px);
+        }
+
+        // The date line (e.g. "October 2, 2026") stays link-colored via
+        // the cell-wide rule above; the version line below it
+        // (e.g. "Version 26.10.0.cl") reads as regular body text instead.
+        // Left column, three short lines: topic label, date, release number.
+        // Each is an Asciidoctor paragraph (`<div class="paragraph ..."><p>`),
+        // and the page's global `p` rule (normal weight, tall line-height,
+        // bottom margin) wins over styling set on the wrapper — so the type
+        // styles go on the <p>, and the spacing between lines is set here.
+        .release-notes-topic,
+        .release-notes-date,
+        .release-notes-version {
+            margin: 0;
+
+            p {
+                margin: 0;
+                line-height: 1.4;
+            }
+        }
+
+        // The same text the tabs and the Topic filter match on.
+        .release-notes-topic p {
+            font-size: 13.5px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            color: var(--rd-sys-color-content-secondary);
+        }
+
+        // Under the grey label: the date in the normal text colour, the
+        // release number in the same grey as the label — neither in the link
+        // blue the rest of this cell uses.
+        .release-notes-date p {
+            margin-top: 5px;
+            font-size: 14px;
+            font-weight: 400;
+            color: var(--primary-color);
+        }
+
+        .release-notes-version p {
+            margin-top: 4px;
+            font-size: 13.5px;
+            font-weight: 400;
+            color: var(--rd-sys-color-content-secondary);
+        }
+    }
+
+    /* Right cell (description content). Paragraph margins reset and
+       tightened here (the base `p` rule's browser-default margin-top plus
+       its own margin-bottom otherwise stacks into a noticeably large gap
+       between e.g. a row's description, its "Also included" line, and its
+       doc-reference link). */
+    .release-notes-table.release-notes-no-header > table > tbody > tr > td:nth-child(2),
+    table.release-notes-table.release-notes-no-header > tbody > tr > td:nth-child(2) {
+        padding: 16px 0;
+        vertical-align: top;
+
+        > .content > *:first-child {
+            margin-top: 0;
+        }
+
+        .paragraph {
+            margin-top: 0;
+            margin-bottom: 10px;
+
+            &:last-child {
+                margin-bottom: 0;
+            }
+        }
+
+        // The entry's heading, authored as a discrete h5 at the top of the
+        // description — a real heading, sized down to sit level with the
+        // left column's topic label. Primary text color: --secondary-color
+        // renders blue in this theme.
+        h5 {
+            margin: 0 0 6px;
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.35;
+            color: var(--primary-color);
+        }
+    }
+
+    /* Per-row divider, but only in the description column — the left
+       (date/version) column deliberately gets none, since dedupeDateColumn
+       (helper.tsx) already blanks its text on every row after the first in
+       a group, and a repeated divider next to a blank cell would read as a
+       stray line with nothing to its left. This is what makes a run of
+       same-date rows (e.g. several REST API changes in one release) read
+       as one shared left-hand label with distinctly separated items on the
+       right, rather than identical-looking fully bordered rows. */
+    .release-notes-table.release-notes-no-header > table > tbody > tr:not(:first-child) > td:nth-child(2),
+    table.release-notes-table.release-notes-no-header > tbody > tr:not(:first-child) > td:nth-child(2) {
+        border-top: 1px solid var(--border-color);
     }
 
     /* ── Code block header bar ────────────────────────────────────────── */

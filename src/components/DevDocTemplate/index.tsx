@@ -492,9 +492,16 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
     // no in-page headings worth a right-nav TOC, and the extra 260px it reserves
     // squashes the cards. tutorials-overview gets the normal right nav, same as
     // any other tutorial content page.
+    // A flat release-notes list (a single `release-notes-static` table, no
+    // sections — e.g. the tabbed What's new page) has no headings for the
+    // right nav to list either, so the 260px it reserves just sits empty;
+    // let the content use that width instead. Pages built from per-month
+    // sections keep their right nav.
+    const hasFlatReleaseNotesTable = docContent.includes('release-notes-static');
     const shouldShowRightNav =
         params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID &&
-        params[TS_PAGE_ID_PARAM] !== 'quickstarts';
+        params[TS_PAGE_ID_PARAM] !== 'quickstarts' &&
+        !hasFlatReleaseNotesTable;
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
