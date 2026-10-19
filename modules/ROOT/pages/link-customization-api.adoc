@@ -9,11 +9,11 @@
 
 ThoughtSpot generates shareable links for Liveboards, Answers, visualizations, SpotIQ insights, Spotter conversations, and other objects. These links appear in scheduled emails, the Share dialog, and alert notifications.
 
-By default, shareable links point to your ThoughtSpot instance. If you embed ThoughtSpot in your own application, you can use the Link Customization REST API v2 endpoints to redirect these links to your application. When a user clicks a shared link, they are directed to your embedding application instead of the ThoughtSpot application.
+By default, shareable links point to your ThoughtSpot instance. If you embed ThoughtSpot in your own application, you can use the link customization REST API v2 endpoints to redirect these links to your application. When a user clicks a shared link, they are directed to your embedding application instead of the ThoughtSpot application.
 
 [NOTE]
 ====
-The Link Customization APIs are available on ThoughtSpot Cloud 26.11.0.cl and later.
+The Link Customization APIs are available on ThoughtSpot Cloud 26.11.0.cl and later. To customize links from the ThoughtSpot UI instead, see xref:customize-links.adoc[Customize links].
 ====
 
 == Link customization workflow
@@ -27,8 +27,10 @@ Call `POST /api/rest/2.0/customization/links/update` with the `REPLACE` operatio
 === Scopes
 You can manage the templates at the following scopes:
 
-* `CLUSTER`: Sets the default templates that all Orgs inherit. Available only to callers in the primary Org.
-* `ORG`: Sets the templates for the caller's Org and overrides the cluster default. Requires Orgs to be enabled on your instance.
+* `CLUSTER`: Sets the default templates that all Orgs inherit.
+* `ORG`: Sets the templates for the caller's Org and overrides the default settings. Requires Orgs to be enabled on your instance.
+
+Cluster-level templates are available only to callers in the primary Org. If an Org does not set its own template for a link type, it inherits the cluster template. If the cluster does not set one either, ThoughtSpot uses its default template.
 
 === Required privileges
 To use the Link Customization APIs, the user requires one of the following privileges:
@@ -36,35 +38,52 @@ To use the Link Customization APIs, the user requires one of the following privi
 * `ADMINISTRATION` (**Can administer ThoughtSpot**)
 * `DEVELOPER` (**Has developer privilege**)
 
+Authenticate API requests with a bearer token. For information about obtaining a token, see xref:authentication.adoc[REST API v2 authentication].
+
 [#link-types]
 === Supported link types and placeholders
 Each link type requires specific placeholders in its URL template. ThoughtSpot rejects a template that does not include the required placeholders.
 
-[cols="2,2,3", options="header"]
+[cols="2,3,2,3", options="header"]
 |===
-|Link type | Required placeholders | Example template
+|Link type | Used for | Required placeholders | Example template
 | `LIVEBOARD_SHARE_URL`
+| Links to a Liveboard in share and scheduled job notifications.
 | `{object-id}`, `{ts-query-params}`
 | `\https://analytics.acme.com/dashboards/{object-id}?{ts-query-params}`
 | `VISUALIZATION_SHARE_URL`
+| Links to a visualization on a Liveboard.
 | `{object-id}`, `{sub-object-id}`, `{ts-query-params}`
 | `\https://analytics.acme.com/dashboards/{object-id}/charts/{sub-object-id}?{ts-query-params}`
 | `ANSWER_SHARE_URL`
+| Links to a saved Answer in share notifications.
 | `{object-id}`, `{ts-query-params}`
 | `\https://analytics.acme.com/answers/{object-id}?{ts-query-params}`
 | `SPOTIQ_ANALYSIS_URL`
+| Links to a SpotIQ analysis.
 | `{object-id}`
 | `\https://analytics.acme.com/insights/{object-id}`
 | `UNSUBSCRIBE_URL`
+| The *Unsubscribe* link in notification emails.
 | None
 | `\https://analytics.acme.com/account/email-preferences`
 | `GENERIC_URL`
+| Navigation links and pages that the other link types don't cover.
 | `{path}`
 | `\https://analytics.acme.com/{path}`
 | `CONVERSATION_SHARE_URL`
+| Links to a shared Spotter conversation.
 | `{conversation-id}`, `{ts-query-params}`
 | `\https://analytics.acme.com/spotter/{conversation-id}?{ts-query-params}`
 |===
+
+The placeholders are replaced as follows:
+
+* `{object-id}`: The GUID of the Liveboard, Answer, or SpotIQ analysis.
+* `{sub-object-id}`: The GUID of the visualization.
+* `{conversation-id}`: The ID of the shared Spotter conversation.
+* `{path}`: The ThoughtSpot page path.
+* `{ts-query-params}`: The query parameters that ThoughtSpot passes in the link, for example, the parameters required to unsubscribe from an alert.
 
 `{ts-query-params}` is optional for any link type that does not require it. ThoughtSpot substitutes it wherever it appears and removes it when there is nothing to substitute, so it never appears in a generated link.
 
@@ -84,7 +103,7 @@ a|__String__. Optional. The scope to retrieve:
 * `CLUSTER` returns the cluster templates. Available only to callers in the primary Org.
 * `ORG` returns the templates for the Org that the caller is signed in to. Requires Orgs to be enabled.
 
-If you omit the parameter, the API returns the scopes that the caller can access.
+If you omit the parameter, the API returns whichever of these scopes the caller can access.
 |===
 
 === Example request
@@ -100,7 +119,7 @@ curl -X POST \
 ----
 
 === Example response
-If the API request is successful, the API returns an array of link preferences, one for each scope. The following example shows two of the seven link types for each scope. The API always returns all link types, whether they are customized or not.
+If the API request is successful, the API returns an array of link preferences, one for each scope. The API always returns all seven link types for each scope, whether they are customized or not. The following example shows two of them.
 
 [source,JSON]
 ----
@@ -176,7 +195,7 @@ The `/api/rest/2.0/customization/links/update` API endpoint updates the URL temp
 |===
 |Parameter | Description
 | `scope`
-a|__String__. The scope to apply the templates at:
+a|__String__. Optional. The scope to apply the templates at:
 
 * `ORG` (default) updates the templates for the Org that the caller is signed in to. Requires Orgs to be enabled.
 * `CLUSTER` updates the defaults that all Orgs inherit. Available only to callers in the primary Org.
@@ -194,6 +213,7 @@ a|__Array of objects__. The link types to update. At least one entry is required
 
 === Update behavior
 * This is a partial update. Only the link types listed in `templates` change. All other link types keep their current value, whether it is set at this scope or inherited.
+* The API rejects a template that doesn't include the placeholders required for its link type. For more information, see <<link-types,Supported link types and placeholders>>.
 * The API rejects a request that includes the same link type more than once.
 * The API rejects a request that includes a `value` with the `RESET` operation.
 * To clear every override, list all link types with the `RESET` operation.

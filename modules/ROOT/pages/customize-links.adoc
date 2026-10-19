@@ -7,6 +7,8 @@
 
 ThoughtSpot users receive system-generated links in email notifications, which allow them to access objects such as Liveboards, visualizations or saved answers.
 
+You can customize these links in the *Link settings* page of the *Develop* tab, or by using the xref:link-customization-api.adoc[link customization REST API v2 endpoints].
+
 ThoughtSpot generates the following types of links:
 
 Liveboards links::
@@ -69,11 +71,13 @@ xref:embed-search.adoc[SearchEmbed] component to an existing Answer:
 
 By default, ThoughtSpot generates these links with URL paths from the ThoughtSpot application context. If you have embedded ThoughtSpot in your application, you might want to generate links with the URL and resource paths from your host application context. For example, if your host app URL is `\https://www.mysite.com`, you may want to generate a Liveboard link with your host application URL instead of the standard ThoughtSpot portal URL. You can customize the format of system-generated links in the *Link settings* page of the *Develop* tab.
 
-The *Link settings* page in the Developer portal displays the default link format for the system-generated links. You can either prefix your application domain URL to the default link format or customize the entire URL. ThoughtSpot recommends that you use the following variables in your link format:
+The *Link settings* page in the Developer portal displays the default link format for the system-generated links. You can either prefix your application domain URL to the default link format or customize the entire URL. Each link type requires specific variables in its link format. ThoughtSpot rejects a link format that does not include them. The following variables are available:
 
 * `{object-id}` to represent the ID of a Liveboard, Answer, or the SpotIQ analyses. In the Liveboard, Answer, and SpotIQ analyses links, this variable is substituted by the GUID of the object.
 * `{sub-object-id}` to represent the ID of a visualization. In Liveboard visualization links, this variable is  substituted by the GUID of the visualization.
-* `{ts-query-params}` to allow ThoughtSpot to pass query parameters in the URL.  +
+* `{conversation-id}` to represent the ID of a shared Spotter conversation.
+* `{path}` to represent the ThoughtSpot page path in the Generic link.
+* `{ts-query-params}` to allow ThoughtSpot to pass query parameters in the URL. This variable is required for the Liveboard, Liveboard visualization, Answer, and Spotter conversation sharing links, and optional for the other link types. ThoughtSpot removes it from the link when there are no query parameters to pass. +
 For example, when a user subscribes to receive threshold-based alerts for a KPI chart, ThoughtSpot sends email notifications with a link to the KPI chart and also the *Unsubscribe* link to let the user unsubscribe from alerts at any time. When you include `{ts-query-params}` in the link string, ThoughtSpot passes the query parameters required for unsubscribing a user from the alert. +
 
 +
@@ -95,20 +99,20 @@ To customize the link format, follow these steps:
 Liveboard sharing URL::
 This URL provides a link to a ThoughtSpot Liveboard object.
 +
-The default link format is `\https://{ThoughtSpot-Host}/#/pinboard/{object-id}`. You can customize this format to generate a link that represents the objects in your host application context. For example, if your host application is `www.mysite.com`, you can configure this link format as shown here:
+The default link format is `\https://{ThoughtSpot-Host}/#/pinboard/{object-id}?{ts-query-params}`. The `{object-id}` and `{ts-query-params}` variables are required. You can customize this format to generate a link that represents the objects in your host application context. For example, if your host application is `www.mysite.com`, you can configure this link format as shown here:
 +
 ----
 https://www.mysite.com/liveboard/{object-id}?{ts-query-params}
 ----
 +
 ----
-https://www.mysite.com/?pinboard={object-id}?{ts-query-params}
+https://www.mysite.com/?pinboard={object-id}&{ts-query-params}
 ----
 
 Liveboard visualization URL::
 This URL provides a link to a specific ThoughtSpot visualization in a Liveboard.
 +
-The default link format is `\https://{ThoughtSpot-Host}/#/pinboard/{object-id}/{sub-object-id}?{ts-query-params}`.You can customize this format to represent the object attributes of your host application. For example, if your host application is `www.mysite.com`, you can configure this link format as shown here:
+The default link format is `\https://{ThoughtSpot-Host}/#/pinboard/{object-id}/{sub-object-id}?{ts-query-params}`. The `{object-id}`, `{sub-object-id}`, and `{ts-query-params}` variables are required. You can customize this format to represent the object attributes of your host application. For example, if your host application is `www.mysite.com`, you can configure this link format as shown here:
 
 +
 ----
@@ -117,7 +121,7 @@ https://www.mysite.com/liveboard/{object-id}/{sub-object-id}?{ts-query-params}
 
 +
 ----
-https://www.mysite.com/?pinboard={object-id}/viz={sub-object-id}
+https://www.mysite.com/?pinboard={object-id}&viz={sub-object-id}&{ts-query-params}
 ----
 
 +
@@ -139,7 +143,7 @@ https://www.mysite.com/liveboard/{object-id}/viz={sub-object-id}?{ts-query-param
 
 Answer sharing URL::
 This URL provides a link to a shared Answer from a search query.
-The default link format is `\https://{ThoughtSpot-Host}/#/saved-answer/{object-id}`. The customized link format also supports `{ts-query-params}`. For example, if a user has subscribed to receive monitor alerts for a saved Answer, ThoughtSpot replaces `{ts-query-params}` with query parameters to unsubscribe a user from the monitor alert.
+The default link format is `\https://{ThoughtSpot-Host}/#/saved-answer/{object-id}?{ts-query-params}`. The `{object-id}` and `{ts-query-params}` variables are required. For example, if a user has subscribed to receive monitor alerts for a saved Answer, ThoughtSpot replaces `{ts-query-params}` with query parameters to unsubscribe a user from the monitor alert.
 If your host application is `www.mysite.com`, you can configure this link format as shown here:
 
 +
@@ -148,7 +152,7 @@ https://www.mysite.com/saved-answer/{object-id}?{ts-query-params}
 ----
 +
 ----
-https://www.mysite.com/?saved-answer={object-id}
+https://www.mysite.com/?saved-answer={object-id}&{ts-query-params}
 ----
 
 +
@@ -168,7 +172,7 @@ SpotIQ analytics page::
 This URL provides a link to the SpotIQ analyses page.
 
 +
-The default link format is `\https://{ThoughtSpot-Host}/#/insight/{object-id}`. If your host application is `www.mysite.com`, you can configure this link format as shown here:
+The default link format is `\https://{ThoughtSpot-Host}/#/insight/{object-id}?{ts-query-params}`. The `{object-id}` variable is required. If your host application is `www.mysite.com`, you can configure this link format as shown here:
 
 +
 ----
@@ -185,7 +189,7 @@ Unsubscribe link::
 This URL provides a link to the *Profile* settings page in ThoughtSpot.
 
 +
-The default link format is `\https://{ThoughtSpot-Host}/#/user-preference`. If your host application is `www.mysite.com`, you can configure this link format as shown here:
+The default link format is `\https://{ThoughtSpot-Host}/#/user-preference?{ts-query-params}`. This link format has no required variables. If your host application is `www.mysite.com`, you can configure this link format as shown here:
 
 +
 ----
@@ -220,7 +224,7 @@ Generic link::
 The *Generic link* setting allows customizing the embedded ThoughtSpot page URLs and navigation links that are not parameterized using the other link setting options in the *Customization* > *Link settings* page.
 
 +
-The default link format is `\https://{ThoughtSpot-Host}/#/\{path}`. If your host application is `www.mysite.com`, you can configure the link format as shown here:
+The default link format is `\https://{ThoughtSpot-Host}/#/\{path}?{ts-query-params}`. The `{path}` variable is required. If your host application is `www.mysite.com`, you can configure the link format as shown here:
 
 +
 ----
@@ -228,6 +232,15 @@ https://www.mysite.com/{path}
 ----
 
 . Click *Save changes*.
+
+== Customize links using REST API
+
+You can use the following REST API v2 endpoints to manage the link formats at the cluster level or for an Org, instead of using the *Link settings* page:
+
+* `POST /api/rest/2.0/customization/links/search` to retrieve the current link formats
+* `POST /api/rest/2.0/customization/links/update` to set a link format (`REPLACE`) or clear an override (`RESET`)
+
+For more information, see xref:link-customization-api.adoc[Link customization APIs].
 
 == Override ThoughtSpot URLs
 
@@ -305,6 +318,8 @@ Similarly, if the Liveboard URL format is customized for your instance, you will
 image::./images/embed-link-liveboardSchedule.png[Embed link format]
 
 * Verify the `Unsubscribe` links in email notifications.
+
+* You can also retrieve the link formats in effect for your cluster or Org by using the `POST /api/rest/2.0/customization/links/search` API endpoint. The `is_overridden` attribute in the response indicates whether a link type is customized. For more information, see xref:link-customization-api.adoc#search-link-customizations[Searching link customizations].
 
 
 
