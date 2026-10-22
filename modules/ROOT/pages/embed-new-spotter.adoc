@@ -1,0 +1,116 @@
+= Embed the new Spotter experience
+:toc: true
+:toclevels: 2
+
+:page-title: Embed the new Spotter experience
+:page-pageid: embed-new-spotter
+:page-description: Enable the new Spotter experience, including Spotter on Liveboards, in your embedded application using the Visual Embed SDK.
+
+[.version-badge.new]#26.11.0.cl#
+
+ThoughtSpot introduces a new Spotter experience in 26.11.0.cl. In this experience, Spotter opens in a side panel on a Liveboard and uses the entire board — its charts, tabs, groups, note tiles, and applied filters — as conversation context. The Spotter home page also moves to the new experience, and conversations are saved with the Liveboard so users can return to them later.
+// SOURCE: https://docs.google.com/document/d/1sS9DZk3Eg_xio2PCyujV2cukvfB8xyf7qaIVxYx84rk ("New Spotter on Liveboards: documentation and enablement")
+
+The new experience is opt-in. Existing Spotter embeds keep working through the change and remain unchanged unless you explicitly enable the new experience in your embed configuration. New instances and upgrades to 26.11 start on the classic experience.
+
+== Before you begin
+
+* Your ThoughtSpot instance must be running 26.11.0.cl or later, with the new experience enabled at the instance or Org level. The new experience is enabled from the Admin portal; to enable this feature, contact your ThoughtSpot Administrator.
+* Your host application domain is added to xref:security-settings.adoc[ThoughtSpot CSP and CORS allowlists].
+* Your application project uses the xref:api-changelog.adoc[latest version of the Visual Embed SDK].
+// TODO: verify with engineering — confirm the minimum SDK version that includes SpotterExperienceVersion
+
+== Enable the new Spotter experience
+
+To enable the new Spotter experience in your embed, set the `spotterExperienceVersion` property to `SpotterExperienceVersion.SPOTTER_2026_11` in your embed configuration:
+
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    SpotterExperienceVersion,
+    AuthType,
+    init,
+    EmbedEvent,
+} from '@thoughtspot/visual-embed-sdk';
+
+init({
+    thoughtSpotHost: 'https://your-thoughtspot-host',
+    authType: AuthType.None,
+});
+
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        height: '100%',
+        width: '100%',
+    },
+    worksheetId: 'your-worksheet-id',
+    spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11,
+    //... other configuration attributes
+});
+
+spotterEmbed.render();
+----
+// SOURCE: Visual Embed SDK — spotterExperienceVersion flag confirmed by documentation team
+
+To return to the classic experience, remove the property or set it to the classic version value, and re-render the component.
+// TODO: verify with engineering — confirm the enum value for the classic experience and the default when the property is omitted
+
+== Spotter on Liveboards in embedded apps
+
+When the new experience is enabled, Spotter on an embedded Liveboard behaves as follows:
+
+* Spotter opens in a side panel next to the Liveboard, and the board stays usable while the panel is open. The board resizes to make room for the panel.
+* Spotter reads every tab, group, chart, and insight on the Liveboard, so users can ask about one chart, several selected tiles, or the whole board.
+* Answers respect the filters applied to the Liveboard. Users do not need to restate filter context in their questions.
+* The Spotter button on a chart adds that chart to the panel as a reference, instead of opening Spotter over the chart.
+* On a Liveboard, Spotter uses only the data models behind that Liveboard. Make sure Spotter is enabled on those models.
+* Conversations are saved with the Liveboard, and users can continue them later.
+* When the Liveboard is switched to edit mode, the Spotter panel closes.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    liveboardId: 'your-liveboard-id',
+    spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11,
+    //... other configuration attributes
+});
+----
+// TODO: verify with engineering — confirm LiveboardEmbed and AppEmbed support this property in the initial release, and the related action IDs for the Spotter panel
+
+== Behavior changes with the new experience
+
+When your instance or Org switches to the new experience:
+
+* Automatic data model selection is always on. New conversations on the Spotter home page search all data models the user can access; users can still pick a specific model.
+* Chat history is on by default. Conversations started in the new experience are not available if the Org switches back to the classic experience.
+* Clarifying questions: when Spotter is unsure what a question means, it asks a clarifying question with options to choose from.
+* Users can upload a CSV file and analyze it alongside the Liveboard data in the same conversation.
+
+== Features not yet available in the new experience
+
+The following capabilities are not available in the initial release of the new experience. ThoughtSpot plans to add them in future releases:
+
+* Editing an answer or drilling down into it
+* Sharing conversations and shared links
+* Searching conversations
+* Scheduling questions
+* Report generation
+* Deep analysis mode (removed; Spotter now decides the depth of analysis from the question)
+
+== REST API considerations
+
+If your application calls the Spotter conversation REST APIs, plan to move to the new conversation endpoints. Once your Org switches to the new experience, the current conversation endpoints work only for the classic experience.
+// TODO: verify with engineering — new conversation endpoint paths and availability timeline
+
+[NOTE]
+====
+The bodyless Spotter conversation API is planned for deprecation. The deprecation date will be announced separately.
+// TODO: verify with engineering — deprecation date and migration path for bodyless Spotter API
+====
+
+== Additional resources
+
+* xref:embed-spotter.adoc[Embed Spotter experience]
+* xref:customize-spotter-embed.adoc[Customize the Spotter embed view]
+* link:https://docs.thoughtspot.com/cloud/latest/spotter[Spotter Product Documentation, window=_blank]
