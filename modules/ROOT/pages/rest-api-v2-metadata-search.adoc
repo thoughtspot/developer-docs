@@ -180,14 +180,6 @@ The following table provides a high-level overview of the differences in v1 and 
 |Containers and visualizations | Visualizations are nested within sheets and tiles, with less explicit mapping between containers and their visualizations | Each container is defined in `pinboardContainers`, with a clear mapping to its header, client state, and referenced visualization.
 |Layout | Layout is defined in a `layout` object with a list of tiles, each with position and size. | Layout is defined in `containerLayouts`, with each container’s position and size specified, and containers referenced by ID.
 |Parameter overrides and chips| No explicit parameter override or chip structure.| Includes `pinboardParameterOverride` and `orderedChips`.
-|JSON example a| V1 response +
-
-[.widthAuto]
-image:./images/v1-lb-response.png[Liveboard V1 response] a|V2 response +
-
-[.widthAuto]
-image:./images/v2-lb-response.png[Liveboard V2 response]
-|||
 |=====
 
 ==== JSON output format for Liveboard response V2
@@ -3741,9 +3733,11 @@ The details of each object type are a complex object that is unique to each obje
 The JSON output for `metadata_detail` varies for Liveboards based on the response version specified in the API request. For more information, see xref:rest-api-v2-metadata-search.adoc#_response_format_for_liveboards[Liveboard response format].
 
 === include_personalised_views
-When fetching Liveboard metadata with `include_details: true`, you can also request the list of Personalized Views saved on each Liveboard by setting `include_personalised_views` to `true`.
+On ThoughtSpot instances running 26.5.0.cl or later, when fetching Liveboard metadata with `include_details: true`, you can also request the list of personalized views saved on each Liveboard by setting `include_personalised_views` to `true`.
 
 This parameter is only applicable to `LIVEBOARD` type objects and has no effect on other metadata types. It requires `include_details` to also be `true` in the same request.
+
+On ThoughtSpot instances running 26.10.0.cl or later, personalized views are also included when `liveboard_details.personalized_views` is `true`. For more information, see xref:rest-api-v2-metadata-search.adoc#_liveboard_details[liveboard_details].
 
 [source,JSON]
 ----
@@ -3758,7 +3752,7 @@ This parameter is only applicable to `LIVEBOARD` type objects and has no effect 
 }
 ----
 
-When both parameters are set to `true`, each Liveboard object in the response will include a `personalised_views` array nested within `metadata_detail`:
+When both parameters are set to `true`, each Liveboard object in the response includes a `personalised_views` array nested within `metadata_detail`, alongside the other Liveboard details. The following example shows only the `personalised_views` array:
 
 [source,JSON]
 ----
@@ -3770,18 +3764,22 @@ When both parameters are set to `true`, each Liveboard object in the response wi
     "metadata_detail": {
       "personalised_views": [
         {
-          "view_guid": "6e3d11b2-9a4f-4c1e-8b5a-2f3d7e0c1a9d",
-          "view_name": "Q1 Revenue View",
-          "author_guid": "59481331-ee53-42be-a548-bd87be6ddd4a",
-          "author_name": "Alice Johnson",
-          "is_public": false
+          "guid": "6e3d11b2-9a4f-4c1e-8b5a-2f3d7e0c1a9d",
+          "name": "Q1 Revenue View",
+          "isPublic": false,
+          "author": "59481331-ee53-42be-a548-bd87be6ddd4a",
+          "authorDisplayName": "Alice Johnson",
+          "createdAt": 1760198460000,
+          "updatedAt": 1760198460000
         },
         {
-          "view_guid": "a9c42f17-3b8e-4d20-91fa-7c5e2d0b8f3a",
-          "view_name": "Executive Summary",
-          "author_guid": "67e15c06-d153-4924-a4cd-ff615393b60f",
-          "author_name": "Bob Smith",
-          "is_public": true
+          "guid": "a9c42f17-3b8e-4d20-91fa-7c5e2d0b8f3a",
+          "name": "Executive Summary",
+          "isPublic": true,
+          "author": "67e15c06-d153-4924-a4cd-ff615393b60f",
+          "authorDisplayName": "Bob Smith",
+          "createdAt": 1760198460000,
+          "updatedAt": 1760284860000
         }
       ]
     },
@@ -3794,36 +3792,100 @@ When both parameters are set to `true`, each Liveboard object in the response wi
 ]
 ----
 
-The `personalised_views` array contains one object per saved Personalized View on the Liveboard. Each object has the following properties:
+The `personalised_views` array contains one object per saved personalized view on the Liveboard. Each object has the following properties:
 
-[width="100%",cols="2,1,4"]
-|====
-|Property|Type|Description
-
-|`view_guid`
-|String
-|Unique GUID of the Personalized View.
-
-|`view_name`
-|String
-|Display name of the Personalized View as set by its author.
-
-|`author_guid`
-|String
-|GUID of the ThoughtSpot user who created this Personalized View.
-
-|`author_name`
-|String
-|Display name of the user who created this Personalized View.
-
-|`is_public`
-|Boolean
-|If `true`, the Personalized View is shared publicly and visible to other users with access to the Liveboard. If `false`, the view is private to its author.
-|====
+[width="100%" cols="2,4"]
+[options="header"]
+|=====
+| Property | Description
+| `guid` |__String__. Unique GUID of the personalized view.
+| `name` |__String__. Display name of the personalized view as set by its author.
+| `isPublic` |__Boolean__. If `true`, the personalized view is shared publicly and visible to other users with access to the Liveboard. If `false`, the view is private to its author.
+| `author` |__String__. GUID of the ThoughtSpot user who created this personalized view.
+| `authorDisplayName` |__String__. Display name of the user who created this personalized view.
+| `createdAt` |__Number__. Time when the personalized view was created, in milliseconds since the Unix epoch.
+| `updatedAt` |__Number__. Time when the personalized view was last updated, in milliseconds since the Unix epoch.
+|=====
 
 [NOTE]
 ====
-If a Liveboard has no saved Personalized Views, the `personalised_views` array will be empty (`[]`). If `include_personalised_views` is `false` or omitted, the `personalised_views` key will not appear in `metadata_detail`.
+If a Liveboard has no saved personalized views, the `personalised_views` array is empty (`[]`). If `include_personalised_views` is `false` or omitted, and `liveboard_details.personalized_views` is `false` or omitted, the `personalised_views` key does not appear in `metadata_detail`.
+====
+
+=== liveboard_details
+On ThoughtSpot instances running 26.10.0.cl or later, use the `liveboard_details` object to select which parts of a Liveboard's `metadata_detail` the API returns. Leaving out the parts you do not need reduces the size of the response.
+
+The `liveboard_details` object applies only when all of the following conditions are met. Otherwise, the API ignores it.
+
+* The metadata object is of the `LIVEBOARD` type.
+* The `include_details` attribute is `true`.
+* The `liveboard_response_version` attribute is `V2`. For more information, see xref:rest-api-v2-metadata-search.adoc#_response_format_for_liveboards[Response format for Liveboards].
+
+The `liveboard_details` object supports the following Boolean properties:
+
+[width="100%" cols="2,4"]
+[options="header"]
+|=====
+| Property | Description
+| `liveboard_filters` __Optional__ |__Boolean__. Includes the Liveboard filter details. The default value is `true`.
+| `liveboard_tabs` __Optional__ |__Boolean__. Includes the Liveboard tab details. The default value is `true`.
+| `container_layouts` __Optional__ |__Boolean__. Includes the container layout information. The default value is `true`.
+| `visualizations` __Optional__ |__Boolean__. Includes the Liveboard container (visualization) information. The default value is `true`.
+| `parameter_overrides` __Optional__ |__Boolean__. Includes the parameter override information. The default value is `true`.
+| `personalized_views` __Optional__ |__Boolean__. Includes the personalized view details. The default value is `false`. The API returns personalized views when either this property or `include_personalised_views` is `true`. For more information, see xref:rest-api-v2-metadata-search.adoc#_include_personalised_views[include_personalised_views].
+|=====
+
+Set a property to `false` to exclude that part of the Liveboard. The following example excludes the visualization information and returns all other details:
+
+[source,JSON]
+----
+{
+  "metadata": [
+    {
+      "type": "LIVEBOARD",
+      "identifier": "4081f38c-1f26-4354-a418-af14136e3bd7"
+    }
+  ],
+  "include_details": true,
+  "liveboard_response_version": "V2",
+  "liveboard_details": {
+    "visualizations": false
+  }
+}
+----
+
+The API always returns the Liveboard header, type, and style. Collections that you exclude are returned empty. If you do not include `liveboard_details` in the request, the response is the same as before, and personalized views are returned only if you request them with `include_personalised_views`.
+
+==== Fetch only personalized views
+
+To fetch only the personalized views of a Liveboard, set all other properties to `false`:
+
+[source,JSON]
+----
+{
+  "metadata": [
+    {
+      "type": "LIVEBOARD"
+    }
+  ],
+  "include_details": true,
+  "liveboard_response_version": "V2",
+  "liveboard_details": {
+    "liveboard_filters": false,
+    "liveboard_tabs": false,
+    "container_layouts": false,
+    "visualizations": false,
+    "parameter_overrides": false,
+    "personalized_views": true
+  }
+}
+----
+
+In this case, ThoughtSpot does not load the Liveboard definition, and `metadata_detail` contains only the `personalised_views` array. For the properties of each personalized view, see xref:rest-api-v2-metadata-search.adoc#_include_personalised_views[include_personalised_views].
+
+[NOTE]
+====
+The faster response applies only when `personalized_views` is the only property you request. For other combinations, the response is smaller, but ThoughtSpot still loads the Liveboard definition and then removes the excluded parts.
 ====
 
 === include_dependent_objects
@@ -3864,6 +3926,8 @@ The array for each object type will contain the metadata headers for the various
 
 Common use cases for the dependent objects include tagging, auditing proper sharing, proper deletion, and any other tasks for applying a change in bulk to related objects in one data model.
 
+The `dependent_object_version` parameter specifies the version of the dependent object information in the response. The only supported value is `V1`.
+
 === include_stats
 The `include_stats` boolean option causes the `stats` key of the response to be filled with an object with statistics about user access to the object.
 
@@ -3879,6 +3943,20 @@ The Search Assist feature is a deprecated feature and is not available on Though
 The `metadata/search` response typically excludes objects that are `auto-created`, `hidden`, or `incomplete`, as these objects represent internal use cases typically not seen or modified by any end user.
 
 The `include_hidden_objects`, `include_incomplete_objects`, and `include_auto_created_objects` boolean parameters can be used if you have a known use-case where you need metadata information from an object marked under one of these categories, for example, the internal hidden answer objects that represent each visualization on a Liveboard.
+
+=== include_discoverable_objects
+On ThoughtSpot instances running 10.7.0.cl or later, the `include_discoverable_objects` boolean parameter specifies whether the response includes Answers and Liveboards that their owners marked as discoverable. The default value is `true`. Set it to `false` to exclude discoverable objects from the response.
+
+[NOTE]
+====
+The Liveboard and Answer discoverability feature is deprecated and removed from ThoughtSpot Cloud 26.8.0.cl. For more information, see xref:deprecated-features.adoc#liveboardDiscoverable[Liveboard and answer discoverability].
+====
+
+=== include_only_published_objects
+On ThoughtSpot instances running 10.11.0.cl or later, set the `include_only_published_objects` boolean parameter to `true` to retrieve only xref:publish-api.adoc[published objects]. The default value is `false`.
+
+=== show_resolved_parameters
+On ThoughtSpot instances running 10.9.0.cl or later, if your metadata objects are parameterized, set the `show_resolved_parameters` boolean parameter to `true` to return the resolved parameter values in the response.
 
 === Pagination settings
 
