@@ -326,6 +326,14 @@ class TypeDocInternalParser {
         return [...repaired, ...extra];
     };
 
+    // The SDK sometimes adds more lines under @version (e.g. "Payload: {@link X}"). Only the
+    // first line is the version; the rest is text that follows the description (see parseTags).
+    private static versionLine = (tag: TypeDocCommentTag) =>
+        tag.text.trim().split('\n')[0].trim();
+
+    private static versionExtraText = (tag: TypeDocCommentTag) =>
+        tag.text.trim().split('\n').slice(1).join('\n').trim();
+
     // function to parse a tag
     static parseTag(tag: TypeDocCommentTag): string {
         if (!tag.tag.trim() || !tag.text.trim()) {
@@ -334,7 +342,7 @@ class TypeDocInternalParser {
         }
         if (tag.tag === 'group') return '';
         if (tag.tag === 'version')
-            return `[version]#*Version* : ${tag.text.replace(/\n/g, '')}#\n`;
+            return `[version]#*Version* : ${this.versionLine(tag)}#\n`;
         if (tag.tag === 'example') {
             return `${this.convertOutsideCodeBlocks(tag.text)}\n`;
         }
@@ -421,6 +429,10 @@ class TypeDocInternalParser {
                 addTagsToContent(versionTags);
                 addTagsToContent(deprecatedTags);
             }
+            versionTags.forEach((tag) => {
+                const extra = this.versionExtraText(tag);
+                if (extra) content += `\n${this.covertTypeDocText(extra)}\n\n`;
+            });
             addTagsToContent(restTags);
         }
 
@@ -865,6 +877,8 @@ class TypeDocParser {
             return `${TypeDocInternalParser.covertTypeDocText(description)}\n\n`;
         }
         return TypeDocInternalParser.parseComment(node.comment);
+    };
+
     // "Indexable" section: e.g. `[key: string]: any`
     private handleIndexable = (node: TypeDocNode) => {
         const signature = node.indexSignature;
@@ -884,26 +898,19 @@ class TypeDocParser {
         const pageTitle = `= ${node.name}`;
 
         const mainPageContent = '';
-        let enumIndexContent = '\n\n[div boxDiv boxFullWidth]\n--\n';
-        // Special handling
-        if (['Enumeration', 'Class', 'Interface'].includes(node.kindString)) {
-            enumIndexContent += this.createTypeDocIndex(
-                node.children?.map((childNode) =>
-                    this.convertNodeToLink(childNode),
-                ) || [],
-            );
-        // The Index section is only emitted when it has a table to show.
-        // A table with no rows is dropped by Asciidoctor and breaks the markdown conversion.
+        // The Index section is only emitted when it has entries to show.
+        // An empty block is dropped by Asciidoctor and breaks the markdown conversion.
         let indexSection = '';
         if (
             ['Enumeration', 'Class', 'Interface'].includes(node.kindString) &&
             node.children?.length
         ) {
-            indexSection = `== Index\n\n\n[div boxDiv boxFullWidth]\n--\n${this.createTypeDocTable(
+            indexSection = `== Index\n\n${
+                node.name === 'Action' ? `${this.buildEmbedTypeFilter()}\n\n` : ''
+            }\n\n[div boxDiv boxFullWidth]\n--\n${this.createTypeDocIndex(
                 node.children.map((childNode) =>
                     this.convertNodeToLink(childNode),
                 ),
-                3,
             )}\n--\n\n`;
         }
 
@@ -926,11 +933,6 @@ class TypeDocParser {
             this.parseNodeComment(node),
             TypeDocInternalParser.metaAfterDescription(node.comment?.tags),
             TypeDocInternalParser.parseTags(node.comment?.tags, false),
-            '== Index',
-            node.name === 'Action' ? this.buildEmbedTypeFilter() : '',
-            enumIndexContent,
-            TypeDocInternalParser.parseComment(node.comment),
-            TypeDocInternalParser.parseTags(node.comment?.tags),
             this.handleIndexable(node),
             indexSection,
             mainPageContent,
