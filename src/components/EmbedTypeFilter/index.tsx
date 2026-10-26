@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MdClear } from '@react-icons/all-files/md/MdClear';
+import { MdFilterList } from '@react-icons/all-files/md/MdFilterList';
 import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { dispatchHiddenIds } from '../../utils/doc-filter-events';
 import './index.scss';
@@ -13,7 +14,8 @@ const joinWithAnd = (items: string[]) => {
 // The option for the actions that are not categorized by embed type yet.
 const OTHER = 'Other';
 
-// The name on the filter chip: "Action Select".
+// The name on the filter chip: "Action" with the filter icon, and "Action Select" while the
+// panel is open.
 const COMPONENT_NAME = 'Action';
 
 /*
@@ -82,7 +84,14 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
             return undefined;
         }
         const onClick = (event: MouseEvent) => {
-            if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+            // Use the path of the click, not event.target: opening the panel replaces the filter
+            // icon on the chip with "Select", so the element that was clicked is no longer on the
+            // page when this listener runs, and "contains" would call the click an outside one
+            // and close the panel again straight away.
+            const clickedInside = rootRef.current
+                ? event.composedPath().includes(rootRef.current)
+                : false;
+            if (!clickedInside) setOpen(false);
         };
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') setOpen(false);
@@ -177,7 +186,15 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
                         aria-label="Filter actions by embed type"
                         onClick={() => setOpen((isOpen) => !isOpen)}
                     >
-                        {COMPONENT_NAME} <strong>Select</strong>
+                        {COMPONENT_NAME}
+                        {open ? (
+                            <strong>Select</strong>
+                        ) : (
+                            <MdFilterList
+                                className="embed-type-filter__chip-icon"
+                                aria-hidden="true"
+                            />
+                        )}
                     </button>
                     {selected.length > 0 && (
                         <button
