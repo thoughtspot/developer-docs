@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MdFilterList } from '@react-icons/all-files/md/MdFilterList';
+import { MdClear } from '@react-icons/all-files/md/MdClear';
 import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { dispatchHiddenIds } from '../../utils/doc-filter-events';
 import './index.scss';
@@ -13,10 +13,14 @@ const joinWithAnd = (items: string[]) => {
 // The option for the actions that are not categorized by embed type yet.
 const OTHER = 'Other';
 
+// The name on the filter chip: "Action Select".
+const COMPONENT_NAME = 'Action';
+
 /*
- * Filter for the generated Action reference page, using the same pattern as
- * the release-notes filter bar: a "Filter" button that opens a panel of
- * multi-select checkboxes, plus a search box.
+ * Filter for the generated Action reference page. The search box is on the left and the
+ * filter chip ("Action Select") next to it, as in the product UI guidelines. The chip opens
+ * a panel with its own search row and a list of checkboxes, one per embed type. A small
+ * x on the chip clears the selection.
  *
  * The converter (scripts/Converter/index.ts) writes a "Supported in" paragraph
  * with the class `supported-in` under each action, and a placeholder for this
@@ -36,6 +40,8 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
     const [selected, setSelected] = useState<string[]>([]);
     const [query, setQuery] = useState('');
     const [open, setOpen] = useState(false);
+    // The search row inside the panel, which narrows the list of embed types.
+    const [optionQuery, setOptionQuery] = useState('');
     // How many actions have no embed type yet; "Other" is only offered while there are some.
     const [uncategorized, setUncategorized] = useState(0);
     const rootRef = useRef<HTMLDivElement>(null);
@@ -64,9 +70,17 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
         statusText = 'Showing ungrouped Action IDs.';
     }
 
+    const options = [...embedTypes, ...(uncategorized > 0 ? [OTHER] : [])];
+    const visibleOptions = options.filter((option) =>
+        option.toLowerCase().includes(optionQuery.trim().toLowerCase()),
+    );
+
     // Close the panel on an outside click or Escape.
     useEffect(() => {
-        if (!open) return undefined;
+        if (!open) {
+            setOptionQuery('');
+            return undefined;
+        }
         const onClick = (event: MouseEvent) => {
             if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
         };
@@ -141,53 +155,6 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
     return (
         <div className="embed-type-filter" ref={rootRef}>
             <div className="embed-type-filter__controls">
-                <div className="embed-type-filter__dropdown">
-                    <button
-                        type="button"
-                        className={`embed-type-filter__trigger${
-                            selected.length ? ' active' : ''
-                        }`}
-                        aria-haspopup="true"
-                        aria-expanded={open}
-                        aria-label="Filter by embed type"
-                        onClick={() => setOpen((isOpen) => !isOpen)}
-                    >
-                        <span>Filter</span>
-                        <MdFilterList className="embed-type-filter__icon" />
-                    </button>
-                    {open && (
-                        <div className="embed-type-filter__menu">
-                            {[
-                                ...embedTypes,
-                                ...(uncategorized > 0 ? [OTHER] : []),
-                            ].map((embedType) => (
-                                <label
-                                    key={embedType}
-                                    className="embed-type-filter__option"
-                                    title={
-                                        embedType === OTHER
-                                            ? 'Actions that are not categorized by embed type yet'
-                                            : undefined
-                                    }
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={selected.includes(embedType)}
-                                        onChange={() => toggle(embedType)}
-                                    />
-                                    <span>{embedType}</span>
-                                </label>
-                            ))}
-                            <button
-                                type="button"
-                                className="embed-type-filter__clear"
-                                onClick={() => setSelected([])}
-                            >
-                                Clear all
-                            </button>
-                        </div>
-                    )}
-                </div>
                 <label className="embed-type-filter__search">
                     <BiSearch
                         className="embed-type-filter__search-icon"
@@ -201,6 +168,73 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
                         onChange={(event) => setQuery(event.target.value)}
                     />
                 </label>
+                <div className="embed-type-filter__dropdown">
+                    <button
+                        type="button"
+                        className="embed-type-filter__chip"
+                        aria-haspopup="true"
+                        aria-expanded={open}
+                        aria-label="Filter actions by embed type"
+                        onClick={() => setOpen((isOpen) => !isOpen)}
+                    >
+                        {COMPONENT_NAME} <strong>Select</strong>
+                    </button>
+                    {selected.length > 0 && (
+                        <button
+                            type="button"
+                            className="embed-type-filter__chip-clear"
+                            aria-label="Clear the embed type selection"
+                            onClick={() => setSelected([])}
+                        >
+                            <MdClear aria-hidden="true" />
+                        </button>
+                    )}
+                    {open && (
+                        <div
+                            className="embed-type-filter__menu"
+                            role="group"
+                            aria-label="Embed type"
+                        >
+                            <label className="embed-type-filter__menu-search">
+                                <BiSearch aria-hidden="true" />
+                                <input
+                                    type="search"
+                                    placeholder="Search"
+                                    aria-label="Search embed types"
+                                    value={optionQuery}
+                                    onChange={(event) =>
+                                        setOptionQuery(event.target.value)
+                                    }
+                                />
+                            </label>
+                            <div className="embed-type-filter__options">
+                                {visibleOptions.map((embedType) => (
+                                    <label
+                                        key={embedType}
+                                        className="embed-type-filter__option"
+                                        title={
+                                            embedType === OTHER
+                                                ? 'Actions that are not categorized by embed type yet'
+                                                : embedType
+                                        }
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selected.includes(embedType)}
+                                            onChange={() => toggle(embedType)}
+                                        />
+                                        <span>{embedType}</span>
+                                    </label>
+                                ))}
+                                {!visibleOptions.length && (
+                                    <div className="embed-type-filter__empty">
+                                        No matches
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
             <span className="embed-type-filter__status" aria-live="polite">
                 {statusText}
