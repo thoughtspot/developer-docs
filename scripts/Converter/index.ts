@@ -326,6 +326,14 @@ class TypeDocInternalParser {
         return [...repaired, ...extra];
     };
 
+    // The SDK sometimes adds more lines under @version (e.g. "Payload: {@link X}"). Only the
+    // first line is the version; the rest is text that follows the description (see parseTags).
+    private static versionLine = (tag: TypeDocCommentTag) =>
+        tag.text.trim().split('\n')[0].trim();
+
+    private static versionExtraText = (tag: TypeDocCommentTag) =>
+        tag.text.trim().split('\n').slice(1).join('\n').trim();
+
     // function to parse a tag
     static parseTag(tag: TypeDocCommentTag): string {
         if (!tag.tag.trim() || !tag.text.trim()) {
@@ -334,7 +342,7 @@ class TypeDocInternalParser {
         }
         if (tag.tag === 'group') return '';
         if (tag.tag === 'version')
-            return `[version]#*Version* : ${tag.text.replace(/\n/g, '')}#\n`;
+            return `[version]#*Version* : ${this.versionLine(tag)}#\n`;
         if (tag.tag === 'example') {
             return `${this.convertOutsideCodeBlocks(tag.text)}\n`;
         }
@@ -421,6 +429,10 @@ class TypeDocInternalParser {
                 addTagsToContent(versionTags);
                 addTagsToContent(deprecatedTags);
             }
+            versionTags.forEach((tag) => {
+                const extra = this.versionExtraText(tag);
+                if (extra) content += `\n${this.covertTypeDocText(extra)}\n\n`;
+            });
             addTagsToContent(restTags);
         }
 
@@ -859,6 +871,14 @@ class TypeDocParser {
         return '';
     };
 
+    private parseNodeComment = (node: TypeDocNode): string => {
+        const description = this.getDescription(node);
+        if (description) {
+            return `${TypeDocInternalParser.covertTypeDocText(description)}\n\n`;
+        }
+        return TypeDocInternalParser.parseComment(node.comment);
+    };
+
     // "Indexable" section: e.g. `[key: string]: any`
     private handleIndexable = (node: TypeDocNode) => {
         const signature = node.indexSignature;
@@ -871,14 +891,6 @@ class TypeDocParser {
         return `== Indexable\n\n[div boxDiv boxFullWidth]\n--\n\`[${params}]: ${this.parseTypeDocType(
             signature.type,
         )}\`\n--\n`;
-    };
-
-    private parseNodeComment = (node: TypeDocNode): string => {
-        const description = this.getDescription(node);
-        if (description) {
-            return `${TypeDocInternalParser.covertTypeDocText(description)}\n\n`;
-        }
-        return TypeDocInternalParser.parseComment(node.comment);
     };
 
     // handles the Main page nodes (Enum, Class, Interface, Type Alias)
