@@ -40,6 +40,12 @@ exports.onCreateNode = ({ node, actions }) => {
         $(el).replaceWith(`<blockquote><p><strong>${type}:</strong> ${content}</p></blockquote>`);
     });
 
+    /* Drop tables with no rows (usually from malformed asciidoc tables).
+     * turndown-plugin-gfm reads `table.rows[0].parentNode` and throws on them. */
+    $('table').each((_, el) => {
+        if (!$(el).find('tr').length) $(el).remove();
+    });
+
     /* Get the cleaned HTML */
     const cleanedHtml = $('body').html() || '';
 
@@ -55,7 +61,13 @@ exports.onCreateNode = ({ node, actions }) => {
     const { tables } = require('turndown-plugin-gfm');
     td.use(tables);
 
-    const markdownBody = td.turndown(cleanedHtml);
+    /* A conversion failure on one page must not fail the whole build */
+    let markdownBody = '';
+    try {
+        markdownBody = td.turndown(cleanedHtml);
+    } catch (err) {
+        console.warn(`Markdown conversion failed for "${title}" (${node.id}): ${err.message}`);
+    }
 
     createNodeField({
         node,
