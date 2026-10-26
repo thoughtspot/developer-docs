@@ -90,6 +90,7 @@ interface TypeDocNode {
     groups?: TypeDocGroup[];
     comment?: TypeDocComment;
     flags?: any;
+    indexSignature?: SignatureNode;
 }
 
 interface TypeDocComment {
@@ -864,6 +865,18 @@ class TypeDocParser {
             return `${TypeDocInternalParser.covertTypeDocText(description)}\n\n`;
         }
         return TypeDocInternalParser.parseComment(node.comment);
+    // "Indexable" section: e.g. `[key: string]: any`
+    private handleIndexable = (node: TypeDocNode) => {
+        const signature = node.indexSignature;
+        if (!signature?.parameters?.length) return '';
+
+        const params = signature.parameters
+            .map((param) => `${param.name}: ${this.parseTypeDocType(param.type)}`)
+            .join(', ');
+
+        return `== Indexable\n\n[div boxDiv boxFullWidth]\n--\n\`[${params}]: ${this.parseTypeDocType(
+            signature.type,
+        )}\`\n--\n`;
     };
 
     // handles the Main page nodes (Enum, Class, Interface, Type Alias)
@@ -879,8 +892,20 @@ class TypeDocParser {
                     this.convertNodeToLink(childNode),
                 ) || [],
             );
+        // The Index section is only emitted when it has a table to show.
+        // A table with no rows is dropped by Asciidoctor and breaks the markdown conversion.
+        let indexSection = '';
+        if (
+            ['Enumeration', 'Class', 'Interface'].includes(node.kindString) &&
+            node.children?.length
+        ) {
+            indexSection = `== Index\n\n\n[div boxDiv boxFullWidth]\n--\n${this.createTypeDocTable(
+                node.children.map((childNode) =>
+                    this.convertNodeToLink(childNode),
+                ),
+                3,
+            )}\n--\n\n`;
         }
-        enumIndexContent += '\n--\n\n';
 
         // Crate content for children ( Enum members , Parameters, Properties, etc..)
         const groupContent = node.groups
@@ -904,9 +929,15 @@ class TypeDocParser {
             '== Index',
             node.name === 'Action' ? this.buildEmbedTypeFilter() : '',
             enumIndexContent,
+            TypeDocInternalParser.parseComment(node.comment),
+            TypeDocInternalParser.parseTags(node.comment?.tags),
+            this.handleIndexable(node),
+            indexSection,
             mainPageContent,
             groupContent,
-        ].join('\n\n');
+        ]
+            .filter((section) => section !== '')
+            .join('\n\n');
     };
 
     // The SDK does not record which embed types support each Action, so the
