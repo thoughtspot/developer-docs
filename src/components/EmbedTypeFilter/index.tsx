@@ -18,6 +18,14 @@ const OTHER = 'Other';
 // panel is open.
 const COMPONENT_NAME = 'Action';
 
+// Shown in place of the list when the search and the checked embed types match no action.
+const EmptyState = () => (
+    <div className="embed-type-filter__empty-state" role="status">
+        <h4>No results for your search</h4>
+        <p>You can change your search and try again.</p>
+    </div>
+);
+
 // The x at the right end of a search box, shown while the box has text. It clears the text and
 // puts the focus back in the box.
 const ClearSearch = (props: {
@@ -62,6 +70,8 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
     const [optionQuery, setOptionQuery] = useState('');
     // How many actions have no embed type yet; "Other" is only offered while there are some.
     const [uncategorized, setUncategorized] = useState(0);
+    // True when the search and the checked embed types match no action.
+    const [noResults, setNoResults] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const optionInputRef = useRef<HTMLInputElement>(null);
@@ -135,6 +145,7 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
 
         const search = query.trim().toLowerCase();
         let uncategorizedCount = 0;
+        let shownCount = 0;
         const hiddenIds: string[] = [];
         const actionSections = Array.from(
             view.querySelectorAll<HTMLElement>('.sect2'),
@@ -153,7 +164,10 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
                 );
             const matchesSearch =
                 !search || (section.textContent || '').toLowerCase().includes(search);
-            if (matchesEmbedType && matchesSearch) return;
+            if (matchesEmbedType && matchesSearch) {
+                shownCount += 1;
+                return;
+            }
             hide(section);
             const id = section.querySelector('h3')?.id;
             if (!id) return;
@@ -166,6 +180,21 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
             });
         });
         setUncategorized(uncategorizedCount);
+        const nothingShown = actionSections.length > 0 && shownCount === 0;
+        setNoResults(nothingShown);
+        if (nothingShown) {
+            // Nothing is left to list: the empty box of the Index and the heading of the
+            // members are hidden, so the message stands on its own.
+            hide(
+                view
+                    .querySelector<HTMLElement>('.typedoc-index')
+                    ?.closest<HTMLElement>('.boxDiv') || null,
+            );
+            const membersSection = actionSections[0].closest<HTMLElement>('.sect1');
+            if (membersSection && !membersSection.contains(rootRef.current)) {
+                hide(membersSection);
+            }
+        }
         dispatchHiddenIds(hiddenIds);
 
         return () => {
@@ -294,6 +323,7 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
             <span className="embed-type-filter__status" aria-live="polite">
                 {statusText}
             </span>
+            {noResults && <EmptyState />}
         </div>
     );
 };
