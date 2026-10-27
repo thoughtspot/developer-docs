@@ -56,6 +56,8 @@ import VersionIframe from '../VersionIframe';
 // Key of the merged nav-in-product-help.adoc entry in processedNavMap (pageid minus 'nav-' prefix).
 // Not a real DocCategory/tab — used only to pick the left sidebar content when embedded in-product.
 const IN_PRODUCT_NAV_KEY = 'in-product-help';
+// Key of nav-sdk-reference.adoc in processedNavMap; also the 'sdk-reference' DocCategory.
+const SDK_REFERENCE_NAV_KEY = 'sdk-reference';
 
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
@@ -211,7 +213,12 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         if (typeof window === 'undefined') return {};
         const knownCategories = new Set(Object.keys(CATEGORY_NAV_ID));
         const map: Record<string, DocCategory> = {};
-        Object.entries(processedNavMap).forEach(([cat, html]) => {
+        // Entries are applied in order and the last one wins, so the SDK reference nav goes last:
+        // it claims the pages (e.g. VisualEmbedSdk) that the Embedding nav also links to.
+        const orderedNavs = Object.entries(processedNavMap).sort(
+            ([a], [b]) => Number(a === SDK_REFERENCE_NAV_KEY) - Number(b === SDK_REFERENCE_NAV_KEY),
+        );
+        orderedNavs.forEach(([cat, html]) => {
             if (cat === IN_PRODUCT_NAV_KEY || !knownCategories.has(cat)) return;
             const doc = new DOMParser().parseFromString(html as string, 'text/html');
             doc.querySelectorAll('a[href]').forEach((a) => {
