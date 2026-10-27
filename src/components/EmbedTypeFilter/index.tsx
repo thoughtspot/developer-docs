@@ -18,6 +18,22 @@ const OTHER = 'Other';
 // panel is open.
 const COMPONENT_NAME = 'Action';
 
+// The x at the right end of a search box, shown while the box has text. It clears the text and
+// puts the focus back in the box.
+const ClearSearch = (props: {
+    label: string;
+    onClear: () => void;
+}) => (
+    <button
+        type="button"
+        className="embed-type-filter__search-clear"
+        aria-label={props.label}
+        onClick={props.onClear}
+    >
+        <MdClear aria-hidden="true" />
+    </button>
+);
+
 /*
  * Filter for the generated Action reference page. The search box is on the left and the
  * filter chip ("Action Select") next to it, as in the product UI guidelines. The chip opens
@@ -47,6 +63,8 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
     // How many actions have no embed type yet; "Other" is only offered while there are some.
     const [uncategorized, setUncategorized] = useState(0);
     const rootRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const optionInputRef = useRef<HTMLInputElement>(null);
 
     const toggle = (embedType: string) => {
         setSelected((current) =>
@@ -170,12 +188,22 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
                         aria-hidden="true"
                     />
                     <input
+                        ref={searchInputRef}
                         type="search"
                         placeholder="Search"
                         aria-label="Search actions"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                     />
+                    {query && (
+                        <ClearSearch
+                            label="Clear the search text"
+                            onClear={() => {
+                                setQuery('');
+                                searchInputRef.current?.focus();
+                            }}
+                        />
+                    )}
                 </label>
                 <div className="embed-type-filter__dropdown">
                     <button
@@ -215,6 +243,7 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
                             <label className="embed-type-filter__menu-search">
                                 <BiSearch aria-hidden="true" />
                                 <input
+                                    ref={optionInputRef}
                                     type="search"
                                     placeholder="Search"
                                     aria-label="Search embed types"
@@ -223,6 +252,15 @@ const EmbedTypeFilter = (props: { embedTypes: string[] }) => {
                                         setOptionQuery(event.target.value)
                                     }
                                 />
+                                {optionQuery && (
+                                    <ClearSearch
+                                        label="Clear the search text"
+                                        onClear={() => {
+                                            setOptionQuery('');
+                                            optionInputRef.current?.focus();
+                                        }}
+                                    />
+                                )}
                             </label>
                             <div className="embed-type-filter__options">
                                 {visibleOptions.map((embedType) => (
