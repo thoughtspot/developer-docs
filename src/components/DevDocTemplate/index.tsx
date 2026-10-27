@@ -12,6 +12,7 @@ import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { Analytics } from '@vercel/analytics/react';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
+import { useRadianceTheme } from '../../utils/radiance';
 import { passThroughHandler, fetchChild, getPageIdFromHref } from '../../utils/doc-utils';
 import Header from '../Header';
 import SecondaryHeader, { DocCategory, CATEGORY_PAGEIDS, CATEGORY_NAV_ID } from '../SecondaryHeader';
@@ -20,6 +21,7 @@ import Docmap from '../Docmap';
 import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
+import '../../assets/styles/radiance-home.css';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './playGround/RESTAPI';
 import GraphQLPlayGround from './playGround/GraphQL';
@@ -58,6 +60,25 @@ import VersionIframe from '../VersionIframe';
 const IN_PRODUCT_NAV_KEY = 'in-product-help';
 // Key of nav-sdk-reference.adoc in processedNavMap; also the 'sdk-reference' DocCategory.
 const SDK_REFERENCE_NAV_KEY = 'sdk-reference';
+
+// Session key remembering which sidebar category the visitor was last in. Pages like the
+// changelogs are listed in several category navs, and every in-site navigation is a full page
+// reload, so this is how the next page knows which sidebar the link was clicked from.
+const ACTIVE_CATEGORY_STORAGE_KEY = 'docsActiveCategory';
+
+/* The sidebar category the visitor was in on the page they just came from, or null when the
+ * page was opened directly (typed URL, bookmark, search engine, other site). Only trusted for a
+ * same-origin referrer, so a direct visit keeps the default category for the page. */
+const readPreviousCategory = (): DocCategory | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+        if (!document.referrer) return null;
+        if (new URL(document.referrer).origin !== window.location.origin) return null;
+        return window.sessionStorage.getItem(ACTIVE_CATEGORY_STORAGE_KEY) as DocCategory | null;
+    } catch (e) {
+        return null;
+    }
+};
 
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const {
@@ -99,6 +120,15 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const [navContent, setNavContent] = useState(initialNavContentData || '');
     // breadcrumsData is derived after processedNavMap is built (see useMemo below)
     const [activeCategory, setActiveCategory] = useState<DocCategory>('guides');
+    // Read once on mount, before the persistence effect below overwrites the stored value.
+    const [previousCategory] = useState<DocCategory | null>(readPreviousCategory);
+    useEffect(() => {
+        try {
+            window.sessionStorage.setItem(ACTIVE_CATEGORY_STORAGE_KEY, activeCategory);
+        } catch (e) {
+            // storage unavailable (private mode etc.): the default category is used next time
+        }
+    }, [activeCategory]);
     const [showSearch, setShowSearch] = useState(false);
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
@@ -131,6 +161,9 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return prefersDark;
     });
     const [key, setKey] = useState('');
+
+    // Keeps the Radiance hero surface (home.adoc) in the site's current theme.
+    useRadianceTheme(isDarkMode);
 
     // Pre-process all category nav HTMLs once ({{navprefix}} substitution applied to each)
     const processedNavMap = React.useMemo(() =>
@@ -202,29 +235,39 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
 
     const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
-    /* Build pageId → category map by parsing hrefs from each category's nav HTML.
+    /* Build pageId → categories map by parsing hrefs from each category's nav HTML.
      * This means writers only need to update nav-*.adoc — no TypeScript changes needed.
-     * Skips any merged nav key that isn't a real tab/category (e.g. the in-product nav,
-     * or a content-only nav file like nav-release-notes.adoc that a category points to
-     * via CATEGORY_NAV_ID rather than being a category itself) — otherwise `cat` ends up
-     * as a bogus DocCategory and CATEGORY_NAV_ID[activeCategory] later resolves to
-     * undefined, crashing on the `.startsWith` call in activeNavContent below. */
-    const pageIdToCategoryMap = React.useMemo(() => {
+     * A page can be listed in more than one nav (e.g. the changelogs are in both
+     * nav-release-notes.adoc and their product's nav), so each page maps to a list.
+     * Nav keys are resolved to categories through CATEGORY_NAV_ID (nav-release-notes.adoc
+     * belongs to 'whats-new'). Anything that isn't a real tab/category (e.g. the in-product
+     * nav) is skipped — otherwise `cat` ends up as a bogus DocCategory and
+     * CATEGORY_NAV_ID[activeCategory] later resolves to undefined, crashing on the
+     * `.startsWith` call in activeNavContent above. */
+    const pageIdToCategories = React.useMemo(() => {
         if (typeof window === 'undefined') return {};
-        const knownCategories = new Set(Object.keys(CATEGORY_NAV_ID));
-        const map: Record<string, DocCategory> = {};
-        // Entries are applied in order and the last one wins, so the SDK reference nav goes last:
-        // it claims the pages (e.g. VisualEmbedSdk) that the Embedding nav also links to.
+        // nav-*.adoc key (pageid minus 'nav-') -> category, e.g. 'release-notes' -> 'whats-new'
+        const navKeyToCategory: Record<string, DocCategory> = {};
+        (Object.entries(CATEGORY_NAV_ID) as [DocCategory, string][]).forEach(([cat, navId]) => {
+            if (cat !== 'all' && navId.startsWith('nav-')) {
+                navKeyToCategory[navId.slice(4)] = cat;
+            }
+        });
+        const map: Record<string, DocCategory[]> = {};
+        // The navs are applied in order, so the SDK reference nav goes last: it claims the pages
+        // (e.g. VisualEmbedSdk) that the Embedding nav also links to.
         const orderedNavs = Object.entries(processedNavMap).sort(
             ([a], [b]) => Number(a === SDK_REFERENCE_NAV_KEY) - Number(b === SDK_REFERENCE_NAV_KEY),
         );
-        orderedNavs.forEach(([cat, html]) => {
-            if (cat === IN_PRODUCT_NAV_KEY || !knownCategories.has(cat)) return;
+        orderedNavs.forEach(([navKey, html]) => {
+            const cat = navKeyToCategory[navKey];
+            if (navKey === IN_PRODUCT_NAV_KEY || !cat) return;
             const doc = new DOMParser().parseFromString(html as string, 'text/html');
             doc.querySelectorAll('a[href]').forEach((a) => {
                 const pageId = getPageIdFromHref(a.getAttribute('href'));
                 if (!pageId) return;
-                map[pageId] = cat as DocCategory;
+                if (!map[pageId]) map[pageId] = [];
+                if (!map[pageId].includes(cat)) map[pageId].push(cat);
             });
         });
         return map;
@@ -247,8 +290,23 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             return;
         }
         // First try the auto-derived map from nav files
-        if (pageIdToCategoryMap[currentPageId]) {
-            setActiveCategory(pageIdToCategoryMap[currentPageId]);
+        const categories = pageIdToCategories[currentPageId];
+        if (categories?.length) {
+            // The SDK reference nav always claims its pages, wherever the visitor came from.
+            if (categories.includes(SDK_REFERENCE_NAV_KEY)) {
+                setActiveCategory(SDK_REFERENCE_NAV_KEY);
+                return;
+            }
+            // A page listed in several category navs (e.g. the changelogs, which sit in both
+            // "What's new" and their product's nav) stays in the sidebar the visitor came from.
+            // A direct visit has no previous category and gets the product nav, not "What's new".
+            const cameFrom = previousCategory && categories.includes(previousCategory)
+                ? previousCategory
+                : undefined;
+            const productNav = categories.filter((cat) => cat !== 'whats-new');
+            setActiveCategory(
+                cameFrom || productNav[productNav.length - 1] || categories[0],
+            );
             return;
         }
         // Fall back to the static CATEGORY_PAGEIDS for any pages not yet in a nav file
@@ -256,7 +314,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             ([, pageIds]) => pageIds.includes(currentPageId),
         );
         if (found) setActiveCategory(found[0]);
-    }, [curPageNode.pageAttributes.pageid, pageIdToCategoryMap, isVersionedIframe, location.search]);
+    }, [curPageNode.pageAttributes.pageid, pageIdToCategories, previousCategory, isVersionedIframe, location.search]);
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -416,7 +474,15 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                     const found = (Object.entries(CATEGORY_PAGEIDS) as [DocCategory, string[]][]).find(
                         ([, pageIds]) => pageIds.includes(e.data.params.pageid),
                     );
-                    if (found) setActiveCategory(found[0]);
+                    // Keep the current tab when it already lists the page (e.g. a changelog opened
+                    // from "What's new"), instead of jumping to the first category that does.
+                    if (found) {
+                        setActiveCategory((current) =>
+                            CATEGORY_PAGEIDS[current]?.includes(e.data.params.pageid)
+                                ? current
+                                : found[0],
+                        );
+                    }
                 }
             }
         };
