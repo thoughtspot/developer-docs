@@ -13,7 +13,7 @@ This page describes how to configure usage limits, choose a metering scope, conf
 
 [NOTE]
 ====
-The Spotter usage data APIs are in Beta in ThoughtSpot Cloud 26.11.0.cl. Breaking changes may be introduced before the endpoints are made Generally Available.
+The Spotter usage data APIs are in Beta in ThoughtSpot Cloud 26.11.0.cl. Breaking changes may be introduced before the endpoints are made Generally Available (GA).
 ====
 
 == Before you begin
@@ -132,7 +132,6 @@ embed.render();
 
 For more information about the configuration options, see <<_configure_the_usage_counter,Configure the usage counter>>.
 
-
 === Retrieve the usage status of a user
 To check the current usage position of a user, send a `GET` request to the `/api/rest/2.0/ai/usage-data/user` endpoint:
 
@@ -175,48 +174,6 @@ Omit `keys` to return all pools configured on the cluster. Keys that do not matc
 Pool deletion is permanent. If you recreate a deleted pool, its usage restarts from `0`. Users who no longer draw from any pool are not metered.
 
 For the request and response details of each endpoint, see xref:spotter-usage-data-api.adoc[Spotter usage data APIs].
-
-////
-== Configure the usage counter
-The `spotterUsageLimitConfig` object is available in `SpotterEmbed` and `AppEmbed` in Visual Embed SDK v1.53.0 and later.
-
-[source,JavaScript]
-----
-const embed = new SpotterEmbed('#tsEmbed', {
-  spotterUsageLimitConfig: {
-    isEnabled: true,
-    usageCounterDisplayMode: SpotterUsageCounterDisplayMode.VisibleAfterWarning,
-    isUpgradeButtonVisible: true,
-    isWarningBannerEnabled: true,
-    isLimitBannerEnabled: true,
-  },
-});
-----
-
-[cols="2,1,1,4", options="header"]
-|===
-| Property | Type | Default | Description
-| `isEnabled` | Boolean | `false` | Enables Spotter usage limit enforcement and display elements.
-| `isUpgradeButtonVisible` | Boolean | `true` | Controls the visibility of the *Upgrade* button in the embedded UI.
-| `isWarningBannerEnabled` | Boolean | `true` | Shows a warning banner when usage reaches `warning_limit`.
-| `isLimitBannerEnabled` | Boolean | `true` | Shows a notification banner when usage reaches `limit`.
-| `usageCounterDisplayMode` | Enum | `AlwaysVisible` | Determines when the usage counter is displayed.
-|===
-
-[NOTE]
-====
-Disabling `isLimitBannerEnabled` hides the notification banner, but it does not bypass query blocking. Users cannot ask more questions after the limit is reached.
-====
-
-The `usageCounterDisplayMode` property accepts the following `SpotterUsageCounterDisplayMode` values:
-
-* `AlwaysVisible`: The counter is always displayed.
-* `AlwaysHidden`: The counter is always hidden.
-* `VisibleAfterWarning`: The counter appears only after usage reaches the warning threshold.
-* `VisibleAfterLimit`: The counter appears only after usage reaches the limit.
-
-For the complete list of attributes, see xref:SpotterEmbedViewConfig.adoc[SpotterEmbedViewConfig].
-////
 
 == Configure the usage counter
 
@@ -278,158 +235,6 @@ The `SpotterUsageCounterDisplayMode` enum controls when the usage counter is vis
 | The counter appears only after the user's consumption reaches the maximum `limit`.
 |===
 
-== Handle SDK events
-
-=== EmbedEvent.SpotterUsageLimitUpgrade
-
-This event is dispatched when an end user clicks the Upgrade button in the embedded Spotter interface. Use this event to intercept the upgrade action and trigger your application's billing or account upgrade flow.
-
-[source,JavaScript]
-----
-embed.on(EmbedEvent.SpotterUsageLimitUpgrade, (payload) => {
-  const { usageCount, usageLimit, status } = payload.data;
-  // usageCount (number) — total questions asked across sessions
-  // usageLimit (number) — total assigned usage limit
-  // status     (string) — 'withinLimit' | 'almostReached' | 'limitReached'
-});
-----
-
-The `status` field values indicate the following:
-
-[cols="1,3", options="header"]
-|===
-| Value | Meaning
-
-| `withinLimit`
-| The user's consumption is below the `warning_limit`.
-
-| `almostReached`
-| The user's consumption has reached or exceeded the `warning_limit` but has not yet reached `limit`.
-
-| `limitReached`
-| The user's consumption has reached or exceeded `limit`. The user is blocked from asking additional questions.
-|===
-
-=== HostEvent.SpotterRefreshUsageLimit
-
-Dispatch this event from the host application to trigger an immediate client-side refresh of the user's usage position. Use this after a tier upgrade or a server-side REST API update so the embed reflects the new state without a full page reload.
-
-[source,JavaScript]
-----
-// Refresh usage data with no session overrides
-embed.trigger(HostEvent.SpotterRefreshUsageLimit);
-----
-
-[source,JavaScript]
-----
-// Refresh with session-level overrides applied
-embed.trigger(HostEvent.SpotterRefreshUsageLimit, {
-  isUpgradeButtonVisible: false, // hides the Upgrade button for the current session
-  isUnlimited: true,             // suppresses all usage tracking UI for the current session
-});
-----
-
-The payload properties apply only to the current embed session and do not modify the pool configuration stored in ThoughtSpot.
-
-== Building an upgrade workflow
-
-Because ThoughtSpot does not handle subscription billing, upgrade actions must be coordinated between the Visual Embed SDK, the host application, backend billing services, and the ThoughtSpot REST APIs.
-
-=== Implementation sequence
-
-. The end user reaches an allowance threshold and clicks *Upgrade* in the embedded interface.
-. The host application intercepts the `EmbedEvent.SpotterUsageLimitUpgrade` event and reads the payload.
-. The host application invokes its billing or account upgrade flow.
-. After a successful upgrade, the host backend sends a `POST /api/rest/2.0/ai/usage-data/update` request to update the pool limit, or reassigns the user's group memberships.
-. The host application dispatches `HostEvent.SpotterRefreshUsageLimit` to update the embed state without a page reload.
-
-=== Example
-
-[source,JavaScript]
-----
-embed.on(EmbedEvent.SpotterUsageLimitUpgrade, async ({ data }) => {
-  // Step 1: Trigger your application's billing flow
-  const isUpgraded = await myApplicationBillingFlow({
-    currentUsage: data.usageCount,
-    currentLimit: data.usageLimit,
-  });
-
-  if (!isUpgraded) return;
-
-  // Step 2: Notify your backend to update the ThoughtSpot usage pool via REST API
-  await fetch('/api/thoughtspot/upgrade-quota', { method: 'POST' });
-
-  // Step 3: Refresh the embed to reflect the updated usage state
-  embed.trigger(HostEvent.SpotterRefreshUsageLimit, {
-    isUpgradeButtonVisible: false,
-  });
-});
-----
-
-== Common operational tasks
-
-=== Resetting consumption for a new billing cycle
-
-To reset a pool's usage count at the start of a new billing period, send a `POST` request to the xref:spotter-usage-data-api.adoc#_creating_or_updating_usage_data[create or update usage data] endpoint with `usage` set to `0`. Omit the `limit` parameter to preserve the existing allowance.
-
-=== Exempt a user in a group-metered cluster
-
-To exclude a specific user from group-level metering, create a `USER`-type pool for that user without a `limit` attribute using the xref:spotter-usage-data-api.adoc#_creating_or_updating_usage_data[create or update usage data] endpoint. The unlimited individual assignment overrides all group-level caps that apply to that user.
-
-=== Audit user allowance allocations
-
-To review the full set of pools contributing to a user's effective allowance, use the xref:spotter-usage-data-api.adoc#_getting_usage_data_for_a_user[get usage data for a user] endpoint with the user's GUID and inspect the `pools` array in the response.
-
-=== Changing the metering scope
-
-Switching between `USER`, `USER_GROUP`, and `ORG` scope requires clearing all existing pools first. Use the xref:spotter-usage-data-api.adoc#_deleting_usage_data[delete usage data] endpoint to remove all current pools, then reprovision using the new `entity_type`.
-
-== Troubleshooting
-
-[cols="2,2,3", options="header"]
-|===
-| Symptom | Cause | Resolution
-
-| User receives a higher limit than intended
-| Allowances are cumulative across all pools assigned to the user.
-| Use the xref:spotter-usage-data-api.adoc#_getting_usage_data_for_a_user[get usage data] endpoint to inspect the `pools` array for the affected user and identify unintended contributing pools.
-
-| User usage is not being metered
-| The user belongs to at least one unlimited pool, or the user's pools do not match the cluster's active `entity_type`.
-| Verify `has_unlimited_pool` is `false` in the get usage data response. Confirm all pool keys use the `entity_type` established for the cluster.
-
-| Embed counter is not displaying
-| `isEnabled` is `false`, the display mode threshold has not been met, or the SDK version is out of date.
-| Ensure the SDK version is 1.53.0 or later, `isEnabled` is `true`, the display mode criteria are met, and the user maps to a valid pool.
-
-| `HTTP 403 Forbidden` on REST calls
-| The API token does not have the required cluster-level privilege.
-| Use a token with the cluster-level *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege. `CAN_MANAGE_SPOTTER` and Org-level administrator privileges are insufficient.
-
-| `HTTP 400 Bad Request` on update
-| The `entity_type` in the request body does not match the `entity_type` established by existing cluster pools.
-| Verify the `entity_type` in your request payload matches the cluster's active metering scope.
-
-| Stale counter UI after an upgrade
-| The embed state was not refreshed after the server-side API update.
-| Dispatch `HostEvent.SpotterRefreshUsageLimit` immediately after the pool update completes.
-|===
-
-== Limitations
-
-* *No admin UI.* Usage pools must be managed via REST API endpoints. No native ThoughtSpot Cloud UI is available for pool management. +
-[NOTE]
-====
-Endpoints are subject to potential breaking changes prior to General Availability.
-====
-
-* *No automatic reset cycle.* Automatic scheduled resets, such as monthly billing-period resets, are not supported natively. Resets must be orchestrated via an external cron job or API backend.
-* *Shared pool consumption.* In `USER_GROUP` or `ORG` scope, any member can consume the shared allowance pool. Per-user sub-limits within a shared pool are not supported.
-* *Single metering scope per cluster.* Switching between `USER`, `USER_GROUP`, and `ORG` scope requires deleting all existing pools before reprovisioning.
-* *Multi-Org contexts.* Under `ORG` scope metering, users who belong to multiple Orgs maintain separate usage contexts and draw independently from each Org's pool as they switch environments.
-* *Shared Pool Consumption*: In group or Org metering models, any member can
-consume the shared allowance pool. Per-user sub-caps and rate-limiting controls within shared pools are not currently supported.
-
 == Handling usage limit events
 
 === Upgrade event
@@ -446,8 +251,24 @@ embed.on(EmbedEvent.SpotterUsageLimitUpgrade, (payload) => {
 });
 ----
 
+The `status` values indicate the following:
+
+[cols="1,3", options="header"]
+|===
+| Value | Meaning
+
+| `withinLimit`
+| The user's consumption is below the `warning_limit`.
+
+| `almostReached`
+| The user's consumption has reached or exceeded the `warning_limit` but has not yet reached `limit`.
+
+| `limitReached`
+| The user's consumption has reached or exceeded `limit`. The user is blocked from asking additional questions.
+|===
+
 === Refresh usage data
-To refresh the usage data in the embed without reloading the page, for example, after a tier upgrade, trigger the `HostEvent.SpotterRefreshUsageLimit` event:
+To refresh the usage data in the embed without reloading the page, for example, after a tier upgrade or a server-side REST API update, trigger the `HostEvent.SpotterRefreshUsageLimit` event:
 
 [source,JavaScript]
 ----
@@ -465,6 +286,8 @@ The event accepts the following optional session overrides:
 
 * `isUnlimited`: When set to `true`, temporarily hides the usage tracking UI for the session.
 * `isUpgradeButtonVisible`: Overrides the visibility of the *Upgrade* button for the session.
+
+The overrides apply only to the current embed session and do not modify the pool configuration stored in ThoughtSpot.
 
 For a complete list of event IDs, see xref:EmbedEvent.adoc[EmbedEvent reference] and xref:HostEvent.adoc[HostEvent reference].
 
@@ -511,16 +334,16 @@ Do not call the usage data update endpoint from client-side code. The endpoint r
 |===
 | Task | How to
 | Reset usage for a new billing cycle
-| Send a `POST` request to `/api/rest/2.0/ai/usage-data/update` for each pool with `"usage": 0`. Omit `limit` to preserve the existing limit.
+| Send a `POST` request to the xref:spotter-usage-data-api.adoc#update-usage-data[update usage data] endpoint for each pool with `"usage": 0`. Omit `limit` to preserve the existing limit.
 
 | Exempt a user in a group-metered cluster
-| Metering is per user group in this case, so a pool of `USER` type can't be created. Instead, create a pool for the exempted user without a `limit` attribute. A user with an unlimited pool is treated as unlimited, which overrides the group-level caps. Use this approach only if the cluster scope allows the pool type.
+| Create a `USER`-type pool without a `limit` attribute for the exempted user, using the xref:spotter-usage-data-api.adoc#update-usage-data[update usage data] endpoint. The resulting unlimited assignment overrides the group-level caps.
 
 | Audit the allowances of a user
-| Send a `GET` request to `/api/rest/2.0/ai/usage-data/user?user_identifier={user-guid}` and review the `pools` array to see every contributing entity and the remaining balance.
+| Send a `GET` request to the xref:spotter-usage-data-api.adoc#get-usage-data-for-user[get usage data for user] endpoint with the user's GUID, and review the `pools` array to see every contributing entity and the remaining balance.
 
 | Change the metering scope
-| Send a `POST` request to `/api/rest/2.0/ai/usage-data/delete` with all pool keys on the cluster, and then create new pools with the new `entity_type`.
+| Send a `POST` request to the xref:spotter-usage-data-api.adoc#delete-usage-data[delete usage data] endpoint with all pool keys on the cluster, and then create new pools with the new `entity_type`.
 |===
 
 == Troubleshooting
@@ -530,7 +353,7 @@ Do not call the usage data update endpoint from client-side code. The endpoint r
 | Symptom | Cause | Resolution
 | A user receives a higher limit than intended
 | Allowances are cumulative across all pools that apply to the user.
-| Review the `pools` array in the `GET /api/rest/2.0/ai/usage-data/user` response to verify group memberships, and remove unintended assignments.
+| Review the `pools` array in the xref:spotter-usage-data-api.adoc#get-usage-data-for-user[get usage data for user] response to verify group memberships, and remove unintended assignments.
 
 | Usage is not metered for a user
 | The user draws from an unlimited pool, or the assigned pools do not match the active `entity_type` of the cluster.
@@ -542,7 +365,7 @@ Do not call the usage data update endpoint from client-side code. The endpoint r
 
 | HTTP 403 Forbidden on REST API calls
 | The token does not have the required cluster-level privileges.
-| Use a token for a user with cluster-level `ADMINISTRATION` privilege. `CAN_MANAGE_SPOTTER` is not sufficient.
+| Use a token for a user with the cluster-level *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege. `CAN_MANAGE_SPOTTER` and Org-level administrator privileges are not sufficient.
 
 | HTTP 400 Bad Request on update
 | The request uses an `entity_type` that differs from the one set by the existing pools on the cluster.
