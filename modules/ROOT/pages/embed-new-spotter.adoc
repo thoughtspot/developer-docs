@@ -1,0 +1,288 @@
+= Embed the new Spotter experience
+:toc: true
+:toclevels: 2
+
+:page-title: Embed the new Spotter experience
+:page-pageid: embed-new-spotter
+:page-description: Enable the new Spotter experience, including Spotter on Liveboards, in your embedded application using the Visual Embed SDK.
+
+ThoughtSpot introduces a new Spotter experience in 26.11.0.cl. In this experience, Spotter opens in a side panel on a Liveboard and uses the entire board, including its charts, tabs, groups, note tiles, and applied filters, as conversation context. The Spotter home page also moves to the new experience, and conversations are saved with the Liveboard so users can return to them later.
+
+The new experience is disabled by default, and existing embeds are not moved automatically. You can enable it using the `spotterExperienceVersion` attribute in full application, Liveboard, or Spotter embedding. The standard Spotter experience continues to receive fixes, but new Spotter capabilities are delivered only in the new experience.
+
+== Before you begin
+
+Ensure you have the following setup:
+
+* Your ThoughtSpot instance must be running 26.11.0.cl or later, with the new experience enabled at the instance or Org level. A ThoughtSpot administrator enables it from **Admin** > **ThoughtSpot AI** > **Choose Spotter 3 Liveboard experience** > **Liveboard side panel (New)**. The setting can be applied to the whole instance or to a single Org.
+* Your host application domain is added to xref:security-settings.adoc[ThoughtSpot CSP and CORS allowlists].
+* Your embedding application project has Visual Embed SDK v1.53.0 or later. Some of the controls described on this page need a later SDK version. The required version is noted for each control.
+
+== Enable the new Spotter experience
+To enable the new Spotter experience in your embed, set the `spotterExperienceVersion` property to `SpotterExperienceVersion.SPOTTER_2026_11` in your embed configuration. The property is available in `SpotterEmbed`, `LiveboardEmbed`, and `AppEmbed`, and the `SpotterExperienceVersion` enum is exported from the SDK.
+
+[NOTE]
+====
+If you set `spotterExperienceVersion` to a value that the SDK doesn't recognize, the embed falls back to the standard Spotter experience without an error or warning. If the new experience doesn't load, check the value first.
+====
+
+Spotter embed::
+
+[source,JavaScript]
+----
+import {
+    SpotterEmbed,
+    SpotterExperienceVersion,
+    AuthType,
+    init,
+} from '@thoughtspot/visual-embed-sdk';
+
+init({
+    thoughtSpotHost: 'https://your-thoughtspot-host',
+    authType: AuthType.None,
+});
+
+const spotterEmbed = new SpotterEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        height: '100%',
+        width: '100%',
+    },
+    worksheetId: 'your-worksheet-id',
+    spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11,
+    //... other configuration attributes
+});
+
+spotterEmbed.render();
+----
+
+Liveboard embed::
+
+[source,JavaScript]
+----
+import {
+    LiveboardEmbed,
+    SpotterExperienceVersion,
+    AuthType,
+    init,
+} from '@thoughtspot/visual-embed-sdk';
+
+init({
+    thoughtSpotHost: 'https://your-thoughtspot-host', // Replace with your ThoughtSpot URL
+    authType: AuthType.None,
+});
+
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        height: '100%',
+        width: '100%',
+    },
+    liveboardId: 'your-Liveboard-id', // Replace with your Liveboard ID
+    spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11,
+    //... other configuration attributes
+});
+
+liveboardEmbed.render();
+----
+
+Full application embed::
+
+[source,JavaScript]
+----
+import {
+    AppEmbed,
+    Page,
+    SpotterExperienceVersion,
+    AuthType,
+    init,
+} from '@thoughtspot/visual-embed-sdk';
+
+init({
+    thoughtSpotHost: 'https://your-thoughtspot-host', // Replace with your ThoughtSpot URL
+    authType: AuthType.None,
+});
+
+const appEmbed = new AppEmbed(document.getElementById('ts-embed'), {
+    frameParams: {
+        height: '100%',
+        width: '100%',
+    },
+    pageId: Page.Home,
+    spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11,
+    //... other configuration attributes
+});
+
+appEmbed.render();
+----
+
+== Spotter on Liveboards in embedded apps
+
+When the new experience is enabled, you'll see the following behavior:
+
+* Spotter opens in a side panel next to the Liveboard, and the board stays usable while the panel is open. The board resizes to make room for the panel.
+* Spotter reads every tab, group, chart, and insight on the Liveboard, so users can ask about one chart, several selected tiles, or the whole board.
+* Answers respect the filters applied to the Liveboard. Users do not need to restate filter context in their questions.
+* The **Spotter** button on a chart opens the Spotter panel and adds the chart to it as a reference to set context, instead of opening a pop-up for that one chart. Users can select several charts, groups, and note tiles as context.
+* Spotter can use a note tile, such as a tile with quarterly targets, as context next to the data.
+* On a Liveboard, Spotter uses only the data models behind that Liveboard. Make sure Spotter is enabled on those models.
+* Conversations are saved with the Liveboard, and users can continue them later.
+* When the Liveboard is switched to edit mode, the Spotter panel closes. To control who can enter edit mode in your embed, see <<_sdk_controls_for_the_new_experience,SDK controls for the new experience>>.
+* The panel opens automatically when the Liveboard loads. To change this, see <<_sdk_controls_for_the_new_experience,SDK controls for the new experience>>.
+
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    liveboardId: 'your-liveboard-id',
+    spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11,
+    //... other configuration attributes
+});
+----
+
+=== When the Spotter panel isn't shown
+
+The Spotter panel doesn't appear in the following cases:
+
+* You are embedding a single visualization instead of the full Liveboard.  
+* The user doesn't have permission to use Spotter.
+* The Liveboard doesn't contain any visualization.
+* None of the Liveboard's visualizations are based on a data model that has Spotter enabled.
+* The **Spotter** button is hidden or turned off with `Action.SpotterOnLiveboard`.
+
+If the panel is missing from a Liveboard embed, check these conditions.
+
+== Behavior changes with the new experience
+
+When your instance or Org switches to the new experience:
+
+* Automatic data model selection is always on. New conversations on the Spotter home page search all data models the user can access; users can still pick a specific model. On a Liveboard, Spotter uses only the data models behind that Liveboard.
+* Chat history is always on, and the chat history sidebar is visible by default. Conversations are kept for 6 hours, 30, 90, or 180 days, as set by the administrator. Turning chat history off isn't available as a setting; contact ThoughtSpot Support if you need it.
+* Conversations started in the new experience aren't available if you switch back to the standard Spotter experience. Conversations saved in the standard Spotter experience are copied to the new experience in the background and keep their original dates and IDs, so deep links from your host application keep working. Nothing is copied back to the standard Spotter experience.
+* Clarifying questions: when Spotter is unsure what a question means, it asks a clarifying question with options to choose from.
+* Users can upload a CSV file and analyze it alongside the Liveboard data in the same conversation.
+* Data model instructions and the data preview aren't shown in the Spotter view. Users can still view them on the data model.
+* Per-capability feature toggles, such as the deep analysis setting, are removed. Personal memory, agent instructions, custom calendars, and connectors continue to work. Each connector stays off until an administrator, or a user with the **Can manage Spotter** privilege, turns it on.
+* Spotter Analysts work as before on the Spotter home page. Behavior on a Liveboard isn't available yet.
+* Responses and charts, code-based analysis, and data and permissions work as in the standard Spotter experience. Queries run under the same permissions as before.
+
+== Comparison with the standard Spotter experience
+
+The following table compares Spotter on Liveboards (the new experience) with the standard Spotter experience, which includes the Spotter classic, Spotter 2, and Spotter 3 experiences. It summarizes the differences that matter most to embed developers, including the capabilities that aren't available yet in the new experience.
+
+[width="100%", cols="2,3,3"]
+|====
+|Area |Standard Spotter experience (including Spotter classic, Spotter 2, and Spotter 3) |Spotter on Liveboards (new experience)
+
+|Where users ask
+|Spotter home page, and a pop-up for one chart on a Liveboard.
+|Spotter home page, and a side panel on the whole Liveboard.
+
+|Context on a Liveboard
+|The selected chart.
+|The entire Liveboard, including its tabs, groups, charts, note tiles, and applied filters.
+
+|Embed property
+|Default. No `spotterExperienceVersion` set.
+|`spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11`
+
+|Data model selection
+|Configurable with the Auto mode setting.
+|Always on. On a Liveboard, limited to the data models behind that Liveboard.
+
+|Chat history
+|Controlled by the **Enable chat history** setting.
+|Always on. Retention is 6 hours, 30, 90, or 180 days. **Turning off chat history isn't available.**
+
+|Conversations on a Liveboard
+|Not saved with the Liveboard.
+|Saved with the Liveboard.
+
+|Clarifying questions
+|Not available.
+|Available.
+
+|Deep analysis
+|Toggle available.
+|**Removed.** Spotter decides the depth of analysis from the question.
+
+|Monitoring
+|Spotter Conversations Liveboard.
+|Usage metrics Liveboard and an All chats list, available to administrators only.
+
+|Updates
+|Monthly ThoughtSpot release. Fixes only; no new features.
+|Frequent updates between monthly releases. Small fixes and UI improvements need no action. Changes to how Spotter behaves are announced in advance and turned on by an administrator.
+
+|Edit and drill down on answers
+|Available.
+|**Not yet available.**
+
+|Sharing conversations and shared links
+|Available.
+|**Not available.** The `spotterShareConversationConfig` property has no effect, and existing shared links stop working after an Org switches.
+
+|Search conversations
+|Available.
+|**Not yet available.**
+
+|Scheduling questions
+|Available.
+|**Not yet available.**
+
+|Report generation (PDF) and benchmarks
+|Available.
+|**Not available.**
+
+|Spotter Analysts
+|Available on the Spotter home page.
+|Works as before on the Spotter home page. **Not yet available** on a Liveboard.
+
+|Mobile and Slack app
+|Supported.
+|**Not supported.** They continue to use the standard Spotter experience.
+|====
+
+
+== SDK controls for the new experience
+
+The following Visual Embed SDK options apply to embeds that use the new experience:
+
+* `spotterChatConfig.openSpotterOnLiveboardByDefault` (SDK 1.53.0): Controls whether the Spotter panel opens automatically when the Liveboard loads. The default value is `true`. Set it to `false` to load the Liveboard with the panel closed. Supported in `LiveboardEmbed` and `AppEmbed`.
++
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    liveboardId: 'your-liveboard-id',
+    spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11,
+    spotterChatConfig: {
+        openSpotterOnLiveboardByDefault: false,
+    },
+});
+----
+* `Action.SpotterOnLiveboard` (SDK 1.53.0): Controls the **Spotter** button in the Liveboard header. Add it to `hiddenActions` to remove the Spotter panel completely. Add it to `disabledActions` to grey out the header button.
+* `Action.EditLiveboard` and `Action.EditVisualization` (SDK 1.54.0): Hide or turn off Edit on a Liveboard or a visualization independently. `Action.Edit` continues to control both. Because the Spotter panel closes when a Liveboard enters edit mode, you can use these actions to control when users leave Spotter.
+* `EmbedEvent.EditLiveboard` and `EmbedEvent.EditVisualization` (SDK 1.54.0): Fire when a user selects **Edit** on a Liveboard or a visualization, alongside `EmbedEvent.Edit`.
+* `HostEvent.EditLiveboard` and `HostEvent.EditVisualization` (SDK 1.54.0): Trigger Edit on one surface. `EditVisualization` requires a `vizId`.
+
+== Switch back to the standard Spotter experience
+
+You aren't required to move to the new experience, and you can switch back at any time:
+
+. Remove the `spotterExperienceVersion` property from your embed configuration and re-render the embed.
+. If an administrator enabled the new experience for your instance or Org, ask them to switch it back to the standard Spotter experience.
+
+Switching back doesn't affect your data. Conversations started in the new experience aren't available in the standard Spotter experience, and shared links don't move between experiences.
+// TODO: verify with engineering — whether removing the property alone is enough when the admin setting is on.
+
+
+//// 
+== REST API considerations
+If your application calls the Spotter conversation REST APIs, ensure that you use the following endpoints:
+
+<Add API list>
+
+////
+
+== Additional resources
+
+* xref:embed-spotter.adoc[Embed Spotter experience]
+* xref:customize-spotter-embed.adoc[Customize the Spotter embed view]
+* link:https://docs.thoughtspot.com/cloud/latest/spotter[Spotter Product Documentation, window=_blank]

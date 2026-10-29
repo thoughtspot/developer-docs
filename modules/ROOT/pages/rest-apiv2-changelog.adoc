@@ -8,6 +8,91 @@
 
 This changelog lists the features and enhancements introduced in REST API v2.0. For information about new features and enhancements available for embedded analytics, see xref:whats-new.adoc[What's New].
 
+== Version 26.11.0.cl, November 2026
+
+=== Org-level API rate limiting enforced
+The Org-level rate limit of 50 requests per second (RPS) per Org is now enforced for all public REST API endpoints on instances with Orgs enabled. This limit was announced in 26.10.0.cl and operates independently of the existing cluster-level limit of 100 RPS per client IP. Requests exceeding the Org-level limit receive an `HTTP 429: Too Many Requests` response.
+
+For more information, see xref:about-rest-apis.adoc#_rate_limits_for_api_requests[Rate limits for API requests].
+
+=== Link Customization APIs
+ThoughtSpot introduces two REST API v2.0 endpoints for managing the URL templates used when ThoughtSpot generates shareable links.
+
+* `POST /api/rest/2.0/customization/links/search` +
+Retrieves the URL templates at the cluster level or for the Org the caller is signed in to.
+* `POST /api/rest/2.0/customization/links/update` +
+Updates the URL templates at the cluster level or for the caller's Org, using `REPLACE` to set templates or `RESET` to clear overrides.
+
+Supported link types include `LIVEBOARD_SHARE_URL`, `VISUALIZATION_SHARE_URL`, `ANSWER_SHARE_URL`, `SPOTIQ_ANALYSIS_URL`, `UNSUBSCRIBE_URL`, `GENERIC_URL`, and `CONVERSATION_SHARE_URL`.
+
+Requires `ADMINISTRATION` or `DEVELOPER` privilege.
+
+For more information, see xref:link-customization-api.adoc[Link Customization APIs].
+
+=== Input Table APIs
+ThoughtSpot introduces five REST API v2.0 endpoints for managing input tables — user-editable tables stored in an external Cloud Data Warehouse and linked to a ThoughtSpot model.
+
+* `POST /api/rest/2.0/input-tables/create` +
+Creates an input table and links it to a ThoughtSpot model.
+* `POST /api/rest/2.0/input-tables/{input_table_identifier}/update` +
+Writes rows to an input table using a keyed upsert (MERGE).
+* `POST /api/rest/2.0/input-tables/{input_table_identifier}/delete` +
+Deletes an input table.
+* `POST /api/rest/2.0/input-tables/{input_table_identifier}/columns/create` +
+Adds one or more editable columns to an input table.
+* `POST /api/rest/2.0/input-tables/{input_table_identifier}/columns/{column_identifier}/delete` +
+Deletes an editable column from an input table.
+
+Requires `DATAMANAGEMENT` or `ADMINISTRATION` privilege.
+
+For more information, see xref:input-table-api.adoc[Input Table APIs].
+
+=== Spotter Usage Data APIs [beta betaBackground]^Beta^
+ThoughtSpot introduces four REST API v2.0 endpoints for managing Spotter usage pools, which control how many Spotter questions a user, user group, or Org can ask.
+
+* `GET /api/rest/2.0/ai/usage-data/user` +
+Retrieves a user's combined Spotter usage across all pools.
+* `POST /api/rest/2.0/ai/usage-data/search` +
+Retrieves usage pools configured for users, user groups, or Orgs.
+* `POST /api/rest/2.0/ai/usage-data/update` +
+Creates or updates usage pools, setting question allowances.
+* `POST /api/rest/2.0/ai/usage-data/delete` +
+Deletes usage pools.
+
+For more information, see xref:spotter-usage-data-api.adoc[Spotter Usage Data APIs].
+
+=== Webhook configuration reset
+
+The `POST /api/rest/2.0/webhooks/{webhook_identifier}/update` endpoint now supports the following parameters:
+
+* `operation` +
+`REPLACE` (default) updates the fields provided in the request. `RESET` clears the sections specified in `reset_options` and accepts no other fields.
+* `reset_options` +
+The sections to remove from the webhook configuration when `operation` is `RESET`: `AUTHENTICATION`, `SIGNATURE_VERIFICATION`, and `STORAGE_DESTINATION`.
+
+=== Paging for dependent objects in metadata search
+
+The `POST /api/rest/2.0/metadata/search` endpoint supports paging through the dependent objects of each metadata object:
+
+* `dependent_objects_record_offset` +
+Request parameter. The number of dependent objects to skip for each metadata object. Use it with `dependent_objects_record_size`, which sets the page size (default: 50). A negative value is rejected. If you omit this parameter, the API returns dependent objects as before.
+* `dependent_objects_is_last_batch` +
+Response attribute. `true` when the returned page of `dependent_objects` is the last one for the object. A full page returns `false` even when it is the final page, so continue requesting pages until the value is `true`.
+
+=== Maintenance schedule in system information
+
+The `GET /api/rest/2.0/system` response includes the `maintenance_schedule` object with details of the next maintenance window scheduled for the cluster. The object is absent when no maintenance is scheduled and includes the following attributes:
+
+* `start_time_in_millis`: Start time of the maintenance window in milliseconds since epoch.
+* `duration_in_seconds`: Expected duration of the maintenance window.
+* `status`: `SCHEDULED` or `AD_HOC`.
+* `type`: `UPGRADE` or `PATCH`.
+* `description`: Description of the maintenance event.
+
+=== Role identifiers in group import
+
+The group objects in the `POST /api/rest/2.0/groups/import` request body accept `role_identifiers`, an array of role IDs or names to assign to the group.
+
 == Version 26.10.0.cl, October 2026
 
 === Spotter AI APIs
@@ -21,6 +106,8 @@ Creates a Spotter Analyst with a name, description, data sources, and optional i
 Returns the Spotter Analysts visible to the caller.
 * `POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/update` +
 Updates a Spotter Analyst.
+* `POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/share` [beta betaBackground]^Beta^ +
+Updates share permissions on a Spotter Analyst for one or more users or groups. Granting access also shares the Analyst's data sources with the principal.
 * `POST /api/rest/2.0/ai/agent/analysts/{analyst_identifier}/delete` +
 Deletes a Spotter Analyst.
 +
