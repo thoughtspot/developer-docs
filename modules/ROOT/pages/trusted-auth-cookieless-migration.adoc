@@ -1,0 +1,187 @@
+= Migrate from cookie-based to cookieless trusted authentication
+:toc: true
+:toclevels: 2
+
+:page-title: Migrate to cookieless trusted authentication
+:page-pageid: trusted-auth-cookieless-migration
+:page-description: Steps for migrating an embedded ThoughtSpot implementation from cookie-based trusted authentication to cookieless trusted authentication
+
+// #NEW PAGE (SCAL-346886): the whole file is new content.#
+
+If your embedding application uses cookie-based trusted authentication (`AuthType.TrustedAuthToken`), ThoughtSpot recommends migrating to cookieless trusted authentication (`AuthType.TrustedAuthTokenCookieless`).
+
+This document assumes that your embedding application currently uses `AuthType.TrustedAuthToken` in the Visual Embed SDK, and provides instructions to migrate your implementation to `AuthType.TrustedAuthTokenCookieless`.
+
+== Why migrate
+In cookie-based authentication, the Visual Embed SDK uses the login token to create a ThoughtSpot session in the browser, and all subsequent requests rely on the session cookie. When the embedding application and the ThoughtSpot instance are on different domains, the session cookie is a third-party cookie. Many Web browsers, such as Safari, block third-party cookies by default, which prevents the embedded content from loading. For more information, see xref:trusted-auth-troubleshoot.adoc#_third_party_cookie_issues[Third-party cookie issues].
+
+In cookieless authentication, the Visual Embed SDK uses the login token as a bearer token for all requests to ThoughtSpot, without establishing a session cookie in the browser. Cookieless authentication works regardless of the browser's third-party cookie settings.
+
+For a comparison of both methods, see xref:trusted-auth-sdk.adoc#_cookieless_and_cookie_based_authentication[Cookieless and cookie-based authentication].
+
+== Before you begin
+
+* Make sure your embedding application uses Visual Embed SDK version 1.22.0 or later, and your ThoughtSpot instance is on 9.3.0.cl or later.
+* Make sure you have administrator privileges on your ThoughtSpot instance to enable trusted authentication and copy the secret key.
+* Make sure your embedding application has a back-end component that can securely store the secret key and request tokens from ThoughtSpot. The secret key must never be exposed in the browser.
+* Make sure CORS and CSP settings are configured for your embedding application's domain. For more information, see xref:security-settings.adoc[Security settings].
+
+== Overview of migration steps
+The migration includes the following steps:
+
+. <<step1,Enable trusted authentication and get the secret key>>
+. <<step2,Request tokens from the REST API v2 endpoint>>
+. <<step3,Update the init() call in the Visual Embed SDK>>
+. <<step4,Update browser REST API requests>>
+. <<step5,Test the implementation>>
+
+For an overview of the trusted authentication workflow, see xref:trusted-authentication.adoc#_overview_of_implementation[Trusted authentication].
+
+[#step1]
+== Step 1: Enable trusted authentication and get the secret key
+If trusted authentication is already enabled on your instance for your cookie-based implementation, you can continue to use the existing secret key. Skip to <<step2,Step 2>>.
+
+To enable trusted authentication and get the secret key:
+
+. Log in to ThoughtSpot as an administrator.
+. Go to *Develop* > *Customizations* > *Security settings*.
+. Click *Edit* and turn on the *Trusted authentication* toggle.
+. Click *Edit* again, navigate to *Trusted authentication*, and click the copy to clipboard icon to copy the secret key.
+. Store the key in a secure location that your token request service can access.
+. Click *Save Changes*.
+
+To enable trusted authentication programmatically, use the `POST /api/rest/2.0/auth/configure` endpoint. For more information, see xref:authentication.adoc[Configuring authentication settings].
+
+[NOTE]
+====
+If Orgs are enabled on your instance, you can use a secret key generated at the Primary Org (Org 0) level to request tokens for users in any Org. Starting from 9.2.0.cl, Org administrators can also generate a unique secret key for each Org. To enable per-Org secret keys on your instance, contact ThoughtSpot Support.
+====
+
+For more information, see xref:trusted-auth-secret-key.adoc#trusted-auth-enable[Enable Trusted authentication to get a secret key].
+
+[#step2]
+== Step 2: Request tokens from the REST API v2 endpoint
+Cookieless authentication works only with tokens obtained from the REST API v2 endpoints. Tokens obtained from the REST API v1 `/tspublic/v1/session/login/token` endpoint work only with cookie-based authentication.
+
+If your token request service calls the REST API v1 endpoint, update it to call the `xref:authentication.adoc#trusted-auth-v2[POST /api/rest/2.0/auth/token/full]` endpoint. In the request body, include the following parameters:
+
+* `username`: The username of the ThoughtSpot user for whom the token is requested.
+* `secret_key`: The secret key copied in <<step1,Step 1>>.
+* `validity_time_in_sec`: The token expiration time in seconds. Defaults to 300 seconds.
+* `org_id`: The ID of the Org to which the user belongs. Required if Orgs are enabled on your instance.
+
+[source,javascript]
+----
+app.get('/ts-token', async (req, res) => {
+  const session = req.session;
+
+  // secret_key must be stored securely; here it is read from environment variables
+  const thoughtspotUrl = process.env.TS_SERVER_URI;
+  const secretKey = process.env.TS_SECRET_KEY;
+
+  if (!session.user_email) {
+    return res.status(401).send('No user session exists');
+  }
+
+  const response = await fetch(thoughtspotUrl + 'api/rest/2.0/auth/token/full', {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-Requested-By': 'ThoughtSpot'
+    },
+    body: JSON.stringify({
+      username: session.user_email,
+      secret_key: secretKey,
+      org_id: 0, // Set to the user's Org ID if Orgs are enabled
+      validity_time_in_sec: 1800 // Longer validity for cookieless; see the note below
+    })
+  });
+
+  const results = await response.json();
+  res.send(results.token);
+});
+----
+
+[IMPORTANT]
+====
+In cookie-based authentication, the token is used only once to create a session, so a short validity time is sufficient. In cookieless authentication, the token is used for every request and its validity is never extended by user activity. Increase `validity_time_in_sec` in your token request, for example, to 20 or 30 minutes, to avoid frequent token requests. For more information, see xref:trusted-auth-token-request-service.adoc#_v2_token[V2 token expiration].
+====
+
+For more information about building a token request service, see xref:trusted-auth-token-request-service.adoc[Token request service].
+
+[#step3]
+== Step 3: Update the init() call in the Visual Embed SDK
+In the `init()` function of your embedding application, make the following changes:
+
+* Set `authType` to `AuthType.TrustedAuthTokenCookieless`.
+* Define a `getAuthToken` callback function that calls your token request service and returns a Promise that resolves with the token. Alternatively, you can use `authEndpoint`. For more information, see xref:trusted-auth-sdk.adoc#_define_token_request_service[Define token request service].
+* Set `autoLogin: true`, so that the SDK requests a new token before the current token expires.
+* Remove the `username` property. In cookieless authentication, the username is encoded within the token.
+
+.Before: cookie-based authentication
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: "<ThoughtSpot-Host-URL>",
+    authType: AuthType.TrustedAuthToken,
+    username: "<username>",
+    autoLogin: true,
+    getAuthToken: () => {
+        return fetch('https://my-backend.app/ts-token')
+            .then((response) => response.text());
+    }
+});
+----
+
+.After: cookieless authentication
+[source,JavaScript]
+----
+init({
+    thoughtSpotHost: "<ThoughtSpot-Host-URL>",
+    authType: AuthType.TrustedAuthTokenCookieless,
+    autoLogin: true,
+    getAuthToken: () => {
+        return fetch('https://my-backend.app/ts-token')
+            .then((response) => response.text());
+    }
+});
+----
+
+For more examples, see xref:trusted-auth-sdk.adoc#_cookieless_authentication_examples[Cookieless authentication examples]. For more information about the authentication type, see link:{{navprefix}}/Enumeration_AuthType#_trustedauthtokencookieless[AuthType.TrustedAuthTokenCookieless].
+
+[#step4]
+== Step 4: Update browser REST API requests
+In cookie-based authentication, REST API requests from the browser to ThoughtSpot are authenticated by the session cookie. In cookieless authentication, there is no session cookie, so these requests must include the bearer token.
+
+If your embedding application makes REST API calls to ThoughtSpot from the browser, replace the standard `fetch()` calls with the link:{{navprefix}}/Function_tokenizedFetch[tokenizedFetch] function from the Visual Embed SDK. The `tokenizedFetch` function adds the current bearer token to the request.
+
+For more information and examples, see xref:rest-apiv2-js.adoc[REST API v2.0 within a browser].
+
+[NOTE]
+====
+Note the following differences in behavior after you migrate:
+
+* The validity of a cookieless token is set when the token is requested and is not extended by user activity. With `autoLogin: true`, the SDK requests a new token before the current token expires. For more information, see xref:trusted-auth-sdk.adoc#_session_length[Session length].
+* Cookie-based authentication restricts a browser to one logged-in user per ThoughtSpot instance. With cookieless authentication, each browser tab can use a different token. For more information, see xref:trusted-auth-sdk.adoc#_multiple_user_sessions_in_one_browser[Multiple user sessions in one browser].
+====
+
+[#step5]
+== Step 5: Test the implementation
+To verify the migration:
+
+. Open the embedding application in a browser that blocks third-party cookies, such as Safari or a Chrome Incognito window.
+. Log in to your application and load a page with embedded ThoughtSpot content.
+. Verify that the embedded content loads without a ThoughtSpot login prompt.
+. In the browser developer tools, verify that requests to your ThoughtSpot instance include an `Authorization: Bearer` header.
+. Keep the page open beyond the token validity time and verify that the embedded content continues to work.
+
+If you encounter issues, see xref:trusted-auth-troubleshoot.adoc[Troubleshoot trusted authentication].
+
+== Additional resources
+
+* link:https://github.com/thoughtspot/developer-examples/tree/main/visual-embed/auth/cookieless[Cookieless authentication code sample, window=_blank]
+* xref:trusted-authentication.adoc[Trusted authentication]
+* xref:trusted-auth-sdk.adoc[Front-end trusted authentication integration]
+* xref:trusted-auth-token-request-service.adoc[Token request service]
+* xref:api-user-management.adoc#_user_migration_to_iamv2[User migration to IAMv2]
