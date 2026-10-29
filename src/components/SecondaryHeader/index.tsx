@@ -11,6 +11,7 @@ export type DocCategory =
     | 'guides'
     | 'walkthroughs'
     | 'embedding'
+    | 'sdk-reference'
     | 'rest-api'
     | 'mcp-server'
     | 'spottercode'
@@ -22,6 +23,7 @@ export const CATEGORY_LABELS: Record<DocCategory, string> = {
     guides: 'Developer guides',
     walkthroughs: 'Quickstarts',
     embedding: 'Embedding',
+    'sdk-reference': 'Visual Embed SDK reference',
     'rest-api': 'REST APIs',
     'mcp-server': 'MCP server',
     spottercode: 'SpotterCode',
@@ -37,6 +39,7 @@ export const CATEGORY_LANDING: Record<DocCategory, string> = {
     guides: '/introduction',
     walkthroughs: '/tutorials/quickstarts',
     embedding: '/getting-started',
+    'sdk-reference': '/VisualEmbedSdk',
     'rest-api': '/rest-apis',
     'mcp-server': '/mcp-integration',
     spottercode: '/SpotterCode',
@@ -53,6 +56,7 @@ export const CATEGORY_NAV_ID: Record<DocCategory, string> = {
     guides: 'nav',
     walkthroughs: 'nav-walkthroughs',
     embedding: 'nav-embedding',
+    'sdk-reference': 'nav-sdk-reference',
     'rest-api': 'nav-rest-api',
     'mcp-server': 'nav-mcp-server',
     spottercode: 'nav-spottercode',
@@ -125,6 +129,11 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
         'SpotterCode', 'integrate-SpotterCode', 'spottercode-prompting-guide',
     ],
     tutorials: [],
+    // The pages that list every item of one kind are linked from the landing page.
+    'sdk-reference': [
+        'VisualEmbedSdk',
+        'Enumeration', 'Class', 'Interface', 'Type alias', 'Function',
+    ],
     'whats-new': [
         'whats-new', 'fixed-issues', 'known-issues', 'deprecated-features',
         'embed-sdk-changelog', 'mobile-sdk-changelog',
@@ -151,6 +160,8 @@ const SecondaryHeader = (props: {
         isVersionedIframe,
     } = props;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    // The SDK reference has its own sidebar but no tab of its own: it is part of Embedding.
+    const activeTab: DocCategory = activeCategory === 'sdk-reference' ? 'embedding' : activeCategory;
     const menuRef = useRef<HTMLDivElement>(null);
 
     // 'tutorials' and 'walkthroughs' intentionally excluded — reachable from links
@@ -227,8 +238,8 @@ const SecondaryHeader = (props: {
                         <li key={cat} role="none">
                             <button
                                 role="tab"
-                                aria-selected={activeCategory === cat}
-                                className={`secondary-header__tab ${activeCategory === cat ? 'active' : ''}`}
+                                aria-selected={activeTab === cat}
+                                className={`secondary-header__tab ${activeTab === cat ? 'active' : ''}`}
                                 onClick={() => handleClick(cat)}
                             >
                                 {CATEGORY_LABELS[cat]}
@@ -258,7 +269,7 @@ const SecondaryHeader = (props: {
                         aria-haspopup="listbox"
                     >
                         <span className="secondary-header__mobile-label">
-                            {CATEGORY_LABELS[activeCategory]}
+                            {CATEGORY_LABELS[activeTab]}
                         </span>
                         <AiOutlineCaretDown
                             className={`secondary-header__mobile-caret${mobileMenuOpen ? ' open' : ''}`}
@@ -270,8 +281,8 @@ const SecondaryHeader = (props: {
                                 <button
                                     key={cat}
                                     role="option"
-                                    aria-selected={activeCategory === cat}
-                                    className={`secondary-header__mobile-item${activeCategory === cat ? ' active' : ''}`}
+                                    aria-selected={activeTab === cat}
+                                    className={`secondary-header__mobile-item${activeTab === cat ? ' active' : ''}`}
                                     onClick={() => handleClick(cat)}
                                 >
                                     {CATEGORY_LABELS[cat]}

@@ -74,7 +74,11 @@ a| `\https://spottercode.thoughtspot.app/mcp` +
 The full-capability SpotterCode endpoint. Requires authentication with a ThoughtSpot instance. You can use this MCP endpoint to perform authenticated user operations on your ThoughtSpot instance via the public REST APIs.
 a| `get-rest-api-reference` +
 `get-developer-docs-reference` +
-`execute-thoughtspot-code`
+`execute-thoughtspot-code` +
+`list_orgs` +
+`switch_org`
+
+__The `list_orgs` and `switch_org` are available only on ThoughtSpot instances with Orgs enabled. These tools require OAuth or SAML authentication and are not available when connecting via the Bearer token endpoint (`/bearer/mcp`)__
 
 a| *Documentation endpoint* +
 (`/mcp/docs`)
@@ -96,18 +100,38 @@ Provides access to documentation on embedding, UI customization, deployment, sec
 * `execute-thoughtspot-code` +
 Executes authenticated ThoughtSpot API workflows directly from your IDE agent. This skill allows your IDE agent to perform common operations that can be done via public REST APIs.
 
+* `list_orgs` +
+Lists all Orgs the authenticated user can access on the connected ThoughtSpot instance. Each Org entry includes its `id`, `name`, and `description`. The currently active Org is indicated by `is_active: true`.
++
+This tool is available only on ThoughtSpot instances with Orgs enabled and requires OAuth or SAML authentication. It is not available when connecting via the Bearer token endpoint (`/bearer/mcp`).
+
+* `switch_org` +
+Switches the active Org for the current authenticated session. All subsequent tool calls operate in the context of the selected Org. +
++
+Accepts a single input, `org_id`, which is the ID of the Org to switch to (returned by `list_orgs`). Returns `success: true` if the switch succeeded. If the switch fails, the active Org is unchanged.
++
+[IMPORTANT]
+====
+The active Org selection is stored per user, not per conversation. If two concurrent AI sessions switch to different Orgs, the last operation takes effect for both sessions. The selection persists across reconnects and resets only on re-authentication or after a period of inactivity.
+====
++
+This tool is available only on ThoughtSpot instances with Orgs enabled and requires OAuth or SAML authentication. It is not available when connecting via the Bearer token endpoint (`/bearer/mcp`).
+
 === Choosing the right endpoint
-Use the following guidance to decide which endpoint to configure in your IDE:
+Use the following guidance to decide which endpoint to configure in your IDE.
 
-* *Use `/mcp` (authenticated)* if:
-** You want the AI agent to execute ThoughtSpot API workflows from your IDE, for example, to generate a trusted authentication secret key, configure your application domain in CORS/CSP allowlists, or retrieve Liveboard and Answer object IDs from your instance.
-** You want your IDE to use the full set of SpotterCode skills, including `run-ts-workflow`.
-** You are building or configuring a ThoughtSpot embedded application and want end-to-end setup assistance without leaving the IDE.
+Use `/mcp` (authenticated) if::
 
-* *Use `/mcp/docs` (unauthenticated)* if:
-** You only need the AI agent to look up documentation, REST API reference material, and code samples.
-** You are working in an environment where connecting to a ThoughtSpot instance is not appropriate. For example, a shared CI environment, a read-only developer workstation, or a demonstration setup.
-** You do not have a ThoughtSpot Embedded subscription or instance credentials available.
+* You want the AI agent to execute ThoughtSpot API workflows from your IDE, for example, to generate a trusted authentication secret key, configure your application domain in CORS/CSP allowlists, or retrieve Liveboard and Answer object IDs from your instance.
+* You want your IDE to use the full set of SpotterCode skills, including `execute-thoughtspot-code`.
+* You are building or configuring a ThoughtSpot embedded application and want end-to-end setup assistance without leaving the IDE.
+* Your ThoughtSpot instance uses Orgs and you want the AI agent to list or switch Orgs during a session. Use the `list_orgs` and `switch_org` tools with this endpoint.
+
+Use `/mcp/docs` (unauthenticated) if::
+* You only need the AI agent to look up documentation, REST API reference material, and code samples.
+* You are working in an environment where connecting to a ThoughtSpot instance is not appropriate. For example, a shared CI environment, a read-only developer workstation, or a demonstration setup.
+* You do not have a ThoughtSpot Embedded subscription or instance credentials available.
+* You do not need org-switching capabilities. The `/mcp/docs` unauthenticated endpoint does not support `list_orgs` or `switch_org`.
 
 [NOTE]
 ====
@@ -150,6 +174,31 @@ Because code executes as the authenticated user, write operations, such as creat
 ====
 SpotterCode performs operations as the authenticated user. Grant SpotterCode access only to accounts with the minimum permissions required for the intended use case.
 ====
+
+[#_multi_org_support]
+== Multi-Org support
+
+If your ThoughtSpot instance has Orgs enabled, SpotterCode can list and switch between Orgs during a session. By default, SpotterCode operates in the Org that was active when you authenticated. To work with resources in a different Org, use the `list_orgs` and `switch_org` tools.
+
+=== How it works
+When you switch to a different Org using `switch_org`, SpotterCode mints a new per-Org session token scoped to that Org and stores it for your user account. Subsequent tool calls use this token and operate within the selected Org. The selection persists across reconnects until you re-authenticate or the session expires after a period of inactivity.
+The active Org selection is stored per user, not per conversation. If you have multiple active AI sessions, the last `switch_org` call takes effect across all sessions. Plan org switches accordingly when running concurrent sessions.
+
+To check which Org you are in and switch to a different Org, use the following prompts in your IDE agent:
+
+. Ask the agent to list your available Orgs:
++
+`List all Orgs I have access to on my ThoughtSpot instance.`
+
++
+The agent calls `list_orgs` and returns a list of Orgs. The currently active Org is marked with `is_active: true`.
+
+. Ask the agent to switch to the Org you want to work in:
++
+`Switch to the Sales EMEA Org.`
+
++
+The agent calls `switch_org` with the corresponding `org_id`. After a successful switch, all subsequent API calls operate within that Org.
 
 == Limitations
 * Responses from SpotterCode are determined by the features and parameters currently supported in the Visual Embed SDK, REST API, and official ThoughtSpot developer documentation. SpotterCode cannot generate code or solutions that rely on unsupported or undocumented features.

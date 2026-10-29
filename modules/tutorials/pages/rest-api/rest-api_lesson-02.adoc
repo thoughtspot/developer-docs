@@ -6,7 +6,7 @@
 
 [IMPORTANT]
 ====
-The workflows and examples in this tutorial use a legacy version of the ThoughtSpot REST API link:https://github.com/thoughtspot/thoughtspot_rest_api_python[ThoughtSpot Community SDK, window=_blank]. We recommend using the xref:python-sdk.adoc[ThoughtSpot-provided Python SDK for REST API v2], which supports both asynchronous and synchronous invocation, transparent token refresh, server-sent event (SSE) streaming, file uploads and downloads, and error handling.
+The workflows and examples in this tutorial use a legacy version of the ThoughtSpot REST API link:https://github.com/thoughtspot/thoughtspot_rest_api_python[ThoughtSpot Community SDK, window=_blank]. We recommend using the xref:rest-api-python-sdk.adoc[ThoughtSpot-provided Python SDK for REST API v2], which supports both asynchronous and synchronous invocation, transparent token refresh, server-sent event (SSE) streaming, file uploads and downloads, and error handling.
 ====
 
 == Get started
@@ -14,14 +14,12 @@ We'll use the files from the link:https://github.com/thoughtspot/tse-api-tutoria
 
 . Open your IDE +
 Visual Studio Code will be used in all images and instructions.
-The files for this lesson are `api_training_python_1_begin.py` and `api_training_python_1_end.py`.
+The files for this lesson are `api_training_python_1_begin.py` and `api_training_python_1_final.py`.
 . Open up your command line or terminal environment as well.
 
 [NOTE]
 ====
-There are many ways to install and configure Python on a system. This tutorial shows "plain" versions of all commands as if you are using the main system-wide install of Python for the tutorial.
-
-Please adjust all Python commands according to your own environment.
+The commands in this tutorial are the basic versions, which assume that you use the system-wide Python installation. If your environment is different, for example a virtual environment, adjust the Python commands accordingly.
 ====
 
 == 01 - Imports and variables
@@ -101,7 +99,9 @@ requests_session = requests.Session()
 requests_session.headers.update(api_headers)
 
 # Define the JSON message, in Python object syntax (close but not exactly JSON)
-json_post_data = { # a request body }
+json_post_data = {
+    # a request body
+}
 
 # Set the URL of the endpoint
 url = base_url + "{api_endpoint_ending}"
@@ -175,7 +175,7 @@ image:images/tutorials/rest-api/python-command-in-terminal.png[Running script in
 If you have a more complex local Python environment you are using, find the appropriate way to send the script you have updated through the Python environment set up for this tutorial.
 
 === Update the Session object headers
-Almost all REST API endpoints other than the token requests require authentication, either within the cookies or via an `Authentication: Bearer {token}` header.
+Almost all REST API endpoints other than the token requests require authentication, either within the cookies or via an `Authorization: Bearer {token}` header.
 
 You need to update the `Session` object with this new header while keeping the original ones.
 
@@ -219,6 +219,7 @@ try:
 
 except Exception as e:
     # do whatever is necessary in exception case
+    print(e)
 
 # Code after the try block will now run even after Exception
 ----
@@ -236,7 +237,7 @@ try:
     resp = requests_session.post(url=url, json=json_post_data)
     resp.raise_for_status()
     print(resp)
-    token = resp["token"]
+    token = resp.json()["token"]
 except requests.exceptions.HTTPError as e:
     print(e)
     print(e.request)
@@ -257,6 +258,15 @@ import json
 thoughtspot_url = 'https://{}.thoughtspot.cloud'
 org_id = 0
 api_version = '2.0'
+
+base_url = '{thoughtspot_url}/api/rest/{version}/'.format(thoughtspot_url=thoughtspot_url, version=api_version)
+api_headers = {
+    'X-Requested-By': 'ThoughtSpot',
+    'Accept': 'application/json'
+}
+
+requests_session = requests.Session()
+requests_session.headers.update(api_headers)
 
 endpoint = 'auth/token/full'
 url = base_url + endpoint
@@ -293,6 +303,7 @@ except requests.exceptions.HTTPError as e:
     print(e.request.headers)
     print(e.request.body)
     print(e.response.content)
+    exit()  # Stop here, because there is no token to use
 
 # Update api_headers from before with header for Bearer token
 api_headers['Authorization'] = 'Bearer {}'.format(token)
@@ -305,9 +316,13 @@ user_search_url = base_url + "users/search"
 
 # Every request must be wrapped in try...except
 try:
-    search_resp = requests_session.get(url=user_search_url)
+    # Search endpoints are POST requests and need a JSON body, even if it is only {}
+    search_resp = requests_session.post(url=user_search_url, json={"record_offset": 0, "record_size": 10})
     search_resp.raise_for_status()
-...
+    print(json.dumps(search_resp.json(), indent=2))
+except requests.exceptions.HTTPError as e:
+    print(e)
+    print(e.response.content)
 ----
 
 You may have noticed many steps that are repeated each time for any given request.

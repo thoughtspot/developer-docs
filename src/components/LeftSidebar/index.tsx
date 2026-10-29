@@ -60,6 +60,13 @@ const LeftSideBar = (props: {
         });
         if (tag) {
             tag.classList.add('active');
+            // On a page that is only reachable from a hidden sub-menu, mark the
+            // visible parent entry as the active one instead.
+            divElement
+                .querySelector('.nav-hidden-children a.active')
+                ?.closest('.nav-hidden-children')
+                ?.parentElement?.querySelector(':scope > p a')
+                ?.classList.add('active');
         }
 
         const updatedHTML = addExpandCollapseImages(
@@ -101,17 +108,27 @@ const LeftSideBar = (props: {
         // marking this navigation as handled.
         const isAsideVisible = isMaxMobileResolution || props.leftNavOpen;
         if (lastScrolledPageIdRef.current !== props.curPageid && isAsideVisible) {
-            const activeLink = (ref.current as HTMLDivElement)?.querySelector(
-                'a.active',
-            );
-            if (activeLink) {
+            const aside = ref.current as HTMLDivElement;
+            const activeLink = aside?.querySelector('a.active');
+            if (aside && activeLink) {
                 lastScrolledPageIdRef.current = props.curPageid;
-                // 'nearest' is a no-op once the link is already visible. 'center' isn't —
-                // it nudges toward exact-center even when already in view, and since this
-                // sidebar has no scroll room to spare on most pages (content fits exactly),
-                // that nudge has nowhere to go but the window itself, which is what was
-                // sliding the fixed header out of view on some walkthrough pages.
-                activeLink.scrollIntoView({ block: 'nearest' });
+                // Scroll only the sidebar itself, never the window: scrollIntoView() also
+                // scrolls the window, which slid the fixed header out of view on some
+                // walkthrough pages. 'nearest' avoided that but parks a link that starts
+                // below the fold flush against the bottom edge, so the user lands on a nav
+                // that looks jumped. Instead, leave the nav alone when the link is already
+                // comfortably in the upper part of it, and otherwise bring it to about a
+                // third of the way down (scrollTop clamps at the ends).
+                const asideRect = aside.getBoundingClientRect();
+                const linkRect = activeLink.getBoundingClientRect();
+                const linkTop = linkRect.top - asideRect.top;
+                const isComfortablyVisible =
+                    linkTop >= 0 &&
+                    linkRect.bottom <= asideRect.bottom &&
+                    linkTop <= aside.clientHeight * 0.6;
+                if (!isComfortablyVisible) {
+                    aside.scrollTop += linkTop - aside.clientHeight * 0.3;
+                }
             }
         }
     }, [props.curPageid, isMaxMobileResolution, navContent, props.leftNavOpen]);

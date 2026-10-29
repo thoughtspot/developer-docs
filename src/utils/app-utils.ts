@@ -100,4 +100,26 @@ export const isPublicSite = (queryParamStr: string) => {
     }
 };
 
+/**
+ * Whether the page should render in dark mode, resolved the same way the main docs template does
+ * for a fresh load: the isDarkMode URL param (set by the embedding product) wins, then the
+ * explicitly stored choice; with neither, the public site follows the OS preference and
+ * in-product stays light.
+ * @param {string} queryParamStr - query string from location.search
+ * @returns {boolean} true when dark mode applies
+ */
+export const getInitialDarkMode = (queryParamStr: string) => {
+    if (typeof window === 'undefined') return false;
+    const param = new URLSearchParams(queryParamStr).get('isDarkMode');
+    if (param !== null) return param === 'true';
+    try {
+        const stored = window.localStorage.getItem('themeMode');
+        if (stored) return stored === 'dark';
+    } catch (e) {
+        // storage unavailable: fall through to the defaults below
+    }
+    if (!isPublicSite(queryParamStr)) return false;
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+};
+
 export default queryStringParser;
