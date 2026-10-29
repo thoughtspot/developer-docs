@@ -44,7 +44,7 @@ If you do not send specific object IDs as part of your request, the API lists al
 For information about the supported object types, see link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fmodels%2Fenumerations%2Ftype-3[API Playground].
 
 === Subtypes for LOGICAL_TABLE
-For metadata types such as Models, Tables, and Views, set the `type` to `LOGICAL_TABLE`. When `type` is set as `LOGICAL_TABLE` and no object identifier is specified in the request, the API returns all available objects in ThoughtSpot. To get a complete list of `LOGICAL_TABLE` objects, set the `record_size` attribute to a desired value and configure xref:rest-api-v2-metadata-search.adoc#_pagination_settings[pagination settings].
+For metadata types such as Models, Tables, and Views, set the `type` to `LOGICAL_TABLE`. When `type` is set as `LOGICAL_TABLE` and no object identifier is specified in the request, the API returns all available objects in ThoughtSpot. To get a complete list of `LOGICAL_TABLE` objects, set the `record_size` attribute to a desired value and configure xref:rest-api-v2-metadata-search.adoc#_pagination_settings_for_metadata_objects[pagination settings].
 
 For `LOGICAL_TABLE` object type, you can also specify the subtype as an additional option to filter API response.
 You can specify one of the following values to define the `LOGICAL_TABLE` subtype:
@@ -3926,6 +3926,56 @@ Common use cases for the dependent objects include tagging, auditing proper shar
 
 The `dependent_object_version` parameter specifies the version of the dependent object information in the response. The only supported value is `V1`.
 
+==== Pagination settings for dependent objects
+
+When `include_dependent_objects` is set to `true`, you can paginate the dependent objects returned for each metadata object specified in the API request. These settings apply only to dependent objects. To paginate the metadata objects returned in the response, use the xref:rest-api-v2-metadata-search.adoc#_pagination_settings_for_metadata_objects[pagination settings for metadata objects]. Use the following parameters to control pagination of dependent objects:
+
+* `dependent_objects_record_offset` +
+_Request parameter_. Number of dependent objects to skip for each metadata object before collecting them. Use this parameter with `dependent_objects_record_size`, which sets the page size. The default page size is `50`. If you specify an offset and set `dependent_objects_record_size` to `0`, the API uses the default. The API rejects a negative offset. If you omit this parameter, the API returns dependent objects without pagination, as in earlier releases.
+* `dependent_objects_is_last_batch` +
+_Response attribute_. Returns `true` if the returned page (batch) of `dependent_objects` is the last page for the object. If a page is full, the API returns `false` even if it is the final page. Continue requesting pages until the value is `true`.
+
+The following example retrieves the second page of 50 dependent objects:
+
+[source,JSON]
+----
+{
+ "metadata": [
+    {
+      "identifier": "782b50d1-fe89-4fee-812f-b5f9eb0a552d"
+    }
+  ],
+ "include_dependent_objects": true,
+ "dependent_objects_record_offset": 50,
+ "dependent_objects_record_size": 50
+}
+----
+
+The `dependent_objects_is_last_batch` attribute appears in each metadata object in the response, next to `dependent_objects`. In the following example, the returned page is the last page of dependent objects for the object:
+
+[source,JSON]
+----
+[
+  {
+    "metadata_id": "782b50d1-fe89-4fee-812f-b5f9eb0a552d",
+    "metadata_name": "<metadata_name>",
+    "metadata_type": "LOGICAL_TABLE",
+    "dependent_objects": {
+      "782b50d1-fe89-4fee-812f-b5f9eb0a552d": {
+        "LOGICAL_TABLE": [...],
+        "QUESTION_ANSWER_BOOK": [...]
+      }
+    },
+    "dependent_objects_is_last_batch": true,
+    "incomplete_objects": null,
+    "metadata_detail": null,
+    "metadata_header": {...},
+    "visualization_headers": null,
+    "stats": null
+  }
+]
+----
+
 === include_stats
 The `include_stats` boolean option causes the `stats` key of the response to be filled with an object with statistics about user access to the object.
 
@@ -3956,7 +4006,7 @@ On ThoughtSpot instances running 10.11.0.cl or later, set the `include_only_publ
 === show_resolved_parameters
 On ThoughtSpot instances running 10.9.0.cl or later, if your metadata objects are parameterized, set the `show_resolved_parameters` boolean parameter to `true` to return the resolved parameter values in the response.
 
-=== Pagination settings
+=== Pagination settings for metadata objects
 
 By default, the following pagination settings are applied to the API response retrieved from the search metadata endpoint:
 

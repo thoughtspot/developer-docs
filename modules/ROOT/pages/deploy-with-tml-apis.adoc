@@ -59,7 +59,7 @@ Properties of a Connection can also be parameterized.
 Parameterization works with both TML import and xref:publishing-overview.adoc[publishing].
 
 === obj_id
-Before implementing any deployment process, you should ensure that `obj_id` is enabled on your ThoughtSpot instance. 
+Before implementing any deployment process, you should ensure that `obj_id` is enabled on your ThoughtSpot instance. For information about supported object types, format rules, and resolution order, see xref:object-id.adoc[Object ID (obj_id)].
 
 [NOTE]
 ====
@@ -115,6 +115,34 @@ The request format for `metadata/update-obj-id` is an array, allowing for updati
 Once you have decided on the appropriate `obj_id` for all the objects in your dev Org, you can use any existing GUID Mapping files to update the `obj_id` values for the equivalent objects in all your other Orgs.
 
 You only have to do this process for existing objects *one time*, and from that point forward, you can update objects in any Org using TML with obj_ids rather than GUIDs.
+
+[#adopting-obj-id-in-deployment-pipeline]
+==== Adopting obj_id in a deployment pipeline
+You can move an existing GUID-based deployment pipeline to `obj_id` one step at a time. Existing GUID-based workflows continue to work while you migrate, and you can start with the objects you deploy most often.
+
+. *Confirm that Object ID is enabled* on every ThoughtSpot instance in your pipeline. For more information, see xref:object-id.adoc#_enable_object_id[Enable Object ID].
+. *Define a naming convention.* Choose stable, readable identifiers that do not depend on the object's display name or GUID, for example, `<domain>-<object-name>-<purpose>`:
++
+----
+sales-liveboard-prod
+sales-model-prod
+hubspot-contacts-table
+----
++
+The values must follow the xref:object-id.adoc#_obj_id_format_and_constraints[obj_id format].
+. *Assign `obj_id` values in the dev Org.* Use the `metadata/update-obj-id` endpoint or edit the `obj_id` in the object's TML. Replace automatically generated values such as `RetailSalesRAD-KPIs-c1e4043a`: they include part of the GUID, so copies of the same object in different Orgs receive different generated values.
+. *Align existing copies in the other Orgs.* Give each existing copy of an object the same `obj_id` as the original in the dev Org. See <<_implementing_obj_id_in_existing_environments,Implementing obj_id in existing environments>>.
+. *Export the release TML* with `include_obj_id` and `include_obj_id_ref` set to `true`. See <<_obj_id_or_guid,obj_id or guid>>.
+. *Deploy for the first time.* Import the TML into the target Org without a `guid` property. If the object does not exist in the target Org, ThoughtSpot creates it and assigns a new GUID in that Org.
+. *Deploy subsequent releases.* Import the same TML. ThoughtSpot finds the existing object by its `obj_id` and updates it.
+. *Check the import response* for each file to confirm that it created or updated the expected object.
+// TODO: confirm with engineering whether an obj_id that matches no object falls back to the GUID with a WARNING status (object-id.adoc) or creates a new object ("Rules for create vs. update operations" on this page). If the WARNING fallback is correct, add: "A WARNING status means the obj_id did not match an object and ThoughtSpot matched by GUID instead."
+. *Retire your GUID mapping.* Once every deployed object has a consistent `obj_id` in all Orgs, you no longer need to maintain a GUID mapping file.
+
+[NOTE]
+====
+Visualizations and Liveboard tabs do not have an `obj_id`. Objects that reference a visualization, such as Monitor alerts, Liveboard schedules, and related links, still use a GUID that is different in each Org. For more information, see xref:object-id.adoc#_objects_that_do_not_support_obj_id[Objects that do not support obj_id].
+====
 
 [#linkBuildRelease]
 == Identifying release package in dev Org
