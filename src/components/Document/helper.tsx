@@ -4,6 +4,7 @@ import { MdContentCopy } from '@react-icons/all-files/md/MdContentCopy';
 import { MdCheck } from '@react-icons/all-files/md/MdCheck';
 import { MdFilterList } from '@react-icons/all-files/md/MdFilterList';
 import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
+import { MdClear } from '@react-icons/all-files/md/MdClear';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
 import { isTutorialsPath } from '../../utils/app-utils';
@@ -368,7 +369,24 @@ const makeFilterSearch = () => {
     input.setAttribute('aria-label', 'Search release notes');
     field.appendChild(input);
 
-    return { field, input };
+    // The x at the right end, shown while the box has text (same as the
+    // search box on the generated Action reference page).
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.classList.add('release-notes-filterbar-search-clear');
+    clear.setAttribute('aria-label', 'Clear the search text');
+    clear.innerHTML = getHTMLFromComponent(<MdClear />, 'release-notes-search-clear-svg');
+    const syncClear = () => clear.classList.toggle('is-visible', input.value !== '');
+    input.addEventListener('input', syncClear);
+    clear.addEventListener('click', () => {
+        input.value = '';
+        input.dispatchEvent(new Event('input'));
+        input.focus();
+    });
+    field.appendChild(clear);
+    syncClear();
+
+    return { field, input, syncClear };
 };
 
 // customizeDocContent() reruns on every page navigation in this SPA and
@@ -724,7 +742,7 @@ export const customizeDocContent = () => {
     teardownFilterBarListeners?.();
     teardownFilterBarListeners = null;
     document
-        .querySelectorAll('.release-notes-filterbar, .release-notes-filterbar-spacer, .release-notes-loadmore')
+        .querySelectorAll('.release-notes-filterbar, .release-notes-filterbar-spacer, .release-notes-loadmore, .release-notes-empty-state')
         .forEach((el) => el.remove());
 
     // Nav-tab click listener (see wireNavTabs) — same re-run story: torn
@@ -1221,7 +1239,7 @@ export const customizeDocContent = () => {
             // releases). One choice at a time — the options overlap on purpose
             // (the latest release is also within the last 3 months). Picking an
             // exact month is left to the search box, which matches dates.
-            const PERIOD_OPTIONS = ['Latest release', 'Last month', 'Last 3 months', 'Last 6 months'];
+            const PERIOD_OPTIONS = ['This month', 'Last month', 'Last 3 months', 'Last 6 months'];
             const monthIndexes = releaseNotesTables.flatMap((table) =>
                 bodyRows(table).map((row) => Number(row.dataset.monthIndex)).filter((n) => Number.isFinite(n)),
             );
@@ -1231,7 +1249,7 @@ export const customizeDocContent = () => {
                 if (newestMonthIndex === undefined || !Number.isFinite(rowIndex)) return [];
                 const age = newestMonthIndex - rowIndex;
                 return [
-                    ...(age === 0 ? ['Latest release'] : []),
+                    ...(age === 0 ? ['This month'] : []),
                     ...(age === 1 ? ['Last month'] : []),
                     ...(age <= 2 ? ['Last 3 months'] : []),
                     ...(age <= 5 ? ['Last 6 months'] : []),
@@ -1294,8 +1312,9 @@ export const customizeDocContent = () => {
                 });
             }
 
-            const { field: searchField, input: searchInput } = makeFilterSearch();
+            const { field: searchField, input: searchInput, syncClear } = makeFilterSearch();
             searchInput.value = savedState.search;
+            syncClear();
             rightControls.appendChild(searchField);
             filterBar.appendChild(rightControls);
 
@@ -1329,6 +1348,17 @@ export const customizeDocContent = () => {
                 loadMoreButtons.set(table, button);
             });
 
+            // Shown in place of the tables when the search and filters match
+            // no row (same wording as the Action reference page's filter).
+            const emptyState = document.createElement('div');
+            emptyState.classList.add('release-notes-empty-state');
+            emptyState.setAttribute('role', 'status');
+            emptyState.style.display = 'none';
+            emptyState.innerHTML = '<h4>No results for your search</h4><p>You can change your search and try again.</p>';
+            const lastTable = releaseNotesTables[releaseNotesTables.length - 1];
+            const lastAnchor = lastTable ? loadMoreButtons.get(lastTable) ?? lastTable : null;
+            lastAnchor?.insertAdjacentElement('afterend', emptyState);
+
             // A filter/search change should jump back to the first page of
             // results rather than stay scrolled deep into whatever was
             // expanded before — only "Load more" itself (resetPagination:
@@ -1338,6 +1368,7 @@ export const customizeDocContent = () => {
                 const searchQuery = searchInput.value.trim().toLowerCase();
                 if (resetPagination) releaseNotesTables.forEach((table) => visibleCounts.set(table, pageSizeOf(table)));
 
+                let totalMatching = 0;
                 releaseNotesTables.forEach((table) => {
                     const colIndexByLabel = columnIndexByTable.get(table);
                     const rows = bodyRows(table);
@@ -1384,10 +1415,17 @@ export const customizeDocContent = () => {
                     const loadMoreButton = loadMoreButtons.get(table);
                     if (loadMoreButton) loadMoreButton.style.display = hasMore ? '' : 'none';
 
+                    totalMatching += matchingRows.length;
                     const sect2 = table.closest<HTMLElement>('.sect2');
                     if (sect2) sect2.dataset.hasVisibleRows = matchingRows.length > 0 ? 'true' : 'false';
 
                     if (table.classList.contains('release-notes-no-header')) dedupeDateColumn(table);
+                });
+
+                const nothingMatches = releaseNotesTables.length > 0 && totalMatching === 0;
+                emptyState.style.display = nothingMatches ? '' : 'none';
+                releaseNotesTables.forEach((table) => {
+                    table.style.display = nothingMatches ? 'none' : '';
                 });
 
                 document.querySelectorAll<HTMLElement>('.sect2').forEach((sect2) => {
