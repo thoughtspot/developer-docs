@@ -16,10 +16,15 @@ Ensure you have the following setup:
 
 * Your ThoughtSpot instance must be running 26.11.0.cl or later, with the new experience enabled at the instance or Org level. A ThoughtSpot administrator enables it from **Admin** > **ThoughtSpot AI** > **Choose Spotter 3 Liveboard experience** > **Liveboard side panel (New)**. The setting can be applied to the whole instance or to a single Org.
 * Your host application domain is added to xref:security-settings.adoc[ThoughtSpot CSP and CORS allowlists].
-* Your embedding application project has Visual Embed SDK v1.54.0 or later.
+* Your embedding application project has Visual Embed SDK v1.53.0 or later. Some of the controls described on this page need a later SDK version. The required version is noted for each control.
 
 == Enable the new Spotter experience
-To enable the new Spotter experience in your embed, set the `spotterExperienceVersion` property to `SpotterExperienceVersion.SPOTTER_2026_11` in your embed configuration:
+To enable the new Spotter experience in your embed, set the `spotterExperienceVersion` property to `SpotterExperienceVersion.SPOTTER_2026_11` in your embed configuration. The property is available in `SpotterEmbed`, `LiveboardEmbed`, and `AppEmbed`, and the `SpotterExperienceVersion` enum is exported from the SDK.
+
+[NOTE]
+====
+If you set `spotterExperienceVersion` to a value that the SDK doesn't recognize, the embed falls back to the standard Spotter experience without an error or warning. If the new experience doesn't load, check the value first.
+====
 
 Spotter embed::
 
@@ -121,6 +126,7 @@ When the new experience is enabled, you'll see the following behavior:
 * On a Liveboard, Spotter uses only the data models behind that Liveboard. Make sure Spotter is enabled on those models.
 * Conversations are saved with the Liveboard, and users can continue them later.
 * When the Liveboard is switched to edit mode, the Spotter panel closes. To control who can enter edit mode in your embed, see <<_sdk_controls_for_the_new_experience,SDK controls for the new experience>>.
+* The panel opens automatically when the Liveboard loads. To change this, see <<_sdk_controls_for_the_new_experience,SDK controls for the new experience>>.
 
 [source,JavaScript]
 ----
@@ -130,6 +136,18 @@ const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
     //... other configuration attributes
 });
 ----
+
+=== When the Spotter panel isn't shown
+
+The Spotter panel doesn't appear in the following cases:
+
+* You are embedding a single visualization instead of the full Liveboard.  
+* The user doesn't have permission to use Spotter.
+* The Liveboard doesn't contain any visualization.
+* None of the Liveboard's visualizations are based on a data model that has Spotter enabled.
+* The **Spotter** button is hidden or turned off with `Action.SpotterOnLiveboard`.
+
+If the panel is missing from a Liveboard embed, check these conditions.
 
 == Behavior changes with the new experience
 
@@ -227,10 +245,22 @@ The following table compares Spotter on Liveboards (the new experience) with the
 
 The following Visual Embed SDK options apply to embeds that use the new experience:
 
-* `Action.SpotterViewExplanation`: Controls the **View explanation** button on Spotter answer cards, which opens the Answer Verification experience. Add it to `hiddenActions` to restore the classic Pin, Save, Download, and Edit footer. Add it to `disabledActions` to keep the button visible but inactive, with `disabledActionReason` as the tooltip. The button is available only when `enableAnswerVerification` is on for your cluster.
-* `Action.EditLiveboard` and `Action.EditVisualization`: Hide or turn off Edit on a Liveboard or a visualization independently. `Action.Edit` continues to control both. Because the Spotter panel closes when a Liveboard enters edit mode, you can use these actions to control when users leave Spotter.
-* `EmbedEvent.EditLiveboard` and `EmbedEvent.EditVisualization`: Fire when a user selects **Edit** on a Liveboard or a visualization, alongside `EmbedEvent.Edit`.
-* `HostEvent.EditLiveboard` and `HostEvent.EditVisualization`: Trigger Edit on one surface. `EditVisualization` requires a `vizId`.
+* `spotterChatConfig.openSpotterOnLiveboardByDefault` (SDK 1.53.0): Controls whether the Spotter panel opens automatically when the Liveboard loads. The default value is `true`. Set it to `false` to load the Liveboard with the panel closed. Supported in `LiveboardEmbed` and `AppEmbed`.
++
+[source,JavaScript]
+----
+const liveboardEmbed = new LiveboardEmbed(document.getElementById('ts-embed'), {
+    liveboardId: 'your-liveboard-id',
+    spotterExperienceVersion: SpotterExperienceVersion.SPOTTER_2026_11,
+    spotterChatConfig: {
+        openSpotterOnLiveboardByDefault: false,
+    },
+});
+----
+* `Action.SpotterOnLiveboard` (SDK 1.53.0): Controls the **Spotter** button in the Liveboard header. Add it to `hiddenActions` to remove the Spotter panel completely. Add it to `disabledActions` to grey out the header button.
+* `Action.EditLiveboard` and `Action.EditVisualization` (SDK 1.54.0): Hide or turn off Edit on a Liveboard or a visualization independently. `Action.Edit` continues to control both. Because the Spotter panel closes when a Liveboard enters edit mode, you can use these actions to control when users leave Spotter.
+* `EmbedEvent.EditLiveboard` and `EmbedEvent.EditVisualization` (SDK 1.54.0): Fire when a user selects **Edit** on a Liveboard or a visualization, alongside `EmbedEvent.Edit`.
+* `HostEvent.EditLiveboard` and `HostEvent.EditVisualization` (SDK 1.54.0): Trigger Edit on one surface. `EditVisualization` requires a `vizId`.
 
 == Switch back to the standard Spotter experience
 
