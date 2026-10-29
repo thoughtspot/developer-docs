@@ -376,12 +376,10 @@ class TypeDocInternalParser {
         return content;
     }
 
-    // Where the Version and Deprecated blocks of an item go:
-    //  - an item that is not deprecated has its Version block right under the signature,
-    //    before the description;
-    //  - a deprecated item has its description first, then the Deprecated block, then
-    //    the Version block, and then the other tags (default value, examples).
-    // The two are never in one row. Use parseTags(tags, false) for the other tags.
+    // Where the Version and Deprecated blocks of an item go: after its description, the
+    // Deprecated block first (if there is one), then the Version block, and then the other
+    // tags (default value, examples). The two are never in one row. Use
+    // parseTags(tags, false) for the other tags.
     private static metaBlocks(tags: TypeDocCommentTag[] | undefined) {
         const repaired = this.repairTags(tags || []);
         const render = (name: string) =>
@@ -395,14 +393,13 @@ class TypeDocInternalParser {
         };
     }
 
-    static metaBeforeDescription(tags: TypeDocCommentTag[] | undefined) {
-        const { version, deprecated } = this.metaBlocks(tags);
-        return deprecated.length ? '' : version.join('\n\n');
-    }
-
+    // The blocks end with a blank line. Some callers join their parts with a single newline
+    // (e.g. the enumeration members), and without it the text that follows would run on in the
+    // same line as the Version or Deprecated block.
     static metaAfterDescription(tags: TypeDocCommentTag[] | undefined) {
         const { version, deprecated } = this.metaBlocks(tags);
-        return deprecated.length ? [...deprecated, ...version].join('\n\n') : '';
+        const blocks = [...deprecated, ...version];
+        return blocks.length ? `${blocks.join('\n\n')}\n` : '';
     }
 
     static parseTags(tags: TypeDocCommentTag[] | undefined, includeMeta = true) {
@@ -929,7 +926,6 @@ class TypeDocParser {
 
         return [
             pageTitle,
-            TypeDocInternalParser.metaBeforeDescription(node.comment?.tags),
             this.parseNodeComment(node),
             TypeDocInternalParser.metaAfterDescription(node.comment?.tags),
             TypeDocInternalParser.parseTags(node.comment?.tags, false),
@@ -1334,7 +1330,6 @@ class TypeDocParser {
             `=== ${enumMember.name}`,
             '[div typeDocBlock boxFullWidth]\n--',
             `\`${enumMember.name}:= ${enumMember.defaultValue}\`\n`,
-            TypeDocInternalParser.metaBeforeDescription(enumMember.comment?.tags),
             TypeDocInternalParser.parseComment(enumMember.comment),
             TypeDocInternalParser.metaAfterDescription(enumMember.comment?.tags),
             supportedIn,
@@ -1367,7 +1362,6 @@ class TypeDocParser {
 
         return [
             name,
-            TypeDocInternalParser.metaBeforeDescription(node.comment?.tags),
             TypeDocInternalParser.parseComment(node.comment),
             TypeDocInternalParser.metaAfterDescription(node.comment?.tags),
             '[div typeDocBlock boxFullWidth]\n--',
@@ -1386,7 +1380,6 @@ class TypeDocParser {
             `* ${node.name}: ${this.parseTypeDocType(node.type, true)}${
                 node?.defaultValue ? ` = ${node.defaultValue}` : ''
             }`,
-            TypeDocInternalParser.metaBeforeDescription(node.comment?.tags),
             TypeDocInternalParser.parseComment(node.comment),
             TypeDocInternalParser.metaAfterDescription(node.comment?.tags),
             this.handleTypeNode(node.type),
@@ -1407,7 +1400,6 @@ class TypeDocParser {
             // (an enumeration member such as SPOTTER_2026_11), which AsciiDoc would pair
             // with the closing underscore of _Optional_ and turn into broken italics.
             node.flags.isOptional ? `${sig}  [.typedoc-optional]#Optional#` : sig,
-            TypeDocInternalParser.metaBeforeDescription(node.comment?.tags),
             TypeDocInternalParser.parseComment(node.comment),
             TypeDocInternalParser.metaAfterDescription(node.comment?.tags),
             this.handleTypeNode(node.type),
@@ -1422,7 +1414,6 @@ class TypeDocParser {
             .join('\n\n');
 
         return [
-            TypeDocInternalParser.metaBeforeDescription(node.comment?.tags),
             TypeDocInternalParser.parseComment(node.comment),
             TypeDocInternalParser.metaAfterDescription(node.comment?.tags),
             node.parameters?.length ? '**Function Parameters**' : '',
@@ -1483,9 +1474,6 @@ class TypeDocParser {
 
     private handleTypeNode = (node: TypeDocType | undefined) => {
         const content = [
-            TypeDocInternalParser.metaBeforeDescription(
-                node?.declaration?.comment?.tags,
-            ),
             TypeDocInternalParser.parseComment(node?.declaration?.comment),
             TypeDocInternalParser.metaAfterDescription(
                 node?.declaration?.comment?.tags,
