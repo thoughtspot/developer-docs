@@ -1,0 +1,576 @@
+= Liveboard filter and parameter overrides
+:toc: true
+:toclevels: 2
+
+:page-title: Liveboard filter and parameter overrides
+:page-pageid: liveboard-overrides
+:page-description: Set the values of a Liveboard's existing filter and parameter chips at load time, through the Liveboard URL or the liveboardOverride property of the Visual Embed SDK.
+
+[earlyAccess eaBackground]#Early Access#
+
+Liveboard filter and parameter overrides set the values of a Liveboard's existing filter and parameter chips at load time. This feature requires ThoughtSpot Cloud 26.11.0.cl and Visual Embed SDK 1.54.0 or later.
+
+== Overview
+
+You can supply overrides in two ways:
+
+* In the Liveboard URL, through the `filter` and `parameter` query parameters.
+* In an embedded Liveboard, through the `liveboardOverride` property of the Visual Embed SDK.
+
+The Liveboard opens with the chips already showing the values you passed, and it fetches data once, with those values applied. Users can change the chips afterward, just as they can after any other load.
+
+Use overrides for these tasks:
+
+* Open an embedded Liveboard with filters and parameters that match your application's context, such as the signed-in customer's region or the period selected in your app.
+* Build links that open a Liveboard in a specific filtered state, for example a link from a row in one Liveboard to a detail Liveboard filtered on that row's values.
+* Share a filtered state of a Liveboard without saving a personalized view for every combination of values.
+
+[#comparison]
+== How overrides differ from runtime filters and runtime parameters
+
+xref:runtime-filters.adoc[Runtime filters] work on model columns. They add a filter condition behind the scenes and combine with the Liveboard's existing filters using an AND condition. They do not appear in the filter chips.
+
+Overrides work on the Liveboard's filter and parameter chips instead. They replace the values selected in a chip, and the chip shows the new values.
+
+[width="100%", cols="4,3,3,3,3"]
+[options='header']
+|=====
+|
+|Liveboard overrides
+|Runtime filters
+|Runtime Parameter overrides
+|Personalized views
+
+|*What it sets*
+|Values in existing filter and parameter chips
+|A filter condition on a model column
+|A parameter's value
+|A saved set of chip values
+
+|*Shown in the chips*
+|Yes
+|No
+|No (chip is hidden)
+|Yes
+
+|*Needs a chip*
+|Yes
+|No
+|No
+|Yes
+
+|*Effect on existing values*
+|Replaces the selection
+|Adds an AND condition
+|Replaces the value
+|Replaces the selection
+
+|*Rolling dates*
+|Yes
+|No
+|No
+|Yes
+
+|*Targets a model, tab, or group*
+|Yes
+|No
+|No
+|Not applicable
+
+|*Works on*
+|Liveboards
+|Liveboards, Answers, visualizations, REST APIs
+|Liveboards, Answers, REST APIs
+|Liveboards
+
+|*Saved*
+|No
+|No
+|No
+|Yes
+|=====
+
+To change values after the Liveboard loads, use host events. `UpdateFilters` and `UpdateParameters` update the chips and fetch data again. `UpdateRuntimeFilters` adds runtime filters and resets the Liveboard to its original state.
+
+Use overrides when users should see and adjust the values in the Liveboard's own chips.
+
+== Before you begin
+
+* Your administrator must turn on *Filtered Liveboard URLs* on the *Early Access* page of the Admin portal. The setting is Org-aware. When it is off, overrides are ignored without an error.
+* To use `liveboardOverride`, use Visual Embed SDK 1.54.0 or later.
+* Every filter or parameter you want to set must already exist as a chip on the Liveboard. Overrides never add a chip.
+* To target a tab or group, xref:customize-liveboard-filters.adoc#contextual-liveboard-filtering[contextual filtering] (tab-level and group-level filters) must be turned on. When it is off, any clause that names a tab or group is ignored.
+
+== Example Liveboard
+
+Every example on this page uses a Liveboard named *Retail Sales Overview*, set up as follows:
+
+* Two models: *Retail Sales* and *Returns*. Both have a *Region* column.
+* Two tabs: *Summary* and *Regional Detail*. The *Regional Detail* tab has a group named *Top Stores*.
+* Liveboard-level filter chips:
+** *Region* on Retail Sales, and *Region* on Returns
+** *Product Type* (attribute)
+** *Sales* (measure)
+** *Order Date* (date)
+* Tab-level filter chips, on the *Regional Detail* tab:
+** *Product Type* (attribute)
+* Group-level filter chips, in the *Top Stores* group:
+** *Store Name* (attribute)
+* Parameter chips, at the Liveboard level:
+** *Discount Rate*: Double, range 0 to 0.5
+** *Top N*: Integer, range 1 to 50
+** *Target Region*: String, list of West, East, Central, South
+** *Forecast Start*: Date
+
+[#embed]
+== Apply overrides in an embedded Liveboard
+
+Set `liveboardOverride` in the `LiveboardEmbed` configuration. The overrides apply when the Liveboard loads.
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed-container', {
+    frameParams: { width: '100%', height: '100%' },
+    liveboardId: '<liveboard-id>',
+    liveboardOverride: {
+        dataSourceOverride: [
+            {
+                // No dataSourceIdentifier: matching chips on every model are updated
+                filterQuery: [
+                    { filterQueryToken: 'Region = West, East' },
+                    { filterQueryToken: 'Order Date = last 30 days' },
+                ],
+                parameterQuery: [
+                    { parameterQueryToken: 'Discount Rate = 0.15' },
+                ],
+            },
+            {
+                dataSourceIdentifier: 'Retail Sales',
+                filterQuery: [
+                    {
+                        tabName: 'Regional Detail',
+                        groupName: 'Top Stores',
+                        filterQueryToken: 'Store Name = Downtown, Airport',
+                    },
+                ],
+            },
+        ],
+    },
+});
+embed.render();
+----
+
+=== liveboardOverride properties
+
+[width="100%", cols="3,2,6"]
+[options='header']
+|=====
+|Property |Type |Description
+|`dataSourceOverride`
+|Array, required
+|A list of override entries. Each entry groups the filter and parameter clauses for one model, or for all models when `dataSourceIdentifier` is omitted.
+
+|`dataSourceOverride[].dataSourceIdentifier`
+|String, optional
+a|The name or GUID of a model used by the Liveboard. Names are case-insensitive.
+
+* When set, the entry's clauses update only that model's chips.
+* When omitted or empty, they update matching chips on every model.
+* If the identifier doesn't match a model on the Liveboard, every clause in the entry is ignored.
+
+|`dataSourceOverride[].filterQuery`
+|Array, optional
+a|Filter clauses. Each item has:
+
+* `filterQueryToken` (string, required): one filter clause, such as `Region = West`. See <<filter-clauses,Filter clauses>>.
+* `tabName` (string, optional): the tab whose chips to update.
+* `groupName` (string, optional): the group whose chips to update.
+
+|`dataSourceOverride[].parameterQuery`
+|Array, optional
+a|Parameter clauses. Each item has:
+
+* `parameterQueryToken` (string, required): one parameter clause, such as `Top N = 10`. See <<parameter-clauses,Parameter clauses>>.
+* `tabName` (string, optional)
+* `groupName` (string, optional)
+|=====
+
+Each token holds exactly one clause. Do not join clauses with `;` or add `Model::Tab::` prefixes inside a token. Use the `dataSourceIdentifier`, `tabName`, and `groupName` properties instead.
+
+Leave out properties you don't need rather than setting them to empty strings.
+
+=== Behavior in an embedded Liveboard
+
+* `liveboardOverride` is the only way to pass overrides to an embedded Liveboard. Unlike runtime filters, which you can add to an embedded object's URL, adding `filter=` or `parameter=` to the URL of an embedded Liveboard has no effect.
+* Overrides apply when the Liveboard loads. Changing `liveboardOverride` after the Liveboard has rendered doesn't reload it. To change filter or parameter values after load, use the xref:filters_overview.adoc#_updatefilters_event[`UpdateFilters`] and `UpdateParameters` host events.
+* Clauses with no token are dropped, and so are properties the SDK doesn't recognize.
+* When a personalized view is loaded in the embedded Liveboard, for example because the user selects one, the view opens with its saved values, and the overrides aren't applied to it.
+
+[#url]
+== Apply overrides in a Liveboard URL
+
+Add the `filter` and `parameter` query parameters after the Liveboard's route, that is, after the `+#+`:
+
+----
+https://{ThoughtSpot-Host}/#/liveboard/{liveboard-id}?filter={filter clauses}&parameter={parameter clauses}
+----
+
+* Both keys are optional, and both are singular: `filter`, not `filters`.
+* Put them in the query string after the route. If they come before the `+#+`, they are ignored. Legacy runtime filters work the other way: `col1`, `op1` and `val1` go before the `+#+`.
+* You can combine them with other Liveboard URL parameters, such as a tab (`+#/pinboard/{liveboard-id}/tab/{tab-id}?filter=...+`) or a personalized view (`+?view={view-id}&filter=...+`).
+* Separate clauses with a semicolon (`;`).
+* Spaces around operators are optional: `Region=West` and `Region = West` are the same clause.
+* You can wrap the whole value in one pair of straight double quotes, for example `+filter="Region = West"+`. Curly quotes are not removed, and quoting individual clauses isn't supported.
+
+=== URL examples
+
+Add these to the end of the Liveboard's URL, for example `+https://{ThoughtSpot-Host}/#/liveboard/{liveboard-id}?filter=Region = West, East+`.
+
+[width="100%", cols="3,5"]
+[options='header']
+|=====
+|Goal |Add to the URL
+|Show the West and East regions |`+?filter=Region = West, East+`
+|Show the last 30 days |`+?filter=Order Date = last 30 days+`
+|Set three filters and a parameter |`+?filter=Region = West; Order Date = this quarter; Sales > 10000&parameter=Discount Rate = 0.15+`
+|Update only the Retail Sales model's Region chip |`+?filter=Retail Sales::Region = West+`
+|Update the Product Type chip on the Regional Detail tab |`+?filter=Regional Detail::Product Type = Shoes, Jackets+`
+|Update the Store Name chip in the Top Stores group |`+?filter=Regional Detail::Top Stores::Store Name = Downtown, Airport+`
+|Clear the Product Type chip |`+?filter=Product Type =+`
+|Set two parameters |`+?parameter=Forecast Start = 2026-07-01; Top N = 10+`
+|Apply on top of a personalized view |`+?view={view-id}&filter=Region = West+`
+|=====
+
+=== Encoding
+
+You can type or paste these values as shown. The browser encodes spaces and other characters when it opens the URL. Encode a value yourself only in these cases:
+
+* The value contains `&`, `+++`, `%`, `+#+` or `\`. Write them as `%26`, `%2B`, `%25`, `%23` and `%5C`. Otherwise the browser reads them as part of the URL itself.
+* You build the URL in code, or send it where spaces break links, such as email or chat. Use `encodeURIComponent()` on each value. For example, `+?filter=Region = West, East+` becomes `+?filter=Region%20%3D%20West%2C%20East+`.
+
+[#filter-clauses]
+== Filter clauses
+
+A filter clause has this form:
+
+----
+{Column name} {operator} {value}[, {value}...]
+----
+
+* *Column name*: the name shown on the filter chip. It is case-insensitive, but it must match the whole name. Partial and fuzzy matches are not supported. Multi-word names need no quotes.
+* *Operators*: `=`, `!=`, `<`, `+<=+`, `>`, `>=`. Which operators you can use depends on the column type, as shown in the tables below.
+* *Lists*: separate values with commas. Spaces inside a value are kept, so `Store Name = New York Downtown, San Francisco Bay` is a list of two values.
+* *Keywords*: keywords such as `between`, `last` and `today` are case-insensitive.
+
+=== Attribute columns
+
+[width="100%", cols="4,5"]
+[options='header']
+|=====
+|Input |Result
+|`Region = West` |Region is West
+|`Region = West, East, Central` |Region is any of West, East, Central
+|`Region != South` |Region is not South
+|`Region != South, Central` |Region is none of South, Central
+|`+Store Name = Smith\, Jones and Co+` |One value that contains a comma
+|`Region =` |Clears the chip, so all values are shown
+|=====
+
+Not accepted on attribute columns:
+
+* `<`, `+<=+`, `>`, `>=` (for example, `Region > West`)
+* `between`
+* Contains, begins with, or ends with matching
+* An empty list item, such as `Region = West,` or `Region = West,,East`
+* `{null}`. Filtering on null values isn't supported.
+
+Values are passed as written. Type them as they appear in the data.
+
+=== Measure columns
+
+[width="100%", cols="4,5"]
+[options='header']
+|=====
+|Input |Result
+|`Sales > 10000` |Greater than 10000. `>=`, `<` and `+<=+` work the same way.
+|`Sales = between 1000 5000` |Between 1000 and 5000, inclusive
+|`Sales =` |Clears the chip
+|=====
+
+Rules for measure values:
+
+* Comparison operators take exactly one value.
+* `between` takes exactly two values, separated by a space, with the smaller value first.
+* Decimal values (`1250.75`) and negative values (`-200`) are supported.
+* Thousands separators (`10,000`), currency symbols (`$100`), and percent signs are not supported.
+
+Not accepted:
+
+* `Sales > 100, 200`
+* `Sales = between 1000, 5000` (comma between the values)
+* `Sales = between 5000 1000` (larger value first)
+* `Sales != between 1000 5000` (measures have no "not between")
+
+=== Date columns: rolling dates
+
+[width="100%", cols="4,5"]
+[options='header']
+|=====
+|Input |Result
+|`Order Date = today` |Today. `yesterday` and `tomorrow` also work.
+|`Order Date = this quarter` |The current quarter
+|`Order Date = last 30 days` |The last 30 days
+|`Order Date = last quarter` |The last quarter (same as `last 1 quarter`)
+|`Order Date = last 24 hours` |The last 24 hours. Periods can be as short as `second`, `minute` and `hour`.
+|`Order Date = next 2 weeks` |The next 2 weeks
+|`Order Date = next quarter` |The next quarter (same as `next 1 quarter`)
+|`Order Date = year to date` |Year to date. `week`, `month`, and `quarter to date` also work.
+|`Order Date > last 2 months` |After the last 2 months
+|`+Order Date <= this month+` |On or before this month
+|`Order Date < today` |Before today. The before/after operators also work with `today`, `yesterday` and `tomorrow`.
+|=====
+
+Periods are `second`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, and `year`, in singular or plural form. Abbreviations such as `wk` or `yr` are not supported.
+
+Operators for rolling dates:
+
+* Rolling dates accept `=`, `<`, `+<=+`, `>`, and `>=`.
+* Rolling dates do not accept `!=`.
+* "To date" periods accept only `=`.
+
+=== Date columns: fixed dates
+
+[width="100%", cols="53,47"]
+[options='header']
+|=====
+|Input |Result
+|`Order Date = 2026-08-31` |On that day. `!=`, `<`, `+<=+`, `>`, and `>=` also work.
+|`Order Date = between 2026-01-01 2026-06-30` |Between the two dates, inclusive
+|`Order Date != between 2026-01-01 2026-06-30` |Not between the two dates
+|`Order Date = january 2026` |The whole month
+|`Order Date = q1 2026` |The whole quarter (`q1` to `q4`)
+|`Order Date = 2026` |The whole year
+|`Order Date =` |Clears the chip
+|=====
+
+Rules for fixed dates:
+
+* Write dates in ISO format, `yyyy-MM-dd`. A date is read as the start of that day in the ThoughtSpot cluster's time zone.
+* Write month names in full (`january`, not `jan`), followed by a four-digit year.
+* Month, quarter, and year values accept only `=`.
+* In a `between` range, the earlier date comes first.
+* Commas are not allowed in date clauses.
+
+Not accepted:
+
+* `08/31/2026` or other non-ISO formats
+* `jan 2026` or `january` without a year
+* `Q1-2026`, or fiscal quarters written as `fiscal q1 2026`
+* Date and time values, such as `2026-08-31 10:00`
+* Free-form phrases, such as `start of week`, `3 days ago`, `now`, or `last 7 days inclusive`
+* `day to date`
+* `Order Date = after last 2 months`. Write before and after as operators instead: `Order Date > last 2 months`.
+
+[#parameter-clauses]
+== Parameter clauses
+
+A parameter clause has this form:
+
+----
+{Parameter name} = {value}
+----
+
+* *Parameter name*: the parameter's name, or the label shown on its chip. It is case-insensitive.
+* *Value*: exactly one value, written for the parameter's data type.
+
+[width="100%", cols="2,4,4"]
+[options='header']
+|=====
+|Data type |Example |Notes
+|Integer |`Top N = 10` |Whole numbers only
+|Double |`Discount Rate = 0.15` |
+|String |`Target Region = West` |
+|Boolean |`Include Returns = true` |Use `true` or `false`
+|Date |`Forecast Start = 2026-07-01` |ISO format, `yyyy-MM-dd`
+|=====
+
+The value must satisfy the parameter's own restrictions:
+
+* For a parameter with a list of values, use one of the values or one of their display names. Display names are case-insensitive.
+* For a parameter with a range, the value must fall inside the range.
+* A value that doesn't meet these restrictions is ignored, and the chip keeps its current value.
+
+Not accepted:
+
+* Any operator other than `=`
+* More than one value, such as `Top N = 5, 10`
+* An empty value (`Top N =`). Parameter chips can't be cleared.
+* `{null}`
+* Dynamic date values, such as `Forecast Start = today` or `last 7 days`
+* Date-time and time parameters
+
+== Special characters in values
+
+Use a backslash (`\`) to write a character that the syntax would otherwise read as part of the clause structure:
+
+[width="100%", cols="3,2,4"]
+[options='header']
+|=====
+|To include |Write |Where needed
+|A comma inside a value |`+\,+` |URL and SDK
+|`=`, `<`, `>` inside a value |`+\=+`, `+\<+`, `+\>+` |URL and SDK
+|A semicolon inside a value |`+\;+` |URL only. In the SDK, each token is already one clause.
+|`::` inside a value |`+\::+` |URL only
+|=====
+
+A single colon needs no escaping. For example, `Region = sales: eu` is read as one value.
+
+[#scoping]
+== Target a model, tab, or group
+
+When no model, tab, or group is given, a clause updates every chip with a matching name across all models and all levels (Liveboard, tab, and group). For example, `Region = West` updates the Region chip on both Retail Sales and Returns.
+
+To narrow a clause, prefix it with names separated by `::` in a URL, or set `dataSourceIdentifier`, `tabName`, and `groupName` in the SDK:
+
+[width="100%", cols="4,3,4"]
+[options='header']
+|=====
+|URL clause |SDK equivalent |Chips updated
+|`Region = West` |`{ filterQueryToken: 'Region = West' }` |Region chips on all models, at every level
+|`Retail Sales::Region = West` |`dataSourceIdentifier: 'Retail Sales'` |Region chips on the Retail Sales model only, at every level
+|`Regional Detail::Product Type = Shoes` |`tabName: 'Regional Detail'` |Product Type chips on the Regional Detail tab, including groups on that tab. Liveboard-level chips are not updated.
+|`Top Stores::Store Name = Downtown` |`groupName: 'Top Stores'` |Store Name chips in every group named Top Stores
+|`Regional Detail::Top Stores::Store Name = Downtown` |`tabName` and `groupName` |Store Name chips in the Top Stores group on the Regional Detail tab
+|`Retail Sales::Regional Detail::Top Stores::Store Name = Downtown` |All three properties |As above, for the Retail Sales model only
+|=====
+
+How prefixes are matched in a URL:
+
+* Names are matched against the display names of models, tabs, and groups. Matching is case-insensitive.
+* A model can also be given by its GUID. Tabs and groups are matched by name only.
+* When all three prefixes are given, they are read in order: model, tab, group.
+* With one or two prefixes, each name is looked up as a model first, then as a tab, then as a group. So if a model and a tab share a name, the name is read as the model. To name the tab in that case, use the SDK properties.
+* A clause with more than three prefixes is ignored.
+* A clause whose prefix doesn't match a model, tab, or group on the Liveboard is ignored.
+
+Parameters use the same prefixes. For example, `Retail Sales::Discount Rate = 0.15` updates the Discount Rate chip for the Retail Sales model only.
+
+There is no prefix that targets only a Liveboard-level chip. A clause without a tab or group prefix updates all chips with a matching column name, including tab-level and group-level chips. To target only a tab or group, add its prefix.
+
+== How overrides behave
+
+=== Only existing chips are updated
+
+* A clause updates a chip only if the chip already exists on the Liveboard. If a column or parameter is used in a visualization but has no chip, the clause is ignored, and no chip is added.
+* xref:runtime-parameters.adoc[Runtime parameter overrides] behave differently: they apply to any parameter used in the Liveboard.
+* To change a linked parameter, target its primary parameter. Clauses that target a linked secondary parameter are ignored.
+
+=== Invalid clauses are skipped
+
+* Each clause is applied independently. If a clause can't be applied, because of a misspelled name, an invalid value, an unknown prefix, or a missing chip, only that clause is skipped. The other clauses still apply, and the Liveboard always loads.
+* No error or warning is shown, so check the chips after the Liveboard loads to confirm which values were applied.
+* Overrides can be applied differently for different users. For example, a clause on a model the user can't access is skipped for that user.
+
+=== Personalized views
+
+For a URL that includes a view (`+?view={view-id}&filter=...+`):
+
+* The Liveboard opens the view, then applies the overrides on top of it.
+* Chips you don't override keep the view's values.
+* The view shows as modified, and the user can update it with the new values.
+
+For a URL with overrides but no view:
+
+* The Liveboard opens with its saved values plus the overrides, even if the user has set a default view.
+* The *Save view* option becomes available, so the user can save the overridden state as a new view.
+
+=== How long overrides last
+
+Overrides are not saved to the Liveboard. In a Liveboard URL, they stay in the URL while the user works in view mode:
+
+[width="100%", cols="3,6"]
+[options='header']
+|=====
+|Action |Result
+|Reload the page |The overrides are applied again. Filter changes the user made after load are lost.
+|Switch tabs |The overrides stay in effect.
+|Open and close *Explore* on a visualization |The overrides stay in effect.
+|Reset filters in the filter window |The overrides are removed from the URL, and the chips return to their saved values.
+|Enter edit mode |The overrides are removed from the URL, and the Liveboard returns to its saved state. Any other filter changes made in view mode are discarded too. Saving the Liveboard never saves override values.
+|Save or update a personalized view |The view stores the values currently shown, including overridden ones.
+|Open the Liveboard without the `filter` and `parameter` keys |The Liveboard opens with its saved values, or with the default view.
+|=====
+
+=== Downloads, schedules, and alerts
+
+* Downloads from the Liveboard, such as PDF or a visualization's CSV, use the overridden values.
+* Scheduled Liveboard jobs and alerts use the saved values. Overrides aren't applied to them.
+
+[#precedence]
+=== Security and precedence
+
+* Overrides are not a security feature. Anyone who can edit the URL can change the values or remove them. To restrict data, use xref:rls-rules.adoc[row-level security (RLS)] or the xref:abac-user-parameters.adoc[ABAC and JWT security methods].
+* Overrides can't expose data the user isn't allowed to see. RLS applies to the overridden values as it does to any filter. Clauses on columns the user can't access are skipped.
+* A parameter can get its value from several places. When more than one sets it, ThoughtSpot uses the value from the highest-priority source. For example, if a JWT token pins `Discount Rate` to `0.1` and the URL sets `Discount Rate = 0.15`, the Liveboard uses `0.1`. Sources, from highest to lowest priority:
+.. A value pinned through ABAC with a JWT token
+.. A runtime parameter override (`runtimeParameters`, or `param1` and `paramVal1` in the URL)
+.. A Liveboard parameter override
+.. The personalized view's value
+.. The Liveboard's saved value
+.. The parameter's default value
+* Don't set the same parameter with both a runtime parameter override and a Liveboard override. The runtime override wins, and the chip is hidden.
+* Runtime filters and Liveboard filter overrides can be used together. The runtime filter restricts the column's data, and the override sets the chip's selection, and both apply.
+
+== Limitations
+
+* Overrides work on Liveboards only. Answers, saved Answers, Search, and Spotter don't support them, in the UI or in embeds.
+* In embedded deployments, only `LiveboardEmbed` is supported. Full application embedding (`AppEmbed`) is not supported in this release.
+* Overrides apply only at load. To change values after load in an embed, use the `UpdateFilters` and `UpdateParameters` host events.
+* Dynamic date values for parameters are not supported, and date-time and time parameters are not supported.
+* A parameter chip can't be cleared.
+* Overrides don't create chips, and they don't apply to columns or parameters without a chip.
+* Scheduled jobs and alerts don't use overrides.
+* Skipped clauses aren't reported in the UI or through an embed event.
+
+== Troubleshooting
+
+[width="100%", cols="3,6"]
+[options='header']
+|=====
+|Symptom |Check
+|Nothing is applied
+a|
+* *Filtered Liveboard URLs* is turned on for the Org.
+* The keys are `filter` and `parameter`, singular.
+* The keys come after the `+#+` route.
+* In an embed, the overrides are in `liveboardOverride`, not in the URL.
+
+|One clause is not applied
+a|
+* A chip exists for that column or parameter, at the scope you targeted.
+* The name matches the chip name in full.
+* The value format matches the tables above: ISO dates, one value for parameters, a value inside the parameter's list or range.
+* Any prefix matches a model, tab, or group name.
+
+|A clause works for some users but not others
+|The user may not have access to the model or column. Clauses on sources a user can't access are skipped for that user.
+
+|The URL is cut off or a value is wrong
+|Encode `&`, `+++`, `%`, `+#+`, and `\` in values.
+
+|Values disappear after entering edit mode
+|Expected. Edit mode always shows the saved Liveboard.
+
+|A tab or group clause is ignored
+|Contextual filtering must be turned on. Check the tab and group names.
+|=====
+
+To check what was sent, open the browser's developer tools. On the *Network* tab, find the `LoadPinboardSession` request: its `liveboardOverride` variable shows the clauses ThoughtSpot received.
+
+== Related information
+
+* xref:runtime-filters.adoc[Runtime filters]
+* xref:runtime-parameters.adoc[Runtime Parameter overrides]
+* xref:filters_overview.adoc[Filter types and application layers]
+* xref:customize-liveboard-filters.adoc[Customize Liveboard filters]
+* xref:LiveboardViewConfig.adoc#_liveboardoverride[SDK reference]
