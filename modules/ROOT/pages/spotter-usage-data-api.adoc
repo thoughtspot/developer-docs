@@ -7,6 +7,8 @@
 :page-description: Use the Spotter usage data REST API v2 endpoints to manage Spotter question allowances for users, user groups, and Orgs.
 :keywords: Spotter usage, usage pools, usage limits, question allowance, Spotter limits, REST API
 
+[beta betaBackground]^Beta^
+
 Spotter usage pools let administrators control how many Spotter questions a user, user group, or Org can ask. Each pool tracks a question allowance, a warning threshold, and the number of questions consumed.
 
 ThoughtSpot provides public REST API v2 endpoints to create, retrieve, update, and delete usage pools programmatically for the following purposes:
@@ -15,6 +17,8 @@ ThoughtSpot provides public REST API v2 endpoints to create, retrieve, update, a
 * To monitor consumption and find pools that are close to their limit.
 * To raise or lower the limits.
 * To reset usage at the start of a billing period.
+
+To set up usage limits end to end, including the Visual Embed SDK configuration for the usage counter and an upgrade workflow, see xref:spotter-usage-limits.adoc[Manage Spotter usage limits].
 
 [NOTE]
 ====
@@ -46,7 +50,7 @@ To use the Spotter usage data APIs, the user requires the following privileges:
 * **Search, update, and delete usage data**: These endpoints require `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege. Users with only `CAN_MANAGE_SPOTTER`, and Org administrators without cluster-level `ADMINISTRATION`, cannot call these endpoints.
 
 [#get-usage-data-for-user]
-== Getting usage data for a user [beta betaBackground]^Beta^
+== Getting usage data for a user
 The `GET /api/rest/2.0/ai/usage-data/user` API endpoint retrieves a user's combined Spotter usage: every usage pool that the user draws from, with usage, warning limits, and limits summed across them. Use this endpoint to show users how many Spotter questions they have left, or to check whether a user is blocked by a usage limit.
 
 === Request parameters
@@ -135,17 +139,6 @@ a| The user's combined usage across every pool that the user draws from. The obj
 * `is_at_warning`: `true` when usage has reached the combined warning limit.
 * `is_at_limit`: `true` when usage has reached the combined limit and further Spotter questions are blocked. For a user who is not metered, the value is `false`.
 * `has_unlimited_pool`: `true` when any of the user's pools has no limit, which makes the user effectively unlimited.
-|===
-
-=== Response codes
-[cols="1,3", options="header"]
-|===
-| HTTP status code | Description
-| **200** | Successful operation.
-| **400** | Invalid request.
-| **401** | Authentication token is missing, expired, or invalid.
-| **403** | The caller requested another user's usage without `ADMINISTRATION` privilege.
-| **500** | Unexpected server error.
 |===
 
 [#search-usage-data]
@@ -237,19 +230,8 @@ a| One entry for each pool. Each entry includes the following attributes:
 * `updated_by`: ID of the user who last changed the pool configuration.
 |===
 
-=== Response codes
-[cols="1,3", options="header"]
-|===
-| HTTP status code | Description
-| **200** | Successful operation.
-| **400** | Invalid request.
-| **401** | Authentication token is missing, expired, or invalid.
-| **403** | The caller does not have `ADMINISTRATION` privilege.
-| **500** | Unexpected server error.
-|===
-
 [#update-usage-data]
-== Creating or updating usage data [beta betaBackground]^Beta^
+== Creating or updating usage data
 The `/api/rest/2.0/ai/usage-data/update` API endpoint creates or updates Spotter usage pools. Use this endpoint to provision limits for new users or groups, raise or lower an existing limit, or reset usage at the start of a billing period.
 
 A pool that does not exist is created. Fields omitted from an update keep their current value. Every key must use the scope that the cluster meters at. To switch the scope, delete the existing pools first.
@@ -262,7 +244,7 @@ A pool that does not exist is created. Fields omitted from an update keep their 
 a|__Array of objects__. The changes to apply, one entry for each pool. At least one entry is required. For each entry, specify the following attributes:
 
 * `key`. __Object__. The pool to create or update. Specify the `entity_type` (`USER`, `USER_GROUP`, or `ORG`) and the `entity_identifier` (the GUID of the user or user group, or the ID of the Org). The `entity_type` must match the scope that the cluster meters at.
-* `limit`. __Integer__. Optional. Maximum number of Spotter questions that the pool allows. To remove a limit from an existing pool entirely, delete the pool using the xref:spotter-usage-data-api.adoc#_deleting_usage_data[delete usage data] endpoint and recreate it without a `limit` attribute.
+* `limit`. __Integer__. Optional. Maximum number of Spotter questions that the pool allows. To remove a limit from an existing pool entirely, delete the pool using the xref:spotter-usage-data-api.adoc#delete-usage-data[delete usage data] endpoint and recreate it without a `limit` attribute.
 * `warning_limit`. __Integer__. Optional. Usage level at which users are warned that they are approaching the limit.
 * `usage`. __Integer__. Optional. Number of questions consumed so far. Set it to `0` to reset the pool.
 |===
@@ -334,19 +316,8 @@ If the API request is successful, the API returns `usage_data` with each updated
 }
 ----
 
-=== Response codes
-[cols="1,3", options="header"]
-|===
-| HTTP status code | Description
-| **200** | Successful operation.
-| **400** | Invalid request. For example, `updates` is empty, a key is missing its `entity_type` or `entity_identifier`, or a key uses a different `entity_type` from the existing pools on the cluster.
-| **401** | Authentication token is missing, expired, or invalid.
-| **403** | The caller does not have `ADMINISTRATION` privilege.
-| **500** | Unexpected server error.
-|===
-
 [#delete-usage-data]
-== Deleting usage data [beta betaBackground]^Beta^
+== Deleting usage data
 The `/api/rest/2.0/ai/usage-data/delete` API endpoint deletes Spotter usage pools. Use this endpoint to remove a limit from a user, user group, or Org, or to clear every pool before switching the metering scope.
 
 Deleting a pool removes its limit rather than blocking its users. A user who no longer draws from any pool is not metered and can use Spotter without a limit.
@@ -401,19 +372,9 @@ If the API request is successful, the API returns `deleted_keys`, the keys of th
 }
 ----
 
-=== Response codes
-[cols="1,3", options="header"]
-|===
-| HTTP status code | Description
-| **200** | Successful operation.
-| **400** | Invalid request. For example, `keys` is empty, or a key is missing its `entity_type` or `entity_identifier`.
-| **401** | Authentication token is missing, expired, or invalid.
-| **403** | The caller does not have `ADMINISTRATION` privilege.
-| **500** | Unexpected server error.
-|===
-
 == Additional resources
 
+* xref:spotter-usage-limits.adoc[Manage Spotter usage limits]
 * xref:rest-api-v2-reference.adoc#_ai[REST API v2.0 Reference]
 * xref:rest-apiv2-changelog.adoc[REST API v2.0 changelog]
 * +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fai%2Fget-usage-data-for-user">REST API Playground - Get usage data for user endpoint</a>+++

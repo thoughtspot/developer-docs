@@ -22,7 +22,7 @@ Ensure you have the following setup:
 
 * Your ThoughtSpot instance is running 26.11.0.cl or later.
 * Your embedding application project has Visual Embed SDK v1.53.0 or later.
-* You have a user account with `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege to create and manage usage pools. `CAN_MANAGE_SPOTTER` privilege, or Org administrator privileges without cluster-level `ADMINISTRATION`, is not sufficient.
+* You have a user account with `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege to create and manage usage pools via REST APIs.
 
 == How usage limits work
 A *usage pool* is a tracked question allowance assigned to an entity: a user (`USER`), a user group (`USER_GROUP`), or an Org (`ORG`). Each pool has the following properties:
@@ -46,7 +46,7 @@ If any pool that applies to a user has no `limit`, the user is treated as unlimi
 * **Usage limits are opt-in**. +
 A user who does not map to any usage pool is not metered and can use Spotter without a limit.
 
-== Choose a metering scope
+== Choosing a metering scope
 A cluster supports exactly one metering scope at a time. The first usage pool created on a cluster sets its `entity_type`, and all subsequent pools must use the same `entity_type`. To change the metering scope, you must first delete all existing pools.
 
 [cols="1,2,3", options="header"]
@@ -70,10 +70,24 @@ A cluster supports exactly one metering scope at a time. The first usage pool cr
 For the `ORG` scope, `entity_identifier` is the numeric Org ID expressed as a string. For example, `"0"` represents the Primary Org.
 ====
 
-== Get started
+== Setting up usage limits
+To set up usage limits for the embedded Spotter interface, complete the following steps in order:
 
-=== Create a usage pool
-Send a `POST` request to the `/api/rest/2.0/ai/usage-data/update` endpoint to create a usage pool. The following example creates a pool for a user group, for example, Trial users:
+. <<_choosing_a_metering_scope,Choose a metering scope>>.
+. <<step-create-pools,Create usage pools>> using the REST API from your backend.
+. <<step-enable-embed,Enable usage limits in the embed>>.
+. <<step-verify-usage,Verify the usage status of a user>>.
+
+After you complete these steps, you can <<_customizing_usage_limits_in_the_embed,customize the usage counter>> and <<_building_an_upgrade_workflow,build an upgrade workflow>>.
+
+[#step-create-pools]
+=== Creating usage pools
+To create a usage pool, send a `POST` request to the `/api/rest/2.0/ai/usage-data/update` endpoint. Identify each pool with a key that contains the following attributes:
+
+* `entity_type`: `USER`, `USER_GROUP`, or `ORG`. Use the scope that you chose in <<_choosing_a_metering_scope,Choosing a metering scope>>.
+* `entity_identifier`: The GUID of the user or user group, or the ID of the Org.
+
+Set `limit` to the maximum number of questions, and optionally set `warning_limit` to the usage level at which users see a warning. The following example creates a pool for a user group, for example, Trial users:
 
 [source,cURL]
 ----
@@ -96,8 +110,25 @@ curl -X POST \
 }'
 ----
 
-=== Enable usage limits in the embed
-To enable usage tracking and show the usage counter in your embedded Spotter interface, set `spotterUsageLimitConfig` in your embed configuration:
+[IMPORTANT]
+====
+Do not call the usage data endpoints that create, update, delete, or search pools from client-side code. These endpoints require cluster-level `ADMINISTRATION` (**Can administer ThoughtSpot**) privilege, so run them from your backend.
+====
+
+You can use the following endpoints to manage pools. For the request and response details, and for tasks such as raising a limit, resetting usage, removing a limit, or deleting a pool, see xref:spotter-usage-data-api.adoc[Spotter usage data APIs].
+
+[cols="3,3", options="header"]
+|===
+| Endpoint | Purpose
+| `POST /api/rest/2.0/ai/usage-data/update` | Create, update, or reset usage pools. See xref:spotter-usage-data-api.adoc#update-usage-data[Creating or updating usage data].
+| `POST /api/rest/2.0/ai/usage-data/search` | Query existing usage pools. See xref:spotter-usage-data-api.adoc#search-usage-data[Searching usage data].
+| `GET /api/rest/2.0/ai/usage-data/user` | Retrieve the evaluated usage status of a user. See xref:spotter-usage-data-api.adoc#get-usage-data-for-user[Getting usage data for a user].
+| `POST /api/rest/2.0/ai/usage-data/delete` | Delete usage pools. See xref:spotter-usage-data-api.adoc#delete-usage-data[Deleting usage data].
+|===
+
+[#step-enable-embed]
+=== Enabling usage limits in the embed
+To enable usage tracking and show the usage counter in your embedded Spotter interface, set `spotterUsageLimitConfig` in your `SpotterEmbed` or `AppEmbed` configuration:
 
 [source,JavaScript]
 ----
@@ -130,9 +161,10 @@ const embed = new AppEmbed('#tsEmbed', {
 embed.render();
 ----
 
-For more information about the configuration options, see <<_configure_the_usage_counter,Configure the usage counter>>.
+For the other configuration options, see <<_configuring_the_usage_counter,Configuring the usage counter>>.
 
-=== Retrieve the usage status of a user
+[#step-verify-usage]
+=== Verifying the usage status of a user
 To check the current usage position of a user, send a `GET` request to the `/api/rest/2.0/ai/usage-data/user` endpoint:
 
 [source,cURL]
@@ -144,38 +176,20 @@ curl -X GET -G \
   --data-urlencode 'user_identifier={user-guid}'
 ----
 
-If you omit `user_identifier`, the API returns the usage of the authenticated user. The response includes the pools that the user draws from and the combined totals, such as `total_usage`, `total_limit`, `total_remaining`, `is_at_warning`, `is_at_limit`, and `has_unlimited_pool`.
+If you omit `user_identifier`, the API returns the usage of the authenticated user. The response includes the pools that the user draws from and the combined totals, such as `total_usage`, `total_limit`, `total_remaining`, `is_at_warning`, `is_at_limit`, and `has_unlimited_pool`. For the full response, see xref:spotter-usage-data-api.adoc#get-usage-data-for-user[Getting usage data for a user].
 
-== Manage usage pools using REST APIs
-You manage usage pools using the following REST API v2.0 endpoints:
+To review all the pools on the cluster, use the xref:spotter-usage-data-api.adoc#search-usage-data[search usage data] endpoint.
 
-[cols="3,1,3", options="header"]
-|===
-| Endpoint | Method | Purpose
-| `/api/rest/2.0/ai/usage-data/user` | GET | Retrieve the evaluated usage status of a user.
-| `/api/rest/2.0/ai/usage-data/search` | POST | Query existing usage pools.
-| `/api/rest/2.0/ai/usage-data/update` | POST | Create, update, or reset usage pools.
-| `/api/rest/2.0/ai/usage-data/delete` | POST | Delete usage pools.
-|===
+Then, load the embedded Spotter interface as a user who draws from one of the pools. With the default `AlwaysVisible` display mode, the usage counter appears in the interface.
 
-Each pool is identified by a key that contains an `entity_type` (`USER`, `USER_GROUP`, or `ORG`) and an `entity_identifier` (the GUID of the user or user group, or the ID of the Org).
+== Customizing usage limits in the embed
+After you enable usage limits, you can customize how the usage counter and banners appear in the embedded interface, and respond to usage events in your host application. The following sections describe how to:
 
-The following behaviors apply to the endpoints:
+* <<_configuring_the_usage_counter,Configure the usage counter>>, including the banners, the Upgrade button, and the counter display modes.
+* <<_handling_usage_limit_events,Handle usage limit events>> when a user selects the *Upgrade* button.
+* <<_refreshing_usage_data,Refresh usage data>> in the embed without reloading the page.
 
-* **Partial updates**. +
-Fields that you omit from an update retain their existing values. For example, updating `limit` without specifying `usage` preserves the number of questions consumed.
-* **Resetting usage**. +
-Pass `"usage": 0` to reset the questions consumed, for example, at the start of a new billing cycle.
-* **Removing a limit**. +
-You cannot remove a limit from an existing pool using an update. To make a pool unlimited, delete the pool and recreate it without a `limit`.
-* **Searching pools**. +
-Omit `keys` to return all pools configured on the cluster. Keys that do not match an existing pool are ignored.
-* **Deleting pools**. +
-Pool deletion is permanent. If you recreate a deleted pool, its usage restarts from `0`. Users who no longer draw from any pool are not metered.
-
-For the request and response details of each endpoint, see xref:spotter-usage-data-api.adoc[Spotter usage data APIs].
-
-== Configure the usage counter
+=== Configuring the usage counter
 
 Use `spotterUsageLimitConfig` in your `SpotterEmbed` or `AppEmbed` configuration to control usage enforcement and the counter display.
 
@@ -214,7 +228,7 @@ Use `spotterUsageLimitConfig` in your `SpotterEmbed` or `AppEmbed` configuration
 Disabling `isLimitBannerEnabled` suppresses the notification banner but does not bypass query blocking when the limit is reached. Users are still blocked from asking additional questions.
 ====
 
-=== Counter display modes
+==== Counter display modes
 
 The `SpotterUsageCounterDisplayMode` enum controls when the usage counter is visible to the user:
 
@@ -235,9 +249,7 @@ The `SpotterUsageCounterDisplayMode` enum controls when the usage counter is vis
 | The counter appears only after the user's consumption reaches the maximum `limit`.
 |===
 
-== Handling usage limit events
-
-=== Upgrade event
+=== Handling usage limit events
 When an end user clicks the *Upgrade* button in the embedded Spotter interface, the embed emits the `EmbedEvent.SpotterUsageLimitUpgrade` event. Register a handler for this event to start your own upgrade flow. The event payload includes the following properties:
 
 * `payload.data.usageCount` (__number__): Total questions asked across sessions.
@@ -267,7 +279,7 @@ The `status` values indicate the following:
 | The user's consumption has reached or exceeded `limit`. The user is blocked from asking additional questions.
 |===
 
-=== Refresh usage data
+=== Refreshing usage data
 To refresh the usage data in the embed without reloading the page, for example, after a tier upgrade or a server-side REST API update, trigger the `HostEvent.SpotterRefreshUsageLimit` event:
 
 [source,JavaScript]
@@ -291,10 +303,10 @@ The overrides apply only to the current embed session and do not modify the pool
 
 For a complete list of event IDs, see xref:EmbedEvent.adoc[EmbedEvent reference] and xref:HostEvent.adoc[HostEvent reference].
 
-== Build an upgrade workflow
+== Building an upgrade workflow
 ThoughtSpot does not handle subscription billing. To let users upgrade their allowance, coordinate the following components: the Visual Embed SDK, your host application, your billing service, and the ThoughtSpot REST APIs.
 
-. The end user reaches an allowance threshold and clicks *Upgrade* in the embedded interface.
+. The end-user reaches an allowance threshold and clicks *Upgrade* in the embedded interface.
 . Your host application receives the `EmbedEvent.SpotterUsageLimitUpgrade` event.
 . Your host application runs its own upgrade logic, for example, opening a payment dialog or changing the account plan.
 . After the payment or account change succeeds, your backend calls the `POST /api/rest/2.0/ai/usage-data/update` endpoint with server-side credentials, or reassigns the user's group memberships.
@@ -322,11 +334,6 @@ embed.on(EmbedEvent.SpotterUsageLimitUpgrade, async ({ data }) => {
   });
 });
 ----
-
-[IMPORTANT]
-====
-Do not call the usage data update endpoint from client-side code. The endpoint requires cluster-level `ADMINISTRATION` privilege, so run it from your backend.
-====
 
 == Common operational tasks
 
@@ -381,7 +388,7 @@ Do not call the usage data update endpoint from client-side code. The endpoint r
 * **No administration UI**. +
 You can manage usage pools only using the REST APIs. ThoughtSpot Cloud does not provide a UI for pool management.
 * **Beta REST APIs**. +
-The endpoints may change before they become Generally Available.
+The endpoints may change before they become Generally Available (GA).
 * **Manual reset cycle**. +
 ThoughtSpot does not support automatic scheduled resets, such as monthly resets. Use an external scheduler or a backend job that calls the REST API.
 * **Single metering scope per cluster**. +
