@@ -254,8 +254,8 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
             }
         });
         const map: Record<string, DocCategory[]> = {};
-        // The SDK reference nav goes last, so it comes last in the list of a page that the
-        // Embedding nav also links to (e.g. VisualEmbedSdk).
+        // The navs are applied in order, so the SDK reference nav goes last: it claims the pages
+        // (e.g. VisualEmbedSdk) that the Embedding nav also links to.
         const orderedNavs = Object.entries(processedNavMap).sort(
             ([a], [b]) => Number(a === SDK_REFERENCE_NAV_KEY) - Number(b === SDK_REFERENCE_NAV_KEY),
         );
@@ -292,10 +292,9 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         // First try the auto-derived map from nav files
         const categories = pageIdToCategories[currentPageId];
         if (categories?.length) {
-            // The pages of the SDK reference always show its own sidebar, also for a visitor who
-            // comes from the Embedding nav (which links to its landing page).
-            if (categories.includes('sdk-reference')) {
-                setActiveCategory('sdk-reference');
+            // The SDK reference nav always claims its pages, wherever the visitor came from.
+            if (categories.includes(SDK_REFERENCE_NAV_KEY)) {
+                setActiveCategory(SDK_REFERENCE_NAV_KEY);
                 return;
             }
             // A page listed in several category navs (e.g. the changelogs, which sit in both
