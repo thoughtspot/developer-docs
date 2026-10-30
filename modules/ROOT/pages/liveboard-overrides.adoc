@@ -105,27 +105,45 @@ Use overrides when users should see and adjust the values in the Liveboard's own
 
 Every example on this page uses a Liveboard named *Retail Sales Overview*, set up as follows:
 
-* Two models: *Retail Sales* and *Returns*. Both have a *Region* column.
-* Two tabs: *Summary* and *Regional Detail*. The *Regional Detail* tab has a group named *Top Stores*.
-* Liveboard-level filter chips:
-** *Region* on Retail Sales, and *Region* on Returns
-** *Product Type* (attribute)
-** *Sales* (measure)
-** *Order Date* (date)
-* Tab-level filter chips, on the *Regional Detail* tab:
-** *Product Type* (attribute)
-* Group-level filter chips, in the *Top Stores* group:
-** *Store Name* (attribute)
-* Parameter chips, at the Liveboard level:
-** *Discount Rate*: Double, range 0 to 0.5
-** *Top N*: Integer, range 1 to 50
-** *Target Region*: String, list of West, East, Central, South
-** *Forecast Start*: Date
+* Two models: *Retail Sales* and *Returns*. Both have *Region* and *Store Name* columns.
+* Two tabs: *Summary* and *Regional Detail*. Each tab has a group named *Top Stores*.
+* The *Top Stores* group on the *Regional Detail* tab has visualizations from both models.
+
+The Liveboard has the following filter chips. The examples on this page refer to each chip by its number.
+
+[width="100%", cols="1,3,2,3,6"]
+[options='header']
+|=====
+|# |Chip |Type |Model |Where it is
+|1 |Region |Attribute |Retail Sales |Liveboard
+|2 |Region |Attribute |Returns |Liveboard
+|3 |Order Date |Date |Retail Sales |Liveboard
+|4 |Sales |Measure |Retail Sales |Liveboard
+|5 |Product Type |Attribute |Retail Sales |Summary tab
+|6 |Product Type |Attribute |Retail Sales |Regional Detail tab
+|7 |Store Name |Attribute |Retail Sales |Top Stores group on the Summary tab
+|8 |Store Name |Attribute |Retail Sales |Top Stores group on the Regional Detail tab
+|9 |Store Name |Attribute |Returns |Top Stores group on the Regional Detail tab
+|=====
+
+The Liveboard also has the following parameter chips, all at the Liveboard level and from the Retail Sales model:
+
+[width="100%", cols="3,2,5"]
+[options='header']
+|=====
+|Parameter |Type |Allowed values
+|Discount Rate |DOUBLE |0 to 0.5
+|Top N |INT |1 to 50
+|Target Region |VARCHAR |West, East, Central, South
+|Forecast Start |DATE |Any date
+|=====
 
 [#embed]
 == Apply overrides in an embedded Liveboard
 
 Set `liveboardOverride` in the `LiveboardEmbed` configuration. The overrides apply when the Liveboard loads.
+
+=== Step 1: Set one filter
 
 [source,JavaScript]
 ----
@@ -135,23 +153,8 @@ const embed = new LiveboardEmbed('#embed-container', {
     liveboardOverride: {
         dataSourceOverride: [
             {
-                // No dataSourceIdentifier: matching chips on every model are updated
                 filterQuery: [
-                    { filterQueryToken: 'Region = West, East' },
-                    { filterQueryToken: 'Order Date = last 30 days' },
-                ],
-                parameterQuery: [
-                    { parameterQueryToken: 'Discount Rate = 0.15' },
-                ],
-            },
-            {
-                dataSourceIdentifier: 'Retail Sales',
-                filterQuery: [
-                    {
-                        tabName: 'Regional Detail',
-                        groupName: 'Top Stores',
-                        filterQueryToken: 'Store Name = Downtown, Airport',
-                    },
+                    { filterQueryToken: 'Order Date = last 30 days' }, // Chip 3
                 ],
             },
         ],
@@ -159,6 +162,157 @@ const embed = new LiveboardEmbed('#embed-container', {
 });
 embed.render();
 ----
+
+Result: chip 3 shows the last 30 days. All other chips keep their saved values.
+
+=== Step 2: Set several filters and parameters
+
+Put each override in its own token: filter overrides in `filterQuery`, and parameter overrides in `parameterQuery`.
+
+[source,JavaScript]
+----
+liveboardOverride: {
+    dataSourceOverride: [
+        {
+            filterQuery: [
+                { filterQueryToken: 'Order Date = this quarter' }, // Chip 3
+                { filterQueryToken: 'Sales > 10000' },             // Chip 4
+            ],
+            parameterQuery: [
+                { parameterQueryToken: 'Discount Rate = 0.15' },   // Discount Rate chip
+                { parameterQueryToken: 'Top N = 10' },             // Top N chip
+            ],
+        },
+    ],
+},
+----
+
+Result: chip 3 shows this quarter, chip 4 shows Sales greater than 10000, Discount Rate is 0.15, and Top N is 10. All other chips keep their saved values.
+
+To clear a filter chip, leave the value empty:
+
+[source,JavaScript]
+----
+filterQuery: [
+    { filterQueryToken: 'Sales =' }, // Chip 4
+],
+----
+
+Result: chip 4 is cleared and shows all values.
+
+=== Step 3: Use the same name in several places
+
+An override without `dataSourceIdentifier`, `tabName`, or `groupName` updates every chip with that name, on every model and at every level.
+
+[source,JavaScript]
+----
+filterQuery: [
+    { filterQueryToken: 'Region = West' },         // Chips 1, 2
+    { filterQueryToken: 'Product Type = Shoes' },  // Chips 5, 6
+    { filterQueryToken: 'Store Name = Downtown' }, // Chips 7, 8, 9
+],
+----
+
+Result: both Region chips show West, because Region is on both models. Both Product Type chips show Shoes, because Product Type is on both tabs. All three Store Name chips show Downtown, because Store Name is in both groups and on both models.
+
+=== Step 4: Target a model, tab, or group
+
+Use these properties to narrow which chips an override updates:
+
+* `dataSourceIdentifier`: set on the entry, so it applies to every override in the entry. Use a separate entry for each model.
+* `tabName`: set on each override. A tab also covers the groups on it, but not Liveboard-level chips.
+* `groupName`: set on each override. A group name matches every group with that name. Add `tabName` to pick the group on one tab.
+
+In this table, the numbers refer to the chips of the example Liveboard. An empty cell means the property isn't set.
+
+[width="100%", cols="21,18,14,29,18"]
+[options='header']
+|=====
+|dataSourceIdentifier |tabName |groupName |filterQueryToken |Chips updated
+| | | |`Store Name = Downtown` |7, 8, 9
+|Retail Sales | | |`Region = West` |1
+|Retail Sales | | |`Store Name = Downtown` |7, 8
+| |Regional Detail | |`Product Type = Shoes` |6
+| |Regional Detail | |`Store Name = Downtown` |8, 9. The tab covers its group.
+| | |Top Stores |`Store Name = Downtown` |7, 8, 9. Both groups are named Top Stores.
+| |Regional Detail |Top Stores |`Store Name = Downtown` |8, 9
+|Retail Sales | |Top Stores |`Store Name = Downtown` |7, 8
+|Returns |Regional Detail | |`Store Name = Downtown` |9
+|Retail Sales |Regional Detail |Top Stores |`Store Name = Downtown` |8
+|=====
+
+For example, the last row in code:
+
+[source,JavaScript]
+----
+{
+    dataSourceIdentifier: 'Retail Sales',
+    filterQuery: [
+        {
+            tabName: 'Regional Detail',
+            groupName: 'Top Stores',
+            filterQueryToken: 'Store Name = Downtown', // Chip 8
+        },
+    ],
+},
+----
+
+Result: only chip 8 shows Downtown. Chips 7 and 9 keep their saved values.
+
+=== Overrides that are skipped
+
+Each of these overrides is skipped:
+
+[width="100%", cols="21,13,14,29,23"]
+[options='header']
+|=====
+|dataSourceIdentifier |tabName |groupName |filterQueryToken |Why it's skipped
+| |Summary | |`Region = West` |A tab doesn't cover Liveboard-level chips, and the Summary tab has no Region chip.
+| |Summary |Top Stores |`Product Type = Shoes` |A group doesn't cover its tab's chips. Product Type is on the Summary tab, not in the group.
+|Returns |Summary | |`Store Name = Downtown` |The Summary tab has no Store Name chip from Returns.
+|Retail | | |`Region = West` |No model is named Retail. When the model doesn't match, every override in the entry is skipped.
+|=====
+
+Only the skipped override is affected. Its chips keep their saved values, and the other overrides still apply.
+
+=== Step 5: Put it all together
+
+[source,JavaScript]
+----
+const embed = new LiveboardEmbed('#embed-container', {
+    frameParams: { width: '100%', height: '100%' },
+    liveboardId: '<liveboard-id>',
+    liveboardOverride: {
+        dataSourceOverride: [
+            {
+                // No dataSourceIdentifier: matching chips on every model
+                filterQuery: [
+                    { filterQueryToken: 'Order Date = last 30 days' },                        // Chip 3
+                    { tabName: 'Regional Detail', filterQueryToken: 'Product Type = Shoes' }, // Chip 6
+                ],
+                parameterQuery: [
+                    { parameterQueryToken: 'Discount Rate = 0.15' },                          // Discount Rate chip
+                ],
+            },
+            {
+                dataSourceIdentifier: 'Retail Sales',
+                filterQuery: [
+                    { filterQueryToken: 'Region = West, East' },                              // Chip 1
+                ],
+            },
+            {
+                dataSourceIdentifier: 'Returns',
+                filterQuery: [
+                    { tabName: 'Regional Detail', filterQueryToken: 'Store Name = Downtown' }, // Chip 9
+                ],
+            },
+        ],
+    },
+});
+embed.render();
+----
+
+Result: chips 1, 3, 6, and 9, and the Discount Rate chip, are updated. Chips 2, 4, 5, 7, and 8, and the other parameter chips, keep their saved values. No two overrides target the same chip.
 
 === liveboardOverride properties
 
@@ -231,8 +385,8 @@ Add these to the end of the Liveboard's URL, for example `+https://{ThoughtSpot-
 |Set three filters and a parameter |`+?filter=Region = West; Order Date = this quarter; Sales > 10000&parameter=Discount Rate = 0.15+`
 |Update only the Retail Sales model's Region chip |`+?filter=Retail Sales::Region = West+`
 |Update the Product Type chip on the Regional Detail tab |`+?filter=Regional Detail::Product Type = Shoes, Jackets+`
-|Update the Store Name chip in the Top Stores group |`+?filter=Regional Detail::Top Stores::Store Name = Downtown, Airport+`
-|Clear the Product Type chip |`+?filter=Product Type =+`
+|Update the Store Name chips in the Top Stores group on the Regional Detail tab |`+?filter=Regional Detail::Top Stores::Store Name = Downtown, Airport+`
+|Clear both Product Type chips |`+?filter=Product Type =+`
 |Set two parameters |`+?parameter=Forecast Start = 2026-07-01; Top N = 10+`
 |Apply on top of a personalized view |`+?view={view-id}&filter=Region = West+`
 |=====
@@ -455,26 +609,31 @@ A single colon needs no escaping. For example, `Region = sales: eu` is read as o
 
 When no model, tab, or group is given, an override updates every chip with a matching name across all models and all levels (Liveboard, tab, and group). For example, `Region = West` updates the Region chip on both Retail Sales and Returns.
 
-To narrow an override, prefix it with names separated by `::` in a URL, or set `dataSourceIdentifier`, `tabName`, and `groupName` in the SDK:
+To narrow an override, prefix it with names separated by `::` in a URL, or set `dataSourceIdentifier`, `tabName`, and `groupName` in the SDK. Chip numbers refer to the <<_example_liveboard,example Liveboard>>:
 
 [width="100%", cols="4,3,4"]
 [options='header']
 |=====
 |URL input |SDK equivalent |Chips updated
-|`Region = West` |`{ filterQueryToken: 'Region = West' }` |Region chips on all models, at every level
-|`Retail Sales::Region = West` |`dataSourceIdentifier: 'Retail Sales'` |Region chips on the Retail Sales model only, at every level
-|`Regional Detail::Product Type = Shoes` |`tabName: 'Regional Detail'` |Product Type chips on the Regional Detail tab, including groups on that tab. Liveboard-level chips are not updated.
-|`Top Stores::Store Name = Downtown` |`groupName: 'Top Stores'` |Store Name chips in every group named Top Stores
-|`Regional Detail::Top Stores::Store Name = Downtown` |`tabName` and `groupName` |Store Name chips in the Top Stores group on the Regional Detail tab
-|`Retail Sales::Regional Detail::Top Stores::Store Name = Downtown` |All three properties |As above, for the Retail Sales model only
+|`Region = West` |`{ filterQueryToken: 'Region = West' }` |Chips 1 and 2
+|`Retail Sales::Region = West` |`dataSourceIdentifier: 'Retail Sales'` |Chip 1
+|`Regional Detail::Product Type = Shoes` |`tabName: 'Regional Detail'` |Chip 6. A tab prefix also covers the groups on that tab, but not Liveboard-level chips.
+|`Top Stores::Store Name = Downtown` |`groupName: 'Top Stores'` |Chips 7, 8, and 9. A group name matches every group with that name.
+|`Regional Detail::Top Stores::Store Name = Downtown` |`tabName` and `groupName` |Chips 8 and 9
+|`Retail Sales::Top Stores::Store Name = Downtown` |`dataSourceIdentifier` and `groupName` |Chips 7 and 8
+|`Returns::Regional Detail::Store Name = Downtown` |`dataSourceIdentifier` and `tabName` |Chip 9
+|`Retail Sales::Regional Detail::Top Stores::Store Name = Downtown` |All three properties |Chip 8
 |=====
 
 How prefixes are matched in a URL:
 
 * Names are matched against the display names of models, tabs, and groups. Matching is case-insensitive.
 * A model can also be given by its GUID. Tabs and groups are matched by name only.
-* When all three prefixes are given, they are read in order: model, tab, group.
-* With one or two prefixes, each name is looked up as a model first, then as a tab, then as a group. So if a model and a tab share a name, the name is read as the model. To name the tab in that case, use the SDK properties.
+* Prefixes always go in the order model > tab > group, and you can leave any of them out:
+** With one prefix, the name is looked up as a model, then a tab, then a group. For example, in `Regional Detail::Product Type = Shoes`, `Regional Detail` doesn't match a model, so it is read as a tab.
+** With two prefixes, the first is looked up as a model, then a tab, and the second must come after it in that order. For example, in `Regional Detail::Top Stores::Store Name = Downtown`, `Regional Detail` is read as a tab, so `Top Stores` must be a group.
+** With three prefixes, they are read as model, tab, and group.
+* Because models are looked up first, a name shared by a model and a tab is read as the model. To target the tab in that case, use the `tabName` property in the SDK.
 * An override with more than three prefixes is ignored.
 * An override whose prefix doesn't match a model, tab, or group on the Liveboard is ignored.
 
