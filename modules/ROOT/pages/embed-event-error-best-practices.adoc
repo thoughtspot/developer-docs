@@ -9,79 +9,116 @@
 
 [IMPORTANT]
 ====
-In the upcoming ThoughtSpot Cloud 26.10.0.cl and Visual Embed SDK 1.53.0 versions, `EmbedEvent.Error` will include a `severity` field that categorizes errors into three severity levels: `SEV1`, `SEV2`, and `SEV3`.
+In Visual Embed SDK v1.53.0 and later, `EmbedEvent.Error` includes a `severity` field that categorizes errors into three severity levels: `SEV1`, `SEV2`, and `SEV3`. If your app handles all errors the same way, you may want to update your integrations to distinguish between critical errors (`SEV1`) and less severe errors (`SEV2`, `SEV3`).
 
-ThoughtSpot recommends reviewing your error handing logic to prepare your integrations for this change. If your application currently handles all errors uniformly, you may need to update your error handling to distinguish between critical errors (SEV1) that require tearing down the embed and less severe errors (SEV2, SEV3) that can be logged or ignored.
-
-//For more information, see the xref:embed-event-error-best-practices.adoc#_error_severity_levels[Error severity levels] section.
+For more information, see xref:embed-event-error-best-practices.adoc#_error_severity_levels[Error severity levels].
 ====
 
 
-The ThoughtSpot Visual Embed SDK provides a layered approach to error
-handling. `EmbedEvent.Error` is a real-time outbound event emitted from the embedded ThoughtSpot iframe to the host application, signaling that something has gone wrong, either inside the SDK itself, inside the embedded app (the iframe), or as a result of an invalid HostEvent payload sent by the host.
+The ThoughtSpot Visual Embed SDK provides a layered approach to error handling. `EmbedEvent.Error` is a real-time outbound event that the embedded ThoughtSpot iframe emits to the host app. It signals that something went wrong inside the SDK, inside the embedded app (the iframe), or because the host sent an invalid `HostEvent` payload.
 
-Unlike most embed events, which are cached and can be replayed on late subscribers, `EmbedEvent.Error` is not cached or replayed. Every emission is independent, and a handler must be registered before an error occurs to receive it.
+Unlike most embed events, which the SDK caches and replays to late subscribers, `EmbedEvent.Error` is not cached or replayed. Every emission is independent, so you must register a handler before an error occurs.
 
-`EmbedEvent.Error` fires on a per-embed-component basis. Any handler must be registered before `render()` is called.
+`EmbedEvent.Error` fires per embed component. Register the handler before you call `render()`.
 
 == Trigger sources
+
 Embed errors surface through distinct channels for the following failure categories:
 
 * xref:embed-event-error-best-practices.adoc#_sdk_or_configuration_validation[SDK or configuration validation]
 * xref:embed-event-error-best-practices.adoc#_hostevent_validation[HostEvent validation errors]
-* xref:embed-event-error-best-practices.adoc#_runtime_filter_or_cross_filter_errors[Runtime filter validation errors]
+* xref:embed-event-error-best-practices.adoc#_runtime_filter_or_cross_filter_errors[Runtime filter or cross-filter errors]
 * xref:embed-event-error-best-practices.adoc#_network_events[Network events]
 
 === SDK or configuration validation
 
-When SDK or configuration errors occur, the internal `handleError(error)` method in the embed component:
+When SDK or configuration errors occur, the internal `handleError(errorDetails)` method in the embed component:
 
-1. Sets `isError = true` and permanently blocks future `renderIFrame` calls on this instance.
-2. Calls `executeCallbacks(EmbedEvent.Error, { error })`.
-3. Logs via `logger.error(error)`.
+1. Sets `isError = true`, which permanently blocks future `renderIFrame` calls on this instance.
+2. Calls `executeCallbacks(EmbedEvent.Error, { severity: SEV3, ...errorDetails })`. The default severity is `SEV3` unless the error sets its own.
+3. Logs via `logger.error(errorDetails)`.
 
-[cols="2,3", options="header"]
+[cols="3,2,1,4", options="header"]
 |===
-| Condition | Error message emitted
+| Condition | `code` | `severity` | `message` emitted
 
 | `init()` was not called before `render()`
-| `"Looks like render was called before calling init..."`
+| `INIT_ERROR`
+| `SEV1`
+| `"You need to init the ThoughtSpot SDK module first"`
+
+| `liveboardId` is missing in `LiveboardEmbed`
+| `LIVEBOARD_ID_MISSING`
+| `SEV1`
+| `"Please select a Liveboard to embed."`
 
 | Both `hiddenActions` and `visibleActions` passed
+| `CONFLICTING_ACTIONS_CONFIG`
+| `SEV3`
 | `"You cannot have both hidden actions and visible actions"`
 
 | Both `hiddenTabs` and `visibleTabs` passed
+| `CONFLICTING_TABS_CONFIG`
+| `SEV3`
 | `"You cannot have both hidden Tabs and visible Tabs"`
 
 | `trigger()` called before `render()`
+| `RENDER_NOT_CALLED`
+| `SEV3`
 | `"Please call render before triggering events"`
 
 | `trigger()` called with undefined event type
+| `HOST_EVENT_TYPE_UNDEFINED`
+| `SEV3`
 | `"Host event type is undefined"`
 
 | Auth failure during `renderIFrame`
-| The caught auth/login error object
+| `LOGIN_FAILED`
+| `SEV1`
+| The message of the caught auth or login error, or `"Login failed"`. The `error` field contains the caught error object.
 |===
 
-=== HostEvent validation
-
-When the host sends a HostEvent with an invalid payload or a context mismatch, the event bridge validates it against the HostEvent schema. On failure, `dispatchValidationError()` is triggered to emit `EmbedEvent.Error` with code `embedErrorCodes.HOST_EVENT_VALIDATION`.
+The SDK emits these errors with the following payload:
 
 [source,json]
 ----
 {
-  "type":    "ValidationError",
-  "code":    "HOST_EVENT_VALIDATION",
-  "message": "<human-readable description of what field failed>"
+  "errorType": "VALIDATION_ERROR",
+  "message": "You cannot have both hidden actions and visible actions",
+  "code": "CONFLICTING_ACTIONS_CONFIG",
+  "severity": 3,
+  "error": "You cannot have both hidden actions and visible actions"
+}
+----
+
+The `error` field is retained for backward compatibility. For more information about the payload fields, see xref:EmbedErrorDetailsEvent.adoc[EmbedErrorDetailsEvent].
+
+=== HostEvent validation
+
+When the host sends a HostEvent with an invalid payload or a context mismatch, the event bridge validates it against the HostEvent schema. On failure, the SDK emits `EmbedEvent.Error` with code `embedErrorCodes.HOST_EVENT_VALIDATION`. The `trigger()` call also rejects with the validation error.
+
+[source,json]
+----
+{
+  "type": "Error",
+  "data": {
+    "errorType": "VALIDATION_ERROR",
+    "message": "<human-readable description of what field failed>",
+    "code": "HOST_EVENT_VALIDATION",
+    "error": "<human-readable description of what field failed>"
+  },
+  "status": "end",
+  "severity": 3
 }
 ----
 
 [IMPORTANT]
 ====
-If `shouldBypassPayloadValidation: true`, validation failures are silently logged as console warnings and never reach your `EmbedEvent.Error` handler.
+If `useHostEventsV2` is not enabled, or `shouldBypassPayloadValidation` is `true`, the SDK logs validation failures as console warnings. They never reach your `EmbedEvent.Error` handler.
 ====
 
 === Runtime filter or cross-filter errors
+
 Filter operations can fail inside the iframe with typed errors:
 
 [cols="2,3", options="header"]
@@ -127,104 +164,121 @@ Filter operations can fail inside the iframe with typed errors:
 
 === Network events
 
-A global `window.offline` listener emits `EmbedEvent.Error` with a different payload shape:
+A global listener for the browser `offline` event on `window` emits `EmbedEvent.Error` with a different payload shape:
 
 [source,json]
 ----
 {
+  "errorType": "NETWORK",
+  "message": "Network not Detected. Embed is offline. Please reconnect and refresh",
+  "code": "NETWORK_ERROR",
+  "severity": 2,
   "offlineWarning": "Network not Detected. Embed is offline. Please reconnect and refresh"
 }
 ----
 
 == Error types
 
-The `EmbedEvent.Error` is fired when the following types of errors occur:
+`EmbedEvent.Error` fires when the following types of errors occur:
 
 [cols="2,3", options="header"]
 |===
-|Error type| Description
-|`API` a| API call failure error. This error event occurs when an API request is blocked.
+| Error type | Description
+
+| `API`
+a| API call failure. This error occurs when an API request is blocked.
+
 Example:
-[source,JavaScript]
+
+[source,javascript]
 ----
-SearchEmbed.on(EmbedEvent.Error, (error) => {
+searchEmbed.on(EmbedEvent.Error, (error) => {
     console.log(error);
     // { type: "Error", data: { errorType: "API", error: { message: '...', error: '...' } } }
 });
 ----
-|`FULLSCREEN` a| Error in presenting a Liveboard or visualization in full-screen mode.
 
-[source,JavaScript]
+| `FULLSCREEN`
+a| Error in presenting a Liveboard or visualization in full-screen mode.
+
+[source,javascript]
 ----
-LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+liveboardEmbed.on(EmbedEvent.Error, (error) => {
     console.log(error);
     // { type: "Error", data: { errorType: "FULLSCREEN", error: {
     //   message: "Fullscreen mode is not available",
     // } }}
-})
+});
 ----
-|`SINGLE_VALUE_FILTER`  a| Error in updating filter values. This error occurs when a single-value filter is applied to a Liveboard and the user tries to update this filter with multiple values.
 
-[source,JavaScript]
+| `SINGLE_VALUE_FILTER`
+a| Error in updating filter values. This error occurs when a single-value filter is applied to a Liveboard and the user tries to update this filter with multiple values.
+
+[source,javascript]
 ----
-LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+liveboardEmbed.on(EmbedEvent.Error, (error) => {
     console.log(error);
     // { type: "Error", data: { errorType: "SINGLE_VALUE_FILTER", error: {
-    //  message: "Filter {filter_name}: Cannot pass multiple filtering elements to this single value filter.",
+    //   message: "Filter {filter_name}: Cannot pass multiple filtering elements to this single value filter.",
     // } }}
-})
+});
 ----
-|`NON_EXIST_FILTER` a| Error in applying filter due to a non-existent filter.
 
-[source,JavaScript]
+| `NON_EXIST_FILTER`
+a| Error in applying filter due to a non-existent filter.
+
+[source,javascript]
 ----
-LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+liveboardEmbed.on(EmbedEvent.Error, (error) => {
     console.log(error);
     // { type: "Error", data: { errorType: "NON_EXIST_FILTER", error: {
-    //  message: "UpdateFilters could not update the filter on {filter_name} as it is not an existing filter in the Liveboard. Please edit the Liveboard and add {filter_name} as a filter chip in order to update it programmatically.",
+    //   message: "UpdateFilters could not update the filter on {filter_name} as it is not an existing filter in the Liveboard. Please edit the Liveboard and add {filter_name} as a filter chip in order to update it programmatically.",
     // } }}
-})
+});
 ----
-|`INVALID_DATE_VALUE`  a| Error due to an invalid date value in a filter. For example, if the column name is `Commit Date` and a correct date value is not specified, the `INVALID_DATE_VALUE` error event is fired.
 
-[source,JavaScript]
+| `INVALID_DATE_VALUE`
+a| Error due to an invalid date value in a filter. For example, if the column name is `Commit Date` and a correct date value is not specified, the `INVALID_DATE_VALUE` error event is fired.
+
+[source,javascript]
 ----
-LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+liveboardEmbed.on(EmbedEvent.Error, (error) => {
     console.log(error);
     // { type: "Error", data: { errorType: "INVALID_DATE_VALUE", error: {
-    //  message: "UpdateFilters could not update the filter on {filter_name} as invalid date value provided.",
+    //   message: "UpdateFilters could not update the filter on {filter_name} as invalid date value provided.",
     // } }}
-})
+});
 ----
-|`INVALID_OPERATOR`  a|Error due to an invalid operator in filter properties. For example, if you try to apply filters on the `Revenue` column with the operator as `LT` and specify multiple values, it may result in an error.
 
-[source,JavaScript]
+| `INVALID_OPERATOR`
+a| Error due to an invalid operator in filter properties. For example, if you try to apply filters on the `Revenue` column with the operator as `LT` and specify multiple values, it may result in an error.
+
+[source,javascript]
 ----
-LiveboardEmbed.on(EmbedEvent.Error, (error) => {
+liveboardEmbed.on(EmbedEvent.Error, (error) => {
     console.log(error);
     // { type: "Error", data: { errorType: "INVALID_OPERATOR", error: {
-    //  message: "UpdateFilters could not update the filter on {filter_name} as invalid operator value provided.",
+    //   message: "UpdateFilters could not update the filter on {filter_name} as invalid operator value provided.",
     // } }}
-})
+});
 ----
 |===
 
-////
 [#_error_severity_levels]
 == Error severity levels
 
-Starting from ThoughtSpot Cloud 26.10.0.cl (Visual Embed SDK 1.53.0), the `EmbedEvent.Error` payload includes a `severity` field that categorizes errors into three levels:
+The `EmbedEvent.Error` payload includes a `severity` field that categorizes errors into three levels:
 
 [cols="1,2,3", options="header"]
 |===
 | Severity | Description | Recommended handling
 
-| `SEV1` | The embed is down: the app crashed and a fallback page is showing. | Consider tearing down the embed and re-initializing, or showing a custom error message to the user.
+| `SEV1` | The embed is down: nothing usable is on screen, for example, because of an SDK initialization failure, a login failure, or an app crash. | Consider tearing down the embed and re-initializing, or showing a custom error message to the user.
 | `SEV2` | An error was shown to the user; the embed still works. | Log the error for monitoring. No immediate action is required unless the error indicates a persistent issue.
 | `SEV3` | Everything else, including validation of the embedder's own input. | Log the error for debugging. These errors are typically not user-facing and can often be ignored if the application is functioning correctly.
 |===
 
-The `severity` field is included in the error payload as an optional integer value:
+The `severity` field is an optional numeric value that maps to the xref:EmbedErrorSeverity.adoc[EmbedErrorSeverity] enum: `SEV1` is `1`, `SEV2` is `2`, and `SEV3` is `3`. If an error does not set a severity, the SDK defaults to `SEV3`.
 
 [source,json]
 ----
@@ -244,25 +298,46 @@ The `severity` field is included in the error payload as an optional integer val
 ====
 The `severity` field is backward compatible. If your application does not use the `severity` field, the error handling behavior remains unchanged.
 ====
-////
+
 == Payload shapes
+
+`EmbedEvent.Error` emits one of the following payload shapes:
 
 [source,typescript]
 ----
 // SDK / auth error
-{ error: string | Record<string, unknown> }
+{
+  errorType: string;
+  message: string | string[];
+  code: string;
+  severity?: number;
+  error?: unknown; // retained for backward compatibility
+}
 
 // HostEvent validation error
-{ type: string; code: string; message: string }
+{
+  type: 'Error';
+  data: { errorType: string; message: string; code: 'HOST_EVENT_VALIDATION'; error: string };
+  status: string;
+  severity?: number;
+}
 
 // Filter / runtime error (from embedded app)
 // — matches one of the eventErrorType patterns above
 
 // Network offline
-{ offlineWarning: string }
+{
+  errorType: 'NETWORK';
+  message: string;
+  code: 'NETWORK_ERROR';
+  severity: number;
+  offlineWarning: string;
+}
 ----
 
 == How to subscribe
+
+The following example shows how to handle each `EmbedEvent.Error` payload shape.
 
 [source,typescript]
 ----
@@ -277,93 +352,70 @@ embed.on(EmbedEvent.Error, (payload) => {
 
   // SDK/auth error
   if (payload?.error) {
-    console.error('[SDK Error]', payload.error);
+    console.error('[SDK Error]', payload.code, payload.error);
     return;
   }
 
   // HostEvent validation error (your payload is malformed)
-  if (payload?.code === 'HOST_EVENT_VALIDATION') {
-    console.error('[HostEvent validation failed]', payload.message);
+  if (payload?.data?.code === 'HOST_EVENT_VALIDATION') {
+    console.error('[HostEvent validation failed]', payload.data.message);
     return;
   }
-
-  // runtime filter/action error from the iframe
-  console.warn('[Embed runtime error]', payload);
 
   // network offline
   if (payload?.offlineWarning) {
     showOfflineBanner(payload.offlineWarning);
     return;
   }
+
+  // runtime filter/action error from the iframe
+  console.warn('[Embed runtime error]', payload);
 });
 
 embed.render();
 ----
 
+== Handling HostEvent errors
 
-
-////
-=== Recovery after an error
-
-Once `handleError` fires, the embed instance sets `isError = true` and all future
-`renderIFrame` calls are silently skipped. To recover, you must destroy the existing
-instance and create a new one:
-
-[source,typescript]
-----
-embed.on(EmbedEvent.Error, async (payload) => {
-  logError(payload);
-
-  if (isRecoverable(payload)) {
-    embed.destroy(); // removes window listeners and DOM node
-
-    const freshEmbed = new LiveboardEmbed('#container', viewConfig);
-    freshEmbed.on(EmbedEvent.Error, errorHandler);
-    await freshEmbed.render();
-  }
-});
-----
-////
-
-== Handling errors
-The following example shows the sample code for handling errors.
+The following example shows how to handle errors from a `trigger()` call.
 
 [source,typescript]
 ----
 import { HostEvent } from '@thoughtspot/visual-embed-sdk';
 
-try {
-  const result = await embed.trigger(HostEvent.UpdateRuntimeFilters, [
-    { columnName: 'Region', operator: 'EQ', values: ['West'] },
-  ]);
+async function updateRegionFilter() {
+  try {
+    const result = await embed.trigger(HostEvent.UpdateRuntimeFilters, [
+      { columnName: 'Region', operator: 'EQ', values: ['West'] },
+    ]);
 
-  // Timeout is a resolve, not a reject — check explicitly
-  if (result instanceof Error) {
-    console.error('HostEvent timed out:', result.message);
-    return;
+    // Timeout is a resolve, not a reject — check explicitly
+    if (result instanceof Error) {
+      console.error('HostEvent timed out:', result.message);
+      return;
+    }
+
+    console.log('HostEvent succeeded:', result);
+  } catch (err) {
+    // Rejection = iframe returned an explicit error in the response
+    console.error('HostEvent rejected by iframe:', err);
   }
-
-  console.log('HostEvent succeeded:', result);
-
-} catch (err) {
-  // Rejection = iframe returned an explicit error in the response
-  console.error('HostEvent rejected by iframe:', err);
 }
 ----
 
 === Error handling guidelines
 
 [cols="2,4", options="header"]
-|=====
+|===
 | Error category | Detection and recovery
 
 | SDK init config error
 
-a|**Detection mechanism**: `EmbedEvent.Error`  +
+a|**Detection mechanism**: `EmbedEvent.Error`
 
-**Payload/data**: `{ error: string }`
+**Payload/data**: `{ errorType, message, code, severity, error }`
 
-**Recovery action**: Fix configuration. Recreate and render embed.
+**Recovery action**: Fix the configuration. xref:embed-event-error-best-practices.adoc#destroy-embed[Destroy] the embed, then create and render a new instance.
 
 | Auth failure (SDK layer)
 a|
@@ -376,9 +428,9 @@ a|
 | Auth failure (iframe layer)
 
 a|
-**Detection mechanism**:  `EmbedEvent.AuthFailure` +
+**Detection mechanism**: `EmbedEvent.AuthFailure`
 
-**Recovery action**: Show login prompt. Recreate and render embed.
+**Recovery action**: Show a login prompt. xref:embed-event-error-best-practices.adoc#destroy-embed[Destroy] the embed, then create and render a new instance.
 
 | Session expired
 
@@ -392,7 +444,7 @@ a|**Detection mechanism**: `EmbedEvent.IdleSessionTimeout` and `AuthStatus.FAILU
 
 **Recovery action**: Use `autoLogin: true`. Prompt re-authentication.
 
-|Third-party cookies blocked
+| Third-party cookies blocked
 
 a|**Detection mechanism**: `EmbedEvent.NoCookieAccess` and `AuthStatus.FAILURE(NO_COOKIE_ACCESS)`
 
@@ -401,7 +453,7 @@ a|**Detection mechanism**: `EmbedEvent.NoCookieAccess` and `AuthStatus.FAILURE(N
 | User logout
 a|**Detection mechanism**: `EmbedEvent.AuthLogout` and  `AuthStatus.LOGOUT`
 
-**Recovery action**: Redirect to login or clear state
+**Recovery action**: Redirect to login or clear state.
 
 | Duplicate token
 a|**Detection mechanism**: `AuthStatus.FAILURE(SDK)` and `alert()` (suppressible)
@@ -418,32 +470,32 @@ a|**Detection mechanism**: `AuthStatus.FAILURE(SDK)` and `logger.error`
 **Recovery action**: Verify token generation on the server.
 
 | Network offline
-a| **Detection mechanism**: `EmbedEvent.Error`
+a|**Detection mechanism**: `EmbedEvent.Error`
 
-**Payload/data**: `{ offlineWarning: string }`
+**Payload/data**: `{ errorType: "NETWORK", code: "NETWORK_ERROR", offlineWarning: string }`
 
 **Recovery action**: Show offline UI. Reconnect and reload.
 
 | HostEvent validation error
 a|**Detection mechanism**: `EmbedEvent.Error`
 
-**Payload/data**: `{ type, code: "HOST_EVENT_VALIDATION", message }`
+**Payload/data**: `{ type, data: { code: "HOST_EVENT_VALIDATION", message } }`
 
-**Recovery action**: Fix the `HostEvent` payload; enable `useHostEventsV2: true` in development
+**Recovery action**: Fix the `HostEvent` payload. Enable `useHostEventsV2: true` in development.
 
 | HostEvent timeout (30 seconds)
 a|**Detection mechanism**: `trigger()` resolves with `Error`
 
 **Payload/data**: `Error("Trigger timed-out...")`
 
-**Recovery action**: Check if iframe is still mounted. Call `reload()` if needed
+**Recovery action**: Check if the iframe is still mounted. Call `reload()` if needed.
 
 | HostEvent iframe rejection
 a|**Detection mechanism**: `trigger()` rejects
 
 **Payload/data**: Error from iframe
 
-**Recovery action**: Inspect the rejection payload; see HostEvent validation error above
+**Recovery action**: Inspect the rejection payload. See the HostEvent validation error row.
 
 | Filter errors at runtime
 a|**Detection mechanism**: `EmbedEvent.Error`
@@ -451,22 +503,107 @@ a|**Detection mechanism**: `EmbedEvent.Error`
 **Payload/data**: `eventErrorType` message string
 
 **Recovery action**: Fix filter parameters. Validate against current Liveboard/answer filters.
-|=====
+|===
+
+[#destroy-embed]
+== Destroying an embed instance
+
+To remove an embedded ThoughtSpot component, for example, during route changes, error recovery, or cleanup in single-page apps, call `embed.destroy()`. This is the only supported way to tear down an embed instance.
+
+Calling `embed.destroy()` performs the following cleanup steps in order:
+
+1. Removes fullscreen change handlers.
+2. Disconnects the resize observer.
+3. Unsubscribes window-level event listeners registered by the embed.
+4. Removes any pre-render wrappers created during initialization.
+5. Sends an internal notification to the embedded iframe so that it can release its own resources.
+6. Removes the iframe DOM node from the page.
+
+If the embed has not rendered yet, `destroy()` skips steps 5 and 6.
+
+After `destroy()` completes, the embed instance is no longer usable. To re-embed, create a new instance and call `render()` again.
+
+After an SDK or configuration error, the embed instance blocks all further `render()` calls. To recover, destroy the instance, fix the cause, and create a new one.
+
+=== Example: Destroy and re-create
+
+[source,TypeScript]
+----
+import {
+  LiveboardEmbed,
+  HostEvent,
+  EmbedEvent,
+} from '@thoughtspot/visual-embed-sdk';
+
+// Create and render the embed
+const embed = new LiveboardEmbed(document.getElementById('embed-container'), {
+  liveboardId: 'd084c256-e284-4fc4-b80c-111111111111',
+});
+embed.render();
+
+// Later, tear it down
+embed.destroy();
+
+// To re-embed, create a new instance
+const newEmbed = new LiveboardEmbed(document.getElementById('embed-container'), {
+  liveboardId: 'd084c256-e284-4fc4-b80c-111111111111',
+});
+newEmbed.render();
+----
+
+=== Wait for iframe cleanup
+
+By default, `destroy()` sends the internal teardown notification to the iframe and removes the DOM node immediately, without waiting for the iframe to finish its own cleanup.
+
+If your application requires the iframe to complete its cleanup before the DOM node is removed, set `waitForCleanupOnDestroy` to `true` in the `init()` configuration:
+
+[source,typescript]
+----
+import { init, AuthType } from '@thoughtspot/visual-embed-sdk';
+
+init({
+  thoughtSpotHost: 'https://<your-ts-instance>.thoughtspot.cloud',
+  authType: AuthType.TrustedAuthTokenCookieless,
+  // ...other init options
+  waitForCleanupOnDestroy: true,
+  cleanupTimeout: 5000, // milliseconds; optional
+});
+----
+
+[cols="2,1,3", options="header"]
+|===
+| Parameter | Default | Description
+
+| `waitForCleanupOnDestroy`
+| `false`
+| When `true`, `destroy()` waits for the embedded app to acknowledge the teardown notification before removing the iframe from the DOM.
+
+| `cleanupTimeout`
+| `5000`
+| The maximum time, in milliseconds, that `destroy()` waits for the embedded app's cleanup response when `waitForCleanupOnDestroy` is `true`. If the timeout is reached, the iframe is removed regardless.
+|===
+
+[WARNING]
+====
+Do not call `embed.trigger(HostEvent.DestroyEmbed)` directly. The SDK triggers this event for you when you call `embed.destroy()`. Triggering it directly throws a `TypeError` and does not tear down the embed or remove the iframe.
+====
 
 == Best practices
 
 * Always register an event listener for `EmbedEvent.Error` on your embed instance to capture and handle errors emitted by the embedded ThoughtSpot application. Register `EmbedEvent.Error` before calling `render()`.
-* Inspect and categorize error payloads. The error event provides a payload with fields such as errorType, message, and code. Do not assume that `payload.error` always exists in `EmbedEvent.Error`. Offline errors use `offlineWarning`; validation errors use `code`.
-* Do not destroy the embed on errors. First, inspect the errors to determine if you need to display host fallback pages. Not all events are fatal. ThoughtSpot handles some failures internally, so only take action if necessary based on the specific error and event type.
-* Provide contextual and user-friendly error messages based on the errorType and error details. Avoid exposing raw error objects or stack traces to your application users.
+* Inspect and categorize error payloads. The error event provides a payload with fields such as `errorType`, `message`, and `code`. Do not assume that `payload.error` always exists. Offline errors use `offlineWarning`, and validation errors use `code`.
+* Do not destroy the embed for every error. Inspect the error first to determine whether you need to display a host fallback page. Not all errors are fatal, and ThoughtSpot handles some failures internally. Destroy the embed only when the error leaves it unusable. For more information, see xref:embed-event-error-best-practices.adoc#destroy-embed[Destroying an embed instance].
+* Call `embed.destroy()` when you remove the embed container, navigate away from the page, or unmount the component. Do not reuse a destroyed instance. Create a new one instead.
+* Provide contextual and user-friendly error messages based on the `errorType` and error details. Avoid exposing raw error objects or stack traces to your application users.
 * Enable `useHostEventsV2: true` in development/staging to surface `HostEvent` payload errors early.
 * Log errors for diagnostics.
-* Simulate different error scenarios during development. For example, network failures and invalid filters to ensure the error handling logic works as expected.
+* Simulate error scenarios during development, such as network failures and invalid filters, to verify that your error handling logic works as expected.
 * Do not set `shouldBypassPayloadValidation: true` in production environments. Validation errors become invisible console warnings.
-* Do not call `trigger()` before `render()`; calling it before `render()` returns `null`.
+* Do not call `trigger()` before `render()`. The SDK emits an `EmbedEvent.Error` with the `RENDER_NOT_CALLED` code and returns `null`.
 
 == Try it out in the Visual Embed Playground
-Try out the embed events in the +++<a href="{{previewPrefix}}/playground/liveboard"> Visual Embed Playground </a>+++ and preview changes.
+
+Try out the embed events in the +++<a href="{{previewPrefix}}/playground/liveboard">Visual Embed Playground</a>+++ and preview changes.
 
 [.widthAuto]
 [.bordered]
@@ -476,5 +613,3 @@ image::./images/embed-event-playground.png[Try Embed events in Playground]
 
 * To identify and log errors, use the error types and error codes. For more information, see xref:EmbedErrorDetailsEvent.adoc[EmbedErrorDetailsEvent] and xref:EmbedErrorCodes.adoc[EmbedErrorCodes].
 * For information about the supported event objects and examples, see xref:EmbedEvent.adoc[EmbedEvent].
-
-
