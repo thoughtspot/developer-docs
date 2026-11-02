@@ -1,11 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { ResizableBox } from 'react-resizable';
 import { useResizeDetector } from 'react-resize-detector';
-import { IconContext } from '@react-icons/all-files';
-import { GiHamburgerMenu } from '@react-icons/all-files/gi/GiHamburgerMenu';
-import { MdClear } from '@react-icons/all-files/md/MdClear';
-import { RiMoonClearLine } from '@react-icons/all-files/ri/RiMoonClearLine';
-import { FiSun } from '@react-icons/all-files/fi/FiSun';
 import { removeTrailingSlash, queryStringParser } from '../../utils/app-utils';
 import { NAV_PREFIX, TS_PAGE_ID_PARAM } from '../../configs/doc-configs';
 import {
@@ -34,7 +29,6 @@ const LeftSideBar = (props: {
     leftNavOpen: boolean;
     isMaxMobileResolution: boolean;
     isDarkMode: boolean;
-    handleLeftNavChange: (width: number) => void;
     location: Location;
     setLeftNavOpen: Function;
     isPublicSiteOpen: boolean;
@@ -47,6 +41,7 @@ const LeftSideBar = (props: {
     const { width, ref, height } = useResizeDetector();
 
     const expandedTabsRef = useRef({});
+    const lastScrolledPageIdRef = useRef<string | null>(null);
 
     const isMaxTabletResolution = !(props.docWidth < MAX_TABLET_RESOLUTION);
     const isMaxMobileResolution = !(props.docWidth < MAX_MOBILE_RESOLUTION);
@@ -57,9 +52,20 @@ const LeftSideBar = (props: {
         const pageid =
             removeTrailingSlash(props.location.pathname).replace(/^\/*/, '') ||
             getPageIdFromUrl(props.location.href);
-        const tag = divElement.querySelector(`a[href='/${pageid}']`);
+        const allLinks = divElement.querySelectorAll('a');
+        const tag = Array.from(allLinks).find((a) => {
+            const href = a.getAttribute('href');
+            return href === `/${pageid}` || href?.endsWith(`/${pageid}`);
+        });
         if (tag) {
             tag.classList.add('active');
+            // On a page that is only reachable from a hidden sub-menu, mark the
+            // visible parent entry as the active one instead.
+            divElement
+                .querySelector('.nav-hidden-children a.active')
+                ?.closest('.nav-hidden-children')
+                ?.parentElement?.querySelector(':scope > p a')
+                ?.classList.add('active');
         }
 
         const updatedHTML = addExpandCollapseImages(
@@ -68,11 +74,7 @@ const LeftSideBar = (props: {
             expandedTabsRef.current,
         );
         setNavContent(updatedHTML);
-    }, [params[NAV_PREFIX], params[TS_PAGE_ID_PARAM], props.navContent]);
-
-    useEffect(() => {
-        props.handleLeftNavChange(ref?.current?.offsetWidth);
-    }, [width]);
+    }, [params[NAV_PREFIX], params[TS_PAGE_ID_PARAM], props.navContent, props.location.pathname]);
 
     const toggleExpandOnTab = (text: string) => {
         const allTabsRef = { ...expandedTabsRef.current };
@@ -90,85 +92,84 @@ const LeftSideBar = (props: {
             toggleExpandOnTab,
             props.curPageid,
         );
-    }, [props.curPageid, isMaxMobileResolution, navContent]);
 
-    const onMenuClick = () => {
-        props.setLeftNavOpen(!props.leftNavOpen);
-        document.documentElement.scrollTop = 0;
-    };
+        // Every navigation is a full page reload, so the sidebar always
+        // remounts scrolled to the top. Bring the active link back into view
+        // once per navigation (guarded by curPageid) so a resize or category
+        // switch on the same page doesn't re-trigger and jump the scroll
+        // position out from under the user. navContent starts out empty on
+        // mount and is filled in a render later, so don't mark the page as
+        // "scrolled" until the active link actually exists to scroll to.
+        // On mobile widths, .aside is display:none until leftNavOpen is
+        // true (index.scss:365-381) — scrollIntoView on a hidden element
+        // is a no-op, so wait for the nav to actually be visible (desktop/
+        // tablet is always visible; mobile only once opened) before
+        // marking this navigation as handled.
+        const isAsideVisible = isMaxMobileResolution || props.leftNavOpen;
+        if (lastScrolledPageIdRef.current !== props.curPageid && isAsideVisible) {
+            const aside = ref.current as HTMLDivElement;
+            const activeLink = aside?.querySelector('a.active');
+            if (aside && activeLink) {
+                lastScrolledPageIdRef.current = props.curPageid;
+                // Scroll only the sidebar itself, never the window: scrollIntoView() also
+                // scrolls the window, which slid the fixed header out of view on some
+                // walkthrough pages. 'nearest' avoided that but parks a link that starts
+                // below the fold flush against the bottom edge, so the user lands on a nav
+                // that looks jumped. Instead, leave the nav alone when the link is already
+                // comfortably in the upper part of it, and otherwise bring it to about a
+                // third of the way down (scrollTop clamps at the ends).
+                const asideRect = aside.getBoundingClientRect();
+                const linkRect = activeLink.getBoundingClientRect();
+                const linkTop = linkRect.top - asideRect.top;
+                const isComfortablyVisible =
+                    linkTop >= 0 &&
+                    linkRect.bottom <= asideRect.bottom &&
+                    linkTop <= aside.clientHeight * 0.6;
+                if (!isComfortablyVisible) {
+                    aside.scrollTop += linkTop - aside.clientHeight * 0.3;
+                }
+            }
+        }
+    }, [props.curPageid, isMaxMobileResolution, navContent, props.leftNavOpen]);
 
     const renderLeftNav = () => {
         return isMaxMobileResolution ? (
-            <ResizableBox
-                width={
-                    isMaxTabletResolution
-                        ? LEFT_NAV_WIDTH_DESKTOP
-                        : LEFT_NAV_WIDTH_TABLET
-                }
-                minConstraints={[
-                    isMaxTabletResolution
-                        ? MIN_LEFT_NAV_WIDTH_DESKTOP
-                        : MIN_LEFT_NAV_WIDTH_TABLET,
-                ]}
-                maxConstraints={[
-                    isMaxTabletResolution
-                        ? MAX_LEFT_NAV_WIDTH_DESKTOP
-                        : MAX_LEFT_NAV_WIDTH_TABLET,
-                ]}
-                axis="x"
-                className="resizable"
-                height={height || 0} // Height is set to 0 when element is not rendered
-            >
-                <NavContent
-                    backLink={props.backLink}
-                    navContent={navContent}
-                    navTitle={props.navTitle}
-                    refObj={ref as React.RefObject<HTMLDivElement>}
-                    leftNavOpen={props.leftNavOpen}
-                    isPublicSiteOpen={props.isPublicSiteOpen}
-                    isMaxMobileResolution={isMaxMobileResolution}
-                    setDarkMode={props.setDarkMode}
-                    isDarkMode={props.isDarkMode}
-                    searchClickHandler={props.searchClickHandler}
-                />
-            </ResizableBox>
+            <div className="resizable-container">
+                <ResizableBox
+                    width={
+                        isMaxTabletResolution
+                            ? LEFT_NAV_WIDTH_DESKTOP
+                            : LEFT_NAV_WIDTH_TABLET
+                    }
+                    minConstraints={[
+                        isMaxTabletResolution
+                            ? MIN_LEFT_NAV_WIDTH_DESKTOP
+                            : MIN_LEFT_NAV_WIDTH_TABLET,
+                    ]}
+                    maxConstraints={[
+                        isMaxTabletResolution
+                            ? MAX_LEFT_NAV_WIDTH_DESKTOP
+                            : MAX_LEFT_NAV_WIDTH_TABLET,
+                    ]}
+                    axis="x"
+                    className="resizable"
+                >
+                    <NavContent
+                        backLink={props.backLink}
+                        navContent={navContent}
+                        navTitle={props.navTitle}
+                        refObj={ref as React.RefObject<HTMLDivElement>}
+                        leftNavOpen={props.leftNavOpen}
+                        isPublicSiteOpen={props.isPublicSiteOpen}
+                        isMaxMobileResolution={isMaxMobileResolution}
+                        setDarkMode={props.setDarkMode}
+                        isDarkMode={props.isDarkMode}
+                        searchClickHandler={props.searchClickHandler}
+                    />
+                </ResizableBox>
+            </div>
         ) : (
             <div className="menuMain">
-                <div className="menuContainer">
-                    <IconContext.Provider
-                        value={{
-                            className: `icon ${
-                                props.leftNavOpen && 'imgOpacity'
-                            }`,
-                        }}
-                    >
-                        <GiHamburgerMenu onClick={onMenuClick} />
-                    </IconContext.Provider>
-                    <IconContext.Provider
-                        value={{
-                            className: `icon ${
-                                props.leftNavOpen && 'imgOpacity'
-                            }`,
-                        }}
-                    >
-                        {props.isDarkMode ? (
-                            <RiMoonClearLine
-                                onClick={() => props.setDarkMode(false)}
-                            />
-                        ) : (
-                            <FiSun onClick={() => props.setDarkMode(true)} />
-                        )}
-                    </IconContext.Provider>
-                    <IconContext.Provider
-                        value={{
-                            className: `icon ${
-                                !props.leftNavOpen && 'imgOpacity'
-                            } clearIcon`,
-                        }}
-                    >
-                        <MdClear onClick={onMenuClick} />
-                    </IconContext.Provider>
-                </div>
                 <NavContent
                     backLink={props.backLink}
                     navContent={navContent}

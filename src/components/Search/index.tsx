@@ -26,12 +26,11 @@ type SearchProps = {
     updateKeyword: Function;
     setDarkMode: Function;
     isPublicSiteOpen: boolean;
-    leftNavWidth: number;
 };
 
 const Search: React.FC<SearchProps> = (props) => {
-    const node = useRef();
-    const anchor = useRef();
+    const node = useRef<HTMLDivElement>(null);
+    const anchor = useRef<HTMLAnchorElement>(null);
     const optionListRef = useRef({});
     const [showSearchResult, updateShowSearchResult] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -46,7 +45,7 @@ const Search: React.FC<SearchProps> = (props) => {
 
     // This handles the mouse click events for suggestion list
     const handleClick = (event: Event) => {
-        if (node?.current?.contains(event.target)) {
+        if (node?.current?.contains(event.target as Node | null)) {
             return;
         }
         updateShowSearchResult(false);

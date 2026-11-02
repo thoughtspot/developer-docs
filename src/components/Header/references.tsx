@@ -22,7 +22,7 @@ const References = () => {
     };
 
     const links = [
-        { link: 'https://discord.gg/PPgnx3YZ', icon: RiDiscordLine },
+        { link: 'https://discord.gg/YBWP65W6te', icon: RiDiscordLine },
         {
             link: 'https://github.com/thoughtspot/visual-embed-sdk',
             icon: FiGithub,

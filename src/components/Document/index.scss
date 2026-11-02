@@ -4,7 +4,7 @@
 @import '../../assets/styles/grid.scss';
 
 .documentWrapper {
-    width: calc(100% - #{$docmap-width-desktop});
+    width: calc(98%);
     color: var(--primary-color);
 
     .document-toolbar {
@@ -21,6 +21,22 @@
     /* In order to hide TOC in main component */
     #toc {
         display: none;
+    }
+
+   [id]:target::before {
+      display: block;
+      height: 70px;     /* match header height */
+      margin-top: -70px;
+      visibility: hidden;
+    }
+
+   .scroll-container {
+      scroll-behavior: smooth;
+      scroll-padding-top: 65px;
+    }
+    .scroll-container h2[id],
+    .scroll-container h3[id] {
+      scroll-margin-top: 65px;
     }
 
     h1 {
@@ -62,10 +78,53 @@
 
     /* ── Code block wrapper — holds header bar + pre ─────────────────── */
     .code-block-wrapper {
+        position: relative;
         margin: 16px 0;
         border-radius: 8px;
         border: 1px solid #323946;
         overflow: hidden;
+        background: var(--code-block-color);
+
+        /* Collapsed + overflowing: fade the clipped edge instead of an inner scrollbar,
+           so mouse-wheel scroll always falls through to the page, never gets trapped. */
+        &.has-overflow:not(.expanded) pre {
+            overflow: hidden;
+            mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent 100%);
+        }
+
+        &.expanded pre {
+            max-height: none;
+            overflow: visible;
+        }
+
+        .code-expand-btn {
+            display: block;
+            margin: 0 auto;
+            padding: 5px 16px;
+            font-size: 12.5px;
+            font-weight: 500;
+            font-family: 'Optimo-Plain', sans-serif;
+            color: var(--link-text-color);
+            background: var(--copy-btn-bg);
+            border: 1px solid var(--rd-sys-color-border-bold);
+            border-radius: 999px;
+            cursor: pointer;
+        }
+
+        &.has-overflow:not(.expanded) .code-expand-btn {
+            position: absolute;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%);
+            z-index: 3;
+        }
+
+        &.expanded .code-expand-btn {
+            // More breathing room above than below, so it doesn't crowd
+            // the last line of code once expanded.
+            margin: 16px auto 10px;
+        }
     }
 
     /* ── Code block header bar ────────────────────────────────────────── */
@@ -86,52 +145,36 @@
             font-family: $font-family-code;
         }
 
+        .code-block-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .copyButton {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 28px;
+            padding: 0 8px;
             height: 28px;
-            padding: 0;
+            font-size: 13px;
+            font-weight: 500;
             color: #fff;
             background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            border: none;
             border-radius: 5px;
             cursor: pointer;
+            white-space: nowrap;
+            font-family: $font-family-doc;
             transition: background 0.15s ease, color 0.15s ease;
-            position: relative;
 
-            &:hover {
-                background: rgba(255, 255, 255, 0.1);
-                color: #fff;
+            &:hover { background: rgba(255, 255, 255, 0.1); }
+            &.copied,
+            &.copied:hover {
+                color: #0d9f6e;
+                background: rgba(13, 159, 110, 0.14);
             }
-
-            .copyIcon {
-                height: 14px;
-                width: 14px;
-                display: block;
-                flex-shrink: 0;
-            }
-
-            /* Tooltip floats below — absolutely positioned so it doesn't shift layout */
-            .tooltip {
-                position: absolute;
-                top: calc(100% + 6px);
-                right: 0;
-                z-index: 10;
-                pointer-events: none;
-
-                .tooltiptext {
-                    display: block;
-                    background: #1d232f;
-                    color: #fff;
-                    font-size: 11px;
-                    padding: 3px 8px;
-                    border-radius: 4px;
-                    white-space: nowrap;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-                }
-            }
+            &.copied .copyIcon { color: #0d9f6e; }
         }
     }
 
@@ -173,38 +216,67 @@
     /* Light mode: keep code blocks dark for better readability */
     #wrapper[data-theme='light'] & {
         .code-block-wrapper {
-            border-color: #1e2430;
+            border-color: #1D232F;
 
             .code-block-header {
-                background: #1e2430;
-                border: 1px solid #458;
+                background: #0d1117;
+                border: 1px solid #30363d;
 
                 .lang { color: #fff; }
                 .copyButton {
-                    border-color: rgba(255, 255, 255, 0.15);
                     color: #fff;
                     &:hover { background: rgba(255, 255, 255, 0.1); color: #cdd9e5; }
+                    &.copied,
+                    &.copied:hover {
+                        color: #0d9f6e;
+                        background: rgba(13, 159, 110, 0.14);
+                    }
+
+                    &.copied .copyIcon { color: #0d9f6e; }
                 }
             }
         }
         pre {
-            background: #1e2430;
+            background: #1D232F;
             color: #cdd9e5;
         }
     }
 
+    /* Dark mode: header matches the pre body color, subtle grey borders throughout */
+    #wrapper[data-theme='dark'] & {
+        .code-block-wrapper {
+            border-color: #34363C;
+
+            .code-block-header {
+                background: #26282C;
+                border-bottom: 1px solid #34363C;
+            }
+        }
+        pre {
+            border-color: #34363C;
+        }
+    }
+
     #preview-in-playground {
-        background: var(--secondary-color);
+        background: var(--rd-comp-color-button-primary-default);
         color: $white;
         font-size: $font-size-normal;
         font-weight: $font-weight-normal;
         border: 0;
         padding: $preview-padding;
-        border: 0;
         border-radius: $preview-border-radius;
         margin-bottom: $preview-margin-bottom;
         display: inline-block;
         height: $preview-height;
+        transition: background 0.15s ease;
+
+        &:hover {
+            background: var(--rd-comp-color-button-primary-hover);
+        }
+
+        &:active {
+            background: var(--rd-comp-color-button-primary-pressed);
+        }
     }
     .paragraph #preview-in-playground {
         padding: 4px 16px !important;
@@ -213,29 +285,72 @@
     table {
         border-spacing: 0;
         border-collapse: separate;
+        border-top: 1px solid var(--border-color);
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
+        table-layout: fixed;
         width: 100%;
         overflow: auto;
 
         th {
             border-bottom: 1px solid var(--border-color);
-            font-size: 13.5px;
+            font-size: 13px;
             text-align: left;
             padding: 20px $padding-sm 20px $padding-sm;
-            background-color: var(--table-header-color);
+            background-color: var(--table-header-bg);
             position: sticky;
             top: 0;
+            z-index: 2;
         }
 
         td {
-            font-size: 13.5px;
+            font-size: 13px;
             border-bottom: 1px solid var(--border-color-tr);
             padding: 5px $padding-md $padding-sm $padding-sm;
             font-weight: $font-weight-normal;
             vertical-align: top;
 
+            code {
+                overflow-wrap: break-word;
+                word-break: break-word;
+                white-space: normal;
+            }
+
             p {
-                font-size: 13.5px;
+                font-size: 13px;
                 margin: 3px 0;
+            }
+        }
+        .tableCopyCell {
+            position: relative;
+            padding-right: calc(#{$padding-md} + 54px);
+
+            .tableCopyButton {
+                position: absolute;
+                top: 6px;
+                right: 6px;
+                border: 0;
+                background: transparent;
+                padding: 2px;
+                opacity: 0;
+                visibility: hidden;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                font-size: 12px;
+                color: var(--secondary-color);
+
+                &.copied { color: #0d9f6e; }
+                &.copied .copyIcon { color: #0d9f6e; }
+            }
+
+            &:hover .tableCopyButton,
+            .tableCopyButton:focus,
+            .tableCopyButton:focus-visible {
+                opacity: 1;
+                visibility: visible;
             }
         }
 
@@ -249,6 +364,26 @@
             }
         }
     }
+
+    .prompt-guidance-table table td,
+    table.prompt-guidance-table td {
+        padding-right: $padding-xs;
+    }
+
+    .prompt-guidance-table table td.tableCopyCell,
+    table.prompt-guidance-table td.tableCopyCell {
+        padding-right: calc(#{$padding-xs} + 52px);
+    }
+
+    .prompt-guidance-table table .tableCopyCell .tooltiptext,
+    table.prompt-guidance-table .tableCopyCell .tooltiptext {
+        color: #2770ef;
+        font-size: $font-size-table;
+        font-family: $font-family-doc;
+        font-weight: $font-weight-normal;
+    }
+
+
 
     h2 {
         margin-top: $margin-lg;
@@ -351,8 +486,8 @@
     }
 
     .copyIcon {
-        height: 15px;
-        width: 20px;
+        height: 16px;
+        width: 16px;
     }
 
     a,
@@ -427,15 +562,15 @@ pre {
 
 @media screen and (min-width: $tablet-resolution-min) and (max-width: $tablet-resolution-max) {
     .documentWrapper {
-        width: calc(100% - #{$docmap-width-tablet});
+        width: 96%;
     }
 }
 
 @media screen and (max-width: $tablet-resolution-min) {
     .documentWrapper {
-        width: 100%;
+        width: 94%;
         overflow-x: auto;
-
+        
         pre {
             overflow-x: auto;
         }
