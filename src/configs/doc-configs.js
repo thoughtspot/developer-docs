@@ -66,12 +66,6 @@ module.exports = {
            iframeUrl: 'https://developer-docs-26-9-0-cl.vercel.app/docs/',
         },
         {
-           label: '26.8.0.cl',
-           link: '26.8.0.cl',
-           subLabel: 'Cloud',
-           iframeUrl: 'https://developer-docs-26-8-0-cl.vercel.app/docs/',
-        },
-        {
            label: '26.3.0.sw',
            link: '26.3.0.sw',
            subLabel: 'Software (Latest)',
