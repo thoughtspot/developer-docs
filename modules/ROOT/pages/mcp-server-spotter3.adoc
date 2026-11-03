@@ -83,9 +83,8 @@ ThoughtSpot returns the following update types:
 ////
 
 5. *User generates a dashboard with the results (optional)* +
-The user can choose to save answers from the conversation as a ThoughtSpot dashboard. For this workflow, the agent extracts the `answer_id` and `answer_title` from each `answer` type update collected during polling and calls `create_dashboard`. +
-ThoughtSpot creates a dashboard and returns a `dashboard_id` and a
-`dashboard_url`, a direct link to the dashboard in the ThoughtSpot UI.
+The user can choose to save answers from the conversation as a ThoughtSpot dashboard. For this workflow, the agent extracts the `answer_id` and `answer_title` from each `answer` type update collected during polling and calls `create_dashboard`. The agent passes each `answer_title` as the `title` of the answer, and can add `instructions` for layout and style. +
+SpotterViz, the ThoughtSpot dashboard designer, organizes and styles the charts and saves them as a dashboard. If the dashboard is not ready, `create_dashboard` returns `status: "in_progress"` and a `task_id`, and the agent polls `get_dashboard_status` until the status changes. When the status is `completed`, the response contains the `dashboard_id` and the `dashboard_url`, a direct link to the dashboard in the ThoughtSpot UI. For more information, see xref:mcp-tool-reference-spotter3.adoc#create_dashboard[create_dashboard].
 
 The other optional tool calls include:
 
@@ -97,6 +96,18 @@ If the user belongs to more than one Org and connects over OAuth, the agent call
 
 * *Agent searches for existing content (optional)* +
 If the user refers to content that already exists, for example, "open the regional sales Liveboard", the agent calls `search_objects` with a search term and optional filters such as object type, author, tag, or verified status. `search_objects` returns a ranked list of matching objects with their metadata and deep links.
+
+* *Agent reads the data behind existing content (optional)* +
+After `search_objects` returns an Answer or Liveboard, the agent can call `get_data` with the `object_id` from the result, and the result's `type` as `object_type`, to fetch the columns and rows that the object shows. For a single visualization on a Liveboard, the agent passes the `visualization_id` in `visualization_ids`. The agent answers from the returned rows, which reflect the latest data. `get_data` is available only to users who have the privilege to download data. For more information, see xref:mcp-tool-reference-spotter3.adoc#get_data[get_data].
+
+* *User asks for a dashboard from a description (optional)* +
+If the user asks for a dashboard before any analysis, or wants one recreated from another tool, the agent calls `create_dashboard` with `instructions` and no `answers`. SpotterViz returns `status: "needs_input"` with the data source it chose and its plan. The agent shows the plan to the user. After the user confirms or asks for changes, the agent calls `create_dashboard` again with the same `task_id` and the user's reply in `instructions`.
+
+* *User changes an existing dashboard (optional)* +
+The agent finds the dashboard GUID with `search_objects`, and calls `modify_dashboard` with the `dashboard_id` and the user's change in `instructions`. If SpotterViz asks a question, the agent shows it to the user and calls `modify_dashboard` again with the same `dashboard_id` and `task_id`. For more information, see xref:mcp-tool-reference-spotter3.adoc#modify_dashboard[modify_dashboard].
+
+* *User builds or edits a data model (optional)* +
+The agent calls `create_model_session` with a connection GUID for a new model, or a model GUID to edit one. The agent sends instructions with `send_model_message` and polls `get_model_updates` until `is_done` is `true`. The builder proposes a plan first, and the agent shows it to the user and waits for approval. To save, the agent calls `finalize_model` for a summary, and then calls it again with `confirm: true` after the user approves. The model builder tools are available only to users who can create or edit data models. For more information, see xref:mcp-tool-reference-spotter3.adoc#model-builder-tools[Model builder tools].
 
 == Additional resources
 * For information about MCP, see the link:https://modelcontextprotocol.io[Model Context Protocol specification, window=_blank].
