@@ -12,17 +12,19 @@ import { BiSearch } from '@react-icons/all-files/bi/BiSearch';
 import { Analytics } from '@vercel/analytics/react';
 import { Seo } from '../Seo';
 import { queryStringParser, isPublicSite } from '../../utils/app-utils';
+import { useRadianceTheme } from '../../utils/radiance';
 import { passThroughHandler, fetchChild } from '../../utils/doc-utils';
 import Header from '../Header';
+import MobileNavToggle from '../MobileNavToggle';
 import LeftSidebar from '../LeftSidebar';
 import Docmap from '../Docmap';
 import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
+import '../../assets/styles/radiance-home.css';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './playGround/RESTAPI';
-import GraphQLPlayGround from './playGround/GraphQL';
-import { AskDocs } from './askDocs';
+import { ThemeBuilder } from './playGround/ThemeBuilder';
 import {
     TS_HOST_PARAM,
     TS_ORIGIN_PARAM,
@@ -48,7 +50,6 @@ import {
 } from '../../constants/uiConstants';
 import t from '../../utils/lang-utils';
 import { getHTMLFromComponent } from '../../utils/react-utils';
-import { ThemeBuilder } from './playGround/ThemeBuilder';
 import VersionIframe from '../VersionIframe';
 
 const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
@@ -89,24 +90,47 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     const initialNavContentData = passThroughHandler(navNode.html, params);
     const [navContent, setNavContent] = useState(initialNavContentData || '');
-    const [breadcrumsData, setBreadcrumsData] = useState(
-        fetchChild(initialNavContentData) || [],
-    );
     const [showSearch, setShowSearch] = useState(false);
-    const [leftNavWidth, setLeftNavWidth] = useState(
-        width > MAX_TABLET_RESOLUTION
-            ? LEFT_NAV_WIDTH_DESKTOP
-            : LEFT_NAV_WIDTH_TABLET,
-    );
     const [leftNavOpen, setLeftNavOpen] = useState(false);
     const [keyword, updateKeyword] = useState('');
-    const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(false);
-    const checkout =
-        typeof window !== 'undefined'
-            ? localStorage.getItem('theme') === 'dark'
-            : null;
-    const [isDarkMode, setDarkMode] = useState(checkout);
+    const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(() => {
+        if (typeof window !== 'undefined') return isPublicSite(location.search);
+        return true;
+    });
+    const [isDarkMode, setDarkMode] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        // URL param takes highest priority (set by embedding product to pass its theme).
+        const urlParams = new URLSearchParams(window.location.search);
+        const darkModeParam = urlParams.get('isDarkMode');
+        if (darkModeParam !== null) {
+            const isDark = darkModeParam === 'true';
+            localStorage.setItem('themeMode', isDark ? 'dark' : 'light');
+            return isDark;
+        }
+        // In-product (embedded) presentation always uses light mode — product UI has no theme toggle.
+        if (!isPublicSite(location.search)){
+            const explicitChoice = localStorage.getItem('themeMode');
+            if (explicitChoice) return explicitChoice === 'dark';
+            return false;
+        }
+        /* themeMode is only written when the user explicitly clicks the toggle.
+           If absent, follow OS preference fresh every load. */
+        const explicitChoice = localStorage.getItem('themeMode');
+        if (explicitChoice) return explicitChoice === 'dark';
+        const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+        localStorage.setItem('theme', prefersDark ? 'dark' : 'light');
+        return prefersDark;
+    });
     const [key, setKey] = useState('');
+
+    // Keeps the Radiance hero surface (home.adoc) in the site's current theme.
+    useRadianceTheme(isDarkMode);
+
+    // Breadcrumb data built from the single navigation menu (nav-in-product-help.adoc)
+    const breadcrumsData = React.useMemo(() => {
+        if (typeof window === 'undefined') return [];
+        return fetchChild(initialNavContentData);
+    }, []);
 
     const isCustomPage = _.values(CUSTOM_PAGE_ID).some(
         (pageId: string) => pageId === params[TS_PAGE_ID_PARAM],
@@ -114,24 +138,25 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     const isApiPlayground =
         params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.API_PLAYGROUND;
 
-    const isThemeBuilder =
-        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.THEME_BUILDER;
-
-    const isVersionedIframe = VERSION_DROPDOWN.some(
+const isVersionedIframe = VERSION_DROPDOWN.some(
         (version) =>
             props?.pageContext?.iframeUrl &&
             version.iframeUrl === props?.pageContext?.iframeUrl,
     );
 
-    const isGQPlayGround =
-        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.GQ_PLAYGROUND;
+    // True when loaded inside a VersionIframe's nested <iframe> (its src carries ?_iframe=1).
+    // This is body content only — the outer wrapper page owns the chrome (Header),
+    // so the nested content must never render its own copy.
+    const isIframeMode =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(location.search).get('_iframe') === '1';
+
+    const isThemeBuilder =
+        params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.THEME_BUILDER;
     const isPlayGround =
-        isGQPlayGround ||
         isApiPlayground ||
         isThemeBuilder ||
         isVersionedIframe;
-
-    const isAskDocsPage = params[TS_PAGE_ID_PARAM] === CUSTOM_PAGE_ID.ASK_DOCS;
 
     useEffect(() => {
         // based on query params set if public site is open or not
@@ -151,25 +176,48 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
 
     useEffect(() => {
         if (isBrowser()) {
-            setDarkMode(localStorage.getItem('theme') === 'dark');
+            // In-product (embedded) presentation always uses light mode.
+            if (!isPublicSiteOpen) {
+                const explicitChoice = localStorage.getItem('themeMode');
+                if (explicitChoice) {
+                    const isDark = explicitChoice === 'dark';
+                    setDarkMode(isDark);
+                    return;
+                }
+                setDarkMode(false);
+                setKey('dark');
+                return;
+            }
+            /* Correct SSR mismatch on first hydration */
+            const explicitChoice = localStorage.getItem('themeMode');
+            let isDark: boolean;
+            if (explicitChoice) {
+                isDark = explicitChoice === 'dark';
+            } else {
+                isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            }
+            setDarkMode(isDark);
             setKey('dark');
         }
     }, []);
 
-    // Listen for theme change messages
+    // Effect to handle URL parameters for dark mode
     useEffect(() => {
-        const handleThemeMessage = (event: MessageEvent): void => {
-            if (event.data && event.data.type === 'THEME_CHANGE') {
-                setDarkMode(event.data.isDarkMode);
+        if (isBrowser()) {
+            // Check URL for isDarkMode parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const darkModeParam = urlParams.get('isDarkMode');
+
+            if (darkModeParam !== null) {
+                // Update dark mode state from URL parameter
+                const newDarkMode = darkModeParam === 'true';
+                setDarkMode(newDarkMode);
+                localStorage.setItem('theme', newDarkMode ? 'dark' : 'light');
+                localStorage.setItem('themeMode', newDarkMode ? 'dark' : 'light');
             }
-        };
-
-        window.addEventListener('message', handleThemeMessage);
-
-        return () => {
-            window.removeEventListener('message', handleThemeMessage);
-        };
-    }, []);
+        }
+    }, [location.search]);
 
     const getSearch = () => {
         const SearchIconHTML = getHTMLFromComponent(<BiSearch />, 'searchIcon');
@@ -205,9 +253,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
     useEffect(() => {
         // This is to send navigation events to the parent app (if in Iframe)
         // So that the parent can sync the url
-        const urlParams = new URLSearchParams(location.search);
-        const darkModeParam = urlParams.get('isDarkMode');
-        setDarkMode(darkModeParam === 'true');
         window.parent.postMessage(
             {
                 params: {
@@ -255,7 +300,16 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     }
 
                     url.searchParams.set('pageid', e.data.params.pageid);
+                    const hash = e.data.subsection;
+                    if (hash) {
+                        url.hash = hash;
+                    }
+                    // Deliberately bypasses navigate()/React state: this only syncs the address
+                    // bar for shareable links/back-button. Routing it through navigate() would
+                    // update the `location` prop and re-trigger VersionIframe's src memo, causing
+                    // the iframe to reload the page it just navigated to internally.
                     window.history.replaceState({}, '', url.toString());
+
                 }
             }
         };
@@ -329,33 +383,22 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         });
     }
 
-    const calculateDocumentBodyWidth = () => {
-        if (isMaxMobileResolution && !isCustomPage) {
-            if (width > MAX_CONTENT_WIDTH_DESKTOP) {
-                if (isHomePage) return width - leftNavWidth;
-                return `${MAX_CONTENT_WIDTH_DESKTOP - 300}px`;
-            }
-            return `${width - 300}px`;
-        }
-        return '100%';
-    };
     const shouldShowRightNav = params[TS_PAGE_ID_PARAM] !== HOME_PAGE_ID;
     Modal.setAppElement('#___gatsby');
     const renderSearch = () => {
         const customStyles = {
             overlay: {
                 background: 'rgba(50,57,70, 0.9)',
+                zIndex: 1100,
             },
             content: {
                 top: '50px',
-                left: 'auro',
-                right: 'auto',
+                left: 0,
+                right: 0,
                 bottom: 'auto',
-                width: isMaxMobileResolution ? '40%' : '100%',
+                width: isMaxMobileResolution ? '40%' : 'calc(100% - 32px)',
                 margin: 'auto',
-                transform: `translate(${
-                    isMaxMobileResolution ? '80%' : '0'
-                }, 70px)`,
+                transform: 'translate(0, 70px)',
                 border: 'none',
                 height: isMaxMobileResolution ? '400px' : '300px',
                 boxShadow: 'none',
@@ -368,6 +411,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                 isOpen={showSearch}
                 onRequestClose={() => setShowSearch(false)}
                 style={customStyles}
+                portalClassName="DocsSearchModalPortal"
             >
                 <div
                     id="docsModal"
@@ -387,7 +431,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                         setDarkMode={setDarkMode}
                         isDarkMode={isDarkMode}
                         isPublicSiteOpen={isPublicSiteOpen}
-                        leftNavWidth={leftNavWidth}
                     />
                 </div>
             </Modal>
@@ -408,7 +451,6 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     navTitle={navTitle}
                     navContent={navContent}
                     docWidth={width}
-                    handleLeftNavChange={setLeftNavWidth}
                     location={location}
                     setLeftNavOpen={setLeftNavOpen}
                     leftNavOpen={leftNavOpen}
@@ -423,32 +465,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     }}
                 />
             </div>
-            {isAskDocsPage ? (
-                <div
-                    className="documentBody"
-                    style={{
-                        width: calculateDocumentBodyWidth(),
-                        display: 'flex',
-                        marginLeft: isMaxMobileResolution
-                            ? `${leftNavWidth}px`
-                            : '0px',
-                    }}
-                >
-                    <AskDocs />
-                </div>
-            ) : (
-                <div
-                    className={`documentBody ${
-                        isHomePage ? 'doc-home' : 'doc-wrapper-detail'
-                    }`}
-                    style={{
-                        width: calculateDocumentBodyWidth(),
-                        marginLeft: isMaxMobileResolution
-                            ? `${leftNavWidth}px`
-                            : '0px',
-                    }}
-                >
-                    <div className="introWrapper">
+            <div
+                className={`documentBody ${
+                    isHomePage ? 'doc-home' : 'doc-wrapper-detail'
+                }`}
+            >
+                <div className="introWrapper">
+                    <div className="documentWrapperContainer">
                         <Document
                             shouldShowRightNav={shouldShowRightNav}
                             pageid={params[TS_PAGE_ID_PARAM]}
@@ -456,19 +479,20 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             docContent={docContent}
                             breadcrumsData={breadcrumsData}
                             isPublicSiteOpen={isPublicSiteOpen}
+                            markdownBody={curPageNode.fields?.markdownBody}
                         />
-                        {shouldShowRightNav && (
-                            <div>
-                                <Docmap
-                                    docContent={docContent}
-                                    location={location}
-                                    options={results}
-                                />
-                            </div>
-                        )}
                     </div>
+                    {shouldShowRightNav && (
+                        <div className="docmapWrapper">
+                            <Docmap
+                                docContent={docContent}
+                                location={location}
+                                options={results}
+                            />
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </>
     );
 
@@ -483,6 +507,7 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                     backLink={backLink}
                     isPublisSiteOpen={isPublicSiteOpen}
                     params={params}
+                    isDarkMode={isDarkMode}
                 />
             );
 
@@ -500,13 +525,13 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
             );
         }
 
-        return (
-            <GraphQLPlayGround
-                location={location}
-                backLink={backLink}
-                isPublisSiteOpen={isPublicSiteOpen}
-            />
-        );
+        return null;
+    };
+
+    const isEmbeddedContext = () => {
+        if (!isBrowser()) return false;
+        const urlParams = new URLSearchParams(location.search);
+        return urlParams.get('context') === 'embedded' || !isPublicSiteOpen;
     };
 
     const getClassName = () => {
@@ -516,15 +541,19 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
         return cName;
     };
 
+    const getWrapperClassName = () => {
+        return isEmbeddedContext() ? 'embedded-mode' : '';
+    };
+
     return (
         <>
             <Seo title={docTitle} description={docDescription} />
             <Analytics />
             <div
                 id="wrapper"
+                className={getWrapperClassName()}
                 data-theme={isDarkMode ? 'dark' : 'light'}
                 key={key}
-                style={{ height: '100vh', overflow: 'hidden' }}
             >
                 {isPublicSiteOpen && (
                     <Header
@@ -541,48 +570,40 @@ const DevDocTemplate: FC<DevDocTemplateProps> = (props) => {
                             : { height: '0px' }
                     }
                 ></div>
-                {/* AnnouncementBanner not available in this branch
-                {shouldShowAnnouncementBanner() && (
-                    <AnnouncementBanner
-                        enabled={HOME_ANNOUNCEMENT_BANNER?.enabled}
-                        message={
-                            <span>
-                                {HOME_ANNOUNCEMENT_BANNER?.linkHref &&
-                                    HOME_ANNOUNCEMENT_BANNER?.linkText && (
-                                        <a
-                                            className="announcementBanner__link"
-                                            href={HOME_ANNOUNCEMENT_BANNER.linkHref}
-                                            target={
-                                                bannerLinkOpensInNewTab ? '_blank' : undefined
-                                            }
-                                            rel={
-                                                bannerLinkOpensInNewTab
-                                                    ? 'noopener noreferrer'
-                                                    : undefined
-                                            }
-                                        >
-                                            {HOME_ANNOUNCEMENT_BANNER.linkText}
-                                        </a>
-                                    )}
-                                {(HOME_ANNOUNCEMENT_BANNER?.linkHref &&
-                                    HOME_ANNOUNCEMENT_BANNER?.linkText) && ' '}
-                                {HOME_ANNOUNCEMENT_BANNER?.message ||
-                                    (VERSION_DROPDOWN?.[0]?.label
-                                        ? `Version ${VERSION_DROPDOWN[0].label} is now available!`
-                                        : 'A new version is now available!')}
-                            </span>
-                        }
+                {!isIframeMode && !isVersionedIframe && !isMaxMobileResolution && (
+                    // The left sidebar is hidden on narrow viewports until opened, so
+                    // show the bar with the toggle there. Wider viewports always show it.
+                    <MobileNavToggle
+                        leftNavOpen={leftNavOpen}
+                        setLeftNavOpen={setLeftNavOpen}
                     />
-                )} */}
+                )}
                 <main
+                    className={getClassName()}
                     ref={ref as React.RefObject<HTMLDivElement>}
                     style={
-                        !isPublicSiteOpen
+                        isIframeMode
                             ? { height: '100lvh' }
-                            : { height: 'calc(100lvh - 60px)' }
+                            : !isPublicSiteOpen
+                                ? (!isMaxMobileResolution
+                                    ? { height: 'calc(100lvh - 44px)' }
+                                    : { height: '100lvh' })
+                                : {
+                                      // Header (65px) above, plus the nav toggle bar (44px)
+                                      // on narrow viewports.
+                                      height: !isVersionedIframe && !isMaxMobileResolution
+                                          ? 'calc(100lvh - 65px - 44px)'
+                                          : 'calc(100lvh - 65px)',
+                                  }
                     }
                 >
-                    {isPlayGround ? renderPlayGround() : renderDocTemplate()}
+                    {isPlayGround ? (
+                        <div className="playgroundWrapper">
+                            {renderPlayGround()}
+                        </div>
+                    ) : (
+                        renderDocTemplate()
+                    )}
                 </main>
             </div>
         </>
@@ -618,6 +639,9 @@ export const query = graphql`
                 description
             }
             html
+            fields {
+                markdownBody
+            }
         }
         navNode: asciidoc(pageAttributes: { pageid: { eq: $navId } }) {
             document {
@@ -659,4 +683,7 @@ type AsciiDocNode = {
         description?: string;
     };
     html: string;
+    fields?: {
+        markdownBody?: string;
+    };
 };

@@ -3,9 +3,12 @@ import { IconContext } from '@react-icons/all-files';
 
 import './index.scss';
 
-const Menu = (props: { config: {} }) => {
+type MenuChild = { label: string; link: string; external?: boolean };
+type MenuItem = { name: string; link?: string; icon?: any; child?: MenuChild[] };
+
+const Menu = (props: { config: MenuItem[] }) => {
     const { config = [] } = props;
-    const handelClick = (menu: { link: string; external: boolean }) => {
+    const handelClick = (menu: { link: string; external?: boolean }) => {
         const { external = false, link } = menu;
         let url = location.origin + '/' + link;
         let target = '_self';
@@ -30,10 +33,10 @@ const Menu = (props: { config: {} }) => {
     return (
         <div className="d-inline-block headerLink menuWrapper">
             {config?.map((c) => (
-                <div className="menu">
+                <div key={c.name} className="menu">
                     <button
                         className="menubtn"
-                        onClick={() => (c.link ? handelClick(c) : null)}
+                        onClick={() => (c.link ? handelClick({ link: c.link }) : null)}
                     >
                         {c?.icon ? getIcon(c.icon) : null}
 
@@ -42,9 +45,10 @@ const Menu = (props: { config: {} }) => {
                     {c?.child ? (
                         <div className="menuContent">
                             {c?.child?.map(
-                                (d: { label: string; link: string }) => {
+                                (d: { label: string; link: string; external?: boolean }) => {
                                     return (
                                         <div
+                                            key={d.label}
                                             data-testid={`menu-${d?.label}`}
                                             onClick={() => handelClick(d)}
                                         >

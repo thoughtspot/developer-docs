@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { INTRO_WRAPPER_MARGIN_TOP } from '../../constants/uiConstants';
+import React, { useEffect, useRef, useState } from 'react';
 import t from '../../utils/lang-utils';
+import { DOC_FILTER_EVENT } from '../../utils/doc-filter-events';
 import './index.scss';
 
 const Docmap = (props: {
@@ -9,48 +9,123 @@ const Docmap = (props: {
     location: Location;
 }) => {
     const [toc, setToc] = useState('');
+    const [activeId, setActiveId] = useState('');
+    // Sections that a page filter (the Action page) has hidden: their entries are hidden here too.
+    const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+    const tocRef = useRef<HTMLDivElement>(null);
+    const visibleHeadings = useRef<Set<string>>(new Set());
+
     useEffect(() => {
-        // GraphQL doesn't provide any seperate html for Table of Content. It is included in the document itself.
-        // To extract the TOC from document, we first create a temporary element to set the document as it's innerHTML.
-        // Them we search for TOC using querySelector on the temporary element and then set the obtained TOC to display in the UI.
         const doc = document.createElement('div');
         doc.innerHTML = props.docContent;
         const tocEl = doc.querySelector('#toc');
         if (tocEl) {
             const { hash } = props.location;
+            setToc(tocEl.innerHTML);
             if (hash) {
                 const ele = document.querySelector(hash);
                 if (ele) {
-                    document.documentElement.scrollTop =
-                        (ele as HTMLElement).offsetTop -
-                        INTRO_WRAPPER_MARGIN_TOP;
+                    ele.scrollIntoView({ block: 'start' });
+                    window.scrollBy(0, -70);
                 }
             }
-            setToc(tocEl.innerHTML);
         } else {
             setToc('');
         }
     }, [props.docContent, props.location.hash]);
 
-    // Currently not using
-    // const toggleActiveClass = (toc: Element, href: string) => {
-    //     toc.querySelectorAll('a').forEach((tag, index) => {
-    //         const temp = tag;
-    //         if (tag.getAttribute('href') === href) {
-    //             temp.classList.add('activeTag');
-    //         } else if (tag.classList.contains('activeTag')) {
-    //             temp.classList.remove('activeTag');
-    //         }
-    //         toc.querySelectorAll('a')[index].innerHTML = temp.innerHTML;
-    //     });
-    //     return toc;
-    // };
+    // Track which heading is currently near the top of the viewport
+    useEffect(() => {
+        if (!toc) return () => {};
+        visibleHeadings.current.clear();
+
+        const headings = document.querySelectorAll(
+            '.documentView h2[id], .documentView h3[id], .documentView h4[id]',
+        );
+        if (!headings.length) return () => {};
+
+        const headingIds = Array.from(headings).map((h) => h.id);
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        visibleHeadings.current.add(entry.target.id);
+                    } else {
+                        visibleHeadings.current.delete(entry.target.id);
+                    }
+                });
+                // Pick the topmost visible heading in document order
+                const topVisible = headingIds.find((id) =>
+                    visibleHeadings.current.has(id),
+                );
+                if (topVisible) setActiveId(topVisible);
+            },
+            { rootMargin: '-60px 0% -40% 0%', threshold: 0 },
+        );
+
+        headings.forEach((h) => observer.observe(h));
+        return () => {
+            observer.disconnect();
+            visibleHeadings.current.clear();
+        };
+    }, [toc]);
+
+    useEffect(() => {
+        const onFilter = (event: Event) =>
+            setHiddenIds((event as CustomEvent).detail?.hiddenIds || []);
+        window.addEventListener(DOC_FILTER_EVENT, onFilter);
+        return () => window.removeEventListener(DOC_FILTER_EVENT, onFilter);
+    }, []);
+
+    // Hide the entries of the hidden sections. This runs again whenever the list is rebuilt
+    // (toc), so the entries stay hidden.
+    useEffect(() => {
+        const root = tocRef.current;
+        if (!root || !hiddenIds.length) return undefined;
+        const hidden = new Set(hiddenIds);
+        const hiddenEntries: HTMLElement[] = [];
+        root.querySelectorAll('a[href^="#"]').forEach((link) => {
+            const id = (link.getAttribute('href') || '').slice(1);
+            const entry = link.closest<HTMLElement>('li');
+            if (hidden.has(id) && entry) {
+                entry.style.display = 'none';
+                hiddenEntries.push(entry);
+            }
+        });
+        return () => {
+            hiddenEntries.forEach((entry) => {
+                // eslint-disable-next-line no-param-reassign
+                entry.style.display = '';
+            });
+        };
+    }, [hiddenIds, toc]);
+
+    // Apply activeTag class to the li containing the active TOC link
+    useEffect(() => {
+        if (!tocRef.current) return;
+        tocRef.current
+            .querySelectorAll('li.activeTag')
+            .forEach((li) => li.classList.remove('activeTag'));
+        if (activeId) {
+            const link = tocRef.current.querySelector(
+                `a[href="#${activeId}"]`,
+            );
+            if (link?.parentElement?.tagName === 'LI') {
+                link.parentElement.classList.add('activeTag');
+            }
+        }
+    }, [activeId, toc]);
 
     return (
         toc !== '' && (
             <div className="docmapLinks">
                 <p className="tocTitle">{t('RIGHT_NAV_SIDERBAR_TITLE')}</p>
-                <div data-testid="toc" dangerouslySetInnerHTML={{ __html: toc }} />
+                <div
+                    ref={tocRef}
+                    data-testid="toc"
+                    dangerouslySetInnerHTML={{ __html: toc }}
+                />
             </div>
         )
     );

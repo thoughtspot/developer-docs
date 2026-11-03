@@ -2,9 +2,79 @@ const fsExtra = require('fs-extra');
 const {
     DOC_NAV_PAGE_ID,
     NOT_FOUND_PAGE_ID,
+    VERSION_DROPDOWN,
 } = require('./src/configs/doc-configs');
+const { getDocLinkFromEdge } = require('./src/utils/gatsby-utils.js');
 
-exports.onPostBuild = () => {
+/* ── Build-time Markdown generation ───────────────────────────────────────
+ * For every asciidoc node, convert the already-generated HTML to clean
+ * Markdown using cheerio (DOM pre-processing) + turndown (HTML→MD).
+ * The result is stored as `fields.markdownBody` on each node and exposed
+ * in GraphQL so CopyPageDropdown can use it instead of scraping the DOM.
+ */
+exports.onCreateNode = ({ node, actions }) => {
+    if (node.internal.type !== 'Asciidoc') return;
+
+    const { createNodeField } = actions;
+    const TurndownService = require('turndown');
+    const cheerio = require('cheerio');
+
+    const html = node.html || '';
+    const title = node.document?.title || node.pageAttributes?.title || '';
+
+    /* Load HTML into cheerio for pre-processing */
+    const $ = cheerio.load(html, { decodeEntities: false });
+
+    /* Remove anchor icon links that Asciidoctor injects next to headings */
+    $('a.anchor').remove();
+
+    /* Remove the embedded TOC — it adds noise to Markdown */
+    $('#toc').remove();
+
+    /* Convert admonition tables to readable text blocks */
+    $('.admonitionblock').each((_, el) => {
+        const type = $(el).attr('class').match(/\b(note|tip|warning|caution|important)\b/i)?.[1]?.toUpperCase() || 'NOTE';
+        const content = $(el).find('td.content').text().trim();
+        $(el).replaceWith(`<blockquote><p><strong>${type}:</strong> ${content}</p></blockquote>`);
+    });
+
+    /* Drop tables with no rows (usually from malformed asciidoc tables).
+     * turndown-plugin-gfm reads `table.rows[0].parentNode` and throws on them. */
+    $('table').each((_, el) => {
+        if (!$(el).find('tr').length) $(el).remove();
+    });
+
+    /* Get the cleaned HTML */
+    const cleanedHtml = $('body').html() || '';
+
+    /* Configure turndown */
+    const td = new TurndownService({
+        headingStyle: 'atx',
+        bulletListMarker: '-',
+        codeBlockStyle: 'fenced',
+        fence: '```',
+    });
+
+    /* GFM table plugin — renders tables as proper Markdown pipe tables */
+    const { tables } = require('turndown-plugin-gfm');
+    td.use(tables);
+
+    /* A conversion failure on one page must not fail the whole build */
+    let markdownBody = '';
+    try {
+        markdownBody = td.turndown(cleanedHtml);
+    } catch (err) {
+        console.warn(`Markdown conversion failed for "${title}" (${node.id}): ${err.message}`);
+    }
+
+    createNodeField({
+        node,
+        name: 'markdownBody',
+        value: markdownBody,
+    });
+};
+
+exports.onPostBuild = async () => {
     fsExtra.copyFileSync(
         `${__dirname}/robots.txt`,
         `${__dirname}/public/robots.txt`,
@@ -26,6 +96,8 @@ exports.createPages = async function ({ actions, graphql }) {
                         parent {
                             ... on File {
                                 name
+                                sourceInstanceName
+                                relativePath
                             }
                         }
                     }
@@ -35,16 +107,45 @@ exports.createPages = async function ({ actions, graphql }) {
     `);
 
     const namePageIdMap = {};
+    // nav-* files (the navigation menu) are sidebar data, not content pages
+    const NAV_PARTIAL_PREFIX = 'nav-';
+
     data.allAsciidoc.edges.forEach((e) => {
-        namePageIdMap[e.node.parent.name] =
-            e.node.pageAttributes.pageid || NOT_FOUND_PAGE_ID;
+        const {
+            sourceInstanceName: sourceName,
+            relativePath: relPath,
+        } = e.node.parent;
+        const pageId = e.node.pageAttributes.pageid;
+
+        if (pageId && pageId.startsWith(NAV_PARTIAL_PREFIX)) return;
+
+        if (sourceName === 'tutorials') {
+            const relPathSplit = relPath.split('/');
+            const pageIdSplit = pageId.split('__');
+            let finalPageId = pageId;
+            if (pageIdSplit.length > 1) {
+                finalPageId = pageIdSplit[1];
+            }
+            let mapPageId = `tutorials/${finalPageId}`;
+            if (relPathSplit.length > 1) {
+                mapPageId = `tutorials/${relPathSplit[0]}/${finalPageId}`;
+            }
+            namePageIdMap[e.node.parent.name] = mapPageId || NOT_FOUND_PAGE_ID;
+        } else {
+            namePageIdMap[e.node.parent.name] =
+                e.node.pageAttributes.pageid || NOT_FOUND_PAGE_ID;
+        }
     });
 
     data.allAsciidoc.edges.forEach((edge) => {
         const { pageid: pageId } = edge.node.pageAttributes;
 
+        // Skip nav partial files — they are sidebar data, not content pages
+        if (pageId && pageId.startsWith(NAV_PARTIAL_PREFIX)) return;
+
+        const docPath = getDocLinkFromEdge(edge);
         actions.createPage({
-            path: `/${pageId}`,
+            path: docPath,
             component: require.resolve(
                 './src/components/DevDocTemplate/index.tsx',
             ),
@@ -60,5 +161,23 @@ exports.createPages = async function ({ actions, graphql }) {
                 context: { pageId, navId: DOC_NAV_PAGE_ID, namePageIdMap },
             });
         }
+    });
+
+    VERSION_DROPDOWN.forEach((version) => {
+        if (version.link === ' ' || !version.iframeUrl) {
+            return;
+        }
+
+        const versionPath = version.link.startsWith('/')
+            ? version.link.substring(1)
+            : version.link;
+
+        actions.createPage({
+            path: `/${versionPath}`,
+            component: require.resolve(
+                './src/components/DevDocTemplate/index.tsx',
+            ),
+            context: { iframeUrl: version.iframeUrl },
+        });
     });
 };
