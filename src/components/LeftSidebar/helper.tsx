@@ -28,6 +28,15 @@ export const addExpandCollapseImages = (
 
     nav.querySelectorAll('li').forEach((el, index) => {
         if (el.children.length === 2) {
+            // A nested list marked `nav-hidden-children` stays out of the menu:
+            // no arrow, never expanded. Its items are reached from the page of
+            // the entry itself. They stay in the HTML so their breadcrumbs and
+            // sidebar category still resolve.
+            if (el.children[1].classList.contains('nav-hidden-children')) {
+                el.children[1].classList.add('displayNone');
+                el.children[0].classList.add('node-child');
+                return;
+            }
             const paragraphElement = el.children[0];
             if (paragraphElement.childNodes.length < 2) {
                 paragraphElement.classList.add('linkTitle');
@@ -181,7 +190,10 @@ export const collapseAndExpandLeftNav = (
     });
 
     doc?.querySelectorAll('li').forEach((el, i) => {
-        if (el.children.length === 2) {
+        if (
+            el.children.length === 2 &&
+            !el.children[1].classList.contains('nav-hidden-children')
+        ) {
             const spanElement =
                 el.children[0].children.length === 2
                     ? el.children[0].children[1]
