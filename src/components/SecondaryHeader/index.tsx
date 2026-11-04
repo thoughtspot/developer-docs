@@ -92,7 +92,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
         'embed-ts-swift', 'embed-ts-android',
         'style-customization', 'customize-style', 'custom-css', 'css-variables-reference',
         'customize-icons', 'customize-text', 'theme-builder-doc',
-        'filters-overview', 'runtime-overrides', 'runtime-filters', 'runtime-params',
+        'filters-overview', 'runtime-overrides', 'runtime-filters', 'runtime-params', 'liveboard-filter-and-parameter-overrides',
         'action-config', 'actions', 'events-app-integration', 'embed-events', 'host-events',
         'context-aware-event-routing', 'hostEventsV2-migration', 'api-search-intercept',
         'custom-action-intro', 'customize-actions', 'custom-action-url', 'custom-action-callback',
