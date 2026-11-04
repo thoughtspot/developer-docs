@@ -1,3 +1,4 @@
+
 = MCP tool reference (Spotter 3)
 :toc: true
 :toclevels: 3
@@ -6,7 +7,8 @@
 :page-pageid: mcp-tool-reference-spotter3
 :page-description: Refer to this guide to learn which MCP tools are supported, input parameters used for tool calls, and the response format.
 
-The ThoughtSpot Spotter Model Context Protocol (MCP) Server integration exposes tools for running natural language analytics queries and searching existing ThoughtSpot content. The core analytics pattern is: **create a session** → **send a message** → **poll for updates**. The `search_objects` tool is independent of this workflow and can be called at any time.
+Analysis, dashboard creation, and model building each follow the same pattern, **start the work** → **poll for updates** until it finishes.
+The analysis workflow is **create a session** → **send a message** → **poll for updates**. The `search_objects` and `get_data` tools are independent of these workflows and can be called at any time.
 
 * <<create_analysis_session,create_analysis_session>> +
 Start an analytical session.
@@ -15,15 +17,37 @@ Send a natural language question or follow-up.
 * <<get_session_updates,get_session_updates>> +
 Poll for streamed responses.
 * <<create_dashboard,create_dashboard>> +
-Create a dashboard from session answers.
+Create a dashboard from session answers or from a description.
+* <<modify_dashboard,modify_dashboard>> +
+Change an existing dashboard.
+* <<get_dashboard_status,get_dashboard_status>> +
+Poll a dashboard task that is still running.
 * <<search_objects,search_objects>> +
 Search for existing ThoughtSpot content by name or description.
+* <<get_data,get_data>> +
+Fetch the columns and rows of a saved Answer or Liveboard.
+* <<create_model_session,create_model_session>> +
+Start a session to build or edit a data model.
+* <<send_model_message,send_model_message>> +
+Send an instruction to the model builder or answer one of its questions.
+* <<get_model_updates,get_model_updates>> +
+Poll for the model builder's progress.
+* <<finalize_model,finalize_model>> +
+Review and save the model.
 * <<list_orgs,list_orgs>> +
 List the Orgs your account can access. (OAuth connections on Org-enabled instances only)
 * <<switch_org,switch_org>> +
 Switch your active Org for the current session. (OAuth connections on Org-enabled instances only)
 * <<check_connectivity,check_connectivity>> +
 Verify that the MCP Server is reachable.
+
+[NOTE]
+====
+* The new and updated tools are available by default on the MCP server endpoint with `?api-version=latest`. To pin your integration to the release that includes them, use the release date, for example `?api-version=2026-10-14`. For information about the available API versions and release dates, see the xref:mcp-server-changelog.adoc[MCP Server changelog].
+* The server lists `get_data` only for users who have the privilege to download data.
+* The server lists the model builder tools only for users who have the data management privilege and the privilege to create or edit data models.
+====
+
 
 [#create_analysis_session]
 == create_analysis_session
@@ -32,7 +56,9 @@ Start an analytical session with ThoughtSpot's analytics agent. This is the requ
 Sessions are conversational. Once created, you can send multiple follow-up questions to the same session without calling `create_analysis_session` again.
 
 === Input parameter
-The `data_source_id` is optional. Provide this when the user has specified or confirmed a data source, or when context makes a particular source obvious. Omit to let ThoughtSpot automatically select the most relevant source based on the question.
+The `data_source_id` is optional. Provide this when the user has specified or confirmed a data source, or when context makes a particular source obvious. Omit to let ThoughtSpot automatically select the most relevant source based on the question. If the instance does not support automatic selection, the tool returns an error that asks for a data source. Find the GUID with xref:mcp-tool-reference-spotter3.adoc#search_objects[search_objects], using `types: ["WORKSHEET"]`. If you have only the data source name, you can pass it in the `additional_context` field of `send_session_message` instead.
+
+The `data_source_id` must be a GUID in the format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.
 
 === Example call
 
@@ -92,7 +118,7 @@ __Optional__|Can be used to provide external information relating to the questio
 [source,javascript]
 ----
 const sendMessage = await callMCPTool("send_session_message", {
-    analytical_session_id: "sess_abc123", // Session ID from create_analysis_session.
+    analytical_session_id: "session-guid-abc123", // Session ID from create_analysis_session.
     message: "What were total sales by region last quarter?", // User's natural language question.
     additional_context: "The user's fiscal year starts in April. " +
         "Focus on underperforming regions only." // Optional. External information to influence the analysis.
@@ -104,10 +130,10 @@ const sendMessage = await callMCPTool("send_session_message", {
 call_mcp_tool(
     "send_session_message",
     {
-        "analytical_session_id": "sess_abc123",  # Session ID from create_analysis_session.
+        "analytical_session_id": "session-guid-abc123",  # Session ID from create_analysis_session.
         "message": "What were total sales by region last quarter?", # User's natural language question.
         "additional_context": (  # Optional. External information
-            "The user's fiscal year starts in April."
+            "The user's fiscal year starts in April. "
             "Focus on underperforming regions only." # to influence the analysis.
         ),
     },
@@ -131,6 +157,7 @@ call_mcp_tool(
 * After a successful send, immediately begin polling with `get_session_updates`.
 * Do not send a second message until `get_session_updates` returns `is_done: true`. The agent processes one message at a time per session.
 * To ask a follow-up question, reuse the same `analytical_session_id`. There is no need to create a new session.
+* Do not send a dashboard request through this tool. To create a dashboard, use xref:mcp-tool-reference-spotter3.adoc#create_dashboard[create_dashboard].
 ====
 
 [#get_session_updates]
@@ -146,7 +173,7 @@ Send the `analytical_session_id` to specify the session to retrieve updates for.
 
 [div tabbed-code]
 --
-[source,typescript]
+[source,javascript]
 ----
 const updates = await callMCPTool("get_session_updates", {
     analytical_session_id: "session-guid-abc123" // Session ID from the `create_analysis_session` call.
@@ -157,7 +184,7 @@ const updates = await callMCPTool("get_session_updates", {
 ----
 call_mcp_tool(
     "get_session_updates",
-    {"analytical_session_id": "sess_abc123"},  # Session ID from create_analysis_session.
+    {"analytical_session_id": "session-guid-abc123"},  # Session ID from create_analysis_session.
 )
 ----
 --
@@ -180,9 +207,9 @@ Render these immediately so the user sees progress in real time.
 |A fragment of Spotter's narration. Concatenate chunks to form the complete narration string.
 When `is_thinking` is `false`, the chunk is part of the final answer narration, not an intermediate thinking step.
 
-|`answer`|`false`
+|`answer`|`true` or `false`
 |The analytical result. Contains a title, the ThoughtSpot search query used, an embeddable `iframe_url`, and an `answer_id` for creating dashboards.
-Exactly one `answer` update is present per question.
+The same answer can arrive twice in one response, once with `is_thinking: true` and once with `is_thinking: false`. Both updates carry the same `answer_id`. Render the answer once, and use the `answer_id` to remove duplicates.
 |====
 
 Poll returning intermediate updates:
@@ -224,6 +251,15 @@ Poll returning the final answer:
       "text": "Running the query against the sales data model..."
     },
     {
+      "is_thinking": true,
+      "type": "answer",
+      "answer_id": "{\"session_id\":\"1a3d...\",\"gen_no\":2}",
+      "answer_title": "Total sales by region",
+      "answer_data_source_id": "cd252e5c-...",
+      "answer_query": "[sales] [region]",
+      "iframe_url": "https://your-instance.thoughtspot.cloud/?tsmcp=true#/embed/conv-assist-answer?..."
+    },
+    {
       "is_thinking": false,
       "type": "text_chunk",
       "text": "I'm interpreting 'last quarter' as Q4 2025 (October–December), based on a fiscal year starting in April."
@@ -255,8 +291,8 @@ A typical response sequence might look like:
 
 . Step headings: `step_notification` updates announcing each step Spotter is about to start.
 . Thinking narration: `text_chunk` updates with `is_thinking: true` describing what Spotter is doing.
-. Clarifications or caveats: `text_chunk` updates with `is_thinking: false` explaining assumptions, filters applied, or potential ambiguities in the question.
-. The final answer: one or more `answer` updates containing the visualization title, the underlying query, and the embeddable iframe URL.
+. The answer: an `answer` update containing the visualization title, the underlying query, the `answer_id`, and the embeddable iframe URL. The same answer can arrive again with `is_thinking: false`.
+. Final narration: `text_chunk` updates with `is_thinking: false`. This text can explain assumptions, filters applied, or ambiguities in the question, and can include a Markdown summary of the results, such as key takeaways. It can arrive before and after the `answer` update, so the `answer` is not always the last update.
 
 This means a complete response might span 5–20+ `get_session_updates` calls and contain many `session_update` objects before `is_done` becomes `true`. All of this content, the thinking, the narration, and the final answer, should be accumulated and presented together to give the user the full picture.
 
@@ -265,7 +301,7 @@ Includes three types, `step_notification`, `text_chunk`, `answer`. Flat, fixed k
 
 [source,json]
 ----
-{"is_thinking":true,"type":"step_notification","text":"Searching for Datasets"}
+{"is_thinking":true,"type":"step_notification","text":"Searching data models"}
 {"is_thinking":true,"type":"text_chunk","text":" to find the most relevant dataset..."}
 {"is_thinking":false,"type":"answer",
  "answer_id":"{\"session_id\":\"1a3d...\",\"gen_no\":2}",
@@ -286,6 +322,8 @@ Each item in the `session_updates` list is a `session_update` object. The `type`
 |`"step_notification"`|A short heading announcing the step Spotter is about to start, such as `Searching data models` or `Running query`.
 |`"text_chunk"` | A streaming fragment of Spotter's narration. Concatenate all chunks to reconstruct the full text.
 |`"answer"`|Populates `answer_title`, `answer_query`, `answer_data_source_id`, `iframe_url` fields. A data visualization result with a title, the underlying query, and an embeddable URL.
+|`is_thinking`|__Boolean__|`true` for intermediate reasoning (`step_notification` updates and thinking `text_chunk` updates). `false` for the final narration and the answer.
+|`answer_id`|__String__|Identifier of the answer. Present only when `type` is `"answer"`. Pass it as is to `create_dashboard`.
 |`text`|__String__|The text content of the message. Present only when `type` is `"step_notification"` or `"text_chunk"`. For `"text_chunk"` updates, concatenate all chunks to form the complete message.
 |`answer_title`|__String__|A human-readable title describing what the answer shows. Present only when `type` is `"answer"`.
 |`answer_data_source_id`|__String__|GUID of the data source used to generate the answer. Present only when `type` is `"answer"`.
@@ -328,48 +366,70 @@ The full response does not include a preconstructed `iframe_url`. You must build
 
 For the complete event schema, see the xref:spotter-agent-apis.adoc#_api_response_2[Spotter Agent API, window=_blank].
 
+
 [#create_dashboard]
 == create_dashboard
-Create a ThoughtSpot dashboard from answers generated in an analysis session.
 
-* Call this only after `get_session_updates` returns `is_done: true`, because you need the `answer_id` values from completed answer updates.
-* Collect all updates where type is answer across every poll of `get_session_updates`. Each one produces an `answer_id` you can include in the dashboard.
-* The `note_tile` should summarize the full analysis. It is the first thing a viewer sees on the dashboard.
-* Multiple answers from the same session or across multiple sessions can be combined into a single dashboard.
+Create a ThoughtSpot dashboard and save it, so that users can revisit or share the results. SpotterViz, the ThoughtSpot dashboard designer, builds the dashboard. Use this tool when a user asks for a dashboard or Liveboard, asks to save analysis results, or wants to recreate a dashboard from another tool.
+
+You can call the tool in two ways:
+
+. *From completed analysis*: Pass `answers` collected from `get_session_updates`, with optional `instructions` for layout and style. SpotterViz organizes, styles, and saves the charts. Call this only after `get_session_updates` returns `is_done: true`, because you need the answer ID values from completed answer updates.
+. *From a description*: Pass `instructions` that describe the dashboard. Use this when the user asks for a dashboard before any analysis, or wants one recreated from a specification. In this case, do not run the analysis first. SpotterViz replies with `needs_input`, which contains the data source it chose and its plan. Nothing is built until the user confirms the plan.
+
+Dashboard creation can take a few minutes, so the call can return `in_progress` before the dashboard is ready.
 
 === Input parameters
+Pass `answers`, `instructions`, or both.
 
 [cols="2,4", options="header"]
 |====
 |Field|Description
 
-|`title` |Required. Title of the dashboard to be created.
-|`answers`|Required. List of answer objects to add to the dashboard. Each answer requires an `answer_id` (from `get_session_updates` where `type` is `answer`) and a `title`.
-|`note_tile`| Required. An HTML summary of the analysis and answers, rendered as a styled tile on the dashboard. Must be a single line with no line breaks. Use `<br>` for spacing within the HTML. Include emojis, colors, and a `"Generated on <date> <time>"` header.
+|`title` +
+__Optional__
+|Title of the dashboard. Required unless you pass `task_id`.
+
+|`answers` +
+__Optional__
+|List of answer objects from a prior analysis. Each object requires an `answer_id` and a `title`. Pass the `answer_id` exactly as returned by `get_session_updates` for an update where `type` is `answer`. Omit `answers` when you build the dashboard from `instructions` only.
+
+|`instructions` +
+__Optional__
+|The user's request for the dashboard, in their words. Add detail only when the user gave it, such as chart types, grouping, tabs, brand colors as hex codes, or a data source they named. Do not add charts, metrics, filters, or layout that the user did not ask for, because SpotterViz proposes those in a plan for the user to confirm. Changing an existing chart's type or query, and coloring individual data values, are not supported.
+
+|`task_id` +
+__Optional__
+|The `task_id` from an earlier `create_dashboard` call that returned a plan. Pass it to confirm the plan, with any changes in `instructions`, so that the dashboard is built.
+
+|`data_source_id` +
+__Optional__
+|GUID of a data source. Omit it in most cases, because SpotterViz selects the most relevant data source automatically. Provide it only when the user named or confirmed a specific data source.
 |====
 
+If you pass neither `answers` nor `instructions`, the tool returns an error.
 
-=== Example call
+=== Example calls
+
+From completed analysis:
 
 [div tabbed-code]
 --
-[source,typescript]
+[source,javascript]
 ----
 const dashboard = await callMCPTool("create_dashboard", {
     title: "Q4 2025 Regional Sales Analysis",
-    answers: [{
-            answer_id: "ans_xyz789", // answer_id from each answer-type update returned by get_session_updates.
-            title: "Total Sales by Region — Q4 2025"
+    answers: [
+        {
+            answer_id: "{\"session_id\":\"1a3d...\",\"gen_no\":2}", // answer_id from an answer update in get_session_updates.
+            title: "Total Sales by Region, Q4 2025"
         },
         {
-            answer_id: "ans_xyz790",
-            title: "Underperforming Regions — Q4 2025 vs Q4 2024"
+            answer_id: "{\"session_id\":\"1a3d...\",\"gen_no\":3}",
+            title: "Underperforming Regions, Q4 2025 vs Q4 2024"
         }
     ],
-    note_tile: "<h2 style='text-align:center;'> Q4 2025 Regional Sales Analysis</h2>" +
-        "<p>Analysis of total sales by region for Q4 2025, highlighting " +
-        "top-performing and underperforming regions.<br>" +
-        "Generated on 2026-04-16 10:00 AM</p>" // Required. Single-line HTML string rendered as a styled summary tile at the top of the dashboard.
+    instructions: "Put the regional total at the top and use two tabs." // Optional. Layout and style.
 });
 ----
 
@@ -381,34 +441,251 @@ dashboard = call_mcp_tool(
         "title": "Q4 2025 Regional Sales Analysis",
         "answers": [
             {
-                "answer_id": "ans_xyz789", # answer_id from each answer-type update returned by get_session_updates.
-                "title": "Total Sales by Region — Q4 2025",
+                "answer_id": '{"session_id":"1a3d...","gen_no":2}',  # answer_id from an answer update in get_session_updates.
+                "title": "Total Sales by Region, Q4 2025",
             },
             {
-                "answer_id": "ans_xyz790",
-                "title": "Underperforming Regions — Q4 2025 vs Q4 2024",
+                "answer_id": '{"session_id":"1a3d...","gen_no":3}',
+                "title": "Underperforming Regions, Q4 2025 vs Q4 2024",
             },
         ],
-        "note_tile": (
-            "<h2 style='text-align:center;'> Q4 2025 Regional Sales Analysis</h2>"
-            "<p>Analysis of total sales by region for Q4 2025, highlighting "
-            "top-performing and underperforming regions.<br>"
-            "Generated on 2026-04-16 10:00 AM</p>"  # Required. single-line HTML string rendered as a styled summary tile at the top of the dashboard.
-        ),
+        "instructions": "Put the regional total at the top and use two tabs.",  # Optional. Layout and style.
+    },
+)
+----
+--
+
+From a description, then confirming the plan:
+
+[div tabbed-code]
+--
+[source,javascript]
+----
+// First call: SpotterViz returns a plan with status "needs_input".
+const plan = await callMCPTool("create_dashboard", {
+    title: "Customer Retention Overview",
+    instructions: "A dashboard showing churn and retention by segment."
+});
+
+// After the user reviews the plan, confirm it with the same task_id.
+const result = await callMCPTool("create_dashboard", {
+    task_id: plan.task_id,
+    instructions: "Looks good, but add a monthly trend."
+});
+----
+
+[source,python]
+----
+# First call: SpotterViz returns a plan with status "needs_input".
+plan = call_mcp_tool(
+    "create_dashboard",
+    {
+        "title": "Customer Retention Overview",
+        "instructions": "A dashboard showing churn and retention by segment.",
+    },
+)
+
+# After the user reviews the plan, confirm it with the same task_id.
+result = call_mcp_tool(
+    "create_dashboard",
+    {
+        "task_id": plan["task_id"],
+        "instructions": "Looks good, but add a monthly trend.",
+    },
+)
+----
+--
+
+[#dashboard-result]
+=== Response
+`create_dashboard`, `modify_dashboard`, and `get_dashboard_status` return the same result object.
+
+[source,json]
+----
+{
+  "status": "completed",
+  "task_id": "9f1c2d3e-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+  "dashboard_id": "0c4734a8-a06b-40ac-bbfe-6ba2cee7c803",
+  "dashboard_url": "https://your-instance.thoughtspot.cloud/#/insights/pinboard/0c4734a8-a06b-40ac-bbfe-6ba2cee7c803",
+  "changes_applied": true,
+  "message": "Created a dashboard with two tabs."
+}
+----
+
+[cols="2,1,4", options="header"]
+|====
+|Field|Type|Description
+
+|`status`|String
+|Outcome of the request. One of `completed`, `in_progress`, `needs_input`, or `failed`. Always present.
+
+|`task_id`|String
+|Identifier of the dashboard task. Pass it to `get_dashboard_status`, or back to the tool that started the task, to continue.
+
+|`dashboard_id`|String
+|GUID of the dashboard. Present when the dashboard exists.
+
+|`dashboard_url`|String
+|Link to the dashboard in ThoughtSpot. Present when the dashboard exists.
+
+|`changes_applied`|Boolean
+|Whether the dashboard actually changed. `false` with `completed` means that SpotterViz understood the request but changed nothing.
+
+|`message`|String
+|What SpotterViz reported: its current step (`in_progress`), its summary (`completed`), its plan or question (`needs_input`), or why it failed (`failed`).
+
+|`choices`|Array of strings
+|Options that SpotterViz offered with its question. Present only when it offered options.
+|====
+
+Act on each `status` as follows:
+
+[cols="1,3,3", options="header"]
+|====
+|`status`|Meaning|What to do
+
+|`completed`
+|The dashboard is saved.
+|Give the user the `dashboard_url`.
+
+|`needs_input`
+|SpotterViz has a plan or a question for the user, in `message`. Nothing has changed yet.
+|Show it to the user and wait for the reply. Never confirm on the user's behalf. Call `create_dashboard` again with the same `task_id`, and put the user's reply in `instructions`.
+
+|`in_progress`
+|SpotterViz is still working. `message`, when present, describes the current step.
+|Show the progress to the user. Call `get_dashboard_status` with the `task_id` until the status changes.
+
+|`failed`
+|Nothing usable was produced. `message` explains why.
+|Tell the user and ask before you try again, so that you do not create a duplicate dashboard.
+|====
+
+[#modify_dashboard]
+== modify_dashboard
+Change an existing dashboard. The tool can rearrange and restyle existing content, add new charts, add short explanatory text, and organize charts into groups or tabs.
+
+Changes are saved to the user's actual dashboard, so call this tool only when the user has asked for a change. New charts use the dashboard's existing data sources unless you specify otherwise. If the instructions are too vague to act on, SpotterViz responds with a question. A change can take a few minutes, so the call can return before it finishes.
+
+=== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`dashboard_id` +
+__Required__
+|GUID of the dashboard to change. Get it from `search_objects`, or from a dashboard link that ends in `/pinboard/<id>`. Do not pass a name. Every call must include `dashboard_id`, even when you pass `task_id`.
+
+|`instructions` +
+__Required__
+|The change in the user's words: layout or styling, new charts, or the user's answer to SpotterViz's question. Must not be empty. Do not add changes that the user did not ask for.
+
+|`task_id` +
+__Optional__
+|The `task_id` from an earlier `modify_dashboard` call on the same dashboard. Pass it to answer SpotterViz's question or to follow up with the same context. Omit it to start a new change.
+
+|`data_source_id` +
+__Optional__
+|GUID of a data source for new charts. Omit it in most cases. Provide it only when the user named or confirmed a specific data source.
+|====
+
+=== Example call
+
+[div tabbed-code]
+--
+[source,javascript]
+----
+const change = await callMCPTool("modify_dashboard", {
+    dashboard_id: "0c4734a8-a06b-40ac-bbfe-6ba2cee7c803",
+    instructions: "Move the quota attainment chart into a new tab called Field Sales."
+});
+
+// If SpotterViz asks a question (status "needs_input"), reply with the same task_id.
+const followUp = await callMCPTool("modify_dashboard", {
+    dashboard_id: "0c4734a8-a06b-40ac-bbfe-6ba2cee7c803",
+    task_id: change.task_id,
+    instructions: "Yes, keep the existing filters on the new tab."
+});
+----
+
+[source,python]
+----
+change = call_mcp_tool(
+    "modify_dashboard",
+    {
+        "dashboard_id": "0c4734a8-a06b-40ac-bbfe-6ba2cee7c803",
+        "instructions": "Move the quota attainment chart into a new tab called Field Sales.",
+    },
+)
+
+# If SpotterViz asks a question (status "needs_input"), reply with the same task_id.
+follow_up = call_mcp_tool(
+    "modify_dashboard",
+    {
+        "dashboard_id": "0c4734a8-a06b-40ac-bbfe-6ba2cee7c803",
+        "task_id": change["task_id"],
+        "instructions": "Yes, keep the existing filters on the new tab.",
     },
 )
 ----
 --
 
 === Response
+The tool returns the same result object as `create_dashboard`. For the fields, see xref:mcp-tool-reference-spotter3.adoc#dashboard-result[create_dashboard response]. Act on each `status` in the same way. When you answer a `needs_input` question, call `modify_dashboard` again with the same `dashboard_id` and `task_id`.
+
+[NOTE]
+====
+* A dashboard can have only one change in progress. If you send a second change while one is running, the tool returns an error that includes the `task_id` of the running change. Call `get_dashboard_status` with that `task_id`.
+* A `task_id` belongs to one dashboard. Passing a `task_id` with the `dashboard_id` of a different dashboard returns an error.
+* A `task_id` can expire. If the tool reports that the `task_id` could not be found, call `modify_dashboard` again with only the `dashboard_id` and your full instruction to start a new change.
+====
+
+[#get_dashboard_status]
+== get_dashboard_status
+Wait for a dashboard task that is still running. Call this tool when `create_dashboard` or `modify_dashboard` returns `status: "in_progress"`. Each call waits briefly before it returns, so calling it repeatedly is the intended way to wait.
+
+Keep calling until `status` is `completed`, `needs_input`, or `failed`. Do not start a new `create_dashboard` or `modify_dashboard` call for the same work, because that creates duplicate dashboards.
+
+=== Input parameters
 
 [cols="2,4", options="header"]
 |====
 |Field|Description
 
-|`dashboard_id`|The unique identifier of the created dashboard.
-|`dashboard_url`|A link to the newly created dashboard in ThoughtSpot.
+|`task_id` +
+__Required__
+|The `task_id` returned by `create_dashboard` or `modify_dashboard` when `status` was `in_progress`.
 |====
+
+=== Example call
+
+[div tabbed-code]
+--
+[source,javascript]
+----
+let result = await callMCPTool("create_dashboard", { title: "Sales Overview", answers });
+
+while (result.status === "in_progress") {
+    result = await callMCPTool("get_dashboard_status", { task_id: result.task_id });
+}
+// result.status is now "completed", "needs_input", or "failed".
+----
+
+[source,python]
+----
+result = call_mcp_tool("create_dashboard", {"title": "Sales Overview", "answers": answers})
+
+while result["status"] == "in_progress":
+    result = call_mcp_tool("get_dashboard_status", {"task_id": result["task_id"]})
+# result["status"] is now "completed", "needs_input", or "failed".
+----
+--
+
+=== Response
+The tool returns the same result object as `create_dashboard`. For the fields, see xref:mcp-tool-reference-spotter3.adoc#dashboard-result[create_dashboard response]. On `needs_input`, pass the user's reply in `instructions` to the tool that started the task, with the same `task_id`. That tool is `create_dashboard`, or `modify_dashboard` with its `dashboard_id`. If the `task_id` is unknown, the tool returns an error.
+
+
 
 [#search_objects]
 == search_objects
@@ -419,7 +696,7 @@ Use this tool when a user refers to content that already exists. For example, "o
 
 `search_objects` returns identifiers and metadata only. It never returns the object's data or contents, and it does not run queries.
 
-To answer a data question, use the session workflow instead.
+To fetch the rows of a saved Answer or Liveboard that you found, pass its `object_id` as `object_id` and its `type` as `object_type` to xref:mcp-tool-reference-spotter3.adoc#get_data[get_data]. To answer a new data question, use the session workflow instead.
 
 === Input parameters
 
@@ -530,7 +807,7 @@ A call returns one of three outcomes.
       "verified": true,
       "external_link": "https://your-instance.thoughtspot.cloud/#/insights/pinboard/b2c4e6a8-1234-4f5a-9abc-def012345678",
       "query": null,
-      "confidence": 0.94
+      "confidence": 128.9
     },
     {
       "object_id": "b2c4e6a8-1234-4f5a-9abc-def012345678",
@@ -543,7 +820,7 @@ A call returns one of three outcomes.
       "verified": false,
       "external_link": "https://your-instance.thoughtspot.cloud/#/insights/pinboard/b2c4e6a8-1234-4f5a-9abc-def012345678/77f1a0d3-5678-4b21-8e90-aa1122334455",
       "query": "sales by region monthly",
-      "confidence": 0.81
+      "confidence": 117.1
     }
   ],
   "next_cursor": "10"
@@ -646,8 +923,14 @@ For a `LIVEBOARD_VIZ` result, this is the GUID of the parent Liveboard, not the 
 |For an Answer or Liveboard viz, the search tokens that define it. For example, `sales by region monthly`. `null` for a Liveboard.
 
 |`confidence`|Number
-|Relevance score for the search term. Use for ranking only. Do not display this value to the user.
+|Relevance score for the search term. Higher is more relevant. The scale is not bounded to 0 to 1, so compare scores only within one response. Use it for ranking only. Do not display this value to the user.
+
 |====
+
+[NOTE]
+====
+The `description` and `query` fields are authoring metadata. They can be out of date and are often copied across sibling visualizations, so do not use them to tell objects apart.
+====
 
 === Pagination
 
@@ -669,6 +952,418 @@ if (response.next_cursor) {
     });
 }
 ----
+
+[#get_data]
+== get_data
+Fetch the columns and rows of a saved Answer or Liveboard by its GUID. Use this tool when a user wants to explain, describe, summarize, or analyze what an existing object shows.
+
+The tool runs the object's saved query, with its existing filters and columns unchanged, against current data. The rows reflect the latest data and can differ from what the object showed when it was saved. An Answer returns a single tabular result. A Liveboard returns one tabular result for each visualization.
+
+Typically, you call `search_objects` first, and pass the `object_id` of a result as `object_id` and its `type` as `object_type` to `get_data`.
+
+[IMPORTANT]
+====
+The `get_data` tool is available only to users who have the privilege to download data. The MCP Server does not list the tool for other users. If a user without the privilege calls the tool anyway, the request fails with a permission error.
+====
+
+=== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`object_id` +
+__Required__
+|GUID of the Answer or Liveboard, typically the `object_id` from a `search_objects` result. For a Liveboard visualization, pass the GUID of the parent Liveboard.
+
+|`object_type` +
+__Required__
+|Type of the object: `ANSWER`, `LIVEBOARD`, or `LIVEBOARD_VIZ`. Pass the `type` from the `search_objects` result as is. The `WORKSHEET` type is not supported.
+
+|`visualization_ids` +
+__Optional__
+|Array of visualization GUIDs on a Liveboard. Required when `object_type` is `LIVEBOARD_VIZ`, otherwise the request is rejected. Each entry must be a visualization GUID, such as the `visualization_id` from `search_objects` or the `viz_id` from an earlier `get_data` result, not a name. If you omit it for a Liveboard, the tool returns as many of the visualizations as fit within the time limit. Ignored for standalone Answers.
+
+|`max_rows` +
+__Optional__
+|Maximum number of rows to return for each visualization. Positive integer. Defaults to `25`. Raise it only when you need the full result set and know that the object is large.
+|====
+
+=== Example call
+
+[div tabbed-code]
+--
+[source,javascript]
+----
+const data = await callMCPTool("get_data", {
+    object_id: "a6b47acc-c391-4b78-9901-36235fd07809", // GUID of the parent Liveboard, from search_objects.
+    object_type: "LIVEBOARD_VIZ", // The type from the search_objects result.
+    visualization_ids: ["473f787a-bf3f-4366-a58e-4905a1329017"], // The visualization_id from search_objects.
+    max_rows: 3 // Optional. Defaults to 25.
+});
+----
+
+[source,python]
+----
+call_mcp_tool(
+    "get_data",
+    {
+        "object_id": "a6b47acc-c391-4b78-9901-36235fd07809",  # GUID of the parent Liveboard, from search_objects.
+        "object_type": "LIVEBOARD_VIZ",  # The type from the search_objects result.
+        "visualization_ids": ["473f787a-bf3f-4366-a58e-4905a1329017"],  # The visualization_id from search_objects.
+        "max_rows": 3,  # Optional. Defaults to 25.
+    },
+)
+----
+--
+
+=== Response
+
+[source,json]
+----
+{
+  "data": [
+    {
+      "viz_id": "473f787a-bf3f-4366-a58e-4905a1329017",
+      "viz_name": "Sales Monthly",
+      "columns": ["Month(date)", "Total sales"],
+      "data_rows": [
+        [1775001600, 16202999.75],
+        [1777593600, 17906780.6],
+        [1780272000, 17077681.7]
+      ],
+      "total_row_count": 7,
+      "sampling_ratio": 1
+    }
+  ]
+}
+----
+
+[cols="2,1,4", options="header"]
+|====
+|Field|Type|Description
+
+|`data`|Array
+|The object's data. An Answer returns one entry. A Liveboard returns one entry for each visualization.
+
+|`viz_id`|String
+|GUID of the visualization. Present for Liveboard visualizations. Omitted for a standalone Answer.
+
+|`viz_name`|String
+|Display name of the visualization. Present for Liveboard visualizations.
+
+|`columns`|Array of strings
+|Column names, in the same order as the values in each row.
+
+|`data_rows`|Array of arrays
+|The data rows. Each row is an array of cell values that line up with `columns`. A cell is a string, number, boolean, or `null`. Numeric cells are returned at full precision, as stored.
+
+|`total_row_count`|Number
+|Total number of rows available, before `max_rows` is applied. Compare it with the number of returned rows to detect truncation.
+
+|`sampling_ratio`|Number
+|A value from 0 to 1. A value of `1` means that the complete result set was returned and was not sampled.
+|====
+
+=== Liveboard time limit
+Liveboard fetches are time-bound. A call returns as many visualizations as it can fetch within the time limit. A typical call handles about 25 visualizations. Not every requested visualization is guaranteed to come back, even when you pass `visualization_ids`. If a visualization that you need is missing from the result, request it by GUID in a follow-up call.
+
+[#model-builder-tools]
+== Model builder tools
+The model builder tools let an agent build a new ThoughtSpot data model from warehouse tables, or edit an existing model, through conversation. The pattern mirrors the analysis workflow, with two user checkpoints: the builder's plan and the final save.
+
+. The agent calls `create_model_session` with a connection GUID (new model) or a model GUID (edit).
+. The agent sends an instruction with `send_model_message`.
+. The agent polls `get_model_updates` until `is_done` is `true`. If the builder returns a plan or a question, the agent shows it to the user and sends the user's reply with `send_model_message`.
+. The agent calls `finalize_model` without `confirm` to get a summary for review.
+. After the user approves, the agent calls `finalize_model` with `confirm: true` to save the model.
+
+[IMPORTANT]
+====
+The model builder tools require the data management privilege and the privilege to create or edit data models. The MCP Server does not list these tools for other users.
+====
+
+[#create_model_session]
+=== create_model_session
+Start a model builder session. Creating a session does not build anything. Send the first instruction with `send_model_message`.
+
+==== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`connection_identifier` +
+__Optional__
+|GUID of the data warehouse connection for a new model. Ask the user which connection to use, and confirm the exact GUID with the user before you call the tool. Do not guess it, reuse one from a previous model, or assume a default. Omit it when you edit an existing model.
+
+|`model_identifier` +
+__Optional__
+|GUID of an existing model to edit. Omit `connection_identifier` in this case, because the model already has a connection. Confirm the exact model with the user first, and do not guess the GUID.
+|====
+
+Pass one of the two fields.
+
+==== Response
+
+[source,json]
+----
+{
+  "model_session_id": "session-guid-abc123"
+}
+----
+
+* `model_session_id`: Identifier of the model session. Pass it to `send_model_message`, `get_model_updates`, and `finalize_model`.
+
+[#send_model_message]
+=== send_model_message
+Send an instruction to the model builder, such as a description of the model, a correction, or an answer to a clarification. The call returns as soon as the instruction is accepted. Read the builder's response with `get_model_updates`.
+
+==== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`model_session_id` +
+__Required__
+|Session ID from `create_model_session`.
+
+|`message` +
+__Optional__
+|Natural language instruction, for example, `Create a model for sales from the ORDERS and CUSTOMERS tables`. Omit it only when you answer a clarification with `selected_option_ids`.
+
+|`selected_option_ids` +
+__Optional__
+|When you answer a `choice` update, the `id` values (such as `"1"` or `"2"`) of the options that the user selected. Pass the option IDs, not table GUIDs.
+|====
+
+==== Response
+
+[source,json]
+----
+{
+  "success": true
+}
+----
+
+* `success`: Whether the instruction was accepted. If it is `false`, the previous instruction can still be running. Keep calling `get_model_updates` until `is_done` is `true`, then try again.
+
+[NOTE]
+====
+* The builder drives the conversation. Do not invent your own questions.
+* Before the builder adds formulas, list the formulas that you intend to add and get the user's confirmation.
+====
+
+[#get_model_updates]
+=== get_model_updates
+Poll for the builder's updates on the current instruction. Call it repeatedly until `is_done` is `true`. A full build takes 1 to 2 minutes, so an empty batch with `is_done: false` means that the builder is still working.
+
+==== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`model_session_id` +
+__Required__
+|Session ID from `create_model_session`.
+|====
+
+==== Response
+The response contains an `updates` array and an `is_done` flag. Each call returns only the updates that arrived since the previous call. The array can be empty while the builder is still working.
+
+[source,json]
+----
+{
+  "updates": [
+    {
+      "type": "notification",
+      "text": "Adding joins to model"
+    }
+  ],
+  "is_done": false
+}
+----
+
+Each update has a `type`:
+
+[cols="1,3,3", options="header"]
+|====
+|Type|What it means|What to do
+
+|`mrd`
+|A proposed plan (Model Requirements Document). The full plan is in `text`. The model is not built yet.
+|Stop. Show the plan to the user and wait for explicit approval or edits. Never approve the plan on the user's behalf.
+
+|`choice`
+|A clarifying question with options, in `choice`.
+|Show the options. Send the user's selection with `selected_option_ids`.
+
+|`todo`
+|The build's task tracker, in `tasks`. For example, Tables, Joins, and Columns, each marked `PENDING`, `IN_PROGRESS`, or `COMPLETED`.
+|Show it as a progress checklist, and update it as new `todo` updates arrive.
+
+|`notification`
+|A short progress line in `text`, such as `Adding joins to model`.
+|Show each one as it arrives.
+
+|`text`
+|A message from the builder, in `text`.
+|Relay the meaningful parts in plain language.
+
+|`model_state`
+|The model draft advanced to a new generation, in `generation_no`.
+|Use it as progress information.
+
+|`action`
+|Suggested next actions, in `actions`. The user does not have to take them.
+|Offer them to the user if they are relevant.
+
+|`message_end`
+|The turn ended. `status` has the terminal status, such as `completed`.
+|No action is required.
+|====
+
+If a build starts without an `mrd` update, the plan step was skipped. Tell the user, and do not treat the plan as approved.
+
+[#finalize_model]
+=== finalize_model
+Review and save the model. Saving takes two calls. The first call, without `confirm`, returns a summary for review. The second call, with `confirm: true`, saves the model and returns its link. Do not finalize if the builder has returned only a plan and nothing has been built.
+
+==== Input parameters
+
+[cols="2,4", options="header"]
+|====
+|Field|Description
+
+|`model_session_id` +
+__Required__
+|Session ID to finalize.
+
+|`confirm` +
+__Optional__
+|Set to `true` to save, only after the user has reviewed the summary and chosen to save. If you omit it or set it to `false`, the tool returns the summary only and does not save.
+
+|`name` +
+__Optional__
+|Name for the model. Required when you save a new model. When you edit an existing model, omit it to keep the current name, and pass it only if the user asked to rename the model.
+
+|`description` +
+__Optional__
+|Description for the model. When you edit an existing model, omit it to keep the current description.
+|====
+
+==== Response
+The first call, without `confirm`, returns the summary and `saved: false`:
+
+[source,json]
+----
+{
+  "summary": "Sales model with 2 tables, 1 join, and 14 columns.",
+  "saved": false
+}
+----
+
+The second call, with `confirm: true`, saves the model and also returns its GUID and link:
+
+[source,json]
+----
+{
+  "summary": "Sales model with 2 tables, 1 join, and 14 columns.",
+  "saved": true,
+  "model_identifier": "7d2f1c4e-9b3a-4e58-a1f6-0c8b5e2d9a31",
+  "url": "https://your-instance.thoughtspot.cloud/#/data/tables/7d2f1c4e-9b3a-4e58-a1f6-0c8b5e2d9a31"
+}
+----
+
+[cols="2,1,4", options="header"]
+|====
+|Field|Type|Description
+
+|`summary`|String
+|Human-readable summary of the model, returned for review.
+
+|`saved`|Boolean
+|Whether the model was saved. It is `true` only when you set `confirm` to `true`.
+
+|`model_identifier`|String
+|GUID of the saved model. Present when the model was saved.
+
+|`url`|String
+|Link to open the saved model. Present when the model was saved.
+|====
+
+==== Example
+
+[div tabbed-code]
+--
+[source,javascript]
+----
+const { model_session_id } = await callMCPTool("create_model_session", {
+    connection_identifier: "de1b3cfd-1725-400a-b6c7-0cd0f2b70bf1" // Confirmed with the user.
+});
+
+await callMCPTool("send_model_message", {
+    model_session_id,
+    message: "Create a model for sales from the ORDERS and CUSTOMERS tables."
+});
+
+// Poll until is_done. Each call returns only new updates, so keep every batch.
+const allUpdates = [];
+let batch;
+do {
+    batch = await callMCPTool("get_model_updates", { model_session_id });
+    allUpdates.push(...batch.updates);
+} while (!batch.is_done);
+
+// If allUpdates contains an mrd update, show the plan to the user and wait for approval.
+// Send the user's reply with send_model_message, and poll again until is_done.
+
+// Without confirm, finalize_model returns a summary for review and does not save.
+const summary = await callMCPTool("finalize_model", { model_session_id, name: "Sales Model" });
+
+// Save only after the user has reviewed the summary and chosen to save.
+const saved = await callMCPTool("finalize_model", { model_session_id, name: "Sales Model", confirm: true });
+----
+
+[source,python]
+----
+session = call_mcp_tool(
+    "create_model_session",
+    {"connection_identifier": "de1b3cfd-1725-400a-b6c7-0cd0f2b70bf1"},  # Confirmed with the user.
+)
+model_session_id = session["model_session_id"]
+
+call_mcp_tool(
+    "send_model_message",
+    {
+        "model_session_id": model_session_id,
+        "message": "Create a model for sales from the ORDERS and CUSTOMERS tables.",
+    },
+)
+
+# Poll until is_done. Each call returns only new updates, so keep every batch.
+all_updates = []
+while True:
+    batch = call_mcp_tool("get_model_updates", {"model_session_id": model_session_id})
+    all_updates.extend(batch["updates"])
+    if batch["is_done"]:
+        break
+
+# If all_updates contains an mrd update, show the plan to the user and wait for approval.
+# Send the user's reply with send_model_message, and poll again until is_done.
+
+# Without confirm, finalize_model returns a summary for review and does not save.
+summary = call_mcp_tool("finalize_model", {"model_session_id": model_session_id, "name": "Sales Model"})
+
+# Save only after the user has reviewed the summary and chosen to save.
+saved = call_mcp_tool(
+    "finalize_model",
+    {"model_session_id": model_session_id, "name": "Sales Model", "confirm": True},
+)
+----
+--
 
 == Visualizations embedded in iframe
 When displaying the embedded visualization using the `iframe_url` property, the following user interaction features are included by default:
@@ -746,7 +1441,7 @@ Org switching is a two-step pattern:
 
 [#list_orgs]
 === list_orgs
-Returns the `orgId` of the Orgs that the authenticated user has access to and flags the Org that the user is currently logged in to.
+Returns the `id`, `name`, and `description` of each Org that the authenticated user has access to, and flags the Org that the user is currently logged in to.
 
 Use the `list_orgs` tool to discover which Orgs you can reach before switching. The list always reflects your live access at call time, not a snapshot taken when you connected, so orgs granted or revoked since your session started are reflected immediately.
 
@@ -804,8 +1499,7 @@ After a successful switch, all subsequent tool calls including `create_analysis_
 
 [IMPORTANT]
 ====
-* `switch_org` is a state-changing tool (`readOnlyHint: false`). Host applications that gate state-changing tools behind user confirmation will prompt the user before this tool runs.
-* The data models that exist in a target Org cannot be viewed or accessed until after you have switched into it. Use `list_orgs` to discover available Orgs and then use `switch_org` to switch.
+* `switch_org` is annotated `readOnlyHint: false`. For more information, see the note at the start of this section about confirmation prompts.
 * After switching Orgs, the list of data model resources will stay static unless the LLM client provides dynamic resource lists.
 * The active Org selection persists across sessions and applies across all your active sessions. It resets only on re-authentication or after prolonged inactivity.
 ====
@@ -820,7 +1514,7 @@ After a successful switch, all subsequent tool calls including `create_analysis_
 __Required__|The ID of the org to switch to. Obtain this value from `list_orgs`.
 |====
 
-=== Example call
+==== Example call
 
 [div tabbed-code]
 --
@@ -840,7 +1534,7 @@ call_mcp_tool(
 ----
 --
 
-=== Response
+==== Response
 
 [source,json]
 ----
@@ -854,7 +1548,7 @@ call_mcp_tool(
 * `active_org_id`: The ID of the active Org.
 
 
-=== Known limitations
+=== Known limitations for OAuth connections
 
 * Signing in currently relies on a browser cookie from your ThoughtSpot cluster. If your browser blocks third-party cookies, the connection may fail to complete.
 * Re-authentication is required in the following scenarios:
@@ -900,3 +1594,4 @@ call_mcp_tool("check_connectivity", {})
 
 * For a chat client example, see link:https://github.com/thoughtspot/developer-examples/tree/main/mcp/python-react-agent-simple-ui[Python Agent with Simple React UI, window=_blank].
 * For information about rendering iframe visualizations, see the xref:startAutoMCPFrameRenderer.adoc[startAutoMCPFrameRenderer] function reference.
+
