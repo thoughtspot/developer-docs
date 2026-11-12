@@ -1,0 +1,680 @@
+= Version Control V2 APIs
+:toc: true
+:toclevels: 2
+
+:page-title: Version Control V2 APIs
+:page-pageid: version-control-v2-api
+:page-description: Use the Version Control V2 REST APIs to connect an Org to a Git repository, commit ThoughtSpot objects as TML files, promote changes between branches, and deploy content to destination Orgs.
+
+// SOURCE: SCAL-351172
+[IMPORTANT]
+====
+The Version Control V2 APIs are available as [.beta]#Beta# on ThoughtSpot Cloud from 26.12.0.cl onwards. Beta features may change before general availability. +
+To enable Version Control V2 on your instance, contact ThoughtSpot Support.
+====
+
+The Version Control V2 REST APIs let Org admins version ThoughtSpot content in their own Git repository.
+Use these APIs to link an Org to a repository, commit objects as TML files, promote changes between branches, and deploy content into destination Orgs.
+
+// SOURCE: SCAL-351172
+[NOTE]
+====
+The existing Git integration APIs (`/api/rest/2.0/vcs/git/` endpoints) are not affected by this release and continue to work as before.
+====
+
+== Before you begin
+
+Before calling any Version Control V2 API, complete the following steps:
+
+// SOURCE: SCAL-351172
+. *Allowlist the VCS worker NAT IP*. Add the ThoughtSpot VCS worker NAT IP address to your Git provider's allowlist. Contact ThoughtSpot Support for the IP address. Without this step, commit and deploy operations cannot reach your repository.
+. *Confirm Org admin access*. All Version Control V2 endpoints require the `ADMINISTRATION` privilege. The caller must be an Org admin.
+
+== Supported Git providers
+
+// SOURCE: SCAL-351172
+The following Git providers are supported:
+
+* GitHub
+* GitLab
+* Bitbucket (also requires `credential.username`)
+* Azure DevOps
+
+== Key concepts
+
+// SOURCE: SCAL-351172
+A change moves from a development Org to a production Org in exactly three calls, each changing one thing:
+
+[width="100%", cols="1,3"]
+|=====
+|Step |What changes
+|*commit* (from Dev Org) |Exports selected objects as TML files and pushes a commit to the Dev Org's Git branch. This is the only step that pushes ThoughtSpot content to Git.
+|*branch/promote* (from Prod Org) |Brings the source branch's commits into the caller's branch using the specified merge strategy. This is the only step that touches two Git branches. Nothing changes in ThoughtSpot.
+|*deploy* (from Prod Org) |Reads the caller's Git branch and creates, updates, or deletes objects in the Prod Org. This is the only step that users see.
+|=====
+
+[NOTE]
+====
+A promote preview (`dry_run: true`) shows which files in Git would change. A validate-only deploy validates TML against the Org. These are not the same operation.
+====
+
+== Asynchronous operations and run tracking
+
+// SOURCE: SCAL-351172
+The `commit`, `deploy`, and `restore` endpoints are asynchronous. Each returns a `run_id`. Use `runs/search` to poll the run until it is no longer in `RUNNING` state.
+
+Final run states:
+
+* `SUCCESS`
+* `PARTIAL_SUCCESS`
+* `FAILED`
+
+Per-object statuses within a run:
+
+* `PENDING`
+* `VALIDATED` (validate-only deploy)
+* `SKIPPED` (ThoughtSpot system-object dependency)
+
+When a run fails, the `message` field on the run describes the reason. For example, `"The repository refused the stored credential"` or `"The repository could not be reached; retry the commit"`.
+
+[NOTE]
+====
+Only one run per Org can be active at a time. If you send a `commit`, `deploy`, or `restore` request while another run is in progress for the same Org, the API returns `409`. Retry after the first run completes. +
+A run that is idle for 30 minutes is marked `FAILED` when the next run starts.
+====
+
+== Supported endpoints
+
+// SOURCE: SCAL-351172
+All Version Control V2 endpoints use the base path `POST /api/rest/2.0/version-control/`.
+
+[width="100%", cols="1"]
+|=====
+a|`POST /api/rest/2.0/version-control/config/create` +
+xref:version-control-v2-api.adoc#_create_configuration[Creates a Git repository configuration] for the caller's Org. +
+__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
+
+a|`POST /api/rest/2.0/version-control/config/update` +
+xref:version-control-v2-api.adoc#_update_configuration[Updates the Git repository configuration] for the caller's Org. +
+__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
+
+a|`POST /api/rest/2.0/version-control/config/delete` +
+xref:version-control-v2-api.adoc#_delete_configuration[Deletes the Git repository configuration] for the caller's Org. +
+__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
+
+a|`POST /api/rest/2.0/version-control/config/search` +
+xref:version-control-v2-api.adoc#_search_configurations[Retrieves Git repository configurations] for one or more Orgs. +
+__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
+
+a|`POST /api/rest/2.0/version-control/commit` +
+xref:version-control-v2-api.adoc#_commit_objects[Exports selected objects as TML files and pushes a commit] to the Org's configured Git branch. +
+__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
+
+a|`POST /api/rest/2.0/version-control/branch/promote` +
+xref:version-control-v2-api.adoc#_promote_a_branch[Merges the source branch into the caller's branch] using the specified strategy. +
+__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
+
+a|`POST /api/rest/2.0/version-control/deploy` +
+xref:version-control-v2-api.adoc#_deploy_to_an_org[Reads the caller's Git branch and applies changes to the Org]. +
+__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
+
+a|`POST /api/rest/2.0/version-control/restore` +
+xref:version-control-v2-api.adoc#_restore_a_revision[Restores the Org to an earlier revision]. +
+__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
+
+a|`POST /api/rest/2.0/version-control/runs/search` +
+xref:version-control-v2-api.adoc#_search_runs[Returns the status and results of past runs] for the Org. +
+__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
+|=====
+
+== Configuration APIs
+
+=== Create configuration
+
+The `POST /api/rest/2.0/version-control/config/create` endpoint links the caller's Org to a Git repository.
+Each Org can have one configuration. Sending a second `config/create` for an Org that already has a configuration returns `409`.
+
+// SOURCE: SCAL-351172
+[NOTE]
+====
+The credential token is never returned in API responses after it is saved.
+====
+
+==== Prerequisites
+
+// SOURCE: SCAL-351172
+You must have the `ADMINISTRATION` privilege (Org admin).
+
+==== Request parameters
+
+// SOURCE: SCAL-351172
+[width="100%", cols="2,4"]
+[options='header']
+|=====
+|Parameter |Description
+|`repository_url` a|__String__. Required. +
+The HTTPS URL of the Git repository.
+
+|`commit_branch` a|__String__. Required. +
+The branch in the repository to which this Org commits and from which it deploys.
+
+|`credential` a|__Object__. Required. +
+Authentication credentials for the Git provider.
+
+* `token` — __String__. Required. The personal access token or equivalent.
+* `username` — __String__. Required for Bitbucket only.
+
+|`root_dir` a|__String__. Optional. +
+The root directory path within the repository where TML files are stored.
+
+[NOTE]
+====
+You cannot reset `root_dir` to empty after it is set. Use `config/update` to change the value. +
+// TODO: verify with engineering — confirm whether a workaround exists for clearing root_dir
+====
+
+|`disabled_operations` a|__Array of Strings__. Optional. +
+Operations to disable for this Org. Accepted values: `COMMIT`, `DEPLOY`. +
+When an operation is disabled, calling the corresponding endpoint returns `403`.
+
+[NOTE]
+====
+A known limitation in the REST Playground prevents sending an empty `disabled_operations` array to re-enable all operations. Use `curl` with `{"disabled_operations": []}` instead.
+====
+
+|=====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/config/create' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "repository_url": "https://github.com/your-org/your-repo",
+  "commit_branch": "dev",
+  "credential": {
+    "token": "{GIT_ACCESS_TOKEN}"
+  },
+  "root_dir": "thoughtspot-content"
+}'
+----
+
+==== Example response
+
+If the request is successful, ThoughtSpot returns `HTTP 200` with the configuration record. The credential token is not included in the response.
+
+[source,JSON]
+----
+{
+  "org_id": 1,
+  "repository_url": "https://github.com/your-org/your-repo",
+  "commit_branch": "dev",
+  "root_dir": "thoughtspot-content",
+  "disabled_operations": []
+}
+----
+
+=== Update configuration
+
+The `POST /api/rest/2.0/version-control/config/update` endpoint updates the Git repository configuration for the caller's Org.
+
+==== Prerequisites
+
+// SOURCE: SCAL-351172
+You must have the `ADMINISTRATION` privilege (Org admin).
+
+==== Request parameters
+
+// SOURCE: SCAL-351172
+[width="100%", cols="2,4"]
+[options='header']
+|=====
+|Parameter |Description
+|`repository_url` a|__String__. Optional. +
+The updated HTTPS URL of the Git repository.
+
+|`commit_branch` a|__String__. Optional. +
+The updated branch name.
+
+|`credential` a|__Object__. Optional. +
+Updated authentication credentials. Fields are the same as in `config/create`.
+
+|`root_dir` a|__String__. Optional. +
+The updated root directory path. Cannot be reset to empty.
+
+|`disabled_operations` a|__Array of Strings__. Optional. +
+Updated list of disabled operations. Accepted values: `COMMIT`, `DEPLOY`. Pass an empty array `[]` via `curl` to re-enable all operations.
+|=====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/config/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "commit_branch": "dev-v2",
+  "disabled_operations": ["COMMIT"]
+}'
+----
+
+=== Delete configuration
+
+The `POST /api/rest/2.0/version-control/config/delete` endpoint removes the Git repository configuration for the caller's Org.
+
+==== Prerequisites
+
+// SOURCE: SCAL-351172
+You must have the `ADMINISTRATION` privilege (Org admin).
+
+==== Request parameters
+
+This endpoint does not require a request body.
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/config/delete' \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+=== Search configurations
+
+The `POST /api/rest/2.0/version-control/config/search` endpoint retrieves Git repository configurations for the caller's Org or for one or more Orgs specified in the request.
+
+==== Prerequisites
+
+// SOURCE: SCAL-351172
+You must have the `ADMINISTRATION` privilege (Org admin).
+
+==== Request parameters
+
+// SOURCE: SCAL-351172
+[width="100%", cols="2,4"]
+[options='header']
+|=====
+|Parameter |Description
+|`org_ids` a|__Array of Integers__. Optional. +
+The Org IDs to retrieve configurations for. If not specified, returns the configuration for the caller's Org.
+
+|`record_size` a|__Integer__. Optional. +
+The maximum number of records to return.
+
+|`record_offset` a|__Integer__. Optional. +
+The starting position for pagination.
+|=====
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/config/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "org_ids": [1, 2]
+}'
+----
+
+==== Example response
+
+[source,JSON]
+----
+[
+  {
+    "org_id": 1,
+    "repository_url": "https://github.com/your-org/your-repo",
+    "commit_branch": "dev",
+    "root_dir": "thoughtspot-content",
+    "disabled_operations": []
+  }
+]
+----
+
+== Commit objects
+
+The `POST /api/rest/2.0/version-control/commit` endpoint exports the selected ThoughtSpot objects as TML files and pushes a commit to the Org's configured Git branch.
+
+Call this endpoint from the *source Org* (for example, the Dev Org). This is the only Version Control V2 step that pushes ThoughtSpot content to Git.
+
+// SOURCE: SCAL-351172
+[NOTE]
+====
+* The commit is recorded under the calling user's name, not a service account.
+* You can include 1 to 50 objects per commit request.
+* In the Beta release, only Liveboards and Answers are supported.
+* ThoughtSpot system objects (for example, built-in `TS: ...` objects) are never committed. Including one in a commit request is an error.
+* Connections are not committed. If you plan to deploy objects that use a connection to another Org, that Org must already have a matching connection.
+====
+
+=== Prerequisites
+
+// SOURCE: SCAL-351172
+You must have the `ADMINISTRATION` privilege (Org admin).
+
+The Org must have a Git configuration created with `config/create` and the `COMMIT` operation must not be disabled.
+
+=== Request parameters
+
+// SOURCE: SCAL-351172
+[width="100%", cols="2,4"]
+[options='header']
+|=====
+|Parameter |Description
+|`metadata` a|__Array of Objects__. Required. +
+The objects to commit. Each entry must specify the object identifier.
+
+* `obj_id` — __String__. The GUID of the Liveboard or Answer to commit.
+
+[NOTE]
+====
+Version Control V2 uses Object IDs, not display names. If an object's GUID changes, it is treated as a different object for commit and deploy.
+====
+
+|`commit_message` a|__String__. Optional. +
+A message to include in the Git commit.
+
+|`prune_deleted_object_files` a|__Boolean__. Optional. +
+When `true`, TML files for objects that no longer exist in the Org are removed from the Git branch. +
+// TODO: verify with engineering — confirm default value and behavior when prune removes a file that is used by another Org's branch
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/commit' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata": [
+    {"obj_id": "a3b8c2d1-1234-5678-abcd-ef0123456789"},
+    {"obj_id": "f1e2d3c4-9876-5432-fedc-ba9876543210"}
+  ],
+  "commit_message": "Add Q3 sales Liveboards",
+  "prune_deleted_object_files": false
+}'
+----
+
+=== Example response
+
+A successful request returns `HTTP 200` and a `run_id`. Use `runs/search` to poll for the final result.
+
+[source,JSON]
+----
+{
+  "run_id": "run_abc123def456"
+}
+----
+
+== Promote a branch
+
+Call the `POST /api/rest/2.0/version-control/branch/promote` endpoint from the *destination Org* (for example, the Prod Org) to bring commits from the source branch into the caller's branch.
+
+// SOURCE: SCAL-351172
+[IMPORTANT]
+====
+*Promote does not deploy.* Promote moves changes between Git branches only — nothing in ThoughtSpot changes. To apply the promoted changes to a ThoughtSpot Org, follow the promote with a `deploy` call from the same destination Org.
+
+Both Orgs must be configured to the same Git repository.
+====
+
+The following table maps each promote strategy to its Git equivalent:
+
+// SOURCE: SCAL-351172
+[width="100%", cols="1,2,3"]
+[options='header']
+|=====
+|Strategy |Git equivalent |When to use
+|`MERGE` |Merge commit |Preserves the full history of both branches.
+|`SQUASH` |Squash commit |Combines all source commits into one before merging.
+|`FAST_FORWARD` |Move branch pointer |Use only when the target branch has no diverging commits.
+|`CHERRY_PICK` |Copy selected commits |Use to promote a specific commit. Requires `source_revision`.
+|=====
+
+=== Prerequisites
+
+// SOURCE: SCAL-351172
+You must have the `ADMINISTRATION` privilege (Org admin) on the destination Org.
+
+The destination Org must have a Git configuration that uses the same repository as the source Org.
+
+The target branch must not be protected in the Git provider.
+
+=== Request parameters
+
+// SOURCE: SCAL-351172
+[width="100%", cols="2,4"]
+[options='header']
+|=====
+|Parameter |Description
+|`source_branch` a|__String__. Required. +
+The Git branch to promote from (for example, `dev`).
+
+|`strategy` a|__String__. Required. +
+The merge strategy. Accepted values: `MERGE`, `SQUASH`, `FAST_FORWARD`, `CHERRY_PICK`.
+
+|`source_revision` a|__String__. Required when `strategy` is `CHERRY_PICK`. +
+The commit SHA to cherry-pick.
+
+|`conflict_policy` a|__String__. Optional. +
+How to handle conflicts. Accepted values:
+
+* `FAIL_REQUEST` — Stop on the first conflict and return an error.
+* `USE_SOURCE` — Accept the source branch version.
+* `USE_TARGET` — Keep the target branch version.
+
+|`dry_run` a|__Boolean__. Optional. +
+When `true`, the API returns the list of files that would change without pushing anything to Git. Defaults to `true`. +
+To push the promote to Git, set `dry_run` to `false`.
+|=====
+
+[NOTE]
+====
+The promote response lists up to 50 files per change type. The `total_count` field gives the full count of changed files.
+====
+
+=== Example request
+
+The following example promotes all commits from the `dev` branch into the caller's configured branch and performs a dry run first.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/branch/promote' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "source_branch": "dev",
+  "strategy": "MERGE",
+  "conflict_policy": "FAIL_REQUEST",
+  "dry_run": true
+}'
+----
+
+To perform the actual promote, set `dry_run` to `false`.
+
+=== Example response
+
+[source,JSON]
+----
+{
+  "dry_run": true,
+  "total_count": 3,
+  "files_added": ["liveboard_q3_sales.tml"],
+  "files_modified": ["answer_revenue_ytd.tml"],
+  "files_deleted": []
+}
+----
+
+== Deploy to an Org
+
+The `POST /api/rest/2.0/version-control/deploy` endpoint reads the caller's configured Git branch and applies the changes to the Org by creating, updating, or deleting ThoughtSpot objects.
+
+Call this endpoint from the *destination Org* (for example, the Prod Org). This is the only Version Control V2 step that users see.
+
+// SOURCE: SCAL-351172
+[NOTE]
+====
+* The Beta limit is approximately 100 objects per deploy request. Deploys of 200 or more objects may fail. Object batching is planned as part of the general availability release.
+* System objects that are dependencies of a committed object are reported as `SKIPPED` in the run results.
+====
+
+=== Prerequisites
+
+// SOURCE: SCAL-351172
+You must have the `ADMINISTRATION` privilege (Org admin) on the destination Org.
+
+The Org must have a Git configuration created with `config/create` and the `DEPLOY` operation must not be disabled.
+
+=== Request parameters
+
+// SOURCE: SCAL-351172
+[width="100%", cols="2,4"]
+[options='header']
+|=====
+|Parameter |Description
+|`deploy_type` a|__String__. Optional. +
+// TODO: verify with engineering — confirm exact enum names for deploy_type and whether this is a separate field from deploy_policy
+
+|`deploy_policy` a|__String__. Optional. +
+// TODO: verify with engineering — confirm exact enum names for deploy_policy (for example, VALIDATE_ONLY, PARTIAL, ALL_OR_NONE) and whether deploy_type and deploy_policy are separate parameters or a single combined field
+
+|`target_revision` a|__String__. Optional. +
+A specific commit SHA to deploy. When set, the Org is updated to match that commit; the branch head does not move. +
+To return to the branch head, send a deploy request without `target_revision`.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/deploy' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "target_revision": "afc0fea831558e30d7064ab019f49243b1f09552"
+}'
+----
+
+=== Example response
+
+A successful request returns `HTTP 200` and a `run_id`. Use `runs/search` to poll for the final result.
+
+[source,JSON]
+----
+{
+  "run_id": "run_def456ghi789"
+}
+----
+
+== Restore a revision
+
+The `POST /api/rest/2.0/version-control/restore` endpoint restores the caller's Org to an earlier Git revision.
+
+// TODO: verify with engineering — confirm full parameter set, request body, and response schema for the restore endpoint. Take path and parameters from the REST Playground.
+
+=== Prerequisites
+
+// SOURCE: SCAL-351172
+You must have the `ADMINISTRATION` privilege (Org admin).
+
+== Search runs
+
+The `POST /api/rest/2.0/version-control/runs/search` endpoint returns the status, message, and per-object results of past runs for the caller's Org.
+
+// SOURCE: SCAL-351172
+[NOTE]
+====
+Branch promote operations do not create run rows and do not appear in `runs/search` results.
+====
+
+=== Prerequisites
+
+// SOURCE: SCAL-351172
+You must have the `ADMINISTRATION` privilege (Org admin).
+
+=== Request parameters
+
+// SOURCE: SCAL-351172
+[width="100%", cols="2,4"]
+[options='header']
+|=====
+|Parameter |Description
+|`run_ids` a|__Array of Strings__. Optional. +
+One or more run IDs to retrieve. If not specified, returns recent runs for the Org.
+
+|`run_type` a|__String__. Optional. +
+Filter by run type. Accepted values: `COMMIT`, `DEPLOY`, `RESTORE`.
+
+|`record_size` a|__Integer__. Optional. +
+The maximum number of records to return.
+
+|`record_offset` a|__Integer__. Optional. +
+The starting position for pagination.
+|=====
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/runs/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "run_ids": ["run_abc123def456"],
+  "run_type": "COMMIT"
+}'
+----
+
+=== Example response
+
+[source,JSON]
+----
+[
+  {
+    "run_id": "run_abc123def456",
+    "run_type": "COMMIT",
+    "status": "SUCCESS",
+    "message": "",
+    "object_results": [
+      {
+        "obj_id": "a3b8c2d1-1234-5678-abcd-ef0123456789",
+        "status": "SUCCESS",
+        "message": ""
+      },
+      {
+        "obj_id": "f1e2d3c4-9876-5432-fedc-ba9876543210",
+        "status": "SUCCESS",
+        "message": ""
+      }
+    ]
+  }
+]
+----
+
+== Related resources
+
+// SOURCE: SCAL-351172
+* For the existing Git integration APIs, see xref:git-rest-api-guide.adoc[GitHub REST APIs].
+* For the full list of REST API v2.0 endpoints, see xref:rest-apiv2-reference.adoc[REST API v2.0 reference].
+* Visit the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fversion-control%2Fconfig-create">REST API v2.0 Playground</a>+++ to test the `config/create` endpoint.
