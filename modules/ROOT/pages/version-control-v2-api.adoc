@@ -26,19 +26,13 @@ The legacy Git integration APIs and the Version Control V2 APIs cannot be used t
 To choose between Version Control V2, the legacy Git integration APIs, and the Git provider integration pattern, see xref:development-and-deployment.adoc#choose-a-deployment-approach[Choose a deployment approach].
 ====
 
-== Glossary
-
-// SOURCE: SCAL-351172
-* *Commit*: pushes ThoughtSpot content to Git.
-* *Promote*: moves changes from one Git branch to another.
-* *Deploy*: applies content from Git to ThoughtSpot.
-
 == Before you begin
 
 Before calling any Version Control V2 API, complete the following steps:
 
 // SOURCE: SCAL-351172, API reference (26.12.0.cl)
-. *Allowlist the VCS worker NAT IP address*. Add the ThoughtSpot VCS worker NAT IP address to your Git provider's allowlist before you create the configuration. Contact ThoughtSpot Support for the IP address. Without this step, ThoughtSpot cannot reach your repository.
+. *Allow ThoughtSpot to reach your repository*. ThoughtSpot connects to your Git provider from a fixed public IP address (the VCS worker NAT IP address). If your Git provider restricts access by IP address, add this IP address to the provider's IP allowlist before you create the configuration. Contact ThoughtSpot Support for the IP address. For instructions, see your Git provider's documentation: link:https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/managing-allowed-ip-addresses-for-your-organization[GitHub, window=_blank], link:https://docs.gitlab.com/user/group/access_and_permissions/#restrict-group-access-by-ip-address[GitLab, window=_blank], link:https://support.atlassian.com/bitbucket-cloud/docs/control-access-to-your-private-content/[Bitbucket, window=_blank], link:https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/change-application-access-policies[Azure DevOps, window=_blank].
+// TODO: verify with engineering — SCAL-351172 presents the allowlist step as always required. Confirm that it is needed only when the Git provider restricts access by IP address.
 . *Enable Object IDs*. Version Control V2 identifies objects by their xref:object-id.adoc[Object ID] (`obj_id`). Unlike the legacy Git integration APIs, which match objects across Orgs with xref:guid-mapping.adoc[GUID mapping files], Version Control V2 matches them by Object ID and needs no mapping files. Object IDs must be enabled on your instance. If an object's Object ID changes, ThoughtSpot treats it as a different object for commit and deploy.
 . *Confirm Org administrator access*. All Version Control V2 endpoints require the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
 . *Get an access token for each Org*. Every Version Control V2 request acts on the Org of the bearer token used in the request. To call the APIs for a specific Org, xref:authentication.adoc#_generating_a_full_access_token[request a token for that Org].
@@ -182,63 +176,16 @@ If you have used the xref:git-rest-api-guide.adoc[Git integration APIs] (`/api/r
 |`runs/search` returns commit, deploy, and restore runs with their state and per-object results
 |===
 
-== Supported endpoints
-
-// SOURCE: API reference (26.12.0.cl)
-All Version Control V2 endpoints use the `POST` method and the base path `/api/rest/2.0/version-control/`.
-
-[width="100%", cols="1"]
-|===
-a|`POST /api/rest/2.0/version-control/config/create` +
-xref:version-control-v2-api.adoc#_create_configuration[Links the caller's Org to a Git repository and branch]. +
-__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
-
-a|`POST /api/rest/2.0/version-control/config/update` +
-xref:version-control-v2-api.adoc#_update_configuration[Updates the caller's Org configuration]. +
-__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
-
-a|`POST /api/rest/2.0/version-control/config/delete` +
-xref:version-control-v2-api.adoc#_delete_configuration[Deletes the caller's Org configuration and its stored credential]. +
-__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
-
-a|`POST /api/rest/2.0/version-control/config/search` +
-xref:version-control-v2-api.adoc#_search_configurations[Returns the caller's Org configuration]. +
-__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
-
-a|`POST /api/rest/2.0/version-control/commit` +
-xref:version-control-v2-api.adoc#_commit_objects[Exports the selected objects as TML files and commits them] to the Org's branch. +
-__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
-
-a|`POST /api/rest/2.0/version-control/branch/promote` +
-xref:version-control-v2-api.adoc#_promote_a_branch[Brings changes from a source branch into the caller's branch]. +
-__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
-
-a|`POST /api/rest/2.0/version-control/deploy` +
-xref:version-control-v2-api.adoc#_deploy_to_an_org[Applies a revision of the Org's branch to the Org]. +
-__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
-
-a|`POST /api/rest/2.0/version-control/commit/restore` +
-xref:version-control-v2-api.adoc#_restore_a_revision[Restores the Org's branch and the Org to an earlier revision]. +
-__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
-
-a|`POST /api/rest/2.0/version-control/runs/search` +
-xref:version-control-v2-api.adoc#_search_runs[Returns the status and per-object results of commit, deploy, and restore runs]. +
-__Available on ThoughtSpot Cloud instances from 26.12.0.cl onwards. [.beta]#Beta#__
-|===
-
-To try these endpoints, open the *Version Control V2* section of the +++<a href="{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fversion-control-v2%2Fcreate-version-control-config">REST API v2.0 Playground</a>+++. The *Version Control* section of the Playground contains the legacy `/vcs/git/` APIs.
-// TODO: verify the Playground apiResourceId for the Version Control V2 endpoints.
-
 == End-to-end example
 
 // SOURCE: SCAL-351172, API reference (26.12.0.cl)
-The following sequence moves a Liveboard from a Dev Org to a Prod Org. Both Orgs use the same repository; the Dev Org commits to the `dev` branch and the Prod Org commits to the `prod` branch.
+The following sequence moves a Liveboard from a Dev Org to a Prod Org. Both Orgs use the same repository; the Dev Org commits to the `dev` branch and the Prod Org commits to the `prod` branch. All Version Control V2 endpoints use the `POST` method and the base path `/api/rest/2.0/version-control/`.
 
-. With a token for the Dev Org, call `config/create` with `commit_branch` set to `dev`.
+. With a token for the Dev Org, call xref:version-control-v2-api.adoc#_create_configuration[`config/create`] with `commit_branch` set to `dev`.
 . With a token for the Prod Org, call `config/create` with `commit_branch` set to `prod`. Optionally, set `disabled_operations` to `["COMMIT"]`.
-. With the Dev Org token, call `commit` with the Liveboard's identifier. Poll `runs/search` with the returned `run_id` until the run ends.
-. With the Prod Org token, call `branch/promote` with `source.org_identifier` set to the Dev Org. Review the dry run response, then send the same request with `"dry_run": false`.
-. With the Prod Org token, call `deploy`. Poll `runs/search` with the returned `run_id` until the run ends.
+. With the Dev Org token, call xref:version-control-v2-api.adoc#_commit_objects[`commit`] with the Liveboard's identifier. Poll xref:version-control-v2-api.adoc#_search_runs[`runs/search`] with the returned `run_id` until the run ends.
+. With the Prod Org token, call xref:version-control-v2-api.adoc#_promote_a_branch[`branch/promote`] with `source.org_identifier` set to the Dev Org. Review the dry run response, then send the same request with `"dry_run": false`.
+. With the Prod Org token, call xref:version-control-v2-api.adoc#_deploy_to_an_org[`deploy`]. Poll `runs/search` with the returned `run_id` until the run ends.
 . Share any newly created objects with users and groups in the Prod Org. See xref:access-control-sharing.adoc#_sharing_via_rest_api[Sharing via REST API].
 
 == Configuration APIs
@@ -624,7 +571,7 @@ Before you promote, check the following requirements:
 The following table maps each promote strategy to its Git equivalent:
 
 // SOURCE: SCAL-351172
-[cols="1,2,3", options="header"]
+[cols="1,1,2", options="header"]
 |===
 |Strategy |Git equivalent | When to use
 | `MERGE`
