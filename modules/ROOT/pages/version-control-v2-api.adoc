@@ -1,0 +1,975 @@
+= Version Control V2 APIs
+:toc: true
+:toclevels: 2
+
+:page-title: Version Control V2 APIs
+:page-pageid: version-control-v2-api
+:page-description: Use the Version Control V2 REST APIs to connect an Org to a Git repository, commit ThoughtSpot objects as TML files, promote changes between branches, deploy content to Orgs, and restore earlier revisions.
+
+// SOURCE: SCAL-351172
+[IMPORTANT]
+====
+The Version Control V2 APIs are available as [.beta]#Beta# on ThoughtSpot Cloud from 26.12.0.cl onwards. Beta features may change before general availability. +
+The feature is turned off by default. To enable Version Control V2 on your instance, contact ThoughtSpot Support. Until it is enabled, every Version Control V2 request returns `403` with the message `This feature is disabled.`
+====
+
+The Version Control V2 REST APIs let Org administrators version ThoughtSpot content in their own Git repository.
+Use these APIs to link an Org to a repository branch, commit objects as TML files, promote changes from one branch to another, deploy a revision into an Org, restore an earlier revision, and track the status of each run.
+
+// SOURCE: SCAL-351172, API reference (26.12.0.cl)
+[NOTE]
+====
+The Version Control V2 APIs are the recommended path going forward. Existing legacy Git integration configurations (`/api/rest/2.0/vcs/git/` endpoints) continue to work, and migration guidance will be available when the Version Control V2 APIs become generally available. For more information about the legacy APIs, see xref:git-rest-api-guide.adoc[Git integration REST APIs (legacy)].
+
+The legacy Git integration APIs and the Version Control V2 APIs cannot be used together on the same Org. An Org that is configured for the legacy Git integration cannot also have a Version Control V2 configuration.
+
+To choose between Version Control V2, the legacy Git integration APIs, and the Git provider integration pattern, see xref:development-and-deployment.adoc#choose-a-deployment-approach[Choose a deployment approach].
+====
+
+== Before you begin
+
+Before calling any Version Control V2 API, complete the following steps:
+
+// SOURCE: SCAL-351172, API reference (26.12.0.cl)
+. *Allow ThoughtSpot to reach your repository*. ThoughtSpot connects to your Git provider from a fixed public IP address (the VCS worker NAT IP address). If your Git provider restricts access by IP address, add this IP address to the provider's IP allowlist before you create the configuration. Contact ThoughtSpot Support for the IP address. For instructions, see your Git provider's documentation: link:https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/managing-allowed-ip-addresses-for-your-organization[GitHub, window=_blank], link:https://docs.gitlab.com/user/group/access_and_permissions/#restrict-group-access-by-ip-address[GitLab, window=_blank], link:https://support.atlassian.com/bitbucket-cloud/docs/control-access-to-your-private-content/[Bitbucket, window=_blank], link:https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/change-application-access-policies[Azure DevOps, window=_blank].
+// TODO: verify with engineering — SCAL-351172 presents the allowlist step as always required. Confirm that it is needed only when the Git provider restricts access by IP address.
+. *Enable Object IDs*. Version Control V2 identifies objects by their xref:object-id.adoc[Object ID] (`obj_id`). Unlike the legacy Git integration APIs, which match objects across Orgs with xref:guid-mapping.adoc[GUID mapping files], Version Control V2 matches them by Object ID and needs no mapping files. Object IDs must be enabled on your instance. If an object's Object ID changes, ThoughtSpot treats it as a different object for commit and deploy.
+. *Confirm Org administrator access*. All Version Control V2 endpoints require the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
+. *Get an access token for each Org*. Every Version Control V2 request acts on the Org of the bearer token used in the request. To call the APIs for a specific Org, xref:authentication.adoc#_generating_a_full_access_token[request a token for that Org].
+. *Create a Git access token*. Create a personal access token (or your provider's equivalent) with the following permissions on the repository:
++
+* Repository contents: read and write
+* Repository metadata: read
+* Repository rules: read (optional; lets ThoughtSpot validate pushes against the provider's branch rules)
++
+Git provider tokens typically expire. To rotate a token, use xref:version-control-v2-api.adoc#_update_configuration[`config/update`].
+
+== Supported Git providers
+
+// SOURCE: SCAL-351172, API reference (26.12.0.cl)
+Version Control V2 supports the following Git providers. Only ThoughtSpot Cloud instances can connect to an external Git provider.
+
+[cols="2,4", options="header"]
+|===
+|Provider | `provider` value
+| GitHub
+| `GITHUB`
+| GitLab
+| `GITLAB`
+| Bitbucket
+| `BITBUCKET` (also requires `credential.username`)
+| Azure DevOps
+| `AZURE_DEVOPS`
+|===
+
+== Key concepts
+
+=== One Org, one branch
+
+// SOURCE: SCAL-351172, API reference (26.12.0.cl)
+Each Org has one Version Control V2 configuration, which links the Org to one branch (the *commit branch*) in a Git repository. Every commit, deploy, and restore for the Org uses that branch. Two Orgs cannot commit to the same repository and branch.
+
+To move content between environments, configure each Org (for example, Dev and Prod) on the same repository, each with its own branch.
+
+=== Commit, promote, deploy
+
+// SOURCE: SCAL-351172
+A change moves from a development Org to a production Org in three calls, and each call changes one thing:
+
+[cols="1,1,3", options="header"]
+|===
+|Step |Call from | What changes
+| *commit*
+| Source Org (for example, Dev)
+| Exports the selected objects as TML files and pushes a commit to the Dev Org's branch. This is the only step that pushes ThoughtSpot content to Git.
+| *branch/promote*
+| Destination Org (for example, Prod)
+| Brings changes from the Dev branch into the Prod branch. This is the only step that touches two Git branches. Nothing changes in ThoughtSpot.
+| *deploy*
+| Destination Org (for example, Prod)
+| Reads the Prod branch and creates, updates, or deletes objects in the Prod Org. This is the only step that users see.
+|===
+
+[NOTE]
+====
+A promote dry run (`dry_run: true`) shows which files in Git would change. A deploy with `deploy_policy: VALIDATE_ONLY` validates TML against the Org. These are different checks.
+====
+
+=== Disabling operations for an Org
+
+// SOURCE: API reference (26.12.0.cl), SCAL-351172
+Use the `disabled_operations` property of the configuration to turn off commit or deploy for an Org without deleting its configuration. For example, disable `COMMIT` on a production Org so that it can only receive content through deploy.
+
+* `COMMIT` blocks the `commit` endpoint.
+* `DEPLOY` blocks the `deploy` endpoint.
+* A restore operation both commits and deploys, so disabling either operation also blocks `commit/restore`.
+
+A request for a disabled operation returns `400`.
+// TODO: verify with engineering — SCAL-351172 says a disabled operation returns 403; the API reference says 400. Confirm the status code.
+
+=== Asynchronous runs
+
+// SOURCE: SCAL-351172, API reference (26.12.0.cl)
+The `commit`, `deploy`, and `commit/restore` endpoints are asynchronous. Each request is admitted as a *run* and returns a receipt with a `run_id`. Nothing is committed, pushed, or imported before the response returns. Use xref:version-control-v2-api.adoc#_search_runs[`runs/search`] with the `run_id` to poll the run until its `state` is no longer `RUNNING`. Per-object results are reported only by `runs/search`.
+
+Admission is all or nothing. If the request returns a `4xx` error, no run was started, and you can correct the request and send it again. The `error.message` property of the error response gives the reason. If the Org has no Version Control V2 configuration, the API returns `404`.
+
+Run states:
+
+* `RUNNING`
+* `SUCCESS`
+* `PARTIAL_SUCCESS`
+* `FAILED`. The run's `message` describes the reason; for example, `The repository refused the stored credential` or `The repository could not be reached; retry the commit`.
+
+Per-object statuses:
+
+* `PENDING`: the run has not reached the object yet. No object is `PENDING` after the run ends.
+* `SUCCESS`
+* `VALIDATED`: the object passed validation in a `VALIDATE_ONLY` deploy or restore.
+* `FAILED`
+* `SKIPPED`: for example, a ThoughtSpot system object that a committed object depends on.
+
+[NOTE]
+====
+Only one run can be active for an Org at a time. A `deploy` or `commit/restore` request sent while another run is in progress for the same Org returns `409`. Retry after the first run completes.
+
+A run that is idle for 30 minutes is marked `FAILED` when the next run starts.
+// TODO: verify with engineering — SCAL-351172 says commit also returns 409 while a run is in flight; the commit API reference lists 409 only for an ambiguous object name.
+====
+
+// TODO: verify with engineering — the API reference lists "paused repository" as a 400 cause for commit, deploy, and restore. Document what pauses a repository and how to resume it.
+
+=== Differences from the legacy Git integration APIs
+
+// SOURCE: git-configuration.adoc, git-rest-api-guide.adoc, API reference (26.12.0.cl)
+If you have used the xref:git-rest-api-guide.adoc[Git integration APIs] (`/api/rest/2.0/vcs/git/` endpoints), note the following differences:
+
+[cols="2,3,3", options="header"]
+|===
+| |Git integration APIs (`/vcs/git/`) |Version Control V2 APIs (`/version-control/`)
+|Git providers
+|GitHub and GitHub Enterprise
+|GitHub, GitLab, Bitbucket, and Azure DevOps
+|Matching objects across Orgs
+|xref:guid-mapping.adoc[GUID mapping files], stored in a configuration branch
+|xref:object-id.adoc[Object ID]. No GUID mapping files or configuration branch.
+|Branches per Org
+|One or more branches (`branch_names`)
+|One branch (`commit_branch`)
+|Calling `config/create` again
+|Overwrites the existing configuration
+|Returns `409`. Use `config/update` instead.
+|Removing files of deleted objects on commit
+|`delete_aware`. Default: `true`.
+|`prune_deleted_object_files`. Default: `false`.
+|Moving changes between branches
+|In Git, with a pull request. `branches/validate` checks the merge.
+|`branch/promote`
+|`FULL` deploy
+|Deletes objects whose files were deleted in the commit
+|Does not delete objects
+|Returning to an earlier version
+|`commits/{commit_id}/revert`
+|`commit/restore`, which creates a new commit and deploys it to the Org
+|History
+|`commits/search` returns the commits for an object
+|`runs/search` returns commit, deploy, and restore runs with their state and per-object results
+|===
+
+== End-to-end example
+
+// SOURCE: SCAL-351172, API reference (26.12.0.cl)
+The following sequence moves a Liveboard from a Dev Org to a Prod Org. Both Orgs use the same repository; the Dev Org commits to the `dev` branch and the Prod Org commits to the `prod` branch. All Version Control V2 endpoints use the `POST` method and the base path `/api/rest/2.0/version-control/`.
+
+. With a token for the Dev Org, call xref:version-control-v2-api.adoc#_create_configuration[`config/create`] with `commit_branch` set to `dev`.
+. With a token for the Prod Org, call `config/create` with `commit_branch` set to `prod`. Optionally, set `disabled_operations` to `["COMMIT"]`.
+. With the Dev Org token, call xref:version-control-v2-api.adoc#_commit_objects[`commit`] with the Liveboard's identifier. Poll xref:version-control-v2-api.adoc#_search_runs[`runs/search`] with the returned `run_id` until the run ends.
+. With the Prod Org token, call xref:version-control-v2-api.adoc#_promote_a_branch[`branch/promote`] with `source.org_identifier` set to the Dev Org. Review the dry run response, then send the same request with `"dry_run": false`.
+. With the Prod Org token, call xref:version-control-v2-api.adoc#_deploy_to_an_org[`deploy`]. Poll `runs/search` with the returned `run_id` until the run ends.
+. Share any newly created objects with users and groups in the Prod Org. See xref:access-control-sharing.adoc#_sharing_via_rest_api[Sharing via REST API].
+
+== Configuration APIs
+
+=== Create configuration
+
+The `POST /api/rest/2.0/version-control/config/create` endpoint links the caller's Org to a branch in a Git repository. Create the configuration once per Org, before any commit, deploy, or restore. Requires the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
+
+// SOURCE: API reference (26.12.0.cl)
+The API returns `409` and does not change the stored configuration in the following cases:
+
+* The Org already has a configuration. To change it, use `config/update`.
+* Another Org already commits to the same repository and branch.
+* The Org is configured for the legacy Git integration (`/vcs/git/` APIs).
+
+To pause versioning without discarding the configuration, set `disabled_operations` with `config/update` instead of deleting the configuration.
+
+==== Request parameters
+// SOURCE: API reference (26.12.0.cl), SCAL-351172
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `provider`
+|__String__. Required. The Git provider. Valid values: `GITHUB`, `GITLAB`, `BITBUCKET`, `AZURE_DEVOPS`.
+| `repository_url`
+|__String__. Required. The HTTPS URL of the repository; for example, `\https://github.com/example-org/example-repo.git`. Use the URL of the repository itself, not of a branch or folder within it. Plain HTTP URLs are rejected.
+| `commit_branch`
+|__String__. Required. The branch that this Org commits to, deploys from, and restores. For example, `dev` or `prod`.
+| `credential`
+a|__Object__. Required. The credential ThoughtSpot uses to access the repository. The stored credential is never returned in API responses. Specify the following attributes:
+
+* `type`. __String__. Required. Valid value: `ACCESS_TOKEN`.
+* `access_token`. __String__. Required. The personal access token or your provider's equivalent.
+* `username`. __String__. Optional. The username presented with the token. Required for Bitbucket.
+| `root_dir`
+|__String__. Optional. The directory in the repository under which ThoughtSpot writes TML files; for example, `analytics/prod`. The path must be relative, and each path segment must begin with a letter, digit, underscore (`_`), or hyphen (`-`). If not set, files are written to the repository root.
+| `disabled_operations`
+|__Array of strings__. Optional. Operations to turn off for this Org. Valid values: `COMMIT`, `DEPLOY`. See xref:version-control-v2-api.adoc#_disabling_operations_for_an_org[Disabling operations for an Org].
+|===
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/config/create' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "provider": "GITHUB",
+  "repository_url": "https://github.com/example-org/example-repo.git",
+  "commit_branch": "dev",
+  "credential": {
+    "type": "ACCESS_TOKEN",
+    "access_token": "{GIT_ACCESS_TOKEN}"
+  },
+  "root_dir": "analytics/dev"
+}'
+----
+
+==== Example response
+If the API request is successful, the API returns the stored configuration. The response includes the credential type and username, but not the access token.
+
+[source,json]
+----
+{
+  "org": {
+    "id": 823630514,
+    "name": "dev-org"
+  },
+  "provider": "GITHUB",
+  "repository_url": "https://github.com/example-org/example-repo.git",
+  "commit_branch": "dev",
+  "root_dir": "analytics/dev",
+  "credential": {
+    "type": "ACCESS_TOKEN"
+  },
+  "disabled_operations": [],
+  "created_by": {
+    "id": "8e3f2a7b-9c4d-4e5f-8a1b-7c9d3e6f4a2b",
+    "name": "tsadmin"
+  },
+  "creation_time_in_millis": 1785495800000,
+  "last_modified_by": {
+    "id": "8e3f2a7b-9c4d-4e5f-8a1b-7c9d3e6f4a2b",
+    "name": "tsadmin"
+  },
+  "modification_time_in_millis": 1785495800000
+}
+----
+
+==== Response parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `org`
+|The Org that the configuration belongs to, with its `id` and `name`.
+| `provider`
+|The Git provider.
+| `repository_url`
+|The HTTPS URL of the repository.
+| `commit_branch`
+|The branch that the Org commits to, deploys from, and restores.
+| `root_dir`
+|The directory under which ThoughtSpot writes TML files. Empty when files are written to the repository root.
+| `credential`
+|The credential `type` and, if set, the `username`. The access token is never returned.
+| `disabled_operations`
+|The operations that are turned off for the Org. Empty when no operations are turned off.
+| `created_by`
+|The user who created the configuration, with the user's `id` (GUID) and `name`.
+| `creation_time_in_millis`
+|When the configuration was created, in milliseconds since the Unix epoch.
+| `last_modified_by`
+|The user who last changed the configuration, with the user's `id` (GUID) and `name`.
+| `modification_time_in_millis`
+|When the configuration was last changed, in milliseconds since the Unix epoch.
+|===
+
+=== Update configuration
+
+The `POST /api/rest/2.0/version-control/config/update` endpoint changes the caller's Org configuration. Use it to rotate a credential, move the Org to a different branch, or turn operations on or off. Requires the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
+
+All parameters are optional. Any parameter that you omit keeps its stored value.
+
+// SOURCE: API reference (26.12.0.cl)
+[IMPORTANT]
+====
+Changing `provider`, `repository_url`, `commit_branch`, `root_dir`, or `credential` fails any run that is in progress for the Org.
+====
+
+==== Request parameters
+// SOURCE: API reference (26.12.0.cl), SCAL-351172
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `provider`
+|__String__. Optional. The Git provider. Valid values: `GITHUB`, `GITLAB`, `BITBUCKET`, `AZURE_DEVOPS`.
+| `repository_url`
+|__String__. Optional. The HTTPS URL of the repository.
+| `commit_branch`
+|__String__. Optional. The branch that this Org commits to, deploys from, and restores.
+| `credential`
+|__Object__. Optional. A new credential. The attributes are the same as in `config/create`. A new credential is required if you change the provider, the repository host, or the repository owner.
+| `root_dir`
+|__String__. Optional. The directory in the repository under which ThoughtSpot writes TML files. To write to the repository root, send an empty string (`""`).
+| `disabled_operations`
+a|__Array of strings__. Optional. The operations to turn off. Valid values: `COMMIT`, `DEPLOY`. This list replaces the stored list. To turn all operations back on, send an empty array (`[]`).
+
+[NOTE]
+====
+The REST API Playground cannot send an empty `disabled_operations` array. Use `curl` or another HTTP client to send `{"disabled_operations": []}`.
+====
+|===
+
+// TODO: verify with engineering — SCAL-351172 lists "config/update cannot reset root_dir to empty" as a known issue; the API reference says an empty string resets it to the repository root. Confirm the behavior in 26.12.0.cl.
+
+==== Example request
+The following example moves the Org to the `dev-v2` branch and turns off commits.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/config/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "commit_branch": "dev-v2",
+  "disabled_operations": ["COMMIT"]
+}'
+----
+
+==== Example response
+If the API request is successful, the API returns `204` with no response body.
+
+=== Delete configuration
+
+The `POST /api/rest/2.0/version-control/config/delete` endpoint disconnects the caller's Org from its repository. Requires the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
+
+// SOURCE: API reference (26.12.0.cl)
+[IMPORTANT]
+====
+Deleting the configuration destroys the stored credential and fails any run that is in progress for the Org. To stop versioning but keep the configuration and credential, set `disabled_operations` with `config/update` instead.
+====
+
+==== Request parameters
+This endpoint does not take a request body.
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/config/delete' \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+==== Example response
+If the API request is successful, the API returns `204` with no response body.
+
+=== Search configurations
+
+The `POST /api/rest/2.0/version-control/config/search` endpoint returns the caller's Org configuration. Use it to confirm which repository and branch the Org uses before you start a run. Requires the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
+
+==== Request parameters
+This endpoint does not take a request body.
+
+==== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/config/search' \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+==== Example response
+If the API request is successful, the API returns the following response:
+
+[source,json]
+----
+{
+  "configs": [
+    {
+      "org": {
+        "id": 823630514,
+        "name": "dev-org"
+      },
+      "provider": "GITHUB",
+      "repository_url": "https://github.com/example-org/example-repo.git",
+      "commit_branch": "dev",
+      "root_dir": "analytics/dev",
+      "credential": {
+        "type": "ACCESS_TOKEN"
+      },
+      "disabled_operations": [],
+      "created_by": {
+        "id": "8e3f2a7b-9c4d-4e5f-8a1b-7c9d3e6f4a2b",
+        "name": "tsadmin"
+      },
+      "creation_time_in_millis": 1785495800000,
+      "last_modified_by": {
+        "id": "8e3f2a7b-9c4d-4e5f-8a1b-7c9d3e6f4a2b",
+        "name": "tsadmin"
+      },
+      "modification_time_in_millis": 1786612365000
+    }
+  ]
+}
+----
+
+==== Response parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `configs`
+|The Org's configuration. The array contains zero or one entry; it is empty if the Org is not configured. Each entry has the same attributes as the xref:version-control-v2-api.adoc#_create_configuration[`config/create`] response. The stored access token is never returned.
+|===
+
+== Commit objects
+
+The `POST /api/rest/2.0/version-control/commit` endpoint starts a run that exports the selected objects as TML files and commits them to the Org's branch in a single Git commit. Requires the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
+
+Call this endpoint from the *source Org* (for example, the Dev Org). This is the only Version Control V2 step that pushes ThoughtSpot content to Git. The Org must have a configuration, Object IDs must be enabled on the instance, and the `COMMIT` operation must not be disabled.
+
+// SOURCE: SCAL-351172, API reference (26.12.0.cl)
+[NOTE]
+====
+* In the Beta release, you can identify Liveboards and Answers by display name in a commit request. Objects that they depend on, such as Models, are exported and committed with them, and are reported with `is_dependency: true` in the run results.
+* You can include 1 to 50 objects in a request. An object named more than once is committed once.
+* ThoughtSpot system objects (for example, built-in `TS: ...` objects) are never committed. Naming one in a request is an error. A system object that a committed object depends on is reported as `SKIPPED`.
+* Connections are not committed. Before you deploy objects to another Org, make sure the destination Org has a connection that matches the source Org's connection.
+* The commit is recorded under the calling user's name.
+// TODO: verify with engineering — SCAL-351172 says the commit uses the calling user's name with the message "Versioned n objects"; the API reference example shows the author "svc-version-control". Confirm the author and the default commit message.
+====
+
+=== Request parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `objects`
+a|__Array of objects__. Required. The objects to commit. Each object must exist in the Org and have an Object ID. For each object, specify the following attributes:
+
+* `identifier`. __String__. Required. The GUID, Object ID, or name of the object. Whichever you use, ThoughtSpot commits the object by its Object ID. If a name matches more than one object of the given type, the API returns `409`; use the GUID or Object ID instead.
+* `type`. __String__. Optional. The object type. Valid values: `LIVEBOARD`, `ANSWER`. Required when `identifier` is a name.
+
+[TIP]
+====
+An object's GUID differs in every Org, but its Object ID stays the same. To find an object's Object ID, export its TML and check the `obj_id` property. For more information, see xref:object-id.adoc[Object ID].
+====
+| `commit_message`
+|__String__. Optional. The message for the Git commit. If not specified, ThoughtSpot generates a message.
+| `prune_deleted_object_files`
+a|__Boolean__. Optional. Default: `false`. When `true`, ThoughtSpot checks every TML file on the branch against the objects in the Org, and removes the file of any object that no longer exists in the Org.
+
+[WARNING]
+====
+The check covers every file on the branch, not only the objects in the request.
+====
+|===
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/commit' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "objects": [
+    {
+      "identifier": "Revenue-Dashboard-d7f3a1c8"
+    },
+    {
+      "identifier": "Q3 Pipeline",
+      "type": "ANSWER"
+    }
+  ],
+  "commit_message": "Add Q3 sales content",
+  "prune_deleted_object_files": false
+}'
+----
+
+=== Example response
+If the API request is successful, the API returns a receipt for the run. Use `runs/search` with the `run_id` to get the result.
+
+[source,json]
+----
+{
+  "run_id": "7c5d0b22-9a48-4de3-b0c1-2f8ab6119d07",
+  "accepted_time_in_millis": 1783500062000,
+  "author": {
+    "id": "8e3f2a7b-9c4d-4e5f-8a1b-7c9d3e6f4a2b",
+    "name": "tsadmin"
+  }
+}
+----
+
+=== Response parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `run_id`
+|The ID of the run. Use it with `runs/search` to get the run's state and per-object results.
+| `accepted_time_in_millis`
+|When the run was admitted, in milliseconds since the Unix epoch.
+| `author`
+|The user who started the run, with the user's `id` (GUID) and `name`.
+|===
+
+== Promote a branch
+
+The `POST /api/rest/2.0/version-control/branch/promote` endpoint brings changes from a source branch into the branch of the caller's Org (the target branch) and pushes the result. Call it from the *destination Org* (for example, the Prod Org), and name the Org or branch to promote from (for example, the Dev Org).
+
+// SOURCE: SCAL-351172, API reference (26.12.0.cl)
+[IMPORTANT]
+====
+*Promote does not deploy.* Promote changes Git branches only; nothing in ThoughtSpot changes. To apply the promoted changes to the Org, call `deploy` from the same Org.
+
+`dry_run` defaults to `true`. A request that omits `dry_run` reports what would change and pushes nothing. To push the changes, set `"dry_run": false`.
+====
+
+Promote is synchronous. It does not create a run and does not appear in `runs/search` results.
+
+// SOURCE: API reference (26.12.0.cl), SCAL-351172
+Before you promote, check the following requirements:
+
+* You must have the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege in the caller's Org.
+* To promote from another Org, you must also have the `ADMINISTRATION` privilege in the source Org, or tenant administrator privileges. Otherwise, the API returns `403`.
+* The caller's Org and the source Org must both have configurations that use the same repository. If either Org has no configuration, the API returns `404`.
+* The target branch must not be protected in the Git provider, and the source and target branches must share history.
+
+The following table maps each promote strategy to its Git equivalent:
+
+// SOURCE: SCAL-351172
+[cols="1,1,2", options="header"]
+|===
+|Strategy |Git equivalent | When to use
+| `MERGE`
+| Merge commit
+| Preserves the full history of both branches.
+| `SQUASH`
+| Squash commit
+| Combines all source commits into one commit on the target branch.
+| `FAST_FORWARD`
+| Move the branch pointer
+| Use only when the target branch has no commits that the source branch lacks.
+| `CHERRY_PICK`
+| Copy selected commits
+| Use to promote a specific commit. Requires `source.source_revision`.
+|===
+
+=== Request parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `source`
+a|__Object__. Required. Where to promote from. Specify exactly one of `org_identifier` or `source_branch`, and optionally `source_revision`:
+
+* `org_identifier`. __String__. The ID or name of the Org to promote from. ThoughtSpot uses that Org's configured branch.
+* `source_branch`. __String__. The branch to promote from. The branch must be the configured branch of an Org that uses the same repository.
+* `source_revision`. __String__. The revision to promote; for example, a Git commit SHA. Required when `strategy.type` is `CHERRY_PICK`; ignored otherwise.
+| `strategy`
+a|__Object__. Required. How to apply the source changes to the target branch. Specify the following attributes:
+
+* `type`. __String__. Required. Valid values: `MERGE`, `SQUASH`, `FAST_FORWARD`, `CHERRY_PICK`.
+* `conflict_policy`. __String__. Optional. Default: `FAIL_REQUEST`. What to do when a file conflicts. Valid values are:
+** `FAIL_REQUEST`: Return `400` and write nothing. This also applies to dry runs.
+** `USE_SOURCE`: Keep the source branch version.
+** `USE_TARGET`: Keep the target branch version.
+| `commit_message`
+|__String__. Optional. The message for the promotion commit. If not specified, Git generates a message.
+| `dry_run`
+|__Boolean__. Optional. Default: `true`. When `true`, the API returns the files that would change and pushes nothing. To push the changes, set `dry_run` to `false`.
+|===
+
+=== Example request
+The following example previews a merge from the Dev Org's branch into the caller's branch.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/branch/promote' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "source": {
+    "org_identifier": "dev-org"
+  },
+  "strategy": {
+    "type": "MERGE",
+    "conflict_policy": "FAIL_REQUEST"
+  },
+  "dry_run": true
+}'
+----
+
+To push the changes, send the same request with `"dry_run": false`.
+
+=== Example response
+If the API request is successful, the API returns what the promotion did, or, on a dry run, what it would do:
+
+[source,json]
+----
+{
+  "source": {
+    "org": {
+      "id": 823630514,
+      "name": "dev-org"
+    },
+    "branch": "dev"
+  },
+  "target": {
+    "org": {
+      "id": 912847563,
+      "name": "prod-org"
+    },
+    "branch": "prod"
+  },
+  "branch_divergence": {
+    "ahead_by": 3,
+    "behind_by": 1
+  },
+  "file_changes": {
+    "total_count": 3,
+    "added": ["liveboards/revenue_dashboard_q3.liveboard.tml"],
+    "modified": ["answers/top_accounts.answer.tml"],
+    "deleted": ["answers/retired_metric.answer.tml"],
+    "conflicts": []
+  }
+}
+----
+
+=== Response parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `source`
+|The source Org (`id` and `name`) and its `branch`.
+| `target`
+|The caller's Org (`id` and `name`) and its `branch`.
+| `branch_divergence`
+|How far the branches have diverged: `ahead_by` and `behind_by`, in commits.
+| `revision_details`
+|The commit that the target branch points to after the promotion: `revision`, `message`, `committed_time_in_millis`, and `author`. Not returned on a dry run.
+| `file_changes`
+a|The files that changed, or would change on a dry run, as repository paths:
+
+* `total_count`. The total number of changed files.
+* `added`. Files added to the target branch.
+* `modified`. Files modified on the target branch.
+* `deleted`. Files deleted from the target branch.
+* `conflicts`. Files that conflicted and were resolved by `USE_SOURCE` or `USE_TARGET`. Always empty under `FAIL_REQUEST`.
+|===
+
+// TODO: verify with engineering — SCAL-351172 says each file_changes list contains at most 50 files; the API reference says the lists are complete and total_count is their sum.
+
+== Deploy to an Org
+
+The `POST /api/rest/2.0/version-control/deploy` endpoint starts a run that reads a revision of the Org's branch and creates, updates, or deletes objects in the Org to match it. Requires the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
+
+Call this endpoint from the *destination Org* (for example, the Prod Org). This is the only Version Control V2 step that users see. The Org must have a configuration, and the `DEPLOY` operation must not be disabled.
+
+// SOURCE: SCAL-351172
+[NOTE]
+====
+* In the Beta release, deploy requests of up to about 100 objects are supported. Deploys of 200 or more objects can fail.
+* Objects that ThoughtSpot creates in the Org are not shared with any users or groups. To share them, see xref:access-control-sharing.adoc#_sharing_via_rest_api[Sharing via REST API].
+// TODO: verify with engineering — sharing behavior is carried over from the legacy deploy commits API; confirm that Version Control V2 deploy also creates objects unshared.
+====
+
+=== Request parameters
+// SOURCE: API reference (26.12.0.cl), SCAL-351172
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `target_revision`
+|__String__. Optional. The revision to deploy; for example, a Git commit SHA. The revision must be reachable from the Org's branch. If not specified, ThoughtSpot deploys the head of the branch. Deploying a specific revision does not move the branch head. To return the Org to the branch head, send a deploy request without `target_revision`.
+| `deploy_type`
+a|__String__. Optional. Default: `DELTA`. Valid values are:
+
+* `DELTA`: Deploys the changes between the revision that the Org last received and the target revision. Use this to keep the Org in step with its branch.
+* `FULL`: Treats every object at the target revision as a change. A `FULL` deploy does not delete objects from the Org.
+| `deploy_policy`
+a|__String__. Optional. Default: `ALL_OR_NONE`. How the run handles objects that fail to import. Valid values are:
+
+* `ALL_OR_NONE`: Import every object, or none if any object fails.
+* `PARTIAL`: Import the objects that succeed, even if others fail.
+* `VALIDATE_ONLY`: Validate the TML against the Org without importing anything. Objects that pass are reported as `VALIDATED`.
+|===
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/deploy' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "deploy_type": "DELTA",
+  "deploy_policy": "ALL_OR_NONE"
+}'
+----
+
+=== Example response
+If the API request is successful, the API returns a receipt for the run. Use `runs/search` with the `run_id` to get the result.
+
+[source,json]
+----
+{
+  "run_id": "7c5d0b22-9a48-4de3-b0c1-2f8ab6119d07",
+  "target_deployment_revision": "4f9e2b7c1d3a5e8f0b2c4d6a8e0f1b3c5d7e9a1b",
+  "last_deployed_revision": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+  "accepted_time_in_millis": 1783500062000
+}
+----
+
+=== Response parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `run_id`
+|The ID of the run. Use it with `runs/search` to get the run's state and per-object results.
+| `target_deployment_revision`
+|The revision that the run deploys. If the request did not specify `target_revision`, this is the branch head at the time of the request.
+| `last_deployed_revision`
+|The revision that the Org last received, which a `DELTA` deploy compares against. Not returned on the Org's first deploy or for a `FULL` deploy.
+| `accepted_time_in_millis`
+|When the run was admitted, in milliseconds since the Unix epoch.
+|===
+
+== Restore a revision
+
+The `POST /api/rest/2.0/version-control/commit/restore` endpoint starts a run that restores the Org's branch and the Org itself to an earlier revision. The restore creates a new commit on the branch with the content of the earlier revision, and then deploys that content to the Org. Requires the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
+
+The Org must have a configuration, and neither the `COMMIT` nor the `DEPLOY` operation can be disabled.
+
+// SOURCE: API reference (26.12.0.cl)
+[WARNING]
+====
+A restore has the same effect as a deploy. Objects in the Org are overwritten, and objects whose TML files do not exist at the target revision are deleted from the Org.
+====
+
+=== Request parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `target_revision`
+|__String__. Required. The revision to restore; for example, a Git commit SHA. The revision must be reachable from the Org's branch and cannot be the branch head.
+| `restore_policy`
+|__String__. Optional. Default: `ALL_OR_NONE`. How the run handles objects that fail to import. The values are the same as for `deploy_policy`: `ALL_OR_NONE`, `PARTIAL`, `VALIDATE_ONLY`. With `VALIDATE_ONLY`, nothing is committed or imported.
+|===
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/commit/restore' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "target_revision": "4f9e2b7c1d3a5e8f0b2c4d6a8e0f1b3c5d7e9a1b",
+  "restore_policy": "ALL_OR_NONE"
+}'
+----
+
+=== Example response
+If the API request is successful, the API returns a receipt for the run. The receipt does not include the restore commit. To get it, call `runs/search` with the `run_id`; the run's `revision` property is the restore commit.
+
+[source,json]
+----
+{
+  "run_id": "7c5d0b22-9a48-4de3-b0c1-2f8ab6119d07",
+  "target_revision": "4f9e2b7c1d3a5e8f0b2c4d6a8e0f1b3c5d7e9a1b",
+  "accepted_time_in_millis": 1783500062000
+}
+----
+
+=== Response parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `run_id`
+|The ID of the run. Use it with `runs/search` to get the run's state and per-object results.
+| `target_revision`
+|The full commit SHA of the revision being restored.
+| `accepted_time_in_millis`
+|When the run was admitted, in milliseconds since the Unix epoch.
+|===
+
+== Search runs
+
+The `POST /api/rest/2.0/version-control/runs/search` endpoint returns the commit, deploy, and restore runs for the caller's Org, newest first, with each run's state and per-object results. Requires the *Can administer ThoughtSpot* (`ADMINISTRATION`) privilege.
+
+Use this endpoint to follow a run until it ends, to find out why a run ended in `PARTIAL_SUCCESS` or `FAILED`, or to view the Org's commit history by filtering on `run_type: COMMIT`.
+
+// SOURCE: SCAL-351172
+[NOTE]
+====
+Branch promote operations do not create runs and do not appear in `runs/search` results.
+====
+
+=== Request parameters
+// SOURCE: API reference (26.12.0.cl)
+All parameters are optional. Filters are combined with AND.
+
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `run_identifiers`
+|__Array of strings__. Optional. The IDs of the runs to return, as returned by `commit`, `deploy`, or `commit/restore`. Each ID must be a UUID. You can specify up to 100 IDs. If not specified, the API returns the Org's runs. A run ID that does not exist in the Org is left out of the response.
+| `run_type`
+|__String__. Optional. The type of run to return. Valid values: `COMMIT`, `DEPLOY`, `RESTORE`. If not specified, all types are returned.
+| `objects`
+a|__Array of objects__. Optional. Returns only the runs that have a result for at least one of these objects. You can name objects that have since been deleted. An object that is listed more than once is matched once. For each object, specify the following attributes:
+
+* `identifier`. __String__. Required. The Object ID of the object. GUIDs and names are not accepted.
+* `type`. __String__. Optional. Valid values: `LIVEBOARD`, `ANSWER`, `LOGICAL_TABLE`, `LOGICAL_COLUMN`, `TEMPLATE_VARIABLE`. Runs are matched by Object ID only.
+
+// TODO: verify with engineering — the API reference error list limits objects to 50, but the request schema does not state a limit.
+| `record_offset`
+|__Integer__. Optional. Default: `0`. The position of the first run to return, in newest-first order.
+| `record_size`
+|__Integer__. Optional. Default: `10`. The number of runs to return, from 1 to 100. This limit also applies when you specify `run_identifiers`.
+|===
+
+=== Example request
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/version-control/runs/search' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "run_identifiers": ["7c5d0b22-9a48-4de3-b0c1-2f8ab6119d07"]
+}'
+----
+
+=== Example response
+If the API request is successful, the API returns the following response:
+
+[source,json]
+----
+{
+  "runs": [
+    {
+      "id": "7c5d0b22-9a48-4de3-b0c1-2f8ab6119d07",
+      "type": "COMMIT",
+      "state": "PARTIAL_SUCCESS",
+      "message": "1 of 2 requested objects committed",
+      "accepted_time_in_millis": 1783500062000,
+      "end_time_in_millis": 1783500064500,
+      "author": {
+        "id": "8e3f2a7b-9c4d-4e5f-8a1b-7c9d3e6f4a2b",
+        "name": "tsadmin"
+      },
+      "branch": "dev",
+      "revision": "4f9e2b7c1d3a5e8f0b2c4d6a8e0f1b3c5d7e9a1b",
+      "objects": [
+        {
+          "obj_id": "Revenue-Dashboard-d7f3a1c8",
+          "type": "LIVEBOARD",
+          "file_name": "liveboard/Revenue-Dashboard-d7f3a1c8.liveboard.tml",
+          "action": "UPDATE",
+          "status": "SUCCESS",
+          "is_dependency": false
+        },
+        {
+          "obj_id": "Q3-Pipeline-b2c4d6a8",
+          "type": "ANSWER",
+          "status": "FAILED",
+          "message": "Cannot download TML due to lack of access to objects.",
+          "is_dependency": false
+        },
+        {
+          "obj_id": "Sales-Model-a4e6c8d0",
+          "type": "LOGICAL_TABLE",
+          "file_name": "model/Sales-Model-a4e6c8d0.model.tml",
+          "action": "UPDATE",
+          "status": "SUCCESS",
+          "is_dependency": true
+        }
+      ]
+    }
+  ],
+  "last_batch": true
+}
+----
+
+=== Response parameters
+// SOURCE: API reference (26.12.0.cl)
+[cols="2,4", options="header"]
+|===
+|Parameter | Description
+| `runs`
+a|The runs that match the request, newest first. Each run includes the following attributes:
+
+* `id`. The run ID.
+* `type`. The run type: `COMMIT`, `DEPLOY`, or `RESTORE`.
+* `state`. `RUNNING`, `SUCCESS`, `PARTIAL_SUCCESS`, or `FAILED`.
+* `message`. A summary of the outcome. Always present when `state` is `FAILED`.
+* `accepted_time_in_millis`. When the run was admitted, in milliseconds since the Unix epoch.
+* `end_time_in_millis`. When the run ended. Not returned while the run is `RUNNING`.
+* `author`. The user who started the run, with the user's `id` (GUID) and `name`.
+* `branch`. The Org's branch when the run was admitted. Later configuration changes do not affect it.
+* `revision`. For a commit, the commit the run created. For a deploy, the revision deployed. For a restore, the restore commit. Not returned until the run pushes, or if the run fails before pushing.
+* `objects`. The per-object results. While the run is `RUNNING`, the list can grow as a commit exports dependencies. Each object includes:
+** `obj_id`. The Object ID. For a commit, this is the resolved Object ID even if the request named the object by GUID or name.
+** `type`. The object type.
+** `file_name`. The repository path of the object's TML file.
+** `action`. What the run did to the object: `CREATE`, `UPDATE`, `UPSERT`, or `DELETE`.
+** `status`. `PENDING`, `SUCCESS`, `VALIDATED`, `FAILED`, or `SKIPPED`.
+** `message`. The reason for a `FAILED` or `SKIPPED` status, or a warning.
+** `is_dependency`. For commit runs, `true` if the request did not name the object but a named object depends on it.
+| `last_batch`
+|`true` when no more runs follow this page.
+|===
+
+== Related resources
+
+* xref:object-id.adoc[Object ID]
+* xref:development-and-deployment.adoc[Development and deployment]
+* xref:git-rest-api-guide.adoc[Git integration REST APIs (legacy)]
+* xref:git-provider-integration.adoc[Git provider integration]
+* xref:rest-api-v2-reference.adoc[REST API v2.0 reference]
