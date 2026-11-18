@@ -1,0 +1,161 @@
+= Let hosts buy more queries
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Let hosts buy more queries
+:page-pageid: monetize-spotter__buy-more-queries
+:page-description: Sell query packs through Stripe Checkout, credit the host's usage pool from a verified webhook, and refresh the embedded agent.
+
+The modal offers hosts two ways to keep going: move to a bigger plan, or buy a one-time query pack. Both follow the same loop: the host pays in your portal, your backend updates their pool, and the embed refreshes.
+
+. The host picks an option in the modal and pays through Stripe Checkout.
+. Stripe confirms the payment to your webhook.
+. Your backend updates the host's pool with the usage data API.
+. Your portal triggers `HostEvent.SpotterRefreshUsageLimit`, and the counter shows the new balance.
+
+++++
+<div class="videoContainer" style="aspect-ratio: 16 / 9;">
+<iframe src="https://fast.wistia.net/embed/iframe/rj1lhbehz2?videoFoam=true" title="Buying more queries through Stripe in the SpotStay portal" allow="autoplay; fullscreen" allowfullscreen loading="lazy" style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+++++
+
+[#update-modal]
+== Add purchase options to the modal
+
+Start by updating the modal so hosts can buy more queries. Hosts can buy additional queries as an add-on to their plan.
+
+[source,text]
+----
+"Update the modal to show these options:
+1. Upgrade the plan. If the host selects this option, route them through checkout and
+   update their group membership afterward. Their usage isn't reset; only the number of
+   available queries changes.
+2. Buy more queries as a pack. Add the pack's queries to the host's available queries.
+3. Do it later, as a secondary call to action.
+If usage has reached 100%, show only the first two options, and say that usage is at 100%
+and the host must buy more queries to continue."
+----
+
+[#start-checkout]
+== Start the checkout
+
+Next, create the checkout where hosts pay for more queries. This example uses Stripe.
+
+[source,text]
+----
+"Write a Node endpoint POST /api/credits/checkout that creates a Stripe Checkout session
+for a 200-query pack. Attach the host's ID so the webhook knows who paid. Return the
+session URL."
+----
+
+Generated output in your codebase:
+
+[source,javascript]
+----
+app.post('/api/credits/checkout', requireLogin, async (req, res) => {
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    line_items: [{ price: process.env.STRIPE_PACK_200_PRICE_ID, quantity: 1 }],
+    client_reference_id: req.user.id,
+    metadata: { queries: '200' },
+    success_url: 'https://app.spotstay.com/assistant?topup=success',
+    cancel_url: 'https://app.spotstay.com/assistant',
+  });
+  res.json({ url: session.url });
+});
+----
+
+[#credit-webhook]
+== Credit the host from the webhook
+
+When the pack is paid, add the pack's queries to the host's balance.
+
+[source,text]
+----
+"Write a Stripe webhook at POST /api/stripe/webhook. Verify the signature. On
+checkout.session.completed, read the host's remaining queries, then reset their usage to 0
+and set their limit to the remaining queries plus the pack size. Credit each session ID
+only once."
+----
+
+Generated output in your codebase:
+
+[source,javascript]
+----
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch {
+    return res.sendStatus(400); // signature verification failed
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const s = event.data.object;
+    if (await alreadyCredited(s.id)) return res.sendStatus(200);
+
+    const host = await hosts.find(s.client_reference_id);
+    const { summary } = await tsAdmin('GET',
+      `/api/rest/2.0/ai/usage-data/user?user_identifier=${encodeURIComponent(host.tsGuid)}`);
+    const newLimit = summary.total_remaining + Number(s.metadata.queries);
+
+    await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
+      updates: [{
+        key: { entity_type: 'USER', entity_identifier: host.tsGuid },
+        usage: 0,
+        limit: newLimit,
+        warning_limit: Math.floor(newLimit * 0.9),
+      }],
+    });
+    await markCredited(s.id);
+  }
+  res.sendStatus(200);
+});
+----
+
+`alreadyCredited` and `markCredited` record each Checkout session ID in your database, so a webhook retry from Stripe never credits the same purchase twice.
+
+[#refresh-embed]
+== Refresh the embed after the purchase
+
+Stripe redirects the host back to the portal before your webhook necessarily finishes. Wait until the new balance lands, then tell the embed to refresh its usage data:
+
+[source,javascript]
+----
+import { HostEvent } from '@thoughtspot/visual-embed-sdk';
+
+// Called when the host picks "Buy more queries" in the modal
+async function startTopUp() {
+  const usage = await getUsage();
+  sessionStorage.setItem('limitBeforeTopUp', String(usage.limit));
+  const { url } = await fetch('/api/credits/checkout', { method: 'POST' }).then((r) => r.json());
+  location.assign(url);
+}
+
+async function refreshAfterTopUp(previousLimit) {
+  // Poll until the webhook has updated the pool
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const usage = await getUsage();
+    if (usage.limit !== previousLimit) {
+      renderUsageBadge(usage);
+      spotterEmbed.trigger(HostEvent.SpotterRefreshUsageLimit);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
+
+// Back from Checkout: wait for the new balance, then refresh the embed
+if (new URLSearchParams(location.search).get('topup') === 'success') {
+  refreshAfterTopUp(Number(sessionStorage.getItem('limitBeforeTopUp')));
+}
+----
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/monetize-spotter/usage-pop-up">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/monetize-spotter/troubleshooting">Next &rarr;</a>
+</div>
+++++
