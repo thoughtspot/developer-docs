@@ -1,0 +1,96 @@
+= Show a pop-up when queries run low
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Show a pop-up when queries run low
+:page-pageid: monetize-spotter__usage-pop-up
+:page-description: Check each host's balance after every answer, and open a SpotStay-styled modal once they reach 90% of their plan.
+
+After each answer, check the host's balance. When the host reaches 90% of their plan, open a modal that warns them they're running out of queries.
+
+++++
+<div class="videoContainer" style="aspect-ratio: 16 / 9;">
+<iframe src="https://fast.wistia.net/embed/iframe/v1e0k1i8jf?videoFoam=true" title="Out-of-queries modal in the SpotStay portal" allow="autoplay; fullscreen" allowfullscreen loading="lazy" style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+++++
+
+[#usage-endpoint]
+== Expose the host's balance to the portal
+
+The portal can't call the usage data APIs directly, because they need an admin token. Ask SpotterCode for a backend endpoint that returns the logged-in host's balance:
+
+[source,text]
+----
+"Write a Node endpoint GET /api/usage that returns the logged-in host's Spotter usage:
+queries used, the limit, queries remaining, and whether they've reached the warning
+limit or the limit. Call the usage data API with my admin helper."
+----
+
+Generated output in your codebase:
+
+[source,javascript]
+----
+app.get('/api/usage', requireLogin, async (req, res) => {
+  const { summary } = await tsAdmin('GET',
+    `/api/rest/2.0/ai/usage-data/user?user_identifier=${encodeURIComponent(req.user.tsGuid)}`);
+
+  res.json({
+    used: summary.total_usage,
+    limit: summary.total_limit,
+    remaining: summary.total_remaining,
+    atWarning: summary.is_at_warning, // true from 90% usage onward
+    atLimit: summary.is_at_limit,     // true at 100%; Spotter blocks further queries
+  });
+});
+----
+
+[#open-modal]
+== Open the modal from 90% usage
+
+[source,text]
+----
+"Create a pop-up modal that appears in the center of the screen when a host reaches 90%
+usage. Every query from 90% usage onward opens the modal. The modal tells the host they
+are running out of queries and shows their current usage. Style the modal to match the
+SpotStay branding."
+----
+
+Generated output in your codebase:
+
+// TODO: Confirm with engineering that EmbedEvent.SpotterVizResponseComplete fires in SpotterEmbed.
+// The docs only describe it for the SpotterViz panel on Liveboards (embed-spotterViz.adoc).
+// If it doesn't fire, the modal check below never runs. Alternatives: EmbedEvent.SpotterQueryTriggered
+// (documented for Spotter embed, but fires on submit, so usage may not be updated yet), or the
+// correct response-complete event for SpotterEmbed, if one exists.
+[source,javascript]
+----
+import { EmbedEvent } from '@thoughtspot/visual-embed-sdk';
+
+const getUsage = () => fetch('/api/usage').then((r) => r.json());
+
+// After every answer, refresh the balance and open the modal from 90% onward
+spotterEmbed.on(EmbedEvent.SpotterVizResponseComplete, async () => {
+  const usage = await getUsage();
+  renderUsageBadge(usage);                       // for example, "40 of 400 queries left"
+  if (usage.atWarning) openOutOfQueriesModal(usage);
+});
+
+// Clicking Upgrade inside Spotter opens the same modal.
+// payload.data.usageCount  — total questions asked
+// payload.data.usageLimit  — total assigned limit
+// payload.data.status      — "withinLimit" | "almostReached" | "limitReached"
+spotterEmbed.on(EmbedEvent.SpotterUsageLimitUpgrade, (payload) => {
+  const { usageCount, usageLimit, status } = payload.data;
+  openOutOfQueriesModal({ used: usageCount, limit: usageLimit, status });
+});
+----
+
+The `SpotterUsageLimitUpgrade` payload includes `payload.data.usageCount`, `payload.data.usageLimit`, and `payload.data.status`.
+Use these values to tailor the modal wording as the host nears their limit. For more information, see xref:spotter-usage-limits.adoc#_handling_usage_limit_events[Handling usage limit events].
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/monetize-spotter/add-usage-meter">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/monetize-spotter/buy-more-queries">Next &rarr;</a>
+</div>
+++++

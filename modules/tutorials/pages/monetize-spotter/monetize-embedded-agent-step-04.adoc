@@ -1,0 +1,177 @@
+= Add the usage meter
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Add the usage meter
+:page-pageid: monetize-spotter__add-usage-meter
+:page-description: Give each host a usage pool sized to their plan, show the usage counter in the embedded agent, and reset pools every billing cycle.
+
+ThoughtSpot counts every query against a usage pool, shows the count inside the embedded agent, and blocks queries once the pool's limit is reached. Your backend creates and updates the pools. Your portal shows the numbers and the pop-up.
+
+++++
+<div class="videoContainer" style="aspect-ratio: 16 / 9;">
+<iframe src="https://fast.wistia.net/embed/iframe/tfp4xbv3ao?videoFoam=true" title="Spotter usage counter in the SpotStay portal" allow="autoplay; fullscreen" allowfullscreen loading="lazy" style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+++++
+
+[#track-usage]
+== Track usage
+
+Give each host a pool sized to their plan when they first log in. This example sets a warning at 90% of the limit. You can set a different threshold to suit your product.
+
+[source,text]
+----
+"Write a backend helper setAllowance(hostGuid, plan) that calls the Spotter usage data
+API to create or update a USER pool with the plan's limit and a warning at 90%. Use an
+admin token from my server, never the host's."
+----
+
+Generated output in your codebase:
+
+[source,javascript]
+----
+const PLANS = { starter: 400, pro: 750, enterprise: 1000 };
+
+async function setAllowance(hostGuid, plan) {
+  const limit = PLANS[plan];
+  return tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
+    updates: [{
+      key: { entity_type: 'USER', entity_identifier: hostGuid },
+      limit,
+      warning_limit: Math.floor(limit * 0.9),
+    }],
+  });
+}
+----
+
+`setAllowance` relies on two small helpers:
+
+* `tsAdmin` calls the ThoughtSpot REST API with a token for your admin service account. The usage data APIs require the cluster-level `ADMINISTRATION` privilege. Never call them from the browser.
+* `getTsGuid` looks up a host's ThoughtSpot user GUID by username. Store the GUID next to the host's record so you don't look it up on every call.
+
+[source,javascript]
+----
+const TS_HOST = process.env.TS_HOST;
+
+// Calls the ThoughtSpot REST API as the admin service account.
+// In production, cache the token until it expires instead of requesting one per call.
+async function tsAdmin(method, path, body) {
+  const auth = await fetch(`${TS_HOST}/api/rest/2.0/auth/token/full`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: process.env.TS_ADMIN_USERNAME,
+      secret_key: process.env.TS_SECRET_KEY,
+    }),
+  }).then((r) => r.json());
+
+  const r = await fetch(`${TS_HOST}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${auth.token}`,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) throw new Error(`ThoughtSpot ${method} ${path} failed: ${r.status}`);
+  return r.json();
+}
+
+// Returns the ThoughtSpot user GUID for a host.
+async function getTsGuid(username) {
+  const [user] = await tsAdmin('POST', '/api/rest/2.0/users/search', {
+    user_identifier: username,
+  });
+  return user.id;
+}
+----
+
+[IMPORTANT]
+====
+* The first pool you create sets the cluster's metering scope to `USER`, and every later pool must use the same scope.
+* A host with no pool isn't metered at all, so call `setAllowance` when the host first logs in, before their first query. For example, call it from your `/api/ts-token` endpoint when the host's record doesn't have a ThoughtSpot GUID yet.
+====
+
+For the request and response details, see xref:spotter-usage-data-api.adoc[Spotter usage data APIs].
+
+[#show-meter]
+== Show the meter in Spotter
+
+ThoughtSpot already tracks each host's usage and updates the count after every question, so you don't need to build the counter yourself. Turn on usage limits in the embed, and the counter appears in Spotter's prompt bar.
+
+[source,text]
+----
+"Enable Spotter usage limits in my SpotterEmbed. Always show the usage counter, show the
+warning banner when the host reaches the warning limit, and keep the Upgrade button
+visible. Turn off the built-in limit banner, because the portal shows its own pop-up."
+----
+
+Generated output in your codebase:
+
+[source,javascript]
+----
+import { SpotterEmbed, SpotterUsageCounterDisplayMode } from '@thoughtspot/visual-embed-sdk';
+
+const spotterEmbed = new SpotterEmbed('#ts-embed', {
+  worksheetId: 'your-bookings-model-id',
+  disableSourceSelection: true,
+  spotterUsageLimitConfig: {
+    isEnabled: true,
+    usageCounterDisplayMode: SpotterUsageCounterDisplayMode.AlwaysVisible,
+    isWarningBannerEnabled: true,
+    isLimitBannerEnabled: false, // the portal shows its own pop-up instead
+    isUpgradeButtonVisible: true,
+  },
+});
+----
+
+Use `usageCounterDisplayMode` to control when the counter appears:
+
+[cols="1,2", options="header"]
+|===
+| `usageCounterDisplayMode` | The counter shows
+
+| `AlwaysVisible`
+| All the time (default)
+
+| `VisibleAfterWarning`
+| Once usage reaches `warning_limit`
+
+| `VisibleAfterLimit`
+| Once usage reaches `limit`
+
+| `AlwaysHidden`
+| Never
+|===
+
+[NOTE]
+====
+Turning off the limit banner doesn't lift the block. Hosts who reach their limit still can't ask more questions.
+====
+
+For all the configuration options, see xref:spotter-usage-limits.adoc[Manage Spotter usage limits].
+
+[#reset-monthly]
+== Reset every month
+
+ThoughtSpot doesn't reset pools on a schedule. Run a job at the start of each billing cycle that sets every host back to their plan:
+
+[source,javascript]
+----
+// Runs at 00:00 on the 1st of each month, for every host
+await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
+  updates: hosts.map((h) => ({
+    key: { entity_type: 'USER', entity_identifier: h.tsGuid },
+    usage: 0,
+    limit: PLANS[h.plan],
+    warning_limit: Math.floor(PLANS[h.plan] * 0.9),
+  })),
+});
+----
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/monetize-spotter/brand-your-agent">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/monetize-spotter/usage-pop-up">Next &rarr;</a>
+</div>
+++++
