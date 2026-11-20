@@ -95,7 +95,7 @@ module.exports = {
                 'in-app-navigation', 'set-locale', 'custom-domain-config',
                 'customize-emails', 'customize-email-apis',
                 'filters-overview', 'runtime-overrides', 'runtime-filters', 'runtime-params', 'liveboard-filter-and-parameter-overrides',
-                'action-config', 'actions', 'events-app-integration', 'embed-events',
+                'action-config', 'actions', 'sdk-upgrade-checklist', 'events-app-integration', 'embed-events',
                 'host-events', 'context-aware-event-routing', 'api-search-intercept',
                 'custom-action-intro', 'customize-actions', 'add-action-viz', 'add-action-worksheet',
                 'edit-custom-action', 'custom-action-url',
