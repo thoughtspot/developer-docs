@@ -84,7 +84,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
     ],
     walkthroughs: [],
     embedding: [
-        'getting-started', 'tsembed', 'embed-liveboard', 'embed-a-viz',
+        'getting-started', 'sdk-upgrade-checklist', 'tsembed', 'embed-liveboard', 'embed-a-viz',
         'embed-ai-search-analytics', 'embed-spotter', 'embed-spotter-agent',
         'full-embed', 'full-app-customize', 'customize-nav-controls', 'set-default-page',
         'customize-homepage-experience', 'search-embed', 'embed-searchbar', 'react-app-embed',
@@ -93,7 +93,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
         'style-customization', 'customize-style', 'custom-css', 'css-variables-reference',
         'customize-icons', 'customize-text', 'theme-builder-doc',
         'filters-overview', 'runtime-overrides', 'runtime-filters', 'runtime-params', 'liveboard-filter-and-parameter-overrides',
-        'action-config', 'actions', 'sdk-upgrade-checklist', 'events-app-integration', 'embed-events', 'host-events',
+        'action-config', 'actions', 'events-app-integration', 'embed-events', 'host-events',
         'context-aware-event-routing', 'hostEventsV2-migration', 'api-search-intercept',
         'custom-action-intro', 'customize-actions', 'custom-action-url', 'custom-action-callback',
         'custom-action-payload', 'edit-custom-action', 'add-action-viz', 'add-action-worksheet',
@@ -180,6 +180,15 @@ const SecondaryHeader = (props: {
         const landing = CATEGORY_LANDING[cat];
         if (!landing) return;
         if (isVersionedIframe) {
+            // Stay on this wrapper page and retarget the nested iframe instead of
+            // navigating to the unversioned CATEGORY_LANDING page, which would drop
+            // the user out of the pinned older version.
+            // Query-only (no pathname) so the browser resolves it relative to the
+            // current URL via pushState's native relative-URL resolution. Building
+            // the target from location.pathname here duplicated the site's /docs
+            // pathPrefix in production (404s), while working fine in local dev,
+            // which has no prefix — root cause in Gatsby's routing not fully
+            // isolated, but this sidesteps the pathname reconstruction entirely.
             const params = new URLSearchParams(location.search);
             params.set('pageid', landing.replace(/^\//, ''));
             navigate(`?${params.toString()}`);
