@@ -86,6 +86,76 @@ Review the xref:Action.adoc[Actions] reference and the release notes for any new
 
 This behavior does not apply to `hiddenActions`. Because `hiddenActions` works as a denylist, any newly introduced actions are visible by default unless you explicitly add them to the `hiddenActions` array.
 
+==== SDK 1.54.0 and ThoughtSpot 26.11.0.cl — chart settings actions
+
+Visual Embed SDK 1.54.0 (released with ThoughtSpot 26.11.0.cl) introduced action IDs for individual items in the chart settings panel on the answer page. If your embed uses `visibleActions` and you want the chart type switcher and settings panel items to remain visible after upgrading, add one or more of the following action IDs to your `visibleActions` array:
+
+[cols="2,3", options="header"]
+|===
+|Action ID |Chart settings panel item
+
+|`Action.ChartTypeSettings`
+|Chart Type
+
+|`Action.LayoutSettings`
+|Layout
+
+|`Action.ColumnSettings`
+|Column
+
+|`Action.AxisSettings`
+|Axis
+
+|`Action.DataLabelSettings`
+|Data Label
+
+|`Action.TooltipSettings`
+|Tooltip
+
+|`Action.LegendSettings`
+|Legend
+
+|`Action.DisplaySettings`
+|Display
+
+|`Action.QuerySettings`
+|Query Details
+
+|`Action.CustomSettings`
+|Custom Action
+
+|`Action.MuzeAiSettings`
+|Muze AI
+
+|`Action.RAnalysisSettings`
+|R Analysis
+|===
+
+[source,JavaScript]
+----
+// Show chart type switcher and all chart settings panel items
+visibleActions: [
+  Action.ChartTypeSettings,
+  Action.LayoutSettings,
+  Action.ColumnSettings,
+  Action.AxisSettings,
+  Action.DataLabelSettings,
+  Action.TooltipSettings,
+  Action.LegendSettings,
+  Action.DisplaySettings,
+  Action.QuerySettings,
+  Action.CustomSettings,
+  Action.MuzeAiSettings,
+  Action.RAnalysisSettings,
+  // ... your other visible actions
+]
+----
+
+[TIP]
+====
+If your embed shows most default actions and you only need to restrict a few, consider using `hiddenActions` instead of `visibleActions`. With `hiddenActions`, newly introduced actions are visible by default and you are not affected by new action IDs in future SDK upgrades.
+====
+
 === Actions not supported in visibleActions
 
 The `visibleActions` array works as an allowlist for discrete menu actions and buttons. It does not control structural UI elements such as sidebars, banners, and panels. The following action IDs control structural UI surfaces and are supported only in `hiddenActions` (and where noted, `disabledActions`):
@@ -149,183 +219,58 @@ If you specify some action IDs in the `visibleActions` attribute and define `hid
 
 [source,JavaScript]
 ----
-visibleActions: [Action.DownloadAsPdf, Action.DownloadAsCsv, Action.Save, Action.ShowUnderlyingData, Action.Pin]
+visibleActions: [Action.DownloadAsPdf, Action.Save, Action.ShowUnderlyingData, Action.Pin]
 hiddenActions: []
 ----
-
-If the `visibleActions` attribute is set as an empty array and action IDs are specified in the `hiddenActions` attribute, the `visibleActions` definition takes precedence. Therefore, no actions appear in the embedded UI.
-
-[source,JavaScript]
-----
-visibleActions: []
-hiddenActions: [Action.DownloadAsPdf, Action.DownloadAsCsv]
-----
-
-If both `visibleActions` and `hiddenActions` attributes are defined as an empty array, the `visibleActions` definition takes precedence and no actions appear in the embedded UI.
-
-[source,JavaScript]
-----
-visibleActions: []
-hiddenActions: []
-----
-
-==== Choosing between visibleActions and hiddenActions
-
-The `visibleActions` and `hiddenActions` attributes take opposite approaches to controlling menu actions. Use the following guidance to choose the right approach for your application:
-
-[cols="1,1,1", options="header"]
-|===
-|Consideration |`visibleActions` (allowlist) |`hiddenActions` (denylist)
-
-|How it works
-|Only the actions you specify are shown. Everything else is hidden.
-|All actions are shown by default. Only the actions you specify are hidden.
-
-|New actions after upgrade
-|New actions are *hidden* by default. You must explicitly add them to the array to make them visible.
-|New actions are *visible* by default. You must explicitly add them to the array to hide them.
-
-|Best suited for
-|Strict control over the UI. You want to show a small, fixed set of actions and do not want new actions to appear automatically.
-|Flexible control. You want most default actions to remain available and only need to hide a few specific actions.
-|===
 
 == Setting hidden actions
 
-Use the `hiddenActions` attribute to hide specific actions in the embedded UI. For the differences between `hiddenActions` and `visibleActions`, see xref:embed-actions.adoc#_choosing_between_visibleactions_and_hiddenactions[Choosing between visibleActions and hiddenActions].
-
-For example, if you want to hide only the *Download* and *Pin* actions for an embedded visualization and show all other actions, specify the attribute as shown here:
+Use the `hiddenActions` attribute to hide specific actions in the embedded UI. This attribute is useful when you want to show most of the default actions but need to restrict access to a few.
 
 [source,JavaScript]
 ----
-hiddenActions: [Action.Download, Action.Pin]
+hiddenActions: [Action.DownloadAsPdf, Action.DownloadAsCsv]
 ----
 
-=== Hiding the charts edit panel
-In the embedded view, the answer, Liveboard visualizations, and search results page show the chart edit panel by default. There are no actions available in the SDK to hide this panel or its individual options. To hide the panel, you must set `hideAnswerEditPanel` to `true` in your embed configuration.
+== Setting disabled actions
+
+Use the `disabledActions` attribute to make specific actions appear unavailable in the embedded UI. You can also specify a reason for disabling the actions in the `disabledActionReason` attribute.
 
 [source,JavaScript]
 ----
-// AppEmbed
-const embed = new AppEmbed('#embed-div', {
-    // ... other config
-    hideAnswerEditPanel: true,
-});
+disabledActions: [Action.Schedule],
+disabledActionReason: "Contact your administrator to enable this feature"
 ----
 
-== Disabling actions
+== Hiding the chart settings panel
 
-The `disabledActions` attribute in the Visual Embed SDK allows you to specify one or several actions and disable these actions on a Liveboard, Answer, or visualization page. For example, to disable the *Show underlying data* action from the *More* options menu image:./images/icon-more-10px.png[the more options menu], specify the `ShowUnderlyingData` action ID in the `disabledActions` array.
+To hide the entire chart settings panel in an answer page, use the `hideAnswerEditPanel` property in `SearchViewConfig`:
 
 [source,JavaScript]
 ----
-disabledActions: [Action.ShowUnderlyingData]
+searchOptions: {
+  searchViewConfig: {
+    hideAnswerEditPanel: true
+  }
+}
 ----
 
-Similarly, to disable multiple actions, you can specify the action IDs in the `disabledActions` attribute.
+To hide or disable individual items in the chart settings panel, use the `Action.*Settings` action IDs in `hiddenActions` or `disabledActions`:
 
 [source,JavaScript]
 ----
-disabledActions: [Action.AddFilter, Action.Present]
+// Hide the Chart Type and Layout items from the chart settings panel
+hiddenActions: [Action.ChartTypeSettings, Action.LayoutSettings]
 ----
-
-=== Adding a tooltip to a disabled action
-
-To add a tooltip for a disabled action, specify the message text in the `disabledActionReason` attribute.
-
-[source,JavaScript]
-----
-disabledActionReason: "Contact your administrator to enable this action"
-----
-
-=== Visible actions and disabled actions
-
-When you set both `visibleActions` and `disabledActions` to empty arrays, no actions appear in the embedded UI:
-
-[source,JavaScript]
-----
-visibleActions: []
-disabledActions: []
-----
-
-If you specify some action IDs in both `visibleActions` and `disabledActions` attributes, the specified menu actions appear in the embedded UI. However, users can't use the disabled actions.
-
-In the following example, the *Download*, *Save*, *Share*, and *Pin* actions are defined as visible actions and therefore are visible in the embedded UI. However, the *Download* menu action is disabled.
-
-[source,JavaScript]
-----
-visibleActions: [Action.Download, Action.Save, Action.Share, Action.Pin]
-disabledActions: [Action.Download]
-----
-
-== Custom actions
-
-ThoughtSpot assigns an action ID to each xref:custom-actions.adoc[custom action] based on its name. For example, the ID of a custom action named *Send Email* is `send-email`. You can specify this ID in the `visibleActions`, `hiddenActions`, or `disabledActions` array.
-
-To show a custom action when you use `visibleActions`:
-
-[source,JavaScript]
-----
-visibleActions: [Action.Save, Action.Pin, 'send-email']
-----
-
-To hide a custom action:
-
-[source,JavaScript]
-----
-hiddenActions: ['send-email']
-----
-
-To disable a custom action:
-
-[source,JavaScript]
-----
-disabledActions: ['send-email']
-----
-
-== Overriding the default primary action
-
-For Liveboards embedded in your app, the Visual Embed SDK provides the `primaryAction` attribute that allows you to override the default action assigned to the primary button on Liveboard visualizations.
-
-If Spotter is enabled on your instance, the Spotter button appears by default as the primary action on embedded Liveboard charts. If Spotter is not enabled on your instance, the *Explore* button is displayed as the default primary action.
-
-To replace the action assigned to this primary button:
-
-. Check if the SDK includes an action ID for the action you want to use as the replacement.
-. Ensure that the action that you want to use is not hidden or disabled via `disabledActions` or `hiddenActions` arrays.
-. Configure the new primary action:
-+
-[source,JavaScript]
-----
-const embed = new LiveboardEmbed('#embed-div', {
-    liveboardId: "<Your-Liveboard-ID>", // Replace with your Liveboard ID
-    primaryAction: Action.Download,
-});
-----
-. Render your embed and verify that the default action is replaced with the action you defined.
-
-[NOTE]
-====
-* The `primaryAction` attribute doesn't remove the default action. It replaces the action assigned to the primary button.
-* If you configure `primaryAction`, the default action moves to the *More* (`...`) menu, and your configured action appears as the primary button on Liveboard visualizations. On Answers, the new action is added as a secondary button at the top of the chart or table, along with other primary actions.
-====
-
 
 == Best practices
 
-* Use the appropriate action ID to show, hide, or disable a UI action. For a comprehensive list of action IDs available for ThoughtSpot components, see xref:Action.adoc[Actions], and check the version requirements of each action.
-* Don't configure both `visibleActions` and `hiddenActions` with action IDs. The SDK returns a configuration error.
-* For xref:custom-actions.adoc[custom actions], use the action ID that ThoughtSpot assigns based on the action name. For more information, see xref:embed-actions.adoc#_custom_actions[Custom actions].
-* When you configure `visibleActions` in full application embed, make sure the configured actions are displayed across all applicable embedded pages.
-* If you use an older SDK version, test your configuration to make sure all attributes are supported.
-* Try out the actions in the +++
-<a href="{{previewPrefix}}/playground/search?modifyActions=true" target="_blank">Visual Embed Playground</a>
-+++ and verify the results before updating your code.
-* Handle configuration errors by listening for the `EmbedEvent.Error` event.
+* Use `hiddenActions` when your embed needs most default actions and you want to restrict only a few. This approach is future-safe because new actions introduced in later SDK versions remain visible by default.
+* Use `visibleActions` when you want to show only a small, controlled set of actions. After each SDK upgrade, review the xref:api-changelog.adoc[SDK changelog] for newly introduced action IDs and add them to your `visibleActions` array as needed.
+* After upgrading your ThoughtSpot instance or SDK version, test embedded views to verify that expected actions still appear.
 
-== Additional resources
+== Related information
 
-[#standard-actions]
-* xref:Action.adoc[Action enumeration]
-* xref:embed-action-ref.adoc[Action ID reference]
+* xref:embed-action-ref.adoc[Action reference]
+* xref:Action.adoc[Action enum]
 * xref:custom-actions.adoc[Custom actions]
