@@ -84,7 +84,7 @@ export const CATEGORY_PAGEIDS: Record<DocCategory, string[]> = {
     ],
     walkthroughs: [],
     embedding: [
-        'getting-started', 'tsembed', 'embed-liveboard', 'embed-a-viz',
+        'getting-started', 'sdk-upgrade-checklist', 'tsembed', 'embed-liveboard', 'embed-a-viz',
         'embed-ai-search-analytics', 'embed-spotter', 'embed-spotter-agent',
         'full-embed', 'full-app-customize', 'customize-nav-controls', 'set-default-page',
         'customize-homepage-experience', 'search-embed', 'embed-searchbar', 'react-app-embed',
