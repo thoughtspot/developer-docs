@@ -111,7 +111,7 @@ module.exports = {
         {
             label: 'Embedding',
             pageIds: [
-                'getting-started', 'VisualEmbedSdk',
+                'getting-started', 'sdk-upgrade-checklist', 'VisualEmbedSdk',
                 'embed-spotter', 'embed-spotter-agent', 'embed-ai-search-analytics',
                 'search-embed', 'embed-searchbar', 'embed-a-viz', 'embed-liveboard',
                 'customize-liveboard-layout', 'customize-liveboard-filters', 'liveboard-data-downloads',
