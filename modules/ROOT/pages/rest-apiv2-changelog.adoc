@@ -10,40 +10,47 @@ This changelog lists the features and enhancements introduced in REST API v2.0. 
 
 == Version 26.12.0.cl, December 2026
 
-=== Spotter agent conversation APIs, version 2
-// SOURCE: SCAL-324650, SCAL-341072, openapi-spec-diff.md (26.12.0.cl)
-// TODO: verify with engineering. Request and response schemas, the GA or Beta status, and rate limits are not confirmed.
-// TODO: verify with engineering. SCAL-341072 describes optional conversation_identifier and the x-conversation-identifier header for the stream endpoint only. Confirm the behavior of the send endpoint.
-ThoughtSpot introduces the following REST API v2.0 endpoints for conversations with the Spotter agent:
+=== Spotter agent conversation APIs: new Spotter experience version
+The Spotter agent conversation APIs accept a new optional `spotter_experience_version` parameter.
 
-* `POST /api/rest/2.0/ai/agent/v2/conversation/create` +
-Creates a conversation session.
-* `POST /api/rest/2.0/ai/agent/v2/conversation/send` +
-Sends a message in a conversation.
-* `POST /api/rest/2.0/ai/agent/v2/conversation/send/stream` +
-Sends a message and streams the response as server-sent events.
+* `V1` (default) +
+For the Spotter conversation API experinece available before 26.12.0.cl. ThoughtSpot uses this value if you omit the parameter. It uses `conversation_settings`.
+* `V2` +
+For the new Spotter experience, the same experience that powers the Liveboard side panel (New). A cluster administrator must set *Spotter 3 Liveboard experience* to *Liveboard side panel (New)*. Otherwise, the request returns a `400` error.
 
-In the `send/stream` request, `conversation_identifier` is optional. If you omit it, ThoughtSpot creates a session and returns its ID in the `x-conversation-identifier` response header.
+The parameter is a request body property on the following endpoints:
+
+* `POST /api/rest/2.0/ai/agent/conversation/create`
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send`
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream`
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/stop-response`
+
+The version indicator is a query parameter on the following endpoints:
+
+* `GET /api/rest/2.0/ai/agent/conversations`
+* `DELETE /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/delete`
+
+Other changes:
+
+* The `create` endpoint accepts the optional `additional_instructions` property, which adds guidance to the agent instructions for every message in the conversation. It applies to V2 only, cannot be used with `analyst_identifier`, and cannot be changed after you create the conversation.
+* The `conversation_settings` property is now optional and applies to V1 only.
+* The `stop-response` endpoint now accepts an optional request body.
+* The `send/stream` response differs by version. V1 returns `success` and `message`. V2 streams the `event`, `tool_call`, `progress`, `tool_result`, `error`, and `done` events. Make sure your client handles the response shape of the version you use.
+
+For more information, see xref:spotter-agent-conversation-apis.adoc[Spotter agent conversation APIs].
 
 === Session login redirect options
-// SOURCE: SCAL-218290, openapi-spec-diff.md (26.12.0.cl)
-// TODO: verify with engineering. Confirm the data types, the redirect_url validation rules, and the behavior of no_url_redirection.
 The `POST /api/rest/2.0/auth/session/login` endpoint accepts the following optional request properties:
 
 * `redirect_url` +
-The URL to redirect the user to after login.
+The URL to redirect the user to after login. The value must start with a single `/`. ThoughtSpot rejects absolute URLs. If you omit this property, the API does not redirect to the specified URL.
 * `no_url_redirection` +
-Controls whether the API redirects the user.
-
-The `204` response includes a `location` header, and the endpoint can now return a `302` response.
+Controls whether the API redirects the user. When set to `true`, ThoughtSpot returns the resolved URL in the `Location` header of the `204` response, instead of returning a `302` response. This property applies only when `redirect_url` is set. If you set `redirect_url` without `no_url_redirection`, a successful login returns a `302` response with the resolved URL in the `Location` header.
 
 === Org identifier in authentication token endpoints
-// SOURCE: SCAL-301410, openapi-spec-diff.md (26.12.0.cl)
-// TODO: verify with engineering. Confirm whether org_identifier accepts an Org ID, a name, or both, and the removal date for org_id. Also confirm whether the token/object endpoint itself is deprecated (deprecated-features.adoc says it is; the spec diff marks only org_id).
-The `POST /api/rest/2.0/auth/token/full` and `POST /api/rest/2.0/auth/token/object` endpoints accept the optional `org_identifier` request property. The `org_id` request property is [.version-badge.deprecated]#Deprecated#. Use `org_identifier` instead.
+The `POST /api/rest/2.0/auth/token/full` endpoint now accept the optional `org_identifier` request property. The `org_id` parameter in the earlier version is deprecated.
 
 === Custom action endpoints deprecated
-// SOURCE: SCAL-332130, openapi-spec-diff.md (26.12.0.cl), deprecated-features.adoc
 The following endpoints are [.version-badge.deprecated]#Deprecated#. They continue to work until they are removed in June 2027.
 
 * `POST /api/rest/2.0/customization/custom-actions`
@@ -54,14 +61,12 @@ The following endpoints are [.version-badge.deprecated]#Deprecated#. They contin
 For more information, see xref:deprecated-features.adoc#customActions[Custom actions deprecation].
 
 === App color theme in style customization
-// SOURCE: openapi-spec-diff.md (26.12.0.cl)
-// TODO: verify with engineering. No Jira in scope describes this property. Confirm its purpose, value format and defaults (related: SCAL-331190).
-* The `POST /api/rest/2.0/customization/styles/search` response includes the optional `app_color_theme` property for each item.
-* The `POST /api/rest/2.0/customization/styles/update` request accepts the optional `app_color_theme` property.
-* The `style` array in `reset_options` accepts the new `APP_COLOR_THEME` value.
+The style customization APIs support the app color theme, which sets a brand color for the application and how it is applied.
+
+* The `POST /api/rest/2.0/customization/styles/update` request accepts the optional `app_color_theme` object, with `brand_color` (a six-digit hex string) and `apply_as_top_nav_color` Boolean attribute. Do not send `app_color_theme` and `navigation_panel` in the same request. The `style` array in `reset_options` accepts the `APP_COLOR_THEME` value, which clears the brand color.
+* The `POST /api/rest/2.0/customization/styles/search` response includes `app_color_theme` in each item when the app color theme is enabled on your instance.
 
 === Version control APIs [beta betaBackground]^Beta^
-// SOURCE: SCAL-346667, SCAL-351172, openapi-spec-diff.md, API reference (26.12.0.cl)
 ThoughtSpot introduces the following Version Control V2 REST API v2.0 endpoints. These endpoints let Org administrators link an Org to a branch in a GitHub, GitLab, Bitbucket, or Azure DevOps repository, commit Liveboards and Answers as TML files, promote changes between branches, and deploy content to Orgs. The existing `/api/rest/2.0/vcs/git/` endpoints are not affected.
 
 * `POST /api/rest/2.0/version-control/config/create` +
@@ -84,6 +89,9 @@ Brings changes from a source branch into the caller's branch.
 Returns the status and per-object results of commit, deploy, and restore runs.
 
 For more information, see xref:version-control-v2-api.adoc[Version Control V2 APIs].
+
+== Terminology update for feature management APIs
+The xref:feature-management-api.adoc[feature management APIs] are now grouped as feature delegation APIs in the REST API playground. This update does not introduce any changes to endpoint URLs, API request or response format.
 
 == Version 26.11.0.cl, November 2026
 
