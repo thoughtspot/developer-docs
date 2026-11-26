@@ -4,7 +4,7 @@
 :sectanchors:
 :page-title: Let hosts buy more queries
 :page-pageid: monetize-spotter__buy-more-queries
-:page-description: Sell query packs through Stripe Checkout, credit the host's usage pool from a verified webhook, and refresh the embedded agent.
+:page-description: Sell plan upgrades and query packs through Stripe Checkout, update the host's usage pool and plan group from a verified webhook, and refresh the embedded agent.
 
 The modal offers hosts two ways to keep going: move to a bigger plan, or buy a one-time query pack. Both follow the same loop: the host pays in your portal, your backend updates their pool, and the embed refreshes.
 
@@ -39,117 +39,170 @@ and the host must buy more queries to continue."
 [#start-checkout]
 == Start the checkout
 
-Create the checkout session where hosts pay for additional queries. This example uses Stripe.
+Create the checkout session where hosts pay for more queries. This example uses Stripe.
 
 [source,text]
 ----
-"Write a Node endpoint POST /api/credits/checkout that creates a Stripe Checkout session
-for a 200-query pack. Attach the host's ID so the webhook knows who paid. Return the
-session URL."
+"Write a TypeScript Express endpoint POST /api/credits/checkout that creates a Stripe
+Checkout session for either a 200-query pack or a plan upgrade. Attach the host's ID so
+the webhook knows who paid. Return the session URL."
 ----
 
 Generated output in your codebase:
 
-[source,javascript]
+[source,typescript]
 ----
-app.post('/api/credits/checkout', requireLogin, async (req, res) => {
+// src/routes/checkout.ts
+import type { Request, Response } from 'express';
+import Stripe from 'stripe';
+import type { Plan } from '../plans';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+type CheckoutBody =
+  | { kind: 'pack' }
+  | { kind: 'upgrade'; plan: Exclude<Plan, 'starter'> };
+
+const UPGRADE_PRICE_IDS: Record<Exclude<Plan, 'starter'>, string> = {
+  pro: process.env.STRIPE_PRO_PRICE_ID!,
+  enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID!,
+};
+
+export async function createCheckout(req: Request & { user: { id: string } }, res: Response) {
+  const body = req.body as CheckoutBody;
+  const isPack = body.kind === 'pack';
+
   const session = await stripe.checkout.sessions.create({
-    mode: 'payment',
-    line_items: [{ price: process.env.STRIPE_PACK_200_PRICE_ID, quantity: 1 }],
+    mode: 'payment', // use 'subscription' if plans are recurring in your Stripe setup
+    line_items: [{
+      price: isPack ? process.env.STRIPE_PACK_200_PRICE_ID! : UPGRADE_PRICE_IDS[body.plan],
+      quantity: 1,
+    }],
     client_reference_id: req.user.id,
-    metadata: { queries: '200' },
-    success_url: 'https://app.spotstay.com/assistant?topup=success',
+    metadata: isPack ? { kind: 'pack', queries: '200' } : { kind: 'upgrade', plan: body.plan },
+    success_url: 'https://app.spotstay.com/assistant?checkout=success',
     cancel_url: 'https://app.spotstay.com/assistant',
   });
   res.json({ url: session.url });
-});
+}
+
+// app.post('/api/credits/checkout', requireLogin, express.json(), createCheckout);
 ----
 
 [#credit-webhook]
 == Credit the host from the webhook
 
-When Stripe confirms the payment, add the pack's queries to the host's balance.
+When Stripe confirms the payment, update the host's pool. For a query pack, add the pack's queries to the host's remaining balance. For a plan upgrade, set the new plan's limit and keep the host's usage.
 
 [source,text]
 ----
 "Write a Stripe webhook at POST /api/stripe/webhook. Verify the signature. On
-checkout.session.completed, read the host's remaining queries, then reset their usage to 0
-and set their limit to the remaining queries plus the pack size. Credit each session ID
-only once."
+checkout.session.completed, read the host's remaining queries, then set their available
+limit to the remaining queries plus the pack size. Credit each session ID only once."
 ----
 
 Generated output in your codebase:
 
-[source,javascript]
+[source,typescript]
 ----
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch {
-    return res.sendStatus(400); // signature verification failed
-  }
+// src/routes/stripe-webhook.ts
+import express, { type Request, type Response } from 'express';
+import Stripe from 'stripe';
+import { PLANS, type Plan } from '../plans';
+import { tsAdmin } from '../thoughtspot/admin';
+import { changePlanGroup } from '../thoughtspot/groups';
 
-  if (event.type === 'checkout.session.completed') {
-    const s = event.data.object;
-    if (await alreadyCredited(s.id)) return res.sendStatus(200);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-    const host = await hosts.find(s.client_reference_id);
-    const { summary } = await tsAdmin('GET',
-      `/api/rest/2.0/ai/usage-data/user?user_identifier=${encodeURIComponent(host.tsGuid)}`);
-    const newLimit = summary.total_remaining + Number(s.metadata.queries);
+interface UsageUser { summary: { total_remaining: number } }
 
-    await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
-      updates: [{
-        key: { entity_type: 'USER', entity_identifier: host.tsGuid },
-        usage: 0,
-        limit: newLimit,
-        warning_limit: Math.floor(newLimit * 0.9),
-      }],
-    });
-    await markCredited(s.id);
-  }
-  res.sendStatus(200);
-});
+async function setPool(tsGuid: string, limit: number, resetUsage: boolean) {
+  await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
+    updates: [{
+      key: { entity_type: 'USER', entity_identifier: tsGuid },
+      ...(resetUsage ? { usage: 0 } : {}),
+      limit,
+      warning_limit: Math.floor(limit * 0.9),
+    }],
+  });
+}
+
+export const stripeWebhook = [
+  express.raw({ type: 'application/json' }),
+  async (req: Request, res: Response) => {
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body as Buffer,
+        req.headers['stripe-signature'] as string,
+        process.env.STRIPE_WEBHOOK_SECRET!,
+      );
+    } catch {
+      return res.sendStatus(400); // signature verification failed
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const s = event.data.object as Stripe.Checkout.Session;
+      if (await alreadyCredited(s.id)) return res.sendStatus(200);
+
+      const host = await hosts.find(s.client_reference_id!);
+
+      if (s.metadata?.kind === 'pack') {
+        const { summary } = await tsAdmin<UsageUser>('GET',
+          `/api/rest/2.0/ai/usage-data/user?user_identifier=${host.tsGuid}`);
+        await setPool(host.tsGuid, summary.total_remaining + Number(s.metadata.queries), true);
+      }
+
+      if (s.metadata?.kind === 'upgrade') {
+        const newPlan = s.metadata.plan as Plan;
+        await setPool(host.tsGuid, PLANS[newPlan], false); // usage kept
+        await changePlanGroup(host.tsGuid, host.plan, newPlan);
+        await hosts.update(host.id, { plan: newPlan });
+      }
+
+      await markCredited(s.id);
+    }
+    res.sendStatus(200);
+  },
+];
+
+// app.post('/api/stripe/webhook', ...stripeWebhook); // register before express.json()
 ----
 
 `alreadyCredited` and `markCredited` record each Checkout session ID in your database, so a webhook retry from Stripe never credits the same purchase twice.
 
-[#refresh-embed]
-== Refresh the embed after the purchase
+[#upgrade-group]
+== Upgrade the plan group
 
-Stripe redirects the host back to the portal before the webhook finishes processing. Wait until the new balance lands, then tell the embed to refresh its usage data:
+The custom access token sets groups only when it creates the user, so an upgrade has to move the host to the new group itself. Use the user update API with `REMOVE`, then `ADD`. Never send the default `REPLACE` operation, which removes the host from every other group they belong to.
 
-[source,javascript]
+[source,typescript]
 ----
+// src/thoughtspot/groups.ts
+import { planGroup, type Plan } from '../plans';
+import { tsAdmin } from './admin';
+
+export async function changePlanGroup(tsGuid: string, from: Plan, to: Plan): Promise<void> {
+  const path = `/api/rest/2.0/users/${tsGuid}/update`;
+  await tsAdmin('POST', path, { group_identifiers: [planGroup(from)], operation: 'REMOVE' });
+  await tsAdmin('POST', path, { group_identifiers: [planGroup(to)], operation: 'ADD' });
+}
+----
+
+[#refresh-embed]
+== Refresh the meter
+
+Stripe redirects the host back to the portal before the webhook finishes processing. After the success redirect, poll your backend until the pool update lands, then tell the embed to reload the balance:
+
+[source,typescript]
+----
+// src/client/after-checkout.ts
 import { HostEvent } from '@thoughtspot/visual-embed-sdk';
+import { spotterEmbed } from './spotter';
 
-// Called when the host picks "Buy more queries" in the modal
-async function startTopUp() {
-  const usage = await getUsage();
-  sessionStorage.setItem('limitBeforeTopUp', String(usage.limit));
-  const { url } = await fetch('/api/credits/checkout', { method: 'POST' }).then((r) => r.json());
-  location.assign(url);
-}
-
-async function refreshAfterTopUp(previousLimit) {
-  // Poll until the webhook has updated the pool
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const usage = await getUsage();
-    if (usage.limit !== previousLimit) {
-      renderUsageBadge(usage);
-      spotterEmbed.trigger(HostEvent.SpotterRefreshUsageLimit);
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-}
-
-// Back from Checkout: wait for the new balance, then refresh the embed
-if (new URLSearchParams(location.search).get('topup') === 'success') {
-  refreshAfterTopUp(Number(sessionStorage.getItem('limitBeforeTopUp')));
+export async function refreshAfterCheckout(): Promise<void> {
+  await waitForCredit(); // polls your backend until markCredited has run for this session
+  spotterEmbed.trigger(HostEvent.SpotterRefreshUsageLimit);
 }
 ----
 

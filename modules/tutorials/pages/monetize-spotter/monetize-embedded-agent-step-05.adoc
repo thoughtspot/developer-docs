@@ -1,12 +1,12 @@
-= Show a pop-up when queries run low
+= Show a pop-up when queries run out
 :toc!:
 :linkattrs:
 :sectanchors:
-:page-title: Show a pop-up when queries run low
+:page-title: Show a pop-up when queries run out
 :page-pageid: monetize-spotter__usage-pop-up
-:page-description: Check each host's balance after every answer, and open a SpotStay-styled modal once they reach 90% of their plan.
+:page-description: Check each host's balance after every answer, open a SpotStay-styled modal from 90% of their plan, and reset pools every billing cycle.
 
-After each answer, check the host's balance. When the host reaches 90% of their plan, open a modal that warns them they're running out of queries.
+After each answer, check the host's balance. When the host nears or reaches their limit, open a modal that offers a plan upgrade or a query pack.
 
 ++++
 <div class="videoContainer" style="aspect-ratio: 16 / 9;">
@@ -14,38 +14,10 @@ After each answer, check the host's balance. When the host reaches 90% of their 
 </div>
 ++++
 
-[#usage-endpoint]
-== Expose the host's balance to the portal
-
-The portal can't call the usage data APIs directly, because they need an admin token. Ask SpotterCode for a backend endpoint that returns the logged-in host's balance:
-
-[source,text]
-----
-"Write a Node endpoint GET /api/usage that returns the logged-in host's Spotter usage:
-queries used, the limit, queries remaining, and whether they've reached the warning
-limit or the limit. Call the usage data API with my admin helper."
-----
-
-Generated output in your codebase:
-
-[source,javascript]
-----
-app.get('/api/usage', requireLogin, async (req, res) => {
-  const { summary } = await tsAdmin('GET',
-    `/api/rest/2.0/ai/usage-data/user?user_identifier=${encodeURIComponent(req.user.tsGuid)}`);
-
-  res.json({
-    used: summary.total_usage,
-    limit: summary.total_limit,
-    remaining: summary.total_remaining,
-    atWarning: summary.is_at_warning, // true from 90% usage onward
-    atLimit: summary.is_at_limit,     // true at 100%; Spotter blocks further queries
-  });
-});
-----
-
 [#open-modal]
 == Open the modal from 90% usage
+
+Ask SpotterCode to build the modal:
 
 [source,text]
 ----
@@ -57,36 +29,65 @@ SpotStay branding."
 
 Generated output in your codebase:
 
-// TODO: Confirm with engineering that EmbedEvent.SpotterVizResponseComplete fires in SpotterEmbed.
-// The docs only describe it for the SpotterViz panel on Liveboards (embed-spotterViz.adoc).
-// If it doesn't fire, the modal check below never runs. Alternatives: EmbedEvent.SpotterQueryTriggered
-// (documented for Spotter embed, but fires on submit, so usage may not be updated yet), or the
-// correct response-complete event for SpotterEmbed, if one exists.
-[source,javascript]
+// TODO: Confirm with engineering that EmbedEvent.SpotterResponseComplete is the correct
+// response-complete event for SpotterEmbed. It isn't documented elsewhere in these docs.
+[source,typescript]
 ----
+// src/client/usage-modal.ts
 import { EmbedEvent } from '@thoughtspot/visual-embed-sdk';
+import { spotterEmbed } from './spotter';
 
-const getUsage = () => fetch('/api/usage').then((r) => r.json());
+// Shape returned by your portal's /api/usage, a thin wrapper over
+// GET /api/rest/2.0/ai/usage-data/user for the logged-in host.
+interface UsageSummary {
+  used: number;
+  limit: number;
+  remaining: number;
+  atWarning: boolean; // used >= warning_limit
+  atLimit: boolean; // used >= limit
+}
 
-// After every answer, refresh the balance and open the modal from 90% onward
-spotterEmbed.on(EmbedEvent.SpotterVizResponseComplete, async () => {
-  const usage = await getUsage();
-  renderUsageBadge(usage);                       // for example, "40 of 400 queries left"
-  if (usage.atWarning) openOutOfQueriesModal(usage);
-});
+async function checkUsage(): Promise<void> {
+  const usage = (await fetch('/api/usage').then((r) => r.json())) as UsageSummary;
+  renderUsageBadge(usage); // for example, "312 of 400 queries left"
+  if (usage.atWarning || usage.atLimit) openOutOfQueriesModal(usage);
+}
 
-// Clicking Upgrade inside Spotter opens the same modal.
-// payload.data.usageCount  — total questions asked
-// payload.data.usageLimit  — total assigned limit
-// payload.data.status      — "withinLimit" | "almostReached" | "limitReached"
-spotterEmbed.on(EmbedEvent.SpotterUsageLimitUpgrade, (payload) => {
-  const { usageCount, usageLimit, status } = payload.data;
-  openOutOfQueriesModal({ used: usageCount, limit: usageLimit, status });
-});
+spotterEmbed.on(EmbedEvent.SpotterResponseComplete, checkUsage);
+
+// Clicking Upgrade inside Spotter opens the same modal
+spotterEmbed.on(EmbedEvent.SpotterUsageLimitUpgrade, checkUsage);
 ----
 
-The `SpotterUsageLimitUpgrade` payload includes `payload.data.usageCount`, `payload.data.usageLimit`, and `payload.data.status`.
-Use these values to tailor the modal wording as the host nears their limit. For more information, see xref:spotter-usage-limits.adoc#_handling_usage_limit_events[Handling usage limit events].
+`/api/usage` is a backend endpoint in your portal. It calls the usage data API with your admin helper, because the browser can't hold an admin token.
+
+The `SpotterUsageLimitUpgrade` payload also includes `payload.data.usageCount`, `payload.data.usageLimit`, and `payload.data.status` (`withinLimit`, `almostReached`, or `limitReached`).
+Use these values if you want to word the modal differently as the host nears their limit. For more information, see xref:spotter-usage-limits.adoc#_handling_usage_limit_events[Handling usage limit events].
+
+[#reset-monthly]
+== Reset every month
+
+ThoughtSpot doesn't reset pools on a schedule. Run a job at the start of each billing cycle that sets every host back to their plan:
+
+[source,typescript]
+----
+// src/jobs/monthly-reset.ts: run at 00:00 on the 1st of each month
+import { PLANS, type Plan } from '../plans';
+import { tsAdmin } from '../thoughtspot/admin';
+
+interface HostRecord { tsGuid: string; plan: Plan }
+
+export async function resetAllPools(hosts: HostRecord[]): Promise<void> {
+  await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
+    updates: hosts.map((h) => ({
+      key: { entity_type: 'USER', entity_identifier: h.tsGuid },
+      usage: 0,
+      limit: PLANS[h.plan],
+      warning_limit: Math.floor(PLANS[h.plan] * 0.9),
+    })),
+  });
+}
+----
 
 ++++
 <div class="tutorial-pagination">

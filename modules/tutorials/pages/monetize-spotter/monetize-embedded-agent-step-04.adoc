@@ -4,7 +4,7 @@
 :sectanchors:
 :page-title: Add the usage meter
 :page-pageid: monetize-spotter__add-usage-meter
-:page-description: Give each host a usage pool sized to their plan, show the usage counter in the embedded agent, and reset pools every billing cycle.
+:page-description: Give each host a usage pool sized to their plan and show the usage counter in the embedded agent.
 
 ThoughtSpot counts every query against a usage pool, shows the count inside the embedded agent, and blocks queries once the pool's limit is reached. Your backend creates and updates the pools. Your portal shows the numbers and the pop-up.
 
@@ -26,15 +26,42 @@ API to create or update a USER pool with the plan's limit and a warning at 90%. 
 admin token from my server, never the host's."
 ----
 
-Generated output in your codebase:
+Generated output in your codebase. `tsAdmin` calls the ThoughtSpot REST API as your admin service account. The usage data APIs require the cluster-level `ADMINISTRATION` privilege, so never call them from the browser.
 
-[source,javascript]
+[source,typescript]
 ----
-const PLANS = { starter: 400, pro: 750, enterprise: 1000 };
+// src/thoughtspot/admin.ts
+const TS_HOST = process.env.TS_HOST!;
 
-async function setAllowance(hostGuid, plan) {
+// Calls ThoughtSpot as your admin service account. getAdminToken() caches a token
+// for a user with cluster-level ADMINISTRATION.
+export async function tsAdmin<T = unknown>(
+  method: 'GET' | 'POST',
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const r = await fetch(`${TS_HOST}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${await getAdminToken()}`,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) throw new Error(`ThoughtSpot ${method} ${path} failed: ${r.status}`);
+  return (r.status === 204 ? undefined : await r.json()) as T;
+}
+----
+
+[source,typescript]
+----
+// src/usage.ts
+import { PLANS, type Plan } from './plans';
+import { tsAdmin } from './thoughtspot/admin';
+
+export async function setAllowance(hostGuid: string, plan: Plan): Promise<void> {
   const limit = PLANS[plan];
-  return tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
+  await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
     updates: [{
       key: { entity_type: 'USER', entity_identifier: hostGuid },
       limit,
@@ -44,47 +71,7 @@ async function setAllowance(hostGuid, plan) {
 }
 ----
 
-`setAllowance` relies on two small helpers:
-
-* `tsAdmin` calls the ThoughtSpot REST API with a token for your admin service account. The usage data APIs require the cluster-level `ADMINISTRATION` privilege. Never call them from the browser.
-* `getTsGuid` looks up a host's ThoughtSpot user GUID by username. Store the GUID next to the host's record so you don't look it up on every call.
-
-[source,javascript]
-----
-const TS_HOST = process.env.TS_HOST;
-
-// Calls the ThoughtSpot REST API as the admin service account.
-// In production, cache the token until it expires instead of requesting one per call.
-async function tsAdmin(method, path, body) {
-  const auth = await fetch(`${TS_HOST}/api/rest/2.0/auth/token/full`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      username: process.env.TS_ADMIN_USERNAME,
-      secret_key: process.env.TS_SECRET_KEY,
-    }),
-  }).then((r) => r.json());
-
-  const r = await fetch(`${TS_HOST}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${auth.token}`,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!r.ok) throw new Error(`ThoughtSpot ${method} ${path} failed: ${r.status}`);
-  return r.json();
-}
-
-// Returns the ThoughtSpot user GUID for a host.
-async function getTsGuid(username) {
-  const [user] = await tsAdmin('POST', '/api/rest/2.0/users/search', {
-    user_identifier: username,
-  });
-  return user.id;
-}
-----
+To get the host's GUID, call `POST /api/rest/2.0/users/search` with their username. Store the GUID next to the host's record so you don't look it up on every call.
 
 [IMPORTANT]
 ====
@@ -101,18 +88,20 @@ ThoughtSpot already tracks each host's usage and updates the count after every q
 
 [source,text]
 ----
-"Enable Spotter usage limits in my SpotterEmbed. Always show the usage counter, show the
-warning banner when the host reaches the warning limit, and keep the Upgrade button
-visible. Turn off the built-in limit banner, because the portal shows its own pop-up."
+"Create a progress-bar usage metric based on the host's plan that moves as queries
+increase. For example, if a host on the Starter plan in the SpotStay Starter group has
+used 200 of 400 queries, the bar is 50% full. Place it above the prompt box, and update
+the usage every time a query is triggered in the embedded agent."
 ----
 
 Generated output in your codebase:
 
-[source,javascript]
+[source,typescript]
 ----
+// src/client/spotter.ts
 import { SpotterEmbed, SpotterUsageCounterDisplayMode } from '@thoughtspot/visual-embed-sdk';
 
-const spotterEmbed = new SpotterEmbed('#ts-embed', {
+export const spotterEmbed = new SpotterEmbed('#ts-embed', {
   worksheetId: 'your-bookings-model-id',
   disableSourceSelection: true,
   spotterUsageLimitConfig: {
@@ -150,24 +139,6 @@ Turning off the limit banner doesn't lift the block. Hosts who reach their limit
 ====
 
 For all the configuration options, see xref:spotter-usage-limits.adoc[Manage Spotter usage limits].
-
-[#reset-monthly]
-== Reset every month
-
-ThoughtSpot doesn't reset pools on a schedule. Run a job at the start of each billing cycle that sets every host back to their plan:
-
-[source,javascript]
-----
-// Runs at 00:00 on the 1st of each month, for every host
-await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
-  updates: hosts.map((h) => ({
-    key: { entity_type: 'USER', entity_identifier: h.tsGuid },
-    usage: 0,
-    limit: PLANS[h.plan],
-    warning_limit: Math.floor(PLANS[h.plan] * 0.9),
-  })),
-});
-----
 
 ++++
 <div class="tutorial-pagination">
