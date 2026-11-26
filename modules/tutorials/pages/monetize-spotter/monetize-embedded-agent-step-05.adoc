@@ -1,0 +1,97 @@
+= Show a pop-up when queries run out
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Show a pop-up when queries run out
+:page-pageid: monetize-spotter__usage-pop-up
+:page-description: Check each host's balance after every answer, open a SpotStay-styled modal from 90% of their plan, and reset pools every billing cycle.
+
+After each answer, check the host's balance. When the host nears or reaches their limit, open a modal that offers a plan upgrade or a query pack.
+
+++++
+<div class="videoContainer" style="aspect-ratio: 16 / 9;">
+<iframe src="https://fast.wistia.net/embed/iframe/v1e0k1i8jf?videoFoam=true" title="Out-of-queries modal in the SpotStay portal" allow="autoplay; fullscreen" allowfullscreen loading="lazy" style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+++++
+
+[#open-modal]
+== Open the modal from 90% usage
+
+Ask SpotterCode to build the modal:
+
+[source,text]
+----
+"Create a pop-up modal that appears in the center of the screen when a host reaches 90%
+usage. Every query from 90% usage onward opens the modal. The modal tells the host they
+are running out of queries and shows their current usage. Style the modal to match the
+SpotStay branding."
+----
+
+Generated output in your codebase:
+
+[source,typescript]
+----
+// src/client/usage-modal.ts
+import { EmbedEvent } from '@thoughtspot/visual-embed-sdk';
+import { spotterEmbed } from './spotter';
+
+// Shape returned by your portal's /api/usage, a thin wrapper over
+// GET /api/rest/2.0/ai/usage-data/user for the logged-in host.
+interface UsageSummary {
+  used: number;
+  limit: number;
+  remaining: number;
+  atWarning: boolean; // used >= warning_limit
+  atLimit: boolean; // used >= limit
+}
+
+async function checkUsage(): Promise<void> {
+  const usage = (await fetch('/api/usage').then((r) => r.json())) as UsageSummary;
+  renderUsageBadge(usage); // for example, "312 of 400 queries left"
+  if (usage.atWarning || usage.atLimit) openOutOfQueriesModal(usage);
+}
+
+spotterEmbed.on(EmbedEvent.SpotterResponseComplete, checkUsage);
+
+// Clicking Upgrade inside Spotter opens the same modal
+spotterEmbed.on(EmbedEvent.SpotterUsageLimitUpgrade, checkUsage);
+----
+
+`EmbedEvent.SpotterResponseComplete` fires when Spotter finishes streaming and rendering a response, so the balance you fetch already includes that query. Its payload includes `convId` and `messageId`, which you can use to fetch the conversation history through the REST API.
+
+`/api/usage` is a backend endpoint in your portal. It calls the usage data API with your admin helper, because the browser can't hold an admin token.
+
+The `SpotterUsageLimitUpgrade` payload also includes `payload.data.usageCount`, `payload.data.usageLimit`, and `payload.data.status` (`withinLimit`, `almostReached`, or `limitReached`).
+Use these values if you want to word the modal differently as the host nears their limit. For more information, see xref:spotter-usage-limits.adoc#_handling_usage_limit_events[Handling usage limit events].
+
+[#reset-monthly]
+== Reset every month
+
+ThoughtSpot doesn't reset pools on a schedule. Run a job at the start of each billing cycle that sets every host back to their plan:
+
+[source,typescript]
+----
+// src/jobs/monthly-reset.ts: run at 00:00 on the 1st of each month
+import { PLANS, type Plan } from '../plans';
+import { tsAdmin } from '../thoughtspot/admin';
+
+interface HostRecord { tsGuid: string; plan: Plan }
+
+export async function resetAllPools(hosts: HostRecord[]): Promise<void> {
+  await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
+    updates: hosts.map((h) => ({
+      key: { entity_type: 'USER', entity_identifier: h.tsGuid },
+      usage: 0,
+      limit: PLANS[h.plan],
+      warning_limit: Math.floor(PLANS[h.plan] * 0.9),
+    })),
+  });
+}
+----
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/monetize-spotter/add-usage-meter">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/monetize-spotter/buy-more-queries">Next &rarr;</a>
+</div>
+++++

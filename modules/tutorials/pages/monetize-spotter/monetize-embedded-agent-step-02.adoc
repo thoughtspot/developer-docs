@@ -1,0 +1,115 @@
+= Embed an analytics agent
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Embed an analytics agent
+:page-pageid: monetize-spotter__embed-analytics-agent
+:page-description: Allowlist the SpotStay portal domain, sign hosts in with trusted authentication, and embed Spotter on the Bookings Model.
+
+Hosts log in to the SpotStay portal, not ThoughtSpot. ThoughtSpot has to trust your domain, and your backend has to sign each host in.
+
+++++
+<div class="videoContainer" style="aspect-ratio: 16 / 9;">
+<iframe src="https://fast.wistia.net/embed/iframe/pd5f3e9j8n?videoFoam=true" title="Spotter embedded in the SpotStay portal" allow="autoplay; fullscreen" allowfullscreen loading="lazy" style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+++++
+
+[#allowlist-domain]
+== Allowlist the portal domain
+
+Ask SpotterCode to allowlist the portal's domain:
+
+[source,text]
+----
+"Add https://app.spotstay.com to the CORS allowlist and to the CSP visual-embed-hosts
+list at cluster scope."
+----
+
+[#token-endpoint]
+== Sign hosts in with trusted authentication
+
+Turn on trusted authentication under *Develop* > *Customizations* > *Security Settings*, and store the secret key in your server's environment. Then ask SpotterCode for a token endpoint:
+
+[source,text]
+----
+"Write a Node endpoint GET /api/ts-token that gets a ThoughtSpot full-access token for
+the logged-in host using trusted authentication. Create the user on first login and add
+them to the group for their current plan. Read the secret key from the environment."
+----
+
+Generated output in your codebase:
+
+[source,typescript]
+----
+// src/routes/ts-token.ts
+import type { Request, Response } from 'express';
+import { planGroup, type Plan } from '../plans';
+
+interface Host { id: string; email: string; name: string; plan: Plan; tsGuid?: string }
+type AuthedRequest = Request & { user: Host };
+
+const TS_HOST = process.env.TS_HOST!; // for example, https://spotstay.thoughtspot.cloud
+
+export async function getTsToken(req: AuthedRequest, res: Response) {
+  const r = await fetch(`${TS_HOST}/api/rest/2.0/auth/token/custom`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: req.user.id,
+      email: req.user.email,
+      display_name: req.user.name,
+      secret_key: process.env.TS_SECRET_KEY,
+      auto_create: true,
+      persist_option: 'NONE', // required; use APPEND or REPLACE once you send variable_values
+      groups: [{ identifier: planGroup(req.user.plan) }], // for example, 'SpotStay Starter'
+    }),
+  });
+  if (!r.ok) return res.status(502).send('Could not get ThoughtSpot token');
+  const { token } = (await r.json()) as { token: string };
+  res.send(token);
+}
+
+// app.get('/api/ts-token', requireLogin, getTsToken);
+----
+
+For more information, see xref:trusted-auth-secret-key.adoc[Trusted authentication with a secret key].
+
+[#embed-spotter]
+== Embed Spotter
+
+Ask SpotterCode to embed Spotter on the Bookings Model:
+
+[source,text]
+----
+"Embed Spotter on the "Bookings" page, linked to the "Bookings" Model."
+----
+
+Generated output in your codebase:
+
+[source,typescript]
+----
+// src/client/spotter.ts
+import { init, AuthType, SpotterEmbed } from '@thoughtspot/visual-embed-sdk';
+
+init({
+  thoughtSpotHost: 'https://your-instance.thoughtspot.cloud',
+  authType: AuthType.TrustedAuthTokenCookieless,
+  autoLogin: true,
+  getAuthToken: (): Promise<string> => fetch('/api/ts-token').then((r) => r.text()),
+});
+
+export const spotterEmbed = new SpotterEmbed('#ts-embed', {
+  frameParams: { width: '100%', height: '100%' },
+  worksheetId: 'your-bookings-model-id',
+  disableSourceSelection: true,
+});
+
+spotterEmbed.render();
+----
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/monetize-spotter/map-plans-to-groups">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/monetize-spotter/brand-your-agent">Next &rarr;</a>
+</div>
+++++

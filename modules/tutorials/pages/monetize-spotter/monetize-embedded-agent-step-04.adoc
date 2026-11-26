@@ -1,0 +1,148 @@
+= Add the usage meter
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Add the usage meter
+:page-pageid: monetize-spotter__add-usage-meter
+:page-description: Give each host a usage pool sized to their plan and show the usage counter in the embedded agent.
+
+ThoughtSpot counts every query against a usage pool, shows the count inside the embedded agent, and blocks queries once the pool's limit is reached. Your backend creates and updates the pools. Your portal shows the numbers and the pop-up.
+
+++++
+<div class="videoContainer" style="aspect-ratio: 16 / 9;">
+<iframe src="https://fast.wistia.net/embed/iframe/tfp4xbv3ao?videoFoam=true" title="Spotter usage counter in the SpotStay portal" allow="autoplay; fullscreen" allowfullscreen loading="lazy" style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+++++
+
+[#track-usage]
+== Track usage
+
+Give each host a pool sized to their plan when they first log in. This example sets a warning at 90% of the limit. You can set a different threshold to suit your product.
+
+[source,text]
+----
+"Write a backend helper setAllowance(hostGuid, plan) that calls the Spotter usage data
+API to create or update a USER pool with the plan's limit and a warning at 90%. Use an
+admin token from my server, never the host's."
+----
+
+Generated output in your codebase. `tsAdmin` calls the ThoughtSpot REST API as your admin service account. The usage data APIs require the cluster-level `ADMINISTRATION` privilege, so never call them from the browser.
+
+[source,typescript]
+----
+// src/thoughtspot/admin.ts
+const TS_HOST = process.env.TS_HOST!;
+
+// Calls ThoughtSpot as your admin service account. getAdminToken() caches a token
+// for a user with cluster-level ADMINISTRATION.
+export async function tsAdmin<T = unknown>(
+  method: 'GET' | 'POST',
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const r = await fetch(`${TS_HOST}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${await getAdminToken()}`,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) throw new Error(`ThoughtSpot ${method} ${path} failed: ${r.status}`);
+  return (r.status === 204 ? undefined : await r.json()) as T;
+}
+----
+
+[source,typescript]
+----
+// src/usage.ts
+import { PLANS, type Plan } from './plans';
+import { tsAdmin } from './thoughtspot/admin';
+
+export async function setAllowance(hostGuid: string, plan: Plan): Promise<void> {
+  const limit = PLANS[plan];
+  await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
+    updates: [{
+      key: { entity_type: 'USER', entity_identifier: hostGuid },
+      limit,
+      warning_limit: Math.floor(limit * 0.9),
+    }],
+  });
+}
+----
+
+To get the host's GUID, call `POST /api/rest/2.0/users/search` with their username. Store the GUID next to the host's record so you don't look it up on every call.
+
+[IMPORTANT]
+====
+* The first pool you create sets the cluster's metering scope to `USER`, and every later pool must use the same scope.
+* A host with no pool isn't metered at all, so call `setAllowance` when the host first logs in, before their first query. For example, call it from your `/api/ts-token` endpoint when the host's record doesn't have a ThoughtSpot GUID yet.
+====
+
+For the request and response details, see xref:spotter-usage-data-api.adoc[Spotter usage data APIs].
+
+[#show-meter]
+== Show the meter in Spotter
+
+ThoughtSpot already tracks each host's usage and updates the count after every question, so you don't need to build the counter yourself. Turn on usage limits in the embed, and the counter appears in Spotter's prompt bar.
+
+[source,text]
+----
+"Create a progress-bar usage metric based on the host's plan that moves as queries
+increase. For example, if a host on the Starter plan in the SpotStay Starter group has
+used 200 of 400 queries, the bar is 50% full. Place it above the prompt box, and update
+the usage every time a query is triggered in the embedded agent."
+----
+
+Generated output in your codebase:
+
+[source,typescript]
+----
+// src/client/spotter.ts
+import { SpotterEmbed, SpotterUsageCounterDisplayMode } from '@thoughtspot/visual-embed-sdk';
+
+export const spotterEmbed = new SpotterEmbed('#ts-embed', {
+  worksheetId: 'your-bookings-model-id',
+  disableSourceSelection: true,
+  spotterUsageLimitConfig: {
+    isEnabled: true,
+    usageCounterDisplayMode: SpotterUsageCounterDisplayMode.AlwaysVisible,
+    isWarningBannerEnabled: true,
+    isLimitBannerEnabled: false, // the portal shows its own pop-up instead
+    isUpgradeButtonVisible: true,
+  },
+});
+----
+
+Use `usageCounterDisplayMode` to control when the counter appears:
+
+[cols="1,2", options="header"]
+|===
+| `usageCounterDisplayMode` | The counter shows
+
+| `AlwaysVisible`
+| All the time (default)
+
+| `VisibleAfterWarning`
+| Once usage reaches `warning_limit`
+
+| `VisibleAfterLimit`
+| Once usage reaches `limit`
+
+| `AlwaysHidden`
+| Never
+|===
+
+[NOTE]
+====
+Turning off the limit banner doesn't lift the block. Hosts who reach their limit still can't ask more questions.
+====
+
+For all the configuration options, see xref:spotter-usage-limits.adoc[Manage Spotter usage limits].
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/monetize-spotter/brand-your-agent">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/monetize-spotter/usage-pop-up">Next &rarr;</a>
+</div>
+++++

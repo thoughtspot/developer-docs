@@ -1,0 +1,120 @@
+= Send the flag to Slack
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Send the flag to Slack
+:page-pageid: custom-actions__send-flag-to-slack
+:page-description: Turn a Flag to team click into a Slack message through your backend and a Slack incoming webhook, then test the full loop.
+
+Now turn the click into a message in the team's Slack channel. The data travels like this:
+
+. The host right-clicks a data point and chooses *Flag to team*.
+. ThoughtSpot fires `EmbedEvent.CustomAction` in your frontend, with the clicked point attached.
+. Your frontend turns that point into a readable description and sends it to your backend.
+. Your backend formats a message and sends it to a Slack incoming webhook, which posts it to the channel.
+
+The backend step keeps the webhook URL out of the browser, where anyone could read it and post to your channel. It's also why this isn't a URL action pointed straight at Slack: Slack expects a message in its own format, not ThoughtSpot's payload.
+
+[#frontend]
+== Frontend: describe the clicked point and send the flag
+
+[source,javascript]
+----
+function describePoint(point) {
+  // Matches the shape you logged in "Listen for the click"; adjust if yours differs.
+  const attributes = point?.selectedAttributes ?? [];
+  const measures = point?.selectedMeasures ?? [];
+
+  return [...attributes, ...measures]
+    .map((item) => `${item.column?.name} = ${item.value}`)
+    .join(', ');
+}
+
+async function flagToTeam(data) {
+  const point = data.contextMenuPoints?.clickedPoint;
+
+  await fetch('/api/flags', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chart: data.embedAnswerData?.name ?? 'a chart',
+      point: describePoint(point),
+    }),
+  });
+}
+
+liveboardEmbed.on(EmbedEvent.CustomAction, (payload) => {
+  if (payload.data.id !== 'flag-to-team') return;
+  flagToTeam(payload.data);
+});
+----
+
+The handler doesn't hard-code any column names. It reads whatever labels and numbers the clicked point carries, so the same code works on every chart, including charts added to the Liveboard later.
+
+[TIP]
+====
+Ask SpotterCode:
+
+[source,text]
+----
+"Write a function that reads the clicked point's attributes and measures from a context
+menu custom action payload on a Liveboard visualization."
+----
+====
+
+[#slack-webhook]
+== Slack: create an incoming webhook for the team's channel
+
+. Go to link:https://api.slack.com/apps[api.slack.com/apps, window=_blank] and create a new app in your workspace.
+. Under *Incoming Webhooks*, turn on *Activate Incoming Webhooks*.
+. Click *Add New Webhook to Workspace* and pick the channel, such as `#host-ops`.
+. Copy the webhook URL and store it in your backend's environment as `SLACK_WEBHOOK_URL`. Never commit it to your repository.
+
+[#backend]
+== Backend: forward the flag to the team's Slack channel
+
+The backend takes the host's identity from the portal session, not from the browser, so nobody can post to the channel or flag a point in someone else's name.
+
+[source,javascript]
+----
+app.post('/api/flags', requireLogin, async (req, res) => {
+  const { chart, point } = req.body;
+  const flaggedBy = req.user.email; // from the portal session
+
+  const r = await fetch(process.env.SLACK_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text: `${flaggedBy} flagged a point on *${chart}*: ${point}`,
+    }),
+  });
+  if (!r.ok) return res.sendStatus(502);
+
+  res.sendStatus(204);
+});
+----
+
+When a host flags a point, the channel gets a message like this:
+
+[source,text]
+----
+jane@spotstay.com flagged a point on *Bookings by month*: Month = Aug 2026, Bookings = 412
+----
+
+[#test]
+== Test the custom action
+
+. Start your app and backend, and open the SpotStay Liveboard.
+. Right-click a data point on any chart and confirm that *Flag to team* appears in the menu.
+. Choose *Flag to team*.
+. Check the team's Slack channel for a message that names the chart, the point you clicked, and who flagged it.
+. Repeat on a different chart to confirm that the same handler works there too.
+
+If the messages arrive, the loop is closed: a host sees a number that looks wrong and raises it in two clicks, without leaving the portal.
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/custom-actions/listen-for-click">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/custom-actions/troubleshooting">Next &rarr;</a>
+</div>
+++++

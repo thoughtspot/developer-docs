@@ -1,0 +1,214 @@
+= Let hosts buy more queries
+:toc!:
+:linkattrs:
+:sectanchors:
+:page-title: Let hosts buy more queries
+:page-pageid: monetize-spotter__buy-more-queries
+:page-description: Sell plan upgrades and query packs through Stripe Checkout, update the host's usage pool and plan group from a verified webhook, and refresh the embedded agent.
+
+The modal offers hosts two ways to keep going: move to a bigger plan, or buy a one-time query pack. Both follow the same loop: the host pays in your portal, your backend updates their pool, and the embed refreshes.
+
+. The host picks an option in the modal and pays through Stripe Checkout.
+. Stripe confirms the payment to your webhook.
+. Your backend updates the host's pool with the usage data API.
+. Your portal triggers `HostEvent.SpotterRefreshUsageLimit`, and the counter shows the new balance.
+
+++++
+<div class="videoContainer" style="aspect-ratio: 16 / 9;">
+<iframe src="https://fast.wistia.net/embed/iframe/rj1lhbehz2?videoFoam=true" title="Buying more queries through Stripe in the SpotStay portal" allow="autoplay; fullscreen" allowfullscreen loading="lazy" style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+++++
+
+[#update-modal]
+== Add purchase options to the modal
+
+Update the modal to let hosts buy more queries. Hosts can buy additional queries as an add-on to their plan.
+
+[source,text]
+----
+"Update the modal to show these options:
+1. Upgrade the plan. If the host selects this option, route them through checkout and
+   update their group membership afterward. Their usage isn't reset; only the number of
+   available queries changes.
+2. Buy more queries as a pack. Add the pack's queries to the host's available queries.
+3. Do it later, as a secondary call to action.
+If usage has reached 100%, show only the first two options, and say that usage is at 100%
+and the host must buy more queries to continue."
+----
+
+[#start-checkout]
+== Start the checkout
+
+Create the checkout session where hosts pay for more queries. This example uses Stripe.
+
+[source,text]
+----
+"Write a TypeScript Express endpoint POST /api/credits/checkout that creates a Stripe
+Checkout session for either a 200-query pack or a plan upgrade. Attach the host's ID so
+the webhook knows who paid. Return the session URL."
+----
+
+Generated output in your codebase:
+
+[source,typescript]
+----
+// src/routes/checkout.ts
+import type { Request, Response } from 'express';
+import Stripe from 'stripe';
+import type { Plan } from '../plans';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+type CheckoutBody =
+  | { kind: 'pack' }
+  | { kind: 'upgrade'; plan: Exclude<Plan, 'starter'> };
+
+const UPGRADE_PRICE_IDS: Record<Exclude<Plan, 'starter'>, string> = {
+  pro: process.env.STRIPE_PRO_PRICE_ID!,
+  enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID!,
+};
+
+export async function createCheckout(req: Request & { user: { id: string } }, res: Response) {
+  const body = req.body as CheckoutBody;
+  const isPack = body.kind === 'pack';
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment', // use 'subscription' if plans are recurring in your Stripe setup
+    line_items: [{
+      price: isPack ? process.env.STRIPE_PACK_200_PRICE_ID! : UPGRADE_PRICE_IDS[body.plan],
+      quantity: 1,
+    }],
+    client_reference_id: req.user.id,
+    metadata: isPack ? { kind: 'pack', queries: '200' } : { kind: 'upgrade', plan: body.plan },
+    success_url: 'https://app.spotstay.com/assistant?checkout=success',
+    cancel_url: 'https://app.spotstay.com/assistant',
+  });
+  res.json({ url: session.url });
+}
+
+// app.post('/api/credits/checkout', requireLogin, express.json(), createCheckout);
+----
+
+[#credit-webhook]
+== Credit the host from the webhook
+
+When Stripe confirms the payment, update the host's pool. For a query pack, add the pack's queries to the host's remaining balance. For a plan upgrade, set the new plan's limit and keep the host's usage.
+
+[source,text]
+----
+"Write a Stripe webhook at POST /api/stripe/webhook. Verify the signature. On
+checkout.session.completed, read the host's remaining queries, then set their available
+limit to the remaining queries plus the pack size. Credit each session ID only once."
+----
+
+Generated output in your codebase:
+
+[source,typescript]
+----
+// src/routes/stripe-webhook.ts
+import express, { type Request, type Response } from 'express';
+import Stripe from 'stripe';
+import { PLANS, type Plan } from '../plans';
+import { tsAdmin } from '../thoughtspot/admin';
+import { changePlanGroup } from '../thoughtspot/groups';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+interface UsageUser { summary: { total_remaining: number } }
+
+async function setPool(tsGuid: string, limit: number, resetUsage: boolean) {
+  await tsAdmin('POST', '/api/rest/2.0/ai/usage-data/update', {
+    updates: [{
+      key: { entity_type: 'USER', entity_identifier: tsGuid },
+      ...(resetUsage ? { usage: 0 } : {}),
+      limit,
+      warning_limit: Math.floor(limit * 0.9),
+    }],
+  });
+}
+
+export const stripeWebhook = [
+  express.raw({ type: 'application/json' }),
+  async (req: Request, res: Response) => {
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body as Buffer,
+        req.headers['stripe-signature'] as string,
+        process.env.STRIPE_WEBHOOK_SECRET!,
+      );
+    } catch {
+      return res.sendStatus(400); // signature verification failed
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const s = event.data.object as Stripe.Checkout.Session;
+      if (await alreadyCredited(s.id)) return res.sendStatus(200);
+
+      const host = await hosts.find(s.client_reference_id!);
+
+      if (s.metadata?.kind === 'pack') {
+        const { summary } = await tsAdmin<UsageUser>('GET',
+          `/api/rest/2.0/ai/usage-data/user?user_identifier=${host.tsGuid}`);
+        await setPool(host.tsGuid, summary.total_remaining + Number(s.metadata.queries), true);
+      }
+
+      if (s.metadata?.kind === 'upgrade') {
+        const newPlan = s.metadata.plan as Plan;
+        await setPool(host.tsGuid, PLANS[newPlan], false); // usage kept
+        await changePlanGroup(host.tsGuid, host.plan, newPlan);
+        await hosts.update(host.id, { plan: newPlan });
+      }
+
+      await markCredited(s.id);
+    }
+    res.sendStatus(200);
+  },
+];
+
+// app.post('/api/stripe/webhook', ...stripeWebhook); // register before express.json()
+----
+
+`alreadyCredited` and `markCredited` record each Checkout session ID in your database, so a webhook retry from Stripe never credits the same purchase twice.
+
+[#upgrade-group]
+== Upgrade the plan group
+
+The custom access token sets groups only when it creates the user, so an upgrade has to move the host to the new group itself. Use the user update API with `REMOVE`, then `ADD`. Never send the default `REPLACE` operation, which removes the host from every other group they belong to.
+
+[source,typescript]
+----
+// src/thoughtspot/groups.ts
+import { planGroup, type Plan } from '../plans';
+import { tsAdmin } from './admin';
+
+export async function changePlanGroup(tsGuid: string, from: Plan, to: Plan): Promise<void> {
+  const path = `/api/rest/2.0/users/${tsGuid}/update`;
+  await tsAdmin('POST', path, { group_identifiers: [planGroup(from)], operation: 'REMOVE' });
+  await tsAdmin('POST', path, { group_identifiers: [planGroup(to)], operation: 'ADD' });
+}
+----
+
+[#refresh-embed]
+== Refresh the meter
+
+Stripe redirects the host back to the portal before the webhook finishes processing. After the success redirect, poll your backend until the pool update lands, then tell the embed to reload the balance:
+
+[source,typescript]
+----
+// src/client/after-checkout.ts
+import { HostEvent } from '@thoughtspot/visual-embed-sdk';
+import { spotterEmbed } from './spotter';
+
+export async function refreshAfterCheckout(): Promise<void> {
+  await waitForCredit(); // polls your backend until markCredited has run for this session
+  spotterEmbed.trigger(HostEvent.SpotterRefreshUsageLimit);
+}
+----
+
+++++
+<div class="tutorial-pagination">
+<a class="tutorial-pagination__btn tutorial-pagination__prev" href="{{navprefix}}/tutorials/monetize-spotter/usage-pop-up">&larr; Previous</a>
+<a class="tutorial-pagination__btn tutorial-pagination__next" href="{{navprefix}}/tutorials/monetize-spotter/troubleshooting">Next &rarr;</a>
+</div>
+++++
