@@ -52,7 +52,7 @@ image::./images/shareability_can_share_to.png[Shareability and group membership 
 Within the ThoughtSpot UI, there are buttons or menu items to trigger the sharing workflow for every type of object (link:https://docs.thoughtspot.com/cloud/latest/share-liveboards#share-liveboardpage[Liveboards, target=_blank] or link:https://docs.thoughtspot.com/cloud/latest/share-models[Models, target=_blank] for example).
 
 == Sharing via REST API
-The REST API v2 link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/metadata/share endpoint, target=_blank] is used to programmatically share content, or to remove any access.
+The REST API v2 link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fshare-metadata[/security/metadata/share endpoint, window=_blank] is used to programmatically share content, or to remove any access.
 
 The API request has two components, `metadata_identifiers` and `permissions`:
 
@@ -60,9 +60,14 @@ The API request has two components, `metadata_identifiers` and `permissions`:
 * `permissions` defines the set of users or groups (referred to as *principals*) being shared to, and the `share_mode` being granted.
 * `share_mode` can be either `READ_ONLY`, `MODIFY` (equivalent to `Edit` in the UI), or `NO_ACCESS`.
 
-[source,JSON]
+[source,bash]
 ----
-{
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/security/metadata/share' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
   "metadata_identifiers": [
     "3f5d2d4b-87da-4f59-a144-85d444eada18"
   ],
@@ -75,14 +80,19 @@ The API request has two components, `metadata_identifiers` and `permissions`:
       "share_mode": "MODIFY"
     }
   ]
-}
+}'
 ----
 
 To remove sharing to a user or group, you set their `share_mode` to `NO_ACCESS` in the request to `/security/metadata/share`, which effectively removes any existing `share_mode` granted to that user or group within ThoughtSpot:
 
-[source,JSON]
+[source,bash]
 ----
-{
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/security/metadata/share' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
   "metadata_identifiers": [
     "3f5d2d4b-87da-4f59-a144-85d444eada18"
   ],
@@ -95,7 +105,7 @@ To remove sharing to a user or group, you set their `share_mode` to `NO_ACCESS` 
       "share_mode": "NO_ACCESS"
     }
   ]
-}
+}'
 ----
 
 Requests to the `/fetch-permissions` endpoints will never return any user or group that has been set to `NO_ACCESS`.
@@ -103,15 +113,16 @@ Requests to the `/fetch-permissions` endpoints will never return any user or gro
 [#share-personalized-view]
 === #Sharing a personalized view via REST API#
 
-#To share a personalized Liveboard view with specific users and groups, send a request to `/security/metadata/share` with `metadata_type` set to `PERSONALISED_VIEW` and `share_mode` set to `READ_ONLY`. To unshare a view, set `share_mode` to `NO_ACCESS`.#
+#To share a personalized Liveboard view with specific users and groups, send a request to `/security/metadata/share` with `share_mode` set to `READ_ONLY`. In the `metadata` array, set `type` to `PERSONALISED_VIEW` and specify the view GUID in `identifier`. You can also set `metadata_type` to `PERSONALISED_VIEW` and specify the view GUID in `metadata_identifiers`.#
 
-[source,JSON]
+[source,bash]
 ----
-{
-  "metadata_type": "PERSONALISED_VIEW",
-  "metadata_identifiers": [
-    "2a021a12-1aed-425d-984b-141ee916ce72"
-  ],
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/security/metadata/share' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
   "permissions": [
     {
       "principal": {
@@ -120,47 +131,139 @@ Requests to the `/fetch-permissions` endpoints will never return any user or gro
       },
       "share_mode": "READ_ONLY"
     }
+  ],
+  "emails": null,
+  "message": "Sharing the Q4 regional view with you",
+  "enable_custom_url": false,
+  "notify_on_share": true,
+  "has_lenient_discoverability": false,
+  "metadata": [
+    {
+      "type": "PERSONALISED_VIEW",
+      "identifier": "2a021a12-1aed-425d-984b-141ee916ce72"
+    }
   ]
-}
+}'
+----
+
+#To unshare a view, set `share_mode` to `NO_ACCESS`:#
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/security/metadata/share' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "permissions": [
+    {
+      "principal": {
+        "identifier": "Group A",
+        "type": "USER_GROUP"
+      },
+      "share_mode": "NO_ACCESS"
+    }
+  ],
+  "emails": null,
+  "message": null,
+  "enable_custom_url": false,
+  "notify_on_share": false,
+  "has_lenient_discoverability": false,
+  "metadata": [
+    {
+      "type": "PERSONALISED_VIEW",
+      "identifier": "2a021a12-1aed-425d-984b-141ee916ce72"
+    }
+  ]
+}'
 ----
 
 #The following rules apply when sharing a personalized view:#
 
-* #Only the view author or an administrator can share a view.#
+* #Sharing a view requires the personalized view sharing feature to be enabled on your instance. Unsharing a view with `NO_ACCESS` works even when the feature is turned off.#
+* #Only the view author or an administrator can share or unshare a view.#
 * #Every user and group in the request must already have view access to the underlying Liveboard. If any user or group in the request does not have access to the Liveboard, the entire request fails and the view is not shared with any of the specified principals.#
 * #Recipients receive view-only access and cannot reshare, edit, or delete a shared view.#
 * #`MODIFY` share mode is not supported for personalized views.#
 * #Views created for KPI alerts cannot be shared.#
 * #Sharing a view does not share the underlying Liveboard or its data sources.#
 
-#To check who a personalized view is shared with, send a request to `/security/metadata/fetch-permissions` with `type` set to `PERSONALISED_VIEW`, the view GUID in `identifier`, and `permission_type` set to `DEFINED`. To fetch the personalized view permissions of a specific user or group, use `/security/principals/fetch-permissions` with `type` set to `PERSONALISED_VIEW`.#
+#To check who a personalized view is shared with, send a request to `/security/metadata/fetch-permissions`. In the `metadata` array, set `type` to `PERSONALISED_VIEW` and specify the view GUID in `identifier`. Set `permission_type` to `DEFINED` to list only the users and groups the view is explicitly shared with.#
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/security/metadata/fetch-permissions' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "metadata": [
+    {
+      "type": "PERSONALISED_VIEW",
+      "identifier": "2a021a12-1aed-425d-984b-141ee916ce72"
+    }
+  ],
+  "permission_type": "DEFINED"
+}'
+----
+
+#To fetch the personalized view permissions of a specific user or group, send a request to `/security/principals/fetch-permissions`. Specify the user or group in the `principals` array, and set `type` to `PERSONALISED_VIEW` in the `metadata` array. To get the permissions for a specific view, also specify the view GUID in `identifier`.#
+
+[source,bash]
+----
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/security/principals/fetch-permissions' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
+  "principals": [
+    {
+      "identifier": "Group A",
+      "type": "USER_GROUP"
+    }
+  ],
+  "metadata": [
+    {
+      "type": "PERSONALISED_VIEW"
+    }
+  ]
+}'
+----
 
 #For more information, see link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fshare-metadata[Share Metadata, window=_blank] in the REST API v2.0 Reference.#
 
 == Auditing access control
 Sharing details are not returned via the responses from the `/metadata/search` endpoints. Instead, there are two REST API endpoints under the */security/* for retrieving access control details.
 
-Using the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/metadata/fetch-permissions, target=_blank] endpoint on an object will return the *effective permissions* for all groups and the users within those groups who have access to the object.
+Using the link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Ffetch-permissions-on-metadata[/security/metadata/fetch-permissions, window=_blank] endpoint on an object will return the *effective permissions* for all groups and the users within those groups who have access to the object.
 
 Effective permissions for an object are the full set of groups and users who have access, and what that access level is.
 
-The link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/principals/fetch-permissions endpoint, target=_blank] is used to get the *effective permissions* for a specific user or group. 
+The link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Ffetch-permissions-of-principals[/security/principals/fetch-permissions endpoint, window=_blank] is used to get the *effective permissions* for a specific user or group.
 
 Effective permissions for a user are based on things shared to them individually and their group membership. Group effective permissions should be close to their __defined permissions__ but hierarchical groups are a feature in ThoughtSpot that would lead to more complex scenarios (hierarchical groups are discouraged when doing embedded ThoughtSpot integrations).
 
 
 == Re-assign content author
-The *author* of any object can be re-assigned using the V2.0 link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/metadata/assign, target=_blank] REST API endpoint:
+The *author* of any object can be re-assigned using the V2.0 link:https://developers.thoughtspot.com/docs/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fsecurity%2Fassign-change-author[/security/metadata/assign, window=_blank] REST API endpoint:
 
-[source,JSON]
+[source,bash]
 ----
-{
+curl -X POST \
+  --url 'https://{cluster}/api/rest/2.0/security/metadata/assign' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {token}' \
+  --data-raw '{
   "metadata": [
     {"identifier": "1ef11b25-9a95-4f03-9287-83010374962d"},
     {"identifier": "3f5d2d4b-87da-4f59-a144-85d444eada18"}
   ],
   "user_identifier": "reports_service_account_username"
-}
+}'
 ----
 
 Rather than re-assigning authorship, a designated *service account user* is used often when importing TML objects via REST API into a different Org or ThoughtSpot instance, establishing the user used for the import process as the *author* within that environment.
