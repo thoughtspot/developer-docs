@@ -10,8 +10,26 @@ ThoughtSpot's Spotter agent conversation APIs allow you to create a conversation
 
 For an overview of all Spotter agent APIs and related pages, see xref:spotter-agent-apis.adoc[Spotter agent APIs].
 
-== Create a conversation session with Spotter Agent
+[#_spotter_experience_version]
+== Spotter experience version
+From 26.12.0.cl, the conversation APIs accept an optional `spotter_experience_version` parameter that sets the Spotter experience a conversation runs on. This parameter can be passed in the request body to the `/api/rest/2.0/ai/agent/conversation/create`, `/api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send`, `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream`, and `/api/rest/2.0/ai/agent/conversation/{conversation_identifier}/stop-response` API endpoints.
 
+You must set it as query parameter when sending API requests the `GET /api/rest/2.0/ai/agent/conversations` and `DELETE /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/delete` endpoints. The list endpoint returns only the conversations created on the version you specify.
+
+[width="100%" cols="1,4"]
+[options='header']
+|=====
+|Value|Description
+|`V2`|The new Spotter experience. New Spotter capabilities ship on this version. This version accepts `additional_instructions`. This experience is available only if the *Spotter 3 Liveboard experience* is enabled on your instance.
+|`V1` (default)| The default Spotter conversation experience available. This version uses `conversation_settings`.
+|=====
+
+[IMPORTANT]
+====
+A conversation belongs to the version that created it. Pass the same `spotter_experience_version` value in every later request for that conversation. A request with a different value returns a not found error.
+====
+
+== Create a conversation session with Spotter Agent
 The `/api/rest/2.0/ai/agent/conversation/create` API endpoint creates a new conversation session with Spotter Agent for a specific or multi-data context and returns a conversation ID.
 
 === Request parameters
@@ -41,8 +59,11 @@ To set multi-data context, use `data_source_identifiers`.
 This option is deprecated in 26.5.0.cl. ThoughtSpot recommends using the `DATA_SOURCE` with `data_source_context` and data source IDs instead.
 
 |`analyst_identifier` |__String__. Optional. Unique identifier of a Spotter Analyst to start the conversation from. The conversation uses the Analyst's configuration, including its data sources, agent instructions, and connectors, so `metadata_context` must be omitted. For information about Analyst management endpoints, see xref:spotter-analyst-api.adoc[Spotter Analyst API].
+|`spotter_experience_version` |__String__. Optional. Spotter experience that the conversation runs on, `V1` (default) or `V2`. See xref:spotter-agent-conversation-apis.adoc#_spotter_experience_version[Spotter experience version].
 
-|`conversation_settings` a|__Optional__. Defines additional parameters for the conversation context. You can set any of the following attributes as needed:
+|`additional_instructions` |__String__. Optional. Applies to `V2` Spotter experience only. Guidance that ThoughtSpot appends to the agent instructions for every message in the conversation, for example a persona, an output format, or domain rules. You cannot change the instructions after you create the conversation, and you cannot use this parameter with `analyst_identifier`.
+
+|`conversation_settings` a|__Optional__. Applies to `V1` Spotter experience only. Defines additional parameters for the conversation context. You can set any of the following attributes as needed:
 
 * `enable_contextual_change_analysis` +
 __Boolean__. When enabled, Spotter analyzes how context changes over time, that is, comparing results from different queries. Enabled by default in 26.2.0.cl and later versions.
@@ -112,6 +133,27 @@ curl -X POST \
 }'
 ----
 
+With the new Spotter experience (V2)::
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/create'  \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "metadata_context": {
+    "type": "DATA_SOURCE",
+    "data_source_context": {
+      "data_source_identifier": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    }
+  },
+  "spotter_experience_version": "V2",
+  "additional_instructions": "Answer in a concise, executive-summary style."
+}'
+----
+
 For multi-data source context::
 
 [source,cURL]
@@ -171,7 +213,9 @@ This API operation requires the conversation ID obtained from the conversation c
 |Parameter|Type| Description
 |`conversation_identifier`|Path parameter|__String__. Required. Specify the conversation ID received from the xref:spotter-agent-conversation-apis.adoc#_create_a_conversation_session_with_spotter_agent[POST /api/rest/2.0/ai/agent/conversation/create] API call.
 |`messages`|Form parameter|_Array of strings_. Required. Specify at least one query in natural language. For example, `total sales of jackets last month`.
+|`spotter_experience_version`|Form parameter|__String__. Optional. `V1` (default) or `V2` to specify the Spotter experience version. Pass the value that the conversation was created with.
 |=====
+
 
 
 ////
@@ -186,7 +230,6 @@ __Boolean__. Allows Spotter to use reasoning for deep analysis and precise respo
 ////
 
 === Request and response examples
-
 The following example sends a data comparison query to a conversation session. The conversation ID is specified in the request URL as a path parameter.
 
 [source,cURL]
@@ -202,7 +245,9 @@ curl -X POST \
 }'
 ----
 
-If the request is successful, the API returns an array of objects in the response. The messages in the API response include the following parts:
+The API response depends on the Spotter experience version of the conversation. For API requests with the `V2` as the Spotter experience, the API returns the `conversation_identifier` and an `events` array. The array contains the events that the xref:spotter-agent-streaming-apis.adoc[streaming endpoint] publishes for the turn, collected into one response.
+
+For API requests with `V1` as the Spotter experience, the API returns the messages as shown in the following example.
 
 [source,JSON]
 ----
@@ -251,6 +296,8 @@ If the request is successful, the API returns an array of objects in the respons
   }
 ]
 ----
+
+
 
 The following example sends a follow-up question to the same conversation session.
 
@@ -375,9 +422,9 @@ Use this endpoint when you want to cancel a long-running Spotter response before
 |=====
 |Parameter|Type| Description
 |`conversation_identifier`|Path parameter|__String__. Required. The identifier of the active conversation session. Use the value returned by the xref:spotter-agent-conversation-apis.adoc#_create_a_conversation_session_with_spotter_agent[create conversation] API endpoint.
+|`spotter_experience_version`|Form parameter|__String__. Optional. `V1` (default) or `V2` to specify the Spotter experience. Pass the value that the conversation was created with.
 |=====
-
-This endpoint does not require a request body.
+The request body is optional. For a `V2` conversation, include `spotter_experience_version` in the request body.
 
 === Example request
 
@@ -388,6 +435,20 @@ curl -X POST \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer {AUTH_TOKEN}'
+----
+
+To stop a response to a conversation session in `V2` Spotter experience:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/ai/agent/conversation/{conversation_identifier}/stop-response' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "spotter_experience_version": "V2"
+}'
 ----
 
 === Example response

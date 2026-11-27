@@ -24,7 +24,7 @@ Visual Embed SDK provides a set of attributes and action IDs to control the avai
 Defines a list of actions that are visible to your application users. Use `visibleActions` when you want to show only a small subset of actions in the embedded view.
 
 * `disabledActions` array +
-The actions specified in this array appear unavailable. You can also specify a reason for disabling the actions in the `disabledActionReason` attribute. For example, your application might need a specific privilege to schedule a Liveboard job. In this case, you may want to disable the Liveboard schedule action and display the message "Contact your administrator to enable this feature" on hover.
+The actions specified in this array appear unavailable. You can also specify a reason for disabling the actions in the `disabledActionReason` attribute. The reason can apply to every disabled action, or you can set a different reason for each action. For example, your application might need a specific privilege to schedule a Liveboard job. In this case, you may want to disable the Liveboard schedule action and display the message "Contact your administrator to enable this feature" on hover.
 
 * `hiddenActions` array +
 Hides the actions in the embed view. If your embed requires most of the default actions, and you want to hide only a few, use `hiddenActions`.
@@ -231,12 +231,63 @@ disabledActions: [Action.AddFilter, Action.Present]
 
 === Adding a tooltip to a disabled action
 
-To add a tooltip for a disabled action, specify the message text in the `disabledActionReason` attribute.
+To add a tooltip for a disabled action, specify the message text in the `disabledActionReason` attribute. You can set `disabledActionReason` to one of the following values:
+
+* A string, which shows the same tooltip on every disabled action.
+* A map, which sets a different tooltip for each disabled action.
+
+==== Use the same tooltip for all disabled actions
+
+To show the same tooltip on every disabled action, set `disabledActionReason` to a string:
 
 [source,JavaScript]
 ----
 disabledActionReason: "Contact your administrator to enable this action"
 ----
+
+==== Set a tooltip for each disabled action
+
+To set a different tooltip for each disabled action, set `disabledActionReason` to a map. Each key is an `Action` value, and each value is the tooltip text for that action. To set a fallback tooltip for disabled actions that have no entry of their own, add a `GENERIC_REASON` key.
+
+[source,JavaScript]
+----
+import { Action, LiveboardEmbed } from '@thoughtspot/visual-embed-sdk';
+
+const embed = new LiveboardEmbed('#tsEmbed', {
+    liveboardId: '<%=liveboardGUID%>',
+    disabledActions: [Action.Download, Action.Save, Action.Share],
+    disabledActionReason: {
+        [Action.Download]: 'Downloads require a Pro license',
+        [Action.Save]: 'You have read-only access to this Liveboard',
+        // Optional. Shown on Action.Share, which has no entry of its own.
+        GENERIC_REASON: 'This action is not available for your account',
+    },
+});
+----
+
+`GENERIC_REASON` is a plain string key. The SDK does not export it as a constant, so you don't need to import it.
+
+For each disabled action, the SDK uses the first tooltip it finds in the following order:
+
+. The entry for the action.
+. The entry for the parent action, if the action is grouped under a parent action, such as *Edit*.
+. The `GENERIC_REASON` entry, if it is set.
+
+If none of these entries exist, the disabled action shows no tooltip. This is the same behavior as when `disabledActionReason` is not set.
+
+Note the following behavior:
+
+* Every key is optional, including `GENERIC_REASON`. An empty map has the same effect as not setting `disabledActionReason`.
+* The SDK ignores keys that are not `Action` values or `GENERIC_REASON`, and values that are not strings. It logs a warning in the browser console for each ignored entry, and the embed still loads.
+* The SDK doesn't provide default tooltip text. Your application provides all the text, so you can translate it for your users.
+* To change the map after the embed loads, use `HostEvent.UpdateEmbedParams`.
+* The map form is supported in `AppEmbed`, `LiveboardEmbed`, `SearchEmbed`, `SearchBarEmbed`, `SpotterEmbed`, and `SpotterAgentEmbed`.
+* In TypeScript, the map uses the `DisabledActionReasonMap` type, which you can import from `@thoughtspot/visual-embed-sdk` or `@thoughtspot/visual-embed-sdk/react`.
+
+[IMPORTANT]
+====
+The map form requires Visual Embed SDK 1.54.0 or later and ThoughtSpot Cloud 26.12.0.cl or later. On earlier ThoughtSpot versions, tooltips set in the map form do not show correctly. For example, the tooltip might show `[object Object]`. If your ThoughtSpot instance is on an earlier version, set `disabledActionReason` to a string.
+====
 
 === Visible actions and disabled actions
 

@@ -21,13 +21,12 @@ All style customization API endpoints require administrator or developer privile
 Use the following endpoints to search and update style settings at the cluster or Org scope.
 
 ==== Search style configuration
-To get the current style configuration for the cluster and the active Org send an API request to `POST /api/rest/2.0/customization/styles/search` endpoint.
+To get the current style configuration for the cluster and the active Org send an API request to `POST /api/rest/2.0/customization/styles/search` endpoint. If the app color theme is enabled on your instance, the response also includes `app_color_theme` in each item, alongside `navigation_panel`.
 When called from the Primary Org (Org 0), the response returns one record with `"scope": "CLUSTER"` and one with `"scope": "ORG"`.
 
-==== Update style configuration
-To update the style settings send an API request to `POST /api/rest/2.0/customization/styles/update` endpoint.
 
-Request parameters::
+==== Update style configuration
+To update the style settings send an API request to `POST /api/rest/2.0/customization/styles/update` endpoint with the following parameters.
 
 [cols="2,1,4"]
 |=====
@@ -35,17 +34,18 @@ Request parameters::
 |`scope`|Yes|`CLUSTER` or `ORG`.
 //|`org_identifier`|Conditional|Required when `scope` is `ORG`.
 |`operation`|Yes|`REPLACE` overwrites existing settings. `RESET` reverts specific fields to defaults.
+|`app_color_theme`|No|Application color theme, expressed as a brand color and how it is applied. Set `brand_color` to a six-digit hex string, for example `#2359B6`, and `apply_as_top_nav_color` to `true` to paint the brand color on the top navigation bar. Do not use this parameter if your request has `navigation_panel` attribute defined. This setting is supported only when the app color theme is enabled on your instance.
 |`navigation_panel`|No|Top navigation panel color. Can be `DARK`, `TWO_TONE` or `CUSTOM`. A valid hex value for `base_color` is needed only when `theme` is `CUSTOM`.
-|`chart_color_palette`|No|Array of hex color values for charts. When provided with `REPLACE`, exactly 8 `primary` color entries must be specified in colors. `secondary` color entries, if provided, should be exactly 4 in number for each `primary` color. If `secondary` shades are omitted, the server auto-generates 4 shades from the primary color.
+|`chart_color_palette`|No|Array of hex color values for charts. When provided with `REPLACE`, exactly 8 `primary` color entries must be specified in colors. `secondary` color entries, if provided, should be exactly 4 in number for each `primary` color. If `secondary` shades are omitted, the server automatically generates four shades from the primary color.
 |`embedded_footer_text`|No|Footer text for embedded content.
 |`visualization_fonts`|No|Font assignments for visualization elements. Provide only the areas to update; omitted areas remain unchanged.
 |`default_logo`|No|Binary image file for the square application logo. Accepted formats are PNG, JPG, and JPEG only.
 |`wide_logo`|No|Binary image file for the wide logo (email and PDF exports).
-|`reset_options`|No|Resets specified settings to ThoughtSpot defaults. Used when `operation` is `RESET`.
+|`reset_options`|No|Resets specified settings to ThoughtSpot defaults. Used when `operation` is `RESET`. The `style` array accepts `CHART_COLOR_PALETTE`, `EMBEDDED_FOOTER_TEXT`, `NAV_PANEL_COLOR`, `APP_COLOR_THEME`, `DEFAULT_LOGO`, and `WIDE_LOGO`. The `visualization_areas` array lists the visualization areas whose font assignments revert to the system default.
 |=====
 
-Example API request:: To set a custom navigation panel color at cluster scope
-
+===== Example requests
+To set a custom navigation panel color at cluster scope:
 
 [source,cURL]
 ----
@@ -64,7 +64,7 @@ curl -X POST \
 }
 ----
 
-Example API request:: To update chart color palette for a specific Org (REPLACE)
+To update chart color palette for a specific Org (REPLACE):
 
 [source,cURL]
 ----
@@ -97,23 +97,31 @@ curl -X POST \
     }
 ----
 
-Example API request:: To reset style options at the org level
+To set the app color theme at cluster scope:
 
 [source,cURL]
 ----
 curl -X POST \
   --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/styles/update' \
-  -H 'Authorization: Bearer {access-token}'\
-  -H 'Accept: application/json'\
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-  -F 'scope=ORG' \
-    -F 'operation=RESET' \
-    -F 'reset_options={"style":["CHART_COLOR_PALETTE"],"visualization_areas":["CHART_X_AXIS_LABELS"]}'
-    }
+  -H 'Authorization: Bearer {access-token}' \
+  -F 'scope=CLUSTER' \
+  -F 'operation=REPLACE' \
+  -F 'app_color_theme={"brand_color":"#2359B6","apply_as_top_nav_color":true}'
 ----
 
-API response::
+To reset style options at the Org level:
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/customization/styles/update' \
+  -H 'Authorization: Bearer {access-token}' \
+  -F 'scope=ORG' \
+  -F 'operation=RESET' \
+  -F 'reset_options={"style":["CHART_COLOR_PALETTE"],"visualization_areas":["CHART_X_AXIS_LABELS"]}'
+----
+
+===== API response
 If the API request is successful, ThoughtSpot returns a 200 or 204 success code.
 
 === Custom fonts
