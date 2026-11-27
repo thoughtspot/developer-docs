@@ -4,7 +4,7 @@
 
 :page-title: Connecting MCP Server to MCP clients
 :page-pageid: connect-mcp-server-to-clients
-:page-description: Learn how to connect Claude, ChatGPT, Gemini, and other MCP-aware clients to ThoughtSpot Spotter MCP Server with minimal configuration.
+:page-description: Learn how to connect Claude, ChatGPT, Gemini, Microsoft Copilot, and other MCP-aware clients to ThoughtSpot Spotter MCP Server with minimal configuration.
 
 If your application already has an AI-native experience or supports MCP-aware agents and LLMs, you can integrate ThoughtSpot analytics directly into your app's agentic experience by connecting the ThoughtSpot Spotter MCP Server to your client.
 
@@ -31,6 +31,14 @@ Before you begin, review the following prerequisites:
 * Ensure that your setup has access to a ThoughtSpot application instance with 10.11.0.cl or a later release. For MCP Server with Spotter 3 capabilities, ensure that your ThoughtSpot instance is 26.2.0.cl or later.
 * Ensure that users have the necessary permissions to view data from relevant models and tables in ThoughtSpot. Existing row-level security (RLS) and column-level security (CLS) rules on tables are enforced automatically in data source responses. Creating charts or dashboards from a conversation session requires data download and content creation privileges.
 
+== OAuth client registration
+How the OAuth client is registered depends on the MCP client:
+
+* If the client supports Dynamic Client Registration (DCR), the OAuth client is registered automatically.
+* If the client does not support dynamic registration or requires static client credentials, register an OAuth client manually. Then enter the OAuth client ID and client secret in the client when you add ThoughtSpot as an MCP connector. To register a client, go to link:https://agent.thoughtspot.app/clients[ThoughtSpot MCP OAuth Client Registration, window=_blank]. The generated client details are shown only once and cannot be retrieved later.
+
+When you register the OAuth client, add your ThoughtSpot instance URL in the instance URL field. This ensures that users are not prompted to enter the instance URL during the OAuth flow, and the OAuth redirect returns correctly to your ThoughtSpot environment after login.
+
 == Using ThoughtSpot Spotter with ChatGPT and Claude
 The ThoughtSpot Spotter MCP Server is available directly from the ChatGPT and Claude marketplaces. If you want to use ThoughtSpot Spotter with ChatGPT or Claude, you can install it directly from these marketplaces instead of manually configuring it.
 
@@ -44,8 +52,10 @@ ThoughtSpot Spotter is available as a Connector in Claude's Connectors marketpla
 
 Once installed, you can use ThoughtSpot Spotter to query your ThoughtSpot instance directly within ChatGPT or Claude.
 
-=== Connecting clients that support remote MCP servers
-To connect a client that supports remote MCP servers natively, add the MCP Server endpoint to your client's configuration settings.
+== Connecting clients that support remote MCP servers
+To connect a client that supports remote MCP servers natively, add the Spotter MCP Server endpoint to your client's configuration settings.
+
+Most clients authenticate users through OAuth. This method lets you use your existing IdP or SSO configuration for ThoughtSpot login. When a user connects, the client redirects the user to ThoughtSpot to sign in. After a successful login, the client stores the issued OAuth tokens and includes them with each MCP tool call. The Spotter MCP Server then calls ThoughtSpot on behalf of that user.
 
 For OAuth clients, the following options are available:
 
@@ -58,11 +68,16 @@ This URL resolves to the latest version.
 * `\https://agent.thoughtspot.app/mcp?api-version={YYYY-MM-DD}` +
 If you want to pin a specific version, use this URL format.
 
+* `\https://agent.thoughtspot.app/mcp-latest` +
+This path-based URL always points to the latest version. Use it with clients such as Microsoft Copilot that do not support query parameters in the MCP Server URL. For more information, see <<_connecting_microsoft_copilot,Connecting Microsoft Copilot>>.
 
 [IMPORTANT]
 ====
-The `\https://agent.thoughtspot.app/openai/mcp` is deprecated and not recommended for use in OpenAI integrations.
+The `\https://agent.thoughtspot.app/openai/mcp` URL is deprecated and not recommended for use in OpenAI integrations.
 ====
+
+For more information about how to register a remote MCP Server, see your client's documentation.
+
 ////
 For bearer token clients::
 For clients that require a bearer token for authentication, use the following URL:
@@ -82,10 +97,136 @@ Use the following URL:
 +
 ////
 
-For more information about how to register a remote MCP Server, see your client's documentation.
 
-=== Connecting MCP Server to local MCP clients
-For MCP clients that do not natively support configuring a remote MCP Server URL, you must use the `mcp-remote` component. For desktop clients that rely on local MCP components, ensure that Node.js version 22 or later is installed on your system.
+[#gemini-enterprise]
+== Connecting MCP Server to Gemini Enterprise
+Gemini Enterprise connects to the ThoughtSpot Spotter MCP Server through a custom MCP server data store. Gemini Enterprise doesn't support Dynamic Client Registration (DCR), so you must register a static OAuth client with ThoughtSpot and enter its client ID and secret in the Google Cloud console.
+
+Before you begin, make sure that your ThoughtSpot instance meets the requirements listed in <<_before_you_begin,Before you begin>>. You also need a Gemini Enterprise app and a Google Cloud project that meets Google's requirements for custom MCP server data stores. For more information, see link:https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server[Set up your custom MCP server data store, window=_blank] in the Gemini Enterprise documentation.
+
+=== Registering an OAuth client for Gemini Enterprise
+To register an OAuth client for Gemini:
+
+. Go to link:https://agent.thoughtspot.app/clients[ThoughtSpot MCP OAuth Client Registration, window=_blank].
+. Enter the following values in the registration form:
++
+[cols="1,2", options="header"]
+|===
+|Field |Value
+
+|Redirect URI
+|`\https://vertexaisearch.cloud.google.com/oauth-redirect`
+
+|Token Endpoint Auth Method
+|`client_secret_basic`
+
+|Grant Types
+|`authorization_code`, `refresh_token`
+
+|Response Types
+|`code`
+
+|Scope
+|Leave blank.
+
+|ThoughtSpot Instance URL
+|Optional. If you leave this field blank, users are prompted for their ThoughtSpot instance URL when they authorize the connection.
+|===
+
+. Submit the form.
+. Copy the client ID and client secret, and store them securely.
+
+[IMPORTANT]
+====
+The client details are shown only once and can't be retrieved later. If you lose them, register a new client.
+====
+
+=== Adding the MCP Server to Gemini Enterprise
+Create a custom MCP server data store in your Gemini Enterprise app by following the instructions in link:https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server[Set up your custom MCP server data store, window=_blank]. When you configure the data store, select OAuth 2.0 authentication and enter the following values:
+
+[cols="1,2", options="header"]
+|===
+|Field |Value
+
+|MCP Server URL
+|`\https://agent.thoughtspot.app/mcp?api-version=latest`
+
+|Authorization URL
+|`\https://agent.thoughtspot.app/authorize`
+
+|Token URL
+|`\https://agent.thoughtspot.app/token`
+
+|Client ID
+|The client ID you copied when you registered the OAuth client.
+
+|Client Secret
+|The client secret you copied when you registered the OAuth client.
+|===
+
+When the data store is active, users in your Gemini Enterprise app can authorize the ThoughtSpot connection with their own ThoughtSpot credentials and ask data questions in Gemini. Each user sees only the data that their ThoughtSpot permissions allow.
+
+To verify the connection in Gemini Enterprise:
+
+. Open your Gemini Enterprise app.
+. If prompted, authorize the ThoughtSpot data store and sign in to ThoughtSpot.
+. Ask a question about your data, for example, `What data sources do I have access to in ThoughtSpot?`
+. Verify that Gemini calls the ThoughtSpot tools and returns results from your ThoughtSpot instance.
+
+For connection or authentication errors, see <<_troubleshooting_connection_errors,Troubleshooting connection errors>>.
+
+== Connecting Microsoft Copilot
+You can add the ThoughtSpot Spotter MCP Server as a tool when you create an agent in Microsoft Copilot Studio.
+
+[IMPORTANT]
+====
+Microsoft Copilot does not honor query parameters in the MCP Server URL. Therefore, the `\https://agent.thoughtspot.app/mcp?api-version=latest` URL does not work with Microsoft Copilot. Use `\https://agent.thoughtspot.app/mcp-latest` instead.
+====
+
+=== Registering the OAuth client using dynamic discovery
+To connect Microsoft Copilot to the Spotter MCP Server:
+
+. While creating an agent in Copilot Studio, add a tool and select *Model Context Protocol*.
+. In the *Add a Model Context Protocol server* dialog, enter a server name, a description, and the MCP Server URL:
++
+`\https://agent.thoughtspot.app/mcp-latest`
+. Under *Authentication*, select *OAuth 2.0*. By default, *Type* is set to *Dynamic discovery*. Keep this setting if you want Copilot Studio to discover the MCP Server and connect through OAuth. +
+If you want to pre-populate the ThoughtSpot instance URL when authenticating with the MCP Server, <<_registering_the_oauth_client_manually, register the OAuth client manually>> instead.
+. Click *Create*.
+
+Then, complete the steps in <<_completing_authentication_in_copilot_studio,Completing authentication in Copilot Studio>>.
+
+=== Registering the OAuth client manually
+Copilot Studio does not provide a redirect URI until you save the MCP Server configuration. However, registering an OAuth client in ThoughtSpot requires a redirect URI. To resolve this, register the client with a placeholder redirect URI first, and update it later.
+For general information about registering an OAuth client, see <<_oauth_client_registration,OAuth client registration>>.
+
+. Go to link:https://agent.thoughtspot.app/clients[ThoughtSpot MCP OAuth Client Registration, window=_blank], and register a client with a placeholder redirect URI, for example, `\https://example.com`. Enter your ThoughtSpot instance URL in the registration form.
+. Store the generated client ID and client secret in a safe place. The client details are shown only once and cannot be retrieved later.
+. In the *Add a Model Context Protocol server* dialog in Copilot Studio, set *Authentication* to *OAuth 2.0* and *Type* to *Manual*, and enter the following details:
++
+* *Client ID* and *Client secret*: The values generated during registration.
+* *Authorization URL*: `\https://agent.thoughtspot.app/authorize`
+* *Token URL template*: `\https://agent.thoughtspot.app/token`
+* *Refresh URL*: `\https://agent.thoughtspot.app/token`
+* *Scopes*: Optional.
+. Click *Create*. Copilot Studio generates a redirect URL.
+. On the ThoughtSpot MCP OAuth Client Registration page, use *Update redirect URIs for an existing client* to remove the placeholder redirect URI and add the redirect URL that Copilot Studio generated.
+
+After you update the redirect URI, the ThoughtSpot instance URL you provided during registration is pre-populated when users sign in.
+
+Then, complete the steps in <<_completing_authentication_in_copilot_studio,Completing authentication in Copilot Studio>>.
+
+=== Completing authentication in Copilot Studio
+To complete the OAuth flow:
+
+. Sign in to ThoughtSpot to complete the OAuth flow.
+. When you ask the agent to query ThoughtSpot for the first time, Copilot Studio might prompt you to connect again from the Connection Manager. Click *Connect*.
+. Click *Submit*, and then click *Retry*.
+
+To confirm that the integration works, see <<_verifying_integration,verify your integration>>.
+
+== Connecting MCP Server to local MCP clients
+For MCP clients that do not natively support configuring a remote MCP Server URL, you must use the `mcp-remote` component. For desktop clients that rely on local MCP components, ensure that Node.js version 22 or later is installed on the machine where the client runs.
 
 [source,json]
 ----
@@ -102,23 +243,6 @@ For MCP clients that do not natively support configuring a remote MCP Server URL
 }
 ----
 
-== Authenticating users
-In a plug-and-play integration, the most common way to authenticate users is through OAuth tokens. This method allows you to leverage your existing IdP or SSO configuration for ThoughtSpot login and rely on the platform to initiate a browser-based sign-in flow.
-
-=== OAuth flow
-In a typical OAuth flow:
-
-* The ThoughtSpot Spotter MCP Server is configured as a connector/tool in the MCP client.
-* When the user connects, the client redirects the user to ThoughtSpot to sign in.
-* After successful login, the client stores the issued OAuth tokens and includes them with each MCP tool call to the ThoughtSpot Spotter MCP Server, which then calls ThoughtSpot on behalf of that user.
-
-=== OAuth client registration
-OAuth clients can be registered in one of the following ways:
-
-* For MCP hosts that support Dynamic Client Registration (DCR), the OAuth client is registered automatically.
-* For MCP hosts that do not support dynamic registration or that require static client credentials, you must manually register an OAuth client, obtain the OAuth client ID and OAuth client secret, and then configure these in the MCP host when adding ThoughtSpot as an MCP connector. The generated client details are only shown once and cannot be retrieved later.
-+
-To register a client, visit link:https://agent.thoughtspot.app/clients[ThoughtSpot MCP OAuth Client Registration, window=_blank]. When registering the OAuth client, add your ThoughtSpot instance URL to the appropriate field. This ensures that users are not prompted to enter the instance URL during the OAuth flow, and the OAuth redirect returns correctly to your ThoughtSpot environment after login.
 
 == Verifying integration
 After the MCP Server is connected, some clients show *ThoughtSpot Data Sources* under a *Resources* or *Datasets* section.
@@ -129,58 +253,7 @@ To verify the integration:
 . Verify that MCP tools are being called to generate responses. See the xref:mcp-tool-reference-guide.adoc[MCP tool reference guide] for information about tool calls.
 . Try the dashboard creation request and verify whether a Liveboard is added to your ThoughtSpot application.
 
-== Using the ThoughtSpot skill with skill-aware clients
-Some LLM clients such as Claude support skills. Skills are packaged sets of instructions and best practices that an agent can load on demand to perform specific tasks more reliably.
-Alongside the ThoughtSpot Spotter MCP Server, ThoughtSpot provides a companion skill that helps skill-aware clients use the MCP tools more effectively, such as routing questions intelligently, streaming its thinking as it works, and surfacing ThoughtSpot's own visualizations instead of generating new charts.
-
-[NOTE]
-====
-The skill is installed separately from the connector. Connecting the ThoughtSpot Spotter connector (or configuring the MCP Server) gives your client access to the available tools. Installing the skill doesn't provide the tools themselves; instead, it helps the client understand when and how to orchestrate those tools effectively. You can use the MCP Server without the skill, but clients that support skills generally produce better results when both the connector and the skill are installed.
-====
-
-=== Before you begin
-
-* Connect the ThoughtSpot Spotter MCP Server to your client.
-See xref:mcp-server-client-connection.adoc#_using_thoughtspot_spotter_with_chatgpt_and_claude[Using ThoughtSpot Spotter with ChatGPT and Claude] and the connection sections above.
-* Confirm your client supports skills.
-Clients without skill support can still use the MCP Server directly; the skill is an enhancement, not a requirement.
-
-=== Adding the skill
-
-. Get the ThoughtSpot skill (`analyzing-data-with-thoughtspot`) from the link:https://github.com/thoughtspot/mcp-server/tree/main/skills[ThoughtSpot MCP Server repository, window=_blank].
-. Add the skill in your client, following the client's documentation for installing and enabling skills.
-. Confirm the skill is enabled and loaded in your client.
-
-=== Verifying the skill
-
-. Start a chat session with the agent and ask a data question.
-. Verify that the ThoughtSpot MCP tools are being called to generate the response.
-See the xref:mcp-tool-reference-guide.adoc[MCP tool reference guide] for information about tool calls.
-. Confirm the skill is influencing behavior. For example, more accurate data-context selection, cleaner chart generation, and successful Liveboard creation from the conversation.
-
-[NOTE]
-====
-Skill availability and installation steps may vary by client. Refer to your client's documentation for instructions on adding and managing skills.
-====
-
-
-== Switching between Orgs
-If the user has access to multiple ThoughtSpot Orgs, the ThoughtSpot Spotter MCP Server defaults to the last Org the user was logged into.
-
-To switch Orgs mid-session without re-authentication, use the `list_orgs` and `switch_org` MCP tools:
-
-. Call `list_orgs` to retrieve the Orgs your account can access, along with each Org's ID and display name.
-. Call `switch_org` with the `org_id` of the Org you want to switch to.
-The MCP Server switches your active Org immediately. Any subsequent tool calls in the session run in the context of the new Org.
-
-For more information, see xref:mcp-tool-reference-spotter3.adoc#list_orgs[list_orgs] and xref:mcp-tool-reference-spotter3.adoc#switch_org[switch_org].
-
-[NOTE]
-====
-`list_orgs` and `switch_org` are available on OAuth-authenticated connections on Org-enabled ThoughtSpot instances only.
-====
-
-== Troubleshooting errors
+== Troubleshooting connection errors
 
 MCP Server is not connected::
 
@@ -195,6 +268,35 @@ If user authentication fails, or if the server returns HTTP 500, 401, or 403 sta
 * Check whether the user session has expired. Log in to your ThoughtSpot application to start a new session.
 * Verify whether the user has the necessary privileges to view data or create content.
 
+== Using the ThoughtSpot skill with skill-aware clients
+Some LLM clients, such as Claude, support skills. A skill is a packaged set of instructions that an agent loads on demand to perform a task more reliably. ThoughtSpot provides a companion skill, `analyzing-data-with-thoughtspot`, that helps skill-aware clients use the MCP tools more effectively. For example, it routes questions intelligently, shows progress while the agent works, and surfaces ThoughtSpot's own visualizations instead of generating new charts.
+
+The skill is optional and is installed separately from the connector. Connecting the ThoughtSpot Spotter connector (or configuring the MCP Server) gives your client access to the available tools. Installing the skill doesn't provide the tools themselves; instead, it helps the client understand when and how to orchestrate those tools effectively. You can use the MCP Server without the skill, but clients that support skills generally produce better results when both the connector and the skill are installed.
+
+=== Adding the skill
+To add the skill:
+
+. Get the ThoughtSpot skill (`analyzing-data-with-thoughtspot`) from the link:https://github.com/thoughtspot/mcp-server/tree/main/skills[ThoughtSpot MCP Server repository, window=_blank].
+. Add the skill in your client, following the client's documentation for installing and enabling skills.
+
+=== Verifying the skill
+To verify the skill, start a chat session and ask a data question. Check that the ThoughtSpot MCP tools are called to generate the response. For information about tool calls, see the xref:mcp-tool-reference-guide.adoc[MCP tool reference guide].
+
+== Switching between Orgs
+If the user has access to multiple ThoughtSpot Orgs, the ThoughtSpot Spotter MCP Server defaults to the last Org the user was logged into.
+
+To switch Orgs mid-session without re-authentication, use the `list_orgs` and `switch_org` MCP tools:
+
+. Call `list_orgs` to retrieve the Orgs your account can access, along with each Org's ID and display name.
+. Call `switch_org` with the `org_id` of the Org you want to switch to.
+The MCP Server switches your active Org immediately. Any subsequent tool calls in the session run in the context of the new Org.
+
+For more information, see xref:mcp-tool-reference-spotter3.adoc#list_orgs[list_orgs] and xref:mcp-tool-reference-spotter3.adoc#switch_org[switch_org].
+
+[NOTE]
+====
+The `list_orgs` and `switch_org` tools are available on OAuth-authenticated connections on Org-enabled ThoughtSpot instances only.
+====
 
 == Additional resources
 * For information about the MCP Server features and architecture, see xref:mcp-integration.adoc[MCP Server integration].
