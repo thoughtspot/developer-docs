@@ -8,6 +8,125 @@
 
 This changelog lists the features and enhancements introduced in REST API v2.0. For information about new features and enhancements available for embedded analytics, see xref:whats-new.adoc[What's New].
 
+////
+== Version 27.1.0.cl, January 2027
+
+=== Spotter API endpoints deprecated
+The following endpoints are [.version-badge.deprecated]#Deprecated#. They continue to work until the end of support in July 2027.
+
+* `GET /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/answers/{answer_identifier}/details`
+* `GET /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-share-info`
+* `GET /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/get-shared-content`
+* `GET /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/messages`
+* `POST /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/update`
+* `POST /api/rest/2.0/ai/conversation/create`
+* `POST /api/rest/2.0/ai/conversation/{conversation_identifier}/converse`
+* `POST /api/rest/2.0/ai/answer/create`
+* `POST /api/rest/2.0/ai/data-source-suggestions`
+* `POST /api/rest/2.0/ai/relevant-questions/`
+
+For the replacement for each endpoint, see xref:deprecated-features.adoc#spotterApiEndpoints[Spotter REST API endpoints deprecation].
+////
+
+== Version 26.12.0.cl, December 2026
+
+=== Spotter agent conversation APIs: new Spotter experience version
+The Spotter agent conversation APIs accept a new optional `spotter_experience_version` parameter.
+
+* `V1` (default) +
+For the Spotter conversation API experinece available before 26.12.0.cl. ThoughtSpot uses this value if you omit the parameter. It uses `conversation_settings`.
+* `V2` +
+For the new Spotter experience, the same experience that powers the Liveboard side panel (New). A cluster administrator must set *Spotter 3 Liveboard experience* to *Liveboard side panel (New)*. Otherwise, the request returns a `400` error.
+
+The parameter is a request body property on the following endpoints:
+
+* `POST /api/rest/2.0/ai/agent/conversation/create`
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send`
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/send/stream`
+* `POST /api/rest/2.0/ai/agent/conversation/{conversation_identifier}/stop-response`
+
+The version indicator is a query parameter on the following endpoints:
+
+* `GET /api/rest/2.0/ai/agent/conversations`
+* `DELETE /api/rest/2.0/ai/agent/conversations/{conversation_identifier}/delete`
+
+Other changes:
+
+* The `create` endpoint accepts the optional `additional_instructions` property, which adds guidance to the agent instructions for every message in the conversation. It applies to V2 only, cannot be used with `analyst_identifier`, and cannot be changed after you create the conversation.
+* The `conversation_settings` property is now optional and applies to V1 only.
+* The `stop-response` endpoint now accepts an optional request body.
+* The `send/stream` response differs by version. V1 returns `success` and `message`. V2 streams the `event`, `tool_call`, `progress`, `tool_result`, `error`, and `done` events. Make sure your client handles the response shape of the version you use.
+
+For more information, see xref:spotter-agent-conversation-apis.adoc[Spotter agent conversation APIs].
+
+=== Session login redirect options
+The `POST /api/rest/2.0/auth/session/login` endpoint accepts the following optional request properties:
+
+* `redirect_url` +
+The URL to redirect the user to after login. The value must start with a single `/`. ThoughtSpot rejects absolute URLs. If you omit this property, the API does not redirect to the specified URL.
+* `no_url_redirection` +
+Controls whether the API redirects the user. When set to `true`, ThoughtSpot returns the resolved URL in the `Location` header of the `204` response, instead of returning a `302` response. This property applies only when `redirect_url` is set. If you set `redirect_url` without `no_url_redirection`, a successful login returns a `302` response with the resolved URL in the `Location` header.
+
+=== Org identifier in authentication token endpoints
+The `POST /api/rest/2.0/auth/token/full` endpoint now accept the optional `org_identifier` request property. The `org_id` parameter in the earlier version is deprecated.
+
+=== Custom action endpoints deprecated
+The following endpoints are [.version-badge.deprecated]#Deprecated#. They continue to work until they are removed in June 2027.
+
+* `POST /api/rest/2.0/customization/custom-actions`
+* `POST /api/rest/2.0/customization/custom-actions/search`
+* `POST /api/rest/2.0/customization/custom-actions/{custom_action_identifier}/update`
+* `POST /api/rest/2.0/customization/custom-actions/{custom_action_identifier}/delete`
+
+For more information, see xref:deprecated-features.adoc#customActions[Custom actions deprecation].
+
+=== App color theme in style customization
+The style customization APIs support the app color theme, which sets a brand color for the application and how it is applied.
+
+* The `POST /api/rest/2.0/customization/styles/update` request accepts the optional `app_color_theme` object, with `brand_color` (a six-digit hex string) and `apply_as_top_nav_color` Boolean attribute. Do not send `app_color_theme` and `navigation_panel` in the same request. The `style` array in `reset_options` accepts the `APP_COLOR_THEME` value, which clears the brand color.
+* The `POST /api/rest/2.0/customization/styles/search` response includes `app_color_theme` in each item when the app color theme is enabled on your instance.
+
+=== Version control APIs [beta betaBackground]^Beta^
+ThoughtSpot introduces the following Version Control V2 REST API v2.0 endpoints. These endpoints let Org administrators link an Org to a branch in a GitHub, GitLab, Bitbucket, or Azure DevOps repository, commit Liveboards and Answers as TML files, promote changes between branches, and deploy content to Orgs. The existing `/api/rest/2.0/vcs/git/` endpoints are not affected.
+
+* `POST /api/rest/2.0/version-control/config/create` +
+Links the caller's Org to a Git repository and branch.
+* `POST /api/rest/2.0/version-control/config/update` +
+Updates the caller's Org configuration.
+* `POST /api/rest/2.0/version-control/config/search` +
+Returns the caller's Org configuration.
+* `POST /api/rest/2.0/version-control/config/delete` +
+Deletes the caller's Org configuration and its stored credential.
+* `POST /api/rest/2.0/version-control/commit` +
+Exports the selected objects as TML files and commits them to the Org's branch.
+* `POST /api/rest/2.0/version-control/commit/restore` +
+Restores the Org's branch and the Org to an earlier revision.
+* `POST /api/rest/2.0/version-control/deploy` +
+Applies a revision of the Org's branch to the Org.
+* `POST /api/rest/2.0/version-control/branch/promote` +
+Brings changes from a source branch into the caller's branch.
+* `POST /api/rest/2.0/version-control/runs/search` +
+Returns the status and per-object results of commit, deploy, and restore runs.
+
+For more information, see xref:version-control-v2-api.adoc[Version Control V2 APIs].
+
+=== Terminology update for feature management APIs
+The xref:feature-management-api.adoc[feature management APIs] are now grouped as feature delegation APIs in the REST API playground. This update does not introduce any changes to endpoint URLs, API request or response format.
+
+=== JSON response fields documented in the Playground
+The REST API Playground now describes the structure of response fields that hold JSON objects. For example, the response of `POST /api/rest/2.0/metadata/search` documents the keys of `metadata_header`, `metadata_detail`, `dependent_objects`, `incomplete_objects`, `visualization_headers`, and `stats`.
+
+If the content of a field depends on the object type, the description of each key lists the `metadata_type` values that return it. The keys are based on sample responses.
+
+The Playground also shows more accurate types for some fields:
+
+* Timestamp fields in milliseconds, such as `creation_time_in_millis`, are shown as integers.
+* Some list fields, such as `incomplete_details` in the user object, are shown as arrays.
+
+In earlier versions, the Playground showed these fields as a generic `object`.
+
+This change is visible only in the Playground and does not affect the API response structure or the REST API SDKs.
+
 == Version 26.11.0.cl, November 2026
 
 === Org-level API rate limiting enforced
@@ -144,8 +263,8 @@ Spotter conversation enhancements::
 
 The `POST /api/rest/2.0/semantic-integrations/create` endpoint accepts the `RDBMS_DATABRICKS` integration type, and the `search` endpoint returns it.
 
-=== Feature Management API
-This release introduces the following new REST API v2.0 endpoints for programmatic feature management.
+=== Feature delegation APIs
+This release introduces the following new REST API v2.0 endpoints for programmatic feature delegation.
 
 * `POST /api/rest/2.0/configurations/features/search` +
 Returns feature configurations grouped by feature group.
@@ -154,7 +273,7 @@ Updates Org assignments for a feature using `ADD`, `REMOVE`, or `REPLACE` operat
 * `POST /api/rest/2.0/configurations/features/values/update` +
 Sets feature value at `CLUSTER` or `ORG` scope.
 
-For more information, see xref:feature-management-api.adoc[Feature Management API].
+For more information, see xref:feature-management-api.adoc[Feature delegation APIs].
 
 === Multi-Org tokens [beta betaBackground]^Beta^
 

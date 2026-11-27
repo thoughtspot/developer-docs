@@ -36,7 +36,7 @@ This privilege grants administration permissions to manage users and groups on i
 * Authentication administration: __Can manage Authentication__
 * Application administration: __Can manage Application settings__
 
-For a complete list of Roles and privileges, see xref:roles.adoc#_role_privileges[Role categories and privileges].
+For a complete list of Roles and privileges, see xref:roles.adoc#_role_categories_and_privileges[Role categories and privileges].
 |====
 
 == Role assignment
@@ -119,6 +119,10 @@ UI: *Has developer privilege*  a| Allows users to access the following features 
 
 |Liveboard job administration|API: `JOBSCHEDULING` +
 UI: *Can schedule for others*  |Allows users to schedule, edit, and delete Liveboard jobs.
+|Liveboard schedule administration|API: `CAN_ADMINISTER_SCHEDULES` +
+UI: *Can administer schedules* |Allows users to administer Liveboard schedules. This is an additive privilege.
+|KPI alert creation|API: `CAN_CREATE_KPI_ALERTS` +
+UI: *Can create KPI alerts* |Allows users to create KPI alerts.
 |ThoughtSpot Sync|API: `SYNCMANAGEMENT` +
 UI: *Can manage sync settings* | Allows setting up secure pipelines to external business apps and sync data using ThoughtSpot Sync.
 |Spotter access|API: `CAN_USE_SPOTTER` +
@@ -139,8 +143,35 @@ UI: *Can manage catalog*| Allows users to create, edit, and manage a link:https:
 |===
 
 === Object access control
-
 The `SHAREWITHALL` (**Can share with all users**) Role privilege allows users to share objects with all the users and groups in ThoughtSpot.
+
+The following privileges control whether users can create Answers and Liveboards, and analyze data. They are restrictive privileges. A user without a privilege cannot perform the task, even if the user has access to the object.
+
+[width="100%" cols="2,4,4"]
+[options='header']
+|===
+|Role type|Privilege|Description
+|Create Answers|API: `CAN_CREATE_ANSWERS` +
+UI: *Can create Answers* |Allows users to create and save Answers, and to edit, import, delete, and export Answer TML.
+|Create Liveboards|API: `CAN_CREATE_LIVEBOARD` +
+UI: *Can create Liveboards* |Allows users to create Liveboards, pin to Liveboards, edit, import, delete, and export Liveboard TML, share Personalized Views, and use Collections. A user who has this privilege must also have `CAN_CREATE_ANSWERS`.
+|Analyze data|API: `CAN_ANALYZE_DATA` +
+UI: *Can analyze data* |Allows users to analyze data, for example by using the *Analyze* action on a KPI.
+|===
+
+[IMPORTANT]
+====
+* Before these privileges existed, every user could create Answers and Liveboards, and analyze data. To keep existing access unchanged, ThoughtSpot assigns the privileges automatically. For more information, see xref:roles.adoc#default-object-privileges[Default object privileges Role and group].
+* Users with the `ADMINISTRATION` privilege are not restricted by these privileges.
+* If you assign `CAN_CREATE_LIVEBOARD` without `CAN_CREATE_ANSWERS`, the API request returns a `403` error and the UI shows a message.
+====
+
+A user who does not have these privileges sees the following changes in the UI:
+
+* *Liveboard*: The *Edit*, *Rename*, *Copy*, *Delete*, and *Request verification* options on the more options menu, the *Pin* action, and the *Create Liveboard* entry point do not appear.
+* *Answer*: The *Save*, *Delete*, *Copy*, and *Rename* options do not appear. The search bar in an existing Answer is disabled, not hidden.
+* *Search*: *New search* does not appear.
+* *Analysis actions*: *Show underlying data*, *Drill down*, *Change analysis*, *AI Highlights*, *Explore*, and *Copy link* do not appear.
 
 === Data control
 The data control privileges include the following:
@@ -166,16 +197,11 @@ UI: *Can create/edit Connections*| Allows creating, editing, and managing link:h
 UI: *Can manage data models* |Allows users to create, edit, delete, and manage Models, Tables, and Views.
 |Custom variables| API: `CAN_MANAGE_VARIABLES` +
 UI: *Can manage variables* | Allows users to manage formula Variables in the current Org scope.
-// SOURCE: SCAL-301436; SCAL-305010; PrivilegeTypeEnum.java (dev/scaligent)
-// Available from: ThoughtSpot Cloud 26.6.0.cl
 |Manage input tables| API: `CAN_MANAGE_INPUT_TABLES` +
 UI: *Can manage input tables* | Allows users to create, delete, and upload data to input tables. Applicable only on ThoughtSpot Cloud (SaaS) instances.
-// SOURCE: SCAL-305010; PrivilegeTypeEnum.java (dev/scaligent)
-// Available from: ThoughtSpot Cloud 26.10.0.cl
 |Edit input tables| API: `CAN_EDIT_INPUT_TABLES` +
 UI: *Can edit input tables* | Allows users to update values in existing input tables. Does not grant permission to create or delete input tables. Applicable only on ThoughtSpot Cloud (SaaS) instances.
 |===
-
 
 === Data download control
 If RBAC is enabled on your instance, the granular download privileges replace the single `DATADOWNLOADING` privilege.
@@ -237,6 +263,38 @@ To filter group objects assigned to a particular Role, specify the name or GUID 
 * link:{{navprefix}}/restV2-playground?apiResourceId=http%2Fapi-endpoints%2Fusers%2Fsearch-users[`POST /api/rest/2.0/users/search`] +
 To get user objects that have a particular Role assigned, specify the name or GUID of the Role in the `role_identifiers` attribute.
 |===
+
+[#default-object-privileges]
+== Default object privileges Role and group
+Before these privileges existed, every user could create Answers, create Liveboards, and analyze data. To keep the access of existing users unchanged, turning on the privileges does the following in each Org:
+
+* Creates a read-only Role named *Default object privileges* that contains the three privileges. Admins cannot edit or delete it.
+* Assigns the Role to every existing local group, except the system groups *All* and *System*.
+* Creates a group named *Default object privileges group* that carries the Role. The group holds the users who were not in any local group, and ThoughtSpot adds every user created afterward to it automatically.
+
+=== Keep the Role when you update group Roles
+If an integration or deployment pipeline sets the Roles of a group, it must keep the *Default object privileges* Role. Otherwise, the update removes the Role, and the users in the group lose the three privileges. This happens when:
+
+* A `POST /api/rest/2.0/groups/{group_identifier}/update` request sends `role_identifiers` with the `REPLACE` operation, which is the default, and the list does not include the Role.
+* A group TML import lists the Roles of the group without this Role.
+
+Adding the Role again in the Admin UI does not last, because the next sync removes it. To avoid the problem, use one of the following options:
+
+* Use the `ADD` or `REMOVE` operation for group Role updates. ThoughtSpot leaves the Roles that the request does not mention unchanged. Use this option if the same integration also runs against clusters on earlier versions, where the Role does not exist and a request that names it fails.
+* Include `Default object privileges` in `role_identifiers` and in the group TML.
+
+[source,cURL]
+----
+curl -X POST \
+  --url 'https://{ThoughtSpot-Host}/api/rest/2.0/groups/{group_identifier}/update' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer {AUTH_TOKEN}' \
+  --data-raw '{
+  "operation": "ADD",
+  "role_identifiers": ["{role-name-or-GUID}"]
+}'
+----
 
 == Migrating to RBAC
 The Role privileges function in the same way as group privileges. When RBAC is enabled, the corresponding group privileges are automatically migrated to Role privileges.

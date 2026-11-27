@@ -33,7 +33,8 @@ ThoughtSpot does not recommend TML export and import from a *newer version* of T
 
 A single branch in Git can be used for version control of a single Org in ThoughtSpot.
 
-ThoughtSpot provides a GitHub-based link:https://docs.thoughtspot.com/cloud/10.15.0.cl/git-version-control[automated version control in the UI] for Liveboards and answers or a customized process can be built using the TML Export API to any Git provider.
+ThoughtSpot provides a GitHub-based link:https://docs.thoughtspot.com/cloud/latest/git-version-control[automated version control in the UI, window=_blank] for Liveboards and Answers. For version control through the REST API, you can use the xref:version-control-v2-api.adoc[Version Control V2 APIs] [beta betaBackground]^Beta^ or the legacy xref:version_control.adoc[Git integration APIs], or build a customized process with the TML Export API and any Git provider. To compare these options, see xref:development-and-deployment.adoc#choose-a-deployment-approach[Choose a deployment approach].
+// TODO: verify with engineering — does UI version control use the legacy /vcs/git/ configuration? If so, enabling it on an Org blocks a Version Control V2 configuration on that Org.
 
 It is best to use separate branches or even repositories for the UI automated version control and direct REST API processes.
 
@@ -76,6 +77,67 @@ image::./images/single_tenant_publishing.png[Publishing to Single-Tenants]
 If there are structural differences within the various databases that make Publishing unviable, the TML Import process can be used to deploy unique copies of the release TML into each Org. This process may also include modifying the release TML to introduce variation into the objects that are deployed.
 
 image::./images/single_tenant_deployment.png[Individual Deployment to Single-Tenants]
+
+[#choose-a-deployment-approach]
+== Choose a deployment approach
+
+ThoughtSpot provides several ways to version content in Git and move it between Orgs. In each approach, an *environment* is one ThoughtSpot Org paired with one Git branch, and content moves from the dev Org to the prod Org as TML files. The approaches differ in who runs the Git operations and how objects are matched across Orgs.
+
+// SOURCE: version_control.adoc, git-configuration.adoc, git-provider-integration.adoc, version-control-v2-api.adoc
+[cols="2,3,3,3,3", options="header"]
+|===
+| |link:https://docs.thoughtspot.com/cloud/latest/git-version-control[UI version control, window=_blank] |xref:version_control.adoc[Git integration APIs] (legacy) |xref:version-control-v2-api.adoc[Version Control V2 APIs] [beta betaBackground]^Beta^ |xref:git-provider-integration.adoc[TML APIs with a Git provider]
+|Purpose
+|Version history
+|Version history and deployment
+|Version history and deployment
+|Version history and deployment
+|Who runs the Git operations
+|ThoughtSpot
+|ThoughtSpot commits and deploys. You move changes between branches in Git.
+|ThoughtSpot commits, promotes, and deploys.
+|Your scripts, run by your Git provider or CI/CD pipeline
+|Git providers
+|GitHub
+|GitHub and GitHub Enterprise
+|GitHub, GitLab, Bitbucket, and Azure DevOps
+|Any
+|Matching objects across Orgs
+|Not applicable
+|xref:guid-mapping.adoc[GUID mapping files]
+|xref:object-id.adoc[Object ID]
+|xref:object-id.adoc[Object ID] (recommended)
+|Objects
+|Liveboards and Answers
+|All TML object types
+|Liveboards and Answers, committed with the objects they depend on, such as Models and Tables
+|All TML object types
+|Branches per Org
+|Not applicable
+|One or more
+|One
+|Your choice
+|Availability
+|See the product documentation
+|ThoughtSpot Cloud 9.2.0.cl or later +
+ThoughtSpot Software 9.5.0.sw or later
+|ThoughtSpot Cloud 26.12.0.cl or later. REST API only. Turned off by default. No fixed object limit for a deploy in the Beta, but very large deploys can fail.
+|ThoughtSpot Cloud and ThoughtSpot Software
+|===
+
+Use the following guidelines to choose an approach:
+
+* *UI version control*: To keep a version history of Liveboards and Answers without writing code.
+* *Version Control V2 APIs*: The recommended path going forward. Use them to have ThoughtSpot run the full commit, promote, and deploy flow on ThoughtSpot Cloud, with any of the supported Git providers, and match objects by Object ID instead of GUID mapping files. In the Beta release, these APIs cover Liveboards and Answers only and are available through the REST API only. Review the limits on the xref:version-control-v2-api.adoc[Version Control V2 APIs] page before you start.
+* *Git integration APIs (legacy)*: Existing legacy configurations continue to work. Migration guidance will be available when the Version Control V2 APIs become generally available.
+* *TML APIs with a Git provider*: When you need full control of the process, for example, to deploy to ThoughtSpot Software, to commit Models or Tables on their own, to run very large deploys, to xref:modify-tml.adoc[modify TML] for each Org, or to add approvals and tests to your own pipeline.
+
+[IMPORTANT]
+====
+The legacy Git integration APIs and the Version Control V2 APIs cannot be used together on the same Org. An Org that has a legacy Git integration configuration cannot also have a Version Control V2 configuration.
+====
+
+// TODO: verify with engineering — whether Version Control V2 users can merge branches with their own pull requests and then call deploy, instead of promote.
 
 
 

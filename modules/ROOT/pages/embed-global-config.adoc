@@ -1,0 +1,163 @@
+= Global embed configuration
+:toc: true
+:toclevels: 2
+
+:page-title: Global embed configuration
+:page-pageid: embed-global-config
+:page-description: Set options that apply to all embedded ThoughtSpot components on a page, and control how the SDK passes embed configuration to the embedded app.
+
+The global embed configuration is the object that you pass to `init()`. Its options apply to every embedded component on the page, for example authentication, locale, and appearance. Each embedded component also has its own view configuration for settings that apply to that component only.
+
+== Global and view configuration
+For options that you can set in both places, such as `isDarkMode` and `additionalFlags`, the value in the view configuration takes precedence over the value in `init()`. For example, you can set `isDarkMode: true` in `init()` and `isDarkMode: false` in the view configuration of one embed to render that embed in the default appearance.
+
+== How the SDK passes configuration to the embedded app
+The SDK has two ways to pass embed configuration to the embedded ThoughtSpot app:
+
+* *Iframe URL (default)*. The SDK adds the configuration to the iframe URL as query parameters.
+* *postMessage*. The SDK keeps only the parameters that the app needs at startup on the URL, and sends the rest to the app in a `postMessage` when the app loads.
+
+You choose the method with the `excludeConfigFromURL` flag.
+
+== Exclude configuration from the iframe URL
+By default, long configuration can make the iframe URL very long, and the values are visible in the page DOM, browser tools, and proxy logs. The `excludeConfigFromURL` flag moves most of the configuration out of the URL.
+
+[IMPORTANT]
+====
+Pass `excludeConfigFromURL` only through `additionalFlags`. `additionalFlags` is an advanced option, and ThoughtSpot does not publish the full list of the keys that it supports.
+====
+
+=== Enable the flag
+Set the flag in `init()` to apply it to all embeds, or in the view configuration of one embed. The view configuration value takes precedence, so `false` in a view configuration turns the flag off for that embed.
+
+[source,javascript]
+----
+init({
+    thoughtSpotHost: '<ThoughtSpot-host>',
+    authType: AuthType.None,
+    additionalFlags: { excludeConfigFromURL: true },
+});
+
+// Keep the configuration of this embed on the URL
+const liveboardEmbed = new LiveboardEmbed('#tsEmbed', {
+    liveboardId: '<liveboard-guid>',
+    additionalFlags: { excludeConfigFromURL: false },
+});
+----
+
+=== Configuration context with the flag on or off
+
+[width="100%" cols="2,3,3"]
+[options='header']
+|=====
+|Aspect|Flag off (default)|Flag on
+|Where most configuration goes|The SDK adds it to the iframe URL as query parameters.|The SDK sends it to the embedded app in a `postMessage` when the app loads.
+|Parameters on the iframe URL|The full configuration.|Only the parameters in <<_parameters_that_stay_on_the_url,Parameters that stay on the URL>>.
+|URL length|Grows with the configuration and can reach browser or proxy limits.|Stays short.
+|Configuration visible in the iframe URL, browser tools, and proxy logs|Yes.|Only the startup parameters.
+|Flags in `additionalFlags`|Appended to the URL.|Flags that are not startup parameters are sent in the `postMessage`.
+|First render|The app reads the configuration from the URL.|The app receives the configuration before it renders, so the first load does not flash the default layout.
+|=====
+
+NOTE: Regardless of this flag, the map form of `disabledActionReason`, which gives each disabled action its own tooltip, is sent in the `postMessage` because it can be too long for a URL. A string value stays on the URL.
+
+=== Parameters that stay on the URL
+When the flag is on, the SDK keeps the following parameters on the iframe URL, if you set them.
+
+*Embed and host*
+
+[width="100%" cols="2,5"]
+[options='header']
+|=====
+|URL parameter|Purpose
+|`embedApp`|Marks the app as embedded.
+|`hostAppUrl`|The host page URL. The app uses it to validate the origin of the `postMessage`.
+|`sdkVersion`|The SDK version.
+|`isFullAppEmbed`|Marks an `AppEmbed`.
+|`isLiveboardEmbed`|Marks a `LiveboardEmbed`.
+|`isVizEmbed`|Set when a Liveboard embed shows a single visualization (`vizId`).
+|`isSearchEmbed`|Marks a `SearchEmbed` or `SearchBarEmbed`.
+|`isSpotterExperienceEnabled`|Marks a `SpotterEmbed`.
+|`isSpotterAgentEmbed`|Marks a `SpotterAgentEmbed`.
+|=====
+
+*Authentication and Org*
+
+[width="100%" cols="2,5"]
+[options='header']
+|=====
+|URL parameter|Purpose
+|`authType`|The authentication type that you set in `init()`.
+|`autoLogin`|Whether the app signs the user in automatically.
+|`disableLoginRedirect`|Stops the app from redirecting to its login page.
+|`forceSAMLAutoRedirect`|Forces the SAML redirect for embedded SSO.
+|`cookieless`|Set for cookieless trusted authentication.
+|`preAuthCache`|Lets the app use the pre-fetched authentication information.
+|`blockNonEmbedFullAppAccess`|Blocks access to the full app outside the embed.
+|`orgId`|The Org to load. The authentication information depends on it.
+|=====
+
+*Viewport and logging*
+
+[width="100%" cols="2,5"]
+[options='header']
+|=====
+|URL parameter|Purpose
+|`viewPortHeight`|The height of the host window when the iframe loads.
+|`viewPortWidth`|The width of the host window when the iframe loads.
+|`clientLogLevel`|The client log level of the app.
+|`overrideConsoleLogs`|Lets the app override the native console.
+|`additionalPendoKey`|An extra tracking key.
+|=====
+
+*Locale, formats, and appearance*
+
+[width="100%" cols="2,5"]
+[options='header']
+|=====
+|URL parameter|Purpose
+|`locale`|The UI language.
+|`numberFormatLocale`|The locale for number formatting.
+|`dateFormatLocale`|The locale for date formatting.
+|`currencyFormat`|The currency format.
+|`isDarkMode`|Turns on dark mode.
+|`radiantThemeEnabled`|Turns on the theme that dark mode needs.
+|=====
+
+*Links and navigation*
+
+[width="100%" cols="2,5"]
+[options='header']
+|=====
+|URL parameter|Purpose
+|`linkOverride`|Lets the host override links in the app.
+|`enableLinkOverridesV2`|Turns on version 2 of the link overrides.
+|`disableRedirectionLinksInNewTab`|Stops links from opening in a new tab.
+|`overrideHistoryState`|Uses `replaceState` instead of `pushState` for app navigation.
+|`isOnBeforeGetVizDataInterceptEnabled`|Legacy flag for the `onBeforeGetVizData` API intercept.
+|=====
+
+*Search and content*
+
+[width="100%" cols="2,5"]
+[options='header']
+|=====
+|URL parameter|Purpose
+|`dataSources`|The data sources that search opens with.
+|`useLastSelectedSources`|Whether search opens with the last-selected data sources.
+|`searchTokenString`|The initial search query. To keep it off the URL, set `excludeSearchTokenStringFromURL`.
+|`defaultQueryMode`|The query mode that Spotter opens in.
+|`forceTable`|Shows search results as a table.
+|`tag`|The tag that filters the metadata lists in an `AppEmbed`.
+|`overrideStringIDsUrl`|The URL of the custom string IDs file.
+|`iconSprite`|The URL of the custom icon sprite.
+|`exposeTranslationIDs`|Exposes translation IDs in the app.
+|=====
+
+=== Behavior changes with the flag on
+* The iframe URL no longer contains most embed configuration, such as action visibility and Liveboard display options. Scripts, proxies, or monitoring tools that read configuration from the iframe URL stop finding those values. Use the SDK embed configuration as your source for these values.
+* The app receives the configuration before it renders. The first load does not flash the default layout.
+* If you do not set the flag, the SDK behaves as before.
+
+=== Pre-rendered embeds
+For a pre-rendered embed, the SDK sends the configuration when it creates the embed. When you show the pre-rendered embed, the SDK sends the current configuration again, so changes that you made in the meantime take effect.
