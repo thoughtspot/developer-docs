@@ -911,6 +911,14 @@ if (isVersionedIframe) {
                             setLeftNavOpen={setLeftNavOpen}
                             isVersionedIframe={isVersionedIframe}
                         />
+                    ) : isTopNavbar ? (
+                        <SecondaryHeader
+                            activeCategory={activeCategory}
+                            onCategoryChange={setActiveCategory}
+                            location={location}
+                            leftNavOpen={leftNavOpen}
+                            setLeftNavOpen={setLeftNavOpen}
+                        />
                     ) : !isVersionedIframe && !isMaxMobileResolution && (
                         // In-product presentation has no tabs — show just the nav
                         // toggle so the sidebar stays reachable on narrow viewports.

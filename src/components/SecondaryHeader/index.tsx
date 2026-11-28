@@ -194,7 +194,7 @@ const SecondaryHeader = (props: {
             navigate(`?${params.toString()}`);
             return;
         }
-        navigate(landing);
+        navigate(`${landing}${location.search || ''}`);
     };
 
     useEffect(() => {
