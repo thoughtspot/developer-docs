@@ -22,6 +22,7 @@ import Document from '../Document';
 import Search from '../Search';
 import '../../assets/styles/index.scss';
 import '../../assets/styles/radiance-home.css';
+import '../../assets/styles/top-navbar.scss';
 import { getAlgoliaIndex } from '../../configs/algolia-search-config';
 import RenderPlayGround from './playGround/RESTAPI';
 import GraphQLPlayGround from './playGround/GraphQL';
@@ -219,6 +220,10 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
     const isIframeMode =
         typeof window !== 'undefined' &&
         new URLSearchParams(location.search).get('_iframe') === '1';
+
+    const isTopNavbar =
+        !isPublicSiteOpen &&
+        new URLSearchParams(location.search).get('isTopNavbar') === 'true';
 
     // The walkthroughs overview is a card-grid landing page (like home) — no
     // in-page nav to browse, so skip the left sidebar entirely and let the
@@ -628,7 +633,7 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
                 <div className="leftNavContainer">
                     <LeftSidebar
                         backLink={getParentBackButtonLink()}
-                        navTitle={navTitle}
+                        navTitle={isTopNavbar ? docTitle : navTitle}
                         navContent={activeNavContent}
                         docWidth={width}
                         location={location}
@@ -737,7 +742,10 @@ if (isVersionedIframe) {
     };
 
     const getWrapperClassName = () => {
-        return isEmbeddedContext() ? 'embedded-mode' : '';
+        const classNames: string[] = [];
+        if (isEmbeddedContext()) classNames.push('embedded-mode');
+        if (isTopNavbar) classNames.push('top-navbar-mode');
+        return classNames.join(' ');
     };
 
     const getCloudLatestVersion = () => {
