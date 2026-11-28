@@ -221,9 +221,22 @@ const isVersionedIframe = VERSION_DROPDOWN.some(
         typeof window !== 'undefined' &&
         new URLSearchParams(location.search).get('_iframe') === '1';
 
-    const isTopNavbar =
-        !isPublicSiteOpen &&
-        new URLSearchParams(location.search).get('isTopNavbar') === 'true';
+    const [isTopNavbar] = useState<boolean>(() => {
+        if (typeof window === 'undefined' || isPublicSiteOpen) return false;
+        const topNavbarParam = new URLSearchParams(location.search).get(
+            'isTopNavbar',
+        );
+        try {
+            if (topNavbarParam !== null) {
+                const enabled = topNavbarParam === 'true';
+                localStorage.setItem('isTopNavbar', String(enabled));
+                return enabled;
+            }
+            return localStorage.getItem('isTopNavbar') === 'true';
+        } catch (e) {
+            return topNavbarParam === 'true';
+        }
+    });
 
     // The walkthroughs overview is a card-grid landing page (like home) — no
     // in-page nav to browse, so skip the left sidebar entirely and let the
